@@ -84,17 +84,15 @@ const RegistrationPage = () => {
   setMessage('');
   setErrors({});
 
-  try {
-    const { user } = await Auth.signUp({
-      username: formData.email, // Use email as username
-      password: formData.password,
-      attributes: {
-        email: formData.email,
-        given_name: formData.firstName,
-        family_name: formData.lastName,
-        // Remove preferred_username since we're using email as username
-      }
-    });
+ const { user } = await Auth.signUp({
+  username: formData.username, // Use the username field, not email
+  password: formData.password,
+  attributes: {
+    email: formData.email,
+    given_name: formData.firstName,
+    family_name: formData.lastName,
+  }
+});
 
     console.log('Registration successful:', user);
     setMessage('Registration successful! Please check your email for confirmation code.');
@@ -123,7 +121,7 @@ const RegistrationPage = () => {
     setErrors({});
 
     try {
-      await Auth.confirmSignUp(formData.email, confirmationCode.trim());
+      await Auth.confirmSignUp(formData.username, confirmationCode.trim());
       
       // Store user data for dashboard
       const userData = {
