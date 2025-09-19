@@ -3,7 +3,7 @@ import { Auth } from 'aws-amplify';
 import { Eye, EyeOff, User, Mail, Lock, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 
 const RegistrationPage = () => {
-  const [step, setStep] = useState('register');
+  const [step, setStep] = useState('register'); // 'register' or 'confirm'
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -59,31 +59,36 @@ const RegistrationPage = () => {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prevFormData => ({
-      ...prevFormData,
+    setFormData(prev => ({
+      ...prev,
       [name]: value
     }));
     
-    // Clear error for this field
+    // Clear error for this field when user starts typing
     if (errors[name]) {
-      setErrors(prevErrors => ({
-        ...prevErrors,
+      setErrors(prev => ({
+        ...prev,
         [name]: ''
       }));
     }
   };
 
-  const handleRegister = async () => {
+  const handleRegister = async (e) => {
+    e.preventDefault();
+    
     if (!validateForm()) {
       return;
     }
 
     setLoading(true);
     setMessage('');
+    
+    // Clear any previous errors
+    setErrors({});
 
     try {
       const { user } = await Auth.signUp({
-        username: formData.email,
+        username: formData.email, // Using email as username for consistency
         password: formData.password,
         attributes: {
           email: formData.email,
@@ -98,43 +103,74 @@ const RegistrationPage = () => {
       setStep('confirm');
     } catch (error) {
       console.error('Registration error:', error);
-      setErrors({ general: error.message || 'Registration failed. Please try again.' });
+      setErrors(prev => ({ 
+        ...prev, 
+        general: error.message || 'Registration failed. Please try again.' 
+      }));
     } finally {
       setLoading(false);
     }
   };
 
-  const handleConfirmation = async () => {
+  const handleConfirmation = async (e) => {
+    e.preventDefault();
+    
     if (!confirmationCode.trim()) {
-      setErrors({ confirmation: 'Please enter the confirmation code' });
+      setErrors(prev => ({ ...prev, confirmation: 'Please enter the confirmation code' }));
       return;
     }
 
     setLoading(true);
     setMessage('');
+    setErrors({});
 
     try {
       await Auth.confirmSignUp(formData.email, confirmationCode.trim());
+      
+      // Store user data for dashboard
+      const userData = {
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        username: formData.username,
+        email: formData.email
+      };
+      localStorage.setItem('currentUser', JSON.stringify(userData));
+      
       setMessage('Welcome to DahTruth Story Lab! Your writing journey begins now.');
+      
       setTimeout(() => {
         window.location.href = '/dashboard';
       }, 2000);
     } catch (error) {
       console.error('Confirmation error:', error);
-      setErrors({ confirmation: error.message || 'Invalid confirmation code' });
+      setErrors(prev => ({ 
+        ...prev, 
+        confirmation: error.message || 'Invalid confirmation code' 
+      }));
     } finally {
       setLoading(false);
     }
   };
 
   const handleResendCode = async () => {
+    if (!formData.email) {
+      setErrors(prev => ({ ...prev, general: 'Email is required to resend code' }));
+      return;
+    }
+    
     setLoading(true);
+    setMessage('');
+    
     try {
       await Auth.resendSignUp(formData.email);
       setMessage('Confirmation code resent to your email.');
+      setErrors({});
     } catch (error) {
       console.error('Resend error:', error);
-      setErrors({ general: error.message || 'Failed to resend code' });
+      setErrors(prev => ({ 
+        ...prev, 
+        general: error.message || 'Failed to resend code' 
+      }));
     } finally {
       setLoading(false);
     }
@@ -144,9 +180,14 @@ const RegistrationPage = () => {
     window.location.href = '/';
   };
 
+  const handleSignInClick = () => {
+    window.location.href = '/signin';
+  };
+
   if (step === 'confirm') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-indigo-950 flex items-center justify-center p-4 relative overflow-hidden">
+        {/* Animated background */}
         <div className="absolute inset-0 opacity-15">
           <div className="absolute top-20 left-10 w-72 h-72 bg-blue-500 rounded-full mix-blend-multiply filter blur-xl animate-pulse"></div>
           <div className="absolute bottom-20 right-10 w-72 h-72 bg-teal-500 rounded-full mix-blend-multiply filter blur-xl animate-pulse delay-700"></div>
@@ -170,15 +211,19 @@ const RegistrationPage = () => {
             </p>
           </div>
 
-          <div className="space-y-8">
+          <form onSubmit={handleConfirmation} className="space-y-8">
             <div>
               <input
                 type="text"
                 value={confirmationCode}
                 onChange={(e) => setConfirmationCode(e.target.value)}
                 placeholder="Enter confirmation code"
-                className="w-full px-6 py-4 bg-blue-900/30 border border-blue-700/50 rounded-xl text-center text-xl font-mono tracking-widest text-white placeholder-blue-300 focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-all duration-300 backdrop-blur-sm"
+                className="w-full px-6 py-4 bg-blue-900/30 border border-blue-700/50 rounded-xl text-center text-xl font-mono text-white placeholder-blue-300 focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-all duration-300 backdrop-blur-sm"
                 maxLength={6}
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                pattern="\d{6}"
+                required
               />
               {errors.confirmation && (
                 <div className="flex items-center mt-2 text-red-300 text-sm font-serif">
@@ -189,7 +234,7 @@ const RegistrationPage = () => {
             </div>
 
             <button
-              onClick={handleConfirmation}
+              type="submit"
               disabled={loading}
               className="w-full bg-gradient-to-r from-blue-500 to-teal-500 hover:from-blue-400 hover:to-teal-400 text-white py-4 px-6 rounded-xl font-serif font-bold text-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center shadow-xl hover:shadow-2xl hover:scale-105"
             >
@@ -205,14 +250,15 @@ const RegistrationPage = () => {
 
             <div className="text-center">
               <button
+                type="button"
                 onClick={handleResendCode}
-                disabled={loading}
+                disabled={loading || !formData.email}
                 className="text-blue-300 hover:text-blue-100 font-serif text-sm font-medium disabled:opacity-50 transition-colors"
               >
                 Didn't receive the code? Resend
               </button>
             </div>
-          </div>
+          </form>
 
           {message && (
             <div className="mt-6 p-4 bg-green-500/20 border border-green-400/30 rounded-xl flex items-center backdrop-blur-sm">
@@ -229,6 +275,7 @@ const RegistrationPage = () => {
           )}
 
           <button 
+            type="button"
             onClick={() => setStep('register')} 
             className="w-full mt-6 text-blue-300 text-sm hover:text-blue-100 font-serif transition-colors"
           >
@@ -241,6 +288,7 @@ const RegistrationPage = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-indigo-950 flex items-center justify-center p-4 relative overflow-hidden">
+      {/* Animated background */}
       <div className="absolute inset-0 opacity-15">
         <div className="absolute top-20 left-10 w-72 h-72 bg-blue-500 rounded-full mix-blend-multiply filter blur-xl animate-pulse"></div>
         <div className="absolute bottom-20 right-10 w-72 h-72 bg-teal-500 rounded-full mix-blend-multiply filter blur-xl animate-pulse delay-700"></div>
@@ -259,9 +307,8 @@ const RegistrationPage = () => {
           <p className="text-blue-200 font-serif text-lg">Begin your writing journey today</p>
         </div>
 
-        <div className="space-y-6">
+        <form onSubmit={handleRegister} className="space-y-6">
           <div className="grid grid-cols-2 gap-4">
-            {/* First Name */}
             <div className="relative group">
               <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                 <User className="h-5 w-5 text-blue-300 group-focus-within:text-blue-100 transition-colors" />
@@ -277,6 +324,7 @@ const RegistrationPage = () => {
                   focus:ring-2 focus:ring-blue-400 focus:border-blue-400 focus:bg-blue-900/40
                   transition-all duration-300 font-serif
                   ${errors.firstName ? 'border-red-400 focus:ring-red-400' : ''}`}
+                required
               />
               {errors.firstName && (
                 <div className="flex items-center mt-2 text-red-300 text-sm font-serif">
@@ -286,7 +334,6 @@ const RegistrationPage = () => {
               )}
             </div>
 
-            {/* Last Name */}
             <div className="relative group">
               <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                 <User className="h-5 w-5 text-blue-300 group-focus-within:text-blue-100 transition-colors" />
@@ -302,6 +349,7 @@ const RegistrationPage = () => {
                   focus:ring-2 focus:ring-blue-400 focus:border-blue-400 focus:bg-blue-900/40
                   transition-all duration-300 font-serif
                   ${errors.lastName ? 'border-red-400 focus:ring-red-400' : ''}`}
+                required
               />
               {errors.lastName && (
                 <div className="flex items-center mt-2 text-red-300 text-sm font-serif">
@@ -312,7 +360,6 @@ const RegistrationPage = () => {
             </div>
           </div>
 
-          {/* Username */}
           <div className="relative group">
             <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
               <User className="h-5 w-5 text-blue-300 group-focus-within:text-blue-100 transition-colors" />
@@ -328,6 +375,7 @@ const RegistrationPage = () => {
                 focus:ring-2 focus:ring-blue-400 focus:border-blue-400 focus:bg-blue-900/40
                 transition-all duration-300 font-serif
                 ${errors.username ? 'border-red-400 focus:ring-red-400' : ''}`}
+              required
             />
             {errors.username && (
               <div className="flex items-center mt-2 text-red-300 text-sm font-serif">
@@ -337,7 +385,6 @@ const RegistrationPage = () => {
             )}
           </div>
 
-          {/* Email */}
           <div className="relative group">
             <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
               <Mail className="h-5 w-5 text-blue-300 group-focus-within:text-blue-100 transition-colors" />
@@ -353,6 +400,7 @@ const RegistrationPage = () => {
                 focus:ring-2 focus:ring-blue-400 focus:border-blue-400 focus:bg-blue-900/40
                 transition-all duration-300 font-serif
                 ${errors.email ? 'border-red-400 focus:ring-red-400' : ''}`}
+              required
             />
             {errors.email && (
               <div className="flex items-center mt-2 text-red-300 text-sm font-serif">
@@ -362,7 +410,6 @@ const RegistrationPage = () => {
             )}
           </div>
 
-          {/* Password */}
           <div className="relative group">
             <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
               <Lock className="h-5 w-5 text-blue-300 group-focus-within:text-blue-100 transition-colors" />
@@ -378,6 +425,7 @@ const RegistrationPage = () => {
                 focus:ring-2 focus:ring-blue-400 focus:border-blue-400 focus:bg-blue-900/40
                 transition-all duration-300 font-serif
                 ${errors.password ? 'border-red-400 focus:ring-red-400' : ''}`}
+              required
             />
             <button
               type="button"
@@ -394,7 +442,6 @@ const RegistrationPage = () => {
             )}
           </div>
 
-          {/* Confirm Password */}
           <div className="relative group">
             <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
               <Lock className="h-5 w-5 text-blue-300 group-focus-within:text-blue-100 transition-colors" />
@@ -410,6 +457,7 @@ const RegistrationPage = () => {
                 focus:ring-2 focus:ring-blue-400 focus:border-blue-400 focus:bg-blue-900/40
                 transition-all duration-300 font-serif
                 ${errors.confirmPassword ? 'border-red-400 focus:ring-red-400' : ''}`}
+              required
             />
             <button
               type="button"
@@ -431,7 +479,7 @@ const RegistrationPage = () => {
           </div>
 
           <button
-            onClick={handleRegister}
+            type="submit"
             disabled={loading}
             className="w-full bg-gradient-to-r from-blue-500 to-teal-500 hover:from-blue-400 hover:to-teal-400 text-white py-4 px-6 rounded-xl font-serif font-bold text-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center shadow-xl hover:shadow-2xl hover:scale-105"
           >
@@ -444,7 +492,7 @@ const RegistrationPage = () => {
               'Join the Story Lab'
             )}
           </button>
-        </div>
+        </form>
 
         {message && (
           <div className="mt-6 p-4 bg-green-500/20 border border-green-400/30 rounded-xl flex items-center backdrop-blur-sm">
@@ -463,13 +511,18 @@ const RegistrationPage = () => {
         <div className="text-center mt-8">
           <p className="text-blue-200 text-sm font-serif">
             Already have an account?{' '}
-            <button className="text-blue-300 hover:text-blue-100 font-medium transition-colors">
+            <button 
+              type="button"
+              onClick={handleSignInClick}
+              className="text-blue-300 hover:text-blue-100 font-medium transition-colors"
+            >
               Sign in
             </button>
           </p>
         </div>
         
         <button 
+          type="button"
           onClick={handleBackToLanding} 
           className="w-full mt-4 text-blue-300 text-sm hover:text-blue-100 font-serif transition-colors"
         >
