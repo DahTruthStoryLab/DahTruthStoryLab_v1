@@ -177,9 +177,16 @@ const Sidebar = ({ isOpen, onClose, authorName }) => {
 export default function Dashboard() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [greeting, setGreeting] = useState("");
+  const [authorName, setAuthorName] = useState("Author Name");
   
-  // Mock author name - this would come from props or context in real app
-  const authorName = "Author Name"; // Replace with actual user data
+  // Get user data from localStorage
+  useEffect(() => {
+    const userData = localStorage.getItem('currentUser');
+    if (userData) {
+      const user = JSON.parse(userData);
+      setAuthorName(`${user.firstName} ${user.lastName}`);
+    }
+  }, []);
   
   // Set greeting based on time of day
   useEffect(() => {
@@ -350,38 +357,3 @@ export default function Dashboard() {
                     <p className="text-xs text-slate-400 uppercase">Last Week</p>
                   </div>
                   <div>
-                    <p className="text-2xl font-bold text-white">0</p>
-                    <p className="text-xs text-slate-400 uppercase">Average</p>
-                  </div>
-                </div>
-              </CardBody>
-            </Card>
-
-            {/* Recent Chapters */}
-            <Card>
-              <CardBody>
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-xl font-bold">Recent Chapters</h2>
-                  <ChevronRight size={20} className="text-slate-400" />
-                </div>
-                
-                <div className="space-y-4">
-                  {recentChapters.map((chapter) => (
-                    <div key={chapter.id} className="flex items-start gap-3 p-3 rounded-lg hover:bg-slate-800/30 transition-colors cursor-pointer">
-                      <div className="w-2 h-2 rounded-full bg-indigo-400 mt-2 flex-shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-medium text-white text-sm truncate">{chapter.title}</h3>
-                        <p className="text-xs text-slate-400 mt-1">{chapter.words} words • {chapter.time}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardBody>
-            </Card>
-            
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
