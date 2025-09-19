@@ -1,12 +1,11 @@
-// amplify-config.ts (or wherever you init Amplify – runs once at app start)
+// amplify-config.js
 import { Amplify } from 'aws-amplify';
-import awsExports from './aws-exports';
 
-Amplify.configure(awsExports); // base config
-
-// Override just the client id with your PUBLIC (no secret) client id
 Amplify.configure({
   Auth: {
-    userPoolWebClientId: '5scd368qedv001d8n687l3lbf2', // <- your no-secret client id
+    region: 'YOUR_POOL_REGION',            // e.g., us-east-2 (Ohio) — confirm on the pool Overview page
+    userPoolId: 'YOUR_USER_POOL_ID',       // e.g., us-east-2_XXXXXXX
+    userPoolWebClientId: '5scd368qedv001d8n687l3lbf2', // <- the ID from your screenshot
+    mandatorySignIn: false,
   },
 });
