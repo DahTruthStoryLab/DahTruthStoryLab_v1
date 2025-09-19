@@ -1,48 +1,9 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import { Auth } from 'aws-amplify';
 import { Eye, EyeOff, User, Mail, Lock, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 
-// Move InputField outside of component to prevent recreation
-const InputField = ({ type, name, placeholder, value, icon: Icon, showToggle = false, showValue = false, onChange, errors, onToggleShow }) => (
-  <div className="relative group">
-    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-      <Icon className="h-5 w-5 text-blue-300 group-focus-within:text-blue-100 transition-colors" />
-    </div>
-    <input
-      type={showToggle ? (showValue ? 'text' : 'password') : type}
-      name={name}
-      value={value}
-      onChange={onChange}
-      placeholder={placeholder}
-      className={`w-full pl-12 pr-12 py-4 bg-blue-900/30 border border-blue-700/50 rounded-xl 
-        text-white placeholder-blue-300 backdrop-blur-sm
-        focus:ring-2 focus:ring-blue-400 focus:border-blue-400 focus:bg-blue-900/40
-        transition-all duration-300 font-serif
-        ${errors[name] ? 'border-red-400 focus:ring-red-400' : ''}`}
-    />
-    {showToggle && (
-      <button
-        type="button"
-        className="absolute inset-y-0 right-0 pr-4 flex items-center text-blue-300 hover:text-blue-100 transition-colors"
-        onClick={() => onToggleShow(name)}
-      >
-        {showValue ? 
-          <EyeOff className="h-5 w-5" /> : 
-          <Eye className="h-5 w-5" />
-        }
-      </button>
-    )}
-    {errors[name] && (
-      <div className="flex items-center mt-2 text-red-300 text-sm font-serif">
-        <XCircle className="h-4 w-4 mr-1" />
-        {errors[name]}
-      </div>
-    )}
-  </div>
-);
-
 const RegistrationPage = () => {
-  const [step, setStep] = useState('register'); // 'register' or 'confirm'
+  const [step, setStep] = useState('register');
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -96,33 +57,21 @@ const RegistrationPage = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  // Use useCallback to prevent function recreation
-  const handleInputChange = useCallback((e) => {
+  const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
+    setFormData(prevFormData => ({
+      ...prevFormData,
       [name]: value
     }));
     
-    setErrors(prev => {
-      if (prev[name]) {
-        return {
-          ...prev,
-          [name]: ''
-        };
-      }
-      return prev;
-    });
-  }, []);
-
-  // Handle password visibility toggle
-  const handleToggleShow = useCallback((name) => {
-    if (name === 'password') {
-      setShowPassword(prev => !prev);
-    } else if (name === 'confirmPassword') {
-      setShowConfirmPassword(prev => !prev);
+    // Clear error for this field
+    if (errors[name]) {
+      setErrors(prevErrors => ({
+        ...prevErrors,
+        [name]: ''
+      }));
     }
-  }, []);
+  };
 
   const handleRegister = async () => {
     if (!validateForm()) {
@@ -167,9 +116,8 @@ const RegistrationPage = () => {
     try {
       await Auth.confirmSignUp(formData.email, confirmationCode.trim());
       setMessage('Welcome to DahTruth Story Lab! Your writing journey begins now.');
-      // Redirect to dashboard or login
       setTimeout(() => {
-        window.location.href = '/dashboard'; // or wherever you want them to go
+        window.location.href = '/dashboard';
       }, 2000);
     } catch (error) {
       console.error('Confirmation error:', error);
@@ -199,7 +147,6 @@ const RegistrationPage = () => {
   if (step === 'confirm') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-indigo-950 flex items-center justify-center p-4 relative overflow-hidden">
-        {/* Animated background */}
         <div className="absolute inset-0 opacity-15">
           <div className="absolute top-20 left-10 w-72 h-72 bg-blue-500 rounded-full mix-blend-multiply filter blur-xl animate-pulse"></div>
           <div className="absolute bottom-20 right-10 w-72 h-72 bg-teal-500 rounded-full mix-blend-multiply filter blur-xl animate-pulse delay-700"></div>
@@ -294,7 +241,6 @@ const RegistrationPage = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-indigo-950 flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Animated background */}
       <div className="absolute inset-0 opacity-15">
         <div className="absolute top-20 left-10 w-72 h-72 bg-blue-500 rounded-full mix-blend-multiply filter blur-xl animate-pulse"></div>
         <div className="absolute bottom-20 right-10 w-72 h-72 bg-teal-500 rounded-full mix-blend-multiply filter blur-xl animate-pulse delay-700"></div>
@@ -315,71 +261,170 @@ const RegistrationPage = () => {
 
         <div className="space-y-6">
           <div className="grid grid-cols-2 gap-4">
-            <InputField
-              type="text"
-              name="firstName"
-              placeholder="First Name"
-              value={formData.firstName}
-              icon={User}
-              onChange={handleInputChange}
-              errors={errors}
-            />
-            <InputField
-              type="text"
-              name="lastName"
-              placeholder="Last Name"
-              value={formData.lastName}
-              icon={User}
-              onChange={handleInputChange}
-              errors={errors}
-            />
+            {/* First Name */}
+            <div className="relative group">
+              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                <User className="h-5 w-5 text-blue-300 group-focus-within:text-blue-100 transition-colors" />
+              </div>
+              <input
+                type="text"
+                name="firstName"
+                value={formData.firstName}
+                onChange={handleInputChange}
+                placeholder="First Name"
+                className={`w-full pl-12 pr-4 py-4 bg-blue-900/30 border border-blue-700/50 rounded-xl 
+                  text-white placeholder-blue-300 backdrop-blur-sm
+                  focus:ring-2 focus:ring-blue-400 focus:border-blue-400 focus:bg-blue-900/40
+                  transition-all duration-300 font-serif
+                  ${errors.firstName ? 'border-red-400 focus:ring-red-400' : ''}`}
+              />
+              {errors.firstName && (
+                <div className="flex items-center mt-2 text-red-300 text-sm font-serif">
+                  <XCircle className="h-4 w-4 mr-1" />
+                  {errors.firstName}
+                </div>
+              )}
+            </div>
+
+            {/* Last Name */}
+            <div className="relative group">
+              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                <User className="h-5 w-5 text-blue-300 group-focus-within:text-blue-100 transition-colors" />
+              </div>
+              <input
+                type="text"
+                name="lastName"
+                value={formData.lastName}
+                onChange={handleInputChange}
+                placeholder="Last Name"
+                className={`w-full pl-12 pr-4 py-4 bg-blue-900/30 border border-blue-700/50 rounded-xl 
+                  text-white placeholder-blue-300 backdrop-blur-sm
+                  focus:ring-2 focus:ring-blue-400 focus:border-blue-400 focus:bg-blue-900/40
+                  transition-all duration-300 font-serif
+                  ${errors.lastName ? 'border-red-400 focus:ring-red-400' : ''}`}
+              />
+              {errors.lastName && (
+                <div className="flex items-center mt-2 text-red-300 text-sm font-serif">
+                  <XCircle className="h-4 w-4 mr-1" />
+                  {errors.lastName}
+                </div>
+              )}
+            </div>
           </div>
 
-          <InputField
-            type="text"
-            name="username"
-            placeholder="Username"
-            value={formData.username}
-            icon={User}
-            onChange={handleInputChange}
-            errors={errors}
-          />
+          {/* Username */}
+          <div className="relative group">
+            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+              <User className="h-5 w-5 text-blue-300 group-focus-within:text-blue-100 transition-colors" />
+            </div>
+            <input
+              type="text"
+              name="username"
+              value={formData.username}
+              onChange={handleInputChange}
+              placeholder="Username"
+              className={`w-full pl-12 pr-4 py-4 bg-blue-900/30 border border-blue-700/50 rounded-xl 
+                text-white placeholder-blue-300 backdrop-blur-sm
+                focus:ring-2 focus:ring-blue-400 focus:border-blue-400 focus:bg-blue-900/40
+                transition-all duration-300 font-serif
+                ${errors.username ? 'border-red-400 focus:ring-red-400' : ''}`}
+            />
+            {errors.username && (
+              <div className="flex items-center mt-2 text-red-300 text-sm font-serif">
+                <XCircle className="h-4 w-4 mr-1" />
+                {errors.username}
+              </div>
+            )}
+          </div>
 
-          <InputField
-            type="email"
-            name="email"
-            placeholder="Email Address"
-            value={formData.email}
-            icon={Mail}
-            onChange={handleInputChange}
-            errors={errors}
-          />
+          {/* Email */}
+          <div className="relative group">
+            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+              <Mail className="h-5 w-5 text-blue-300 group-focus-within:text-blue-100 transition-colors" />
+            </div>
+            <input
+              type="email"
+              name="email"
+              value={formData.email}
+              onChange={handleInputChange}
+              placeholder="Email Address"
+              className={`w-full pl-12 pr-4 py-4 bg-blue-900/30 border border-blue-700/50 rounded-xl 
+                text-white placeholder-blue-300 backdrop-blur-sm
+                focus:ring-2 focus:ring-blue-400 focus:border-blue-400 focus:bg-blue-900/40
+                transition-all duration-300 font-serif
+                ${errors.email ? 'border-red-400 focus:ring-red-400' : ''}`}
+            />
+            {errors.email && (
+              <div className="flex items-center mt-2 text-red-300 text-sm font-serif">
+                <XCircle className="h-4 w-4 mr-1" />
+                {errors.email}
+              </div>
+            )}
+          </div>
 
-          <InputField
-            type="password"
-            name="password"
-            placeholder="Password"
-            value={formData.password}
-            icon={Lock}
-            showToggle={true}
-            showValue={showPassword}
-            onChange={handleInputChange}
-            errors={errors}
-            onToggleShow={handleToggleShow}
-          />
+          {/* Password */}
+          <div className="relative group">
+            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+              <Lock className="h-5 w-5 text-blue-300 group-focus-within:text-blue-100 transition-colors" />
+            </div>
+            <input
+              type={showPassword ? 'text' : 'password'}
+              name="password"
+              value={formData.password}
+              onChange={handleInputChange}
+              placeholder="Password"
+              className={`w-full pl-12 pr-12 py-4 bg-blue-900/30 border border-blue-700/50 rounded-xl 
+                text-white placeholder-blue-300 backdrop-blur-sm
+                focus:ring-2 focus:ring-blue-400 focus:border-blue-400 focus:bg-blue-900/40
+                transition-all duration-300 font-serif
+                ${errors.password ? 'border-red-400 focus:ring-red-400' : ''}`}
+            />
+            <button
+              type="button"
+              className="absolute inset-y-0 right-0 pr-4 flex items-center text-blue-300 hover:text-blue-100 transition-colors"
+              onClick={() => setShowPassword(!showPassword)}
+            >
+              {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+            </button>
+            {errors.password && (
+              <div className="flex items-center mt-2 text-red-300 text-sm font-serif">
+                <XCircle className="h-4 w-4 mr-1" />
+                {errors.password}
+              </div>
+            )}
+          </div>
 
-          <InputField
-            type="password"
-            name="confirmPassword"
-            placeholder="Confirm Password"
-            value={formData.confirmPassword}
-            icon={Lock}
-            showToggle={true}
-            showValue={showConfirmPassword}
-            onChange={handleInputChange}
-            errors={errors}
-            onToggleShow={handleToggleShow}
-          />
+          {/* Confirm Password */}
+          <div className="relative group">
+            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+              <Lock className="h-5 w-5 text-blue-300 group-focus-within:text-blue-100 transition-colors" />
+            </div>
+            <input
+              type={showConfirmPassword ? 'text' : 'password'}
+              name="confirmPassword"
+              value={formData.confirmPassword}
+              onChange={handleInputChange}
+              placeholder="Confirm Password"
+              className={`w-full pl-12 pr-12 py-4 bg-blue-900/30 border border-blue-700/50 rounded-xl 
+                text-white placeholder-blue-300 backdrop-blur-sm
+                focus:ring-2 focus:ring-blue-400 focus:border-blue-400 focus:bg-blue-900/40
+                transition-all duration-300 font-serif
+                ${errors.confirmPassword ? 'border-red-400 focus:ring-red-400' : ''}`}
+            />
+            <button
+              type="button"
+              className="absolute inset-y-0 right-0 pr-4 flex items-center text-blue-300 hover:text-blue-100 transition-colors"
+              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+            >
+              {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+            </button>
+            {errors.confirmPassword && (
+              <div className="flex items-center mt-2 text-red-300 text-sm font-serif">
+                <XCircle className="h-4 w-4 mr-1" />
+                {errors.confirmPassword}
+              </div>
+            )}
+          </div>
 
           <div className="text-sm text-blue-200 bg-blue-900/30 p-4 rounded-xl font-serif backdrop-blur-sm">
             Password must contain at least 8 characters with uppercase, lowercase, number, and special character
