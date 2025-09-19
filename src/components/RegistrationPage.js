@@ -74,43 +74,41 @@ const RegistrationPage = () => {
   };
 
   const handleRegister = async (e) => {
-    e.preventDefault();
-    
-    if (!validateForm()) {
-      return;
-    }
+  e.preventDefault();
+  
+  if (!validateForm()) {
+    return;
+  }
 
-    setLoading(true);
-    setMessage('');
-    
-    // Clear any previous errors
-    setErrors({});
+  setLoading(true);
+  setMessage('');
+  setErrors({});
 
-    try {
-      const { user } = await Auth.signUp({
-        username: formData.email, // Using email as username for consistency
-        password: formData.password,
-        attributes: {
-          email: formData.email,
-          given_name: formData.firstName,
-          family_name: formData.lastName,
-          preferred_username: formData.username
-        }
-      });
+  try {
+    const { user } = await Auth.signUp({
+      username: formData.email, // Use email as username
+      password: formData.password,
+      attributes: {
+        email: formData.email,
+        given_name: formData.firstName,
+        family_name: formData.lastName,
+        // Remove preferred_username since we're using email as username
+      }
+    });
 
-      console.log('Registration successful:', user);
-      setMessage('Registration successful! Please check your email for confirmation code.');
-      setStep('confirm');
-    } catch (error) {
-      console.error('Registration error:', error);
-      setErrors(prev => ({ 
-        ...prev, 
-        general: error.message || 'Registration failed. Please try again.' 
-      }));
-    } finally {
-      setLoading(false);
-    }
-  };
+    console.log('Registration successful:', user);
+    setMessage('Registration successful! Please check your email for confirmation code.');
+    setStep('confirm');
+  } catch (error) {
+    console.error('Registration error:', error);
+    setErrors(prev => ({ 
+      ...prev, 
+      general: error.message || 'Registration failed. Please try again.' 
+    }));
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleConfirmation = async (e) => {
     e.preventDefault();
