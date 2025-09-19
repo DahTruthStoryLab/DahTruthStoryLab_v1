@@ -74,39 +74,40 @@ const RegistrationPage = () => {
   };
 
   const handleRegister = async (e) => {
-  e.preventDefault();
-  
-  if (!validateForm()) {
-    return;
-  }
+    e.preventDefault();
+    
+    if (!validateForm()) {
+      return;
+    }
 
-  setLoading(true);
-  setMessage('');
-  setErrors({});
+    setLoading(true);
+    setMessage('');
+    setErrors({});
 
- const { user } = await Auth.signUp({
-  username: formData.username, // Use the username field, not email
-  password: formData.password,
-  attributes: {
-    email: formData.email,
-    given_name: formData.firstName,
-    family_name: formData.lastName,
-  }
-});
+    try {
+      const { user } = await Auth.signUp({
+        username: formData.username, // Use the username field, not email
+        password: formData.password,
+        attributes: {
+          email: formData.email,
+          given_name: formData.firstName,
+          family_name: formData.lastName,
+        }
+      });
 
-    console.log('Registration successful:', user);
-    setMessage('Registration successful! Please check your email for confirmation code.');
-    setStep('confirm');
-  } catch (error) {
-    console.error('Registration error:', error);
-    setErrors(prev => ({ 
-      ...prev, 
-      general: error.message || 'Registration failed. Please try again.' 
-    }));
-  } finally {
-    setLoading(false);
-  }
-};
+      console.log('Registration successful:', user);
+      setMessage('Registration successful! Please check your email for confirmation code.');
+      setStep('confirm');
+    } catch (error) {
+      console.error('Registration error:', error);
+      setErrors(prev => ({ 
+        ...prev, 
+        general: error.message || 'Registration failed. Please try again.' 
+      }));
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleConfirmation = async (e) => {
     e.preventDefault();
@@ -149,8 +150,8 @@ const RegistrationPage = () => {
   };
 
   const handleResendCode = async () => {
-    if (!formData.email) {
-      setErrors(prev => ({ ...prev, general: 'Email is required to resend code' }));
+    if (!formData.username) {
+      setErrors(prev => ({ ...prev, general: 'Username is required to resend code' }));
       return;
     }
     
@@ -158,7 +159,7 @@ const RegistrationPage = () => {
     setMessage('');
     
     try {
-      await Auth.resendSignUp(formData.email);
+      await Auth.resendSignUp(formData.username);
       setMessage('Confirmation code resent to your email.');
       setErrors({});
     } catch (error) {
@@ -248,7 +249,7 @@ const RegistrationPage = () => {
               <button
                 type="button"
                 onClick={handleResendCode}
-                disabled={loading || !formData.email}
+                disabled={loading || !formData.username}
                 className="text-blue-300 hover:text-blue-100 font-serif text-sm font-medium disabled:opacity-50 transition-colors"
               >
                 Didn't receive the code? Resend
