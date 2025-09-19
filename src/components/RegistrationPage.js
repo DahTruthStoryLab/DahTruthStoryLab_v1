@@ -1,6 +1,45 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Auth } from 'aws-amplify';
 import { Eye, EyeOff, User, Mail, Lock, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+
+// Move InputField outside of component to prevent recreation
+const InputField = ({ type, name, placeholder, value, icon: Icon, showToggle = false, showValue = false, onChange, errors, onToggleShow }) => (
+  <div className="relative group">
+    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+      <Icon className="h-5 w-5 text-blue-300 group-focus-within:text-blue-100 transition-colors" />
+    </div>
+    <input
+      type={showToggle ? (showValue ? 'text' : 'password') : type}
+      name={name}
+      value={value}
+      onChange={onChange}
+      placeholder={placeholder}
+      className={`w-full pl-12 pr-12 py-4 bg-blue-900/30 border border-blue-700/50 rounded-xl 
+        text-white placeholder-blue-300 backdrop-blur-sm
+        focus:ring-2 focus:ring-blue-400 focus:border-blue-400 focus:bg-blue-900/40
+        transition-all duration-300 font-serif
+        ${errors[name] ? 'border-red-400 focus:ring-red-400' : ''}`}
+    />
+    {showToggle && (
+      <button
+        type="button"
+        className="absolute inset-y-0 right-0 pr-4 flex items-center text-blue-300 hover:text-blue-100 transition-colors"
+        onClick={() => onToggleShow(name)}
+      >
+        {showValue ? 
+          <EyeOff className="h-5 w-5" /> : 
+          <Eye className="h-5 w-5" />
+        }
+      </button>
+    )}
+    {errors[name] && (
+      <div className="flex items-center mt-2 text-red-300 text-sm font-serif">
+        <XCircle className="h-4 w-4 mr-1" />
+        {errors[name]}
+      </div>
+    )}
+  </div>
+);
 
 const RegistrationPage = () => {
   const [step, setStep] = useState('register'); // 'register' or 'confirm'
@@ -57,20 +96,33 @@ const RegistrationPage = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleInputChange = (e) => {
+  // Use useCallback to prevent function recreation
+  const handleInputChange = useCallback((e) => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
       [name]: value
     }));
     
-    if (errors[name]) {
-      setErrors(prev => ({
-        ...prev,
-        [name]: ''
-      }));
+    setErrors(prev => {
+      if (prev[name]) {
+        return {
+          ...prev,
+          [name]: ''
+        };
+      }
+      return prev;
+    });
+  }, []);
+
+  // Handle password visibility toggle
+  const handleToggleShow = useCallback((name) => {
+    if (name === 'password') {
+      setShowPassword(prev => !prev);
+    } else if (name === 'confirmPassword') {
+      setShowConfirmPassword(prev => !prev);
     }
-  };
+  }, []);
 
   const handleRegister = async () => {
     if (!validateForm()) {
@@ -143,44 +195,6 @@ const RegistrationPage = () => {
   const handleBackToLanding = () => {
     window.location.href = '/';
   };
-
-  const InputField = ({ type, name, placeholder, value, icon: Icon, showToggle = false, showValue = false }) => (
-    <div className="relative group">
-      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-        <Icon className="h-5 w-5 text-blue-300 group-focus-within:text-blue-100 transition-colors" />
-      </div>
-      <input
-        type={showToggle ? (showValue ? 'text' : 'password') : type}
-        name={name}
-        value={value}
-        onChange={handleInputChange}
-        placeholder={placeholder}
-        className={`w-full pl-12 pr-12 py-4 bg-blue-900/30 border border-blue-700/50 rounded-xl 
-          text-white placeholder-blue-300 backdrop-blur-sm
-          focus:ring-2 focus:ring-blue-400 focus:border-blue-400 focus:bg-blue-900/40
-          transition-all duration-300 font-serif
-          ${errors[name] ? 'border-red-400 focus:ring-red-400' : ''}`}
-      />
-      {showToggle && (
-        <button
-          type="button"
-          className="absolute inset-y-0 right-0 pr-4 flex items-center text-blue-300 hover:text-blue-100 transition-colors"
-          onClick={() => name === 'password' ? setShowPassword(!showPassword) : setShowConfirmPassword(!showConfirmPassword)}
-        >
-          {(name === 'password' ? showPassword : showConfirmPassword) ? 
-            <EyeOff className="h-5 w-5" /> : 
-            <Eye className="h-5 w-5" />
-          }
-        </button>
-      )}
-      {errors[name] && (
-        <div className="flex items-center mt-2 text-red-300 text-sm font-serif">
-          <XCircle className="h-4 w-4 mr-1" />
-          {errors[name]}
-        </div>
-      )}
-    </div>
-  );
 
   if (step === 'confirm') {
     return (
@@ -307,6 +321,8 @@ const RegistrationPage = () => {
               placeholder="First Name"
               value={formData.firstName}
               icon={User}
+              onChange={handleInputChange}
+              errors={errors}
             />
             <InputField
               type="text"
@@ -314,6 +330,8 @@ const RegistrationPage = () => {
               placeholder="Last Name"
               value={formData.lastName}
               icon={User}
+              onChange={handleInputChange}
+              errors={errors}
             />
           </div>
 
@@ -323,6 +341,8 @@ const RegistrationPage = () => {
             placeholder="Username"
             value={formData.username}
             icon={User}
+            onChange={handleInputChange}
+            errors={errors}
           />
 
           <InputField
@@ -331,6 +351,8 @@ const RegistrationPage = () => {
             placeholder="Email Address"
             value={formData.email}
             icon={Mail}
+            onChange={handleInputChange}
+            errors={errors}
           />
 
           <InputField
@@ -341,6 +363,9 @@ const RegistrationPage = () => {
             icon={Lock}
             showToggle={true}
             showValue={showPassword}
+            onChange={handleInputChange}
+            errors={errors}
+            onToggleShow={handleToggleShow}
           />
 
           <InputField
@@ -351,6 +376,9 @@ const RegistrationPage = () => {
             icon={Lock}
             showToggle={true}
             showValue={showConfirmPassword}
+            onChange={handleInputChange}
+            errors={errors}
+            onToggleShow={handleToggleShow}
           />
 
           <div className="text-sm text-blue-200 bg-blue-900/30 p-4 rounded-xl font-serif backdrop-blur-sm">
