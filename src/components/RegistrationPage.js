@@ -2,8 +2,11 @@ import React, { useState } from 'react';
 import { Auth } from 'aws-amplify';
 import { Eye, EyeOff, User, Mail, Lock, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 
+const sanitize = (s = '') => s.trim();            // trim
+const stripSpaces = (s = '') => s.replace(/\s+/g, ''); // remove all whitespace
+
 const RegistrationPage = () => {
-  const [step, setStep] = useState('register'); // 'register' or 'confirm'
+  const [step, setStep] = useState('register'); // 'register' | 'confirm'
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -21,37 +24,27 @@ const RegistrationPage = () => {
 
   const validateForm = () => {
     const newErrors = {};
-    
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!formData.email) {
-      newErrors.email = 'Email is required';
-    } else if (!emailRegex.test(formData.email)) {
-      newErrors.email = 'Please enter a valid email address';
-    }
 
-    if (!formData.username) {
-      newErrors.username = 'Username is required';
-    } else if (formData.username.length < 3) {
-      newErrors.username = 'Username must be at least 3 characters';
-    }
+    const email = stripSpaces(sanitize(formData.email));
+    const username = stripSpaces(sanitize(formData.username));
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!email) newErrors.email = 'Email is required';
+    else if (!emailRegex.test(email)) newErrors.email = 'Please enter a valid email address';
+
+    if (!username) newErrors.username = 'Username is required';
+    else if (username.length < 3) newErrors.username = 'Username must be at least 3 characters';
 
     const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
-    if (!formData.password) {
-      newErrors.password = 'Password is required';
-    } else if (!passwordRegex.test(formData.password)) {
+    if (!formData.password) newErrors.password = 'Password is required';
+    else if (!passwordRegex.test(formData.password))
       newErrors.password = 'Password must be at least 8 characters with uppercase, lowercase, number, and special character';
-    }
 
-    if (formData.password !== formData.confirmPassword) {
+    if (formData.password !== formData.confirmPassword)
       newErrors.confirmPassword = 'Passwords do not match';
-    }
 
-    if (!formData.firstName.trim()) {
-      newErrors.firstName = 'First name is required';
-    }
-    if (!formData.lastName.trim()) {
-      newErrors.lastName = 'Last name is required';
-    }
+    if (!sanitize(formData.firstName)) newErrors.firstName = 'First name is required';
+    if (!sanitize(formData.lastName)) newErrors.lastName = 'Last name is required';
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -59,50 +52,53 @@ const RegistrationPage = () => {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-    
-    // Clear error for this field when user starts typing
-    if (errors[name]) {
-      setErrors(prev => ({
-        ...prev,
-        [name]: ''
-      }));
-    }
+
+    // live sanitization for email/username: strip spaces
+    const transformed =
+      name === 'email' || name === 'username'
+        ? stripSpaces(value)
+        : value;
+
+    setFormData(prev => ({ ...prev, [name]: transformed }));
+
+    if (errors[name]) setErrors(prev => ({ ...prev, [name]: '' }));
   };
 
   const handleRegister = async (e) => {
     e.preventDefault();
-    
-    if (!validateForm()) {
-      return;
-    }
+    if (!validateForm()) return;
 
     setLoading(true);
     setMessage('');
     setErrors({});
 
+    const email = stripSpaces(sanitize(formData.email));
+    const username = stripSpaces(sanitize(formData.username));
+    const given = sanitize(formData.firstName);
+    const family = sanitize(formData.lastName);
+
     try {
       const { user } = await Auth.signUp({
-        username: formData.username, // Use the username field, not email
+        username,                       // using username for your pool
         password: formData.password,
         attributes: {
-          email: formData.email,
-          given_name: formData.firstName,
-          family_name: formData.lastName,
+          email,                        // must be a verified email format
+          given_name: given,
+          family_name: family,
+          // preferred_username can be added if you want a display handle
         }
       });
 
       console.log('Registration successful:', user);
-      setMessage('Registration successful! Please check your email for confirmation code.');
+      setMessage('Registration successful! Please check your email for the confirmation code.');
       setStep('confirm');
     } catch (error) {
       console.error('Registration error:', error);
-      setErrors(prev => ({ 
-        ...prev, 
-        general: error.message || 'Registration failed. Please try again.' 
+      setErrors(prev => ({
+        ...prev,
+        general:
+          (error && (error.message || error.code)) ||
+          'Registration failed. Please try again.'
       }));
     } finally {
       setLoading(false);
@@ -111,8 +107,8 @@ const RegistrationPage = () => {
 
   const handleConfirmation = async (e) => {
     e.preventDefault();
-    
-    if (!confirmationCode.trim()) {
+    const code = stripSpaces(sanitize(confirmationCode));
+    if (!code) {
       setErrors(prev => ({ ...prev, confirmation: 'Please enter the confirmation code' }));
       return;
     }
@@ -121,28 +117,29 @@ const RegistrationPage = () => {
     setMessage('');
     setErrors({});
 
+    const username = stripSpaces(sanitize(formData.username));
+
     try {
-      await Auth.confirmSignUp(formData.username, confirmationCode.trim());
-      
-      // Store user data for dashboard
+      await Auth.confirmSignUp(username, code);
+
+      // Persist minimal user context for your dashboard
       const userData = {
-        firstName: formData.firstName,
-        lastName: formData.lastName,
-        username: formData.username,
-        email: formData.email
+        firstName: sanitize(formData.firstName),
+        lastName: sanitize(formData.lastName),
+        username,
+        email: stripSpaces(sanitize(formData.email))
       };
       localStorage.setItem('currentUser', JSON.stringify(userData));
-      
+
       setMessage('Welcome to DahTruth Story Lab! Your writing journey begins now.');
-      
-      setTimeout(() => {
-        window.location.href = '/dashboard';
-      }, 2000);
+      setTimeout(() => { window.location.href = '/dashboard'; }, 2000);
     } catch (error) {
       console.error('Confirmation error:', error);
-      setErrors(prev => ({ 
-        ...prev, 
-        confirmation: error.message || 'Invalid confirmation code' 
+      setErrors(prev => ({
+        ...prev,
+        confirmation:
+          (error && (error.message || error.code)) ||
+          'Invalid confirmation code'
       }));
     } finally {
       setLoading(false);
@@ -150,41 +147,38 @@ const RegistrationPage = () => {
   };
 
   const handleResendCode = async () => {
-    if (!formData.username) {
+    const username = stripSpaces(sanitize(formData.username));
+    if (!username) {
       setErrors(prev => ({ ...prev, general: 'Username is required to resend code' }));
       return;
     }
-    
+
     setLoading(true);
     setMessage('');
-    
+
     try {
-      await Auth.resendSignUp(formData.username);
+      await Auth.resendSignUp(username);
       setMessage('Confirmation code resent to your email.');
       setErrors({});
     } catch (error) {
       console.error('Resend error:', error);
-      setErrors(prev => ({ 
-        ...prev, 
-        general: error.message || 'Failed to resend code' 
+      setErrors(prev => ({
+        ...prev,
+        general:
+          (error && (error.message || error.code)) ||
+          'Failed to resend code'
       }));
     } finally {
       setLoading(false);
     }
   };
 
-  const handleBackToLanding = () => {
-    window.location.href = '/';
-  };
-
-  const handleSignInClick = () => {
-    window.location.href = '/signin';
-  };
+  const handleBackToLanding = () => { window.location.href = '/'; };
+  const handleSignInClick = () => { window.location.href = '/signin'; };
 
   if (step === 'confirm') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-indigo-950 flex items-center justify-center p-4 relative overflow-hidden">
-        {/* Animated background */}
         <div className="absolute inset-0 opacity-15">
           <div className="absolute top-20 left-10 w-72 h-72 bg-blue-500 rounded-full mix-blend-multiply filter blur-xl animate-pulse"></div>
           <div className="absolute bottom-20 right-10 w-72 h-72 bg-teal-500 rounded-full mix-blend-multiply filter blur-xl animate-pulse delay-700"></div>
@@ -193,11 +187,7 @@ const RegistrationPage = () => {
         <div className="relative z-10 bg-blue-950/50 backdrop-blur-xl rounded-3xl shadow-2xl p-12 w-full max-w-md border border-blue-800/40">
           <div className="text-center mb-10">
             <div className="w-20 h-20 rounded-full overflow-hidden shadow-2xl border-2 border-blue-400/30 mx-auto mb-6">
-              <img 
-                src="/dahtruth-logo.png" 
-                alt="DahTruth Story Lab Logo" 
-                className="w-full h-full object-cover"
-              />
+              <img src="/dahtruth-logo.png" alt="DahTruth Story Lab Logo" className="w-full h-full object-cover" />
             </div>
             <div className="bg-blue-600/30 rounded-full p-4 w-20 h-20 mx-auto mb-6 flex items-center justify-center">
               <Mail className="h-10 w-10 text-blue-300" />
@@ -208,18 +198,18 @@ const RegistrationPage = () => {
             </p>
           </div>
 
-          <form onSubmit={handleConfirmation} className="space-y-8">
+          <form onSubmit={handleConfirmation} className="space-y-8" noValidate>
             <div>
               <input
                 type="text"
                 value={confirmationCode}
-                onChange={(e) => setConfirmationCode(e.target.value)}
+                onChange={(e) => setConfirmationCode(stripSpaces(e.target.value))}
                 placeholder="Enter confirmation code"
                 className="w-full px-6 py-4 bg-blue-900/30 border border-blue-700/50 rounded-xl text-center text-xl font-mono text-white placeholder-blue-300 focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-all duration-300 backdrop-blur-sm"
                 maxLength={6}
                 inputMode="numeric"
                 autoComplete="one-time-code"
-                pattern="\d{6}"
+                pattern="[0-9]{6}"
                 required
               />
               {errors.confirmation && (
@@ -235,14 +225,7 @@ const RegistrationPage = () => {
               disabled={loading}
               className="w-full bg-gradient-to-r from-blue-500 to-teal-500 hover:from-blue-400 hover:to-teal-400 text-white py-4 px-6 rounded-xl font-serif font-bold text-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center shadow-xl hover:shadow-2xl hover:scale-105"
             >
-              {loading ? (
-                <>
-                  <Loader2 className="animate-spin h-6 w-6 mr-2" />
-                  Confirming...
-                </>
-              ) : (
-                'Confirm Email'
-              )}
+              {loading ? (<><Loader2 className="animate-spin h-6 w-6 mr-2" />Confirming...</>) : ('Confirm Email')}
             </button>
 
             <div className="text-center">
@@ -271,9 +254,9 @@ const RegistrationPage = () => {
             </div>
           )}
 
-          <button 
+          <button
             type="button"
-            onClick={() => setStep('register')} 
+            onClick={() => setStep('register')}
             className="w-full mt-6 text-blue-300 text-sm hover:text-blue-100 font-serif transition-colors"
           >
             ← Back to Registration
@@ -285,7 +268,6 @@ const RegistrationPage = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-indigo-950 flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Animated background */}
       <div className="absolute inset-0 opacity-15">
         <div className="absolute top-20 left-10 w-72 h-72 bg-blue-500 rounded-full mix-blend-multiply filter blur-xl animate-pulse"></div>
         <div className="absolute bottom-20 right-10 w-72 h-72 bg-teal-500 rounded-full mix-blend-multiply filter blur-xl animate-pulse delay-700"></div>
@@ -294,182 +276,79 @@ const RegistrationPage = () => {
       <div className="relative z-10 bg-blue-950/50 backdrop-blur-xl rounded-3xl shadow-2xl p-12 w-full max-w-lg border border-blue-800/40">
         <div className="text-center mb-10">
           <div className="w-20 h-20 rounded-full overflow-hidden shadow-2xl border-2 border-blue-400/30 mx-auto mb-6">
-            <img 
-              src="/dahtruth-logo.png" 
-              alt="DahTruth Story Lab Logo" 
-              className="w-full h-full object-cover"
-            />
+            <img src="/dahtruth-logo.png" alt="DahTruth Story Lab Logo" className="w-full h-full object-cover" />
           </div>
           <h2 className="text-4xl font-bold text-white font-serif mb-3">Join DahTruth Story Lab</h2>
           <p className="text-blue-200 font-serif text-lg">Begin your writing journey today</p>
         </div>
 
-        <form onSubmit={handleRegister} className="space-y-6">
+        <form onSubmit={handleRegister} className="space-y-6" noValidate>
           <div className="grid grid-cols-2 gap-4">
-            <div className="relative group">
-              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                <User className="h-5 w-5 text-blue-300 group-focus-within:text-blue-100 transition-colors" />
-              </div>
-              <input
-                type="text"
-                name="firstName"
-                value={formData.firstName}
-                onChange={handleInputChange}
-                placeholder="First Name"
-                className={`w-full pl-12 pr-4 py-4 bg-blue-900/30 border border-blue-700/50 rounded-xl 
-                  text-white placeholder-blue-300 backdrop-blur-sm
-                  focus:ring-2 focus:ring-blue-400 focus:border-blue-400 focus:bg-blue-900/40
-                  transition-all duration-300 font-serif
-                  ${errors.firstName ? 'border-red-400 focus:ring-red-400' : ''}`}
-                required
-              />
-              {errors.firstName && (
-                <div className="flex items-center mt-2 text-red-300 text-sm font-serif">
-                  <XCircle className="h-4 w-4 mr-1" />
-                  {errors.firstName}
-                </div>
-              )}
-            </div>
-
-            <div className="relative group">
-              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                <User className="h-5 w-5 text-blue-300 group-focus-within:text-blue-100 transition-colors" />
-              </div>
-              <input
-                type="text"
-                name="lastName"
-                value={formData.lastName}
-                onChange={handleInputChange}
-                placeholder="Last Name"
-                className={`w-full pl-12 pr-4 py-4 bg-blue-900/30 border border-blue-700/50 rounded-xl 
-                  text-white placeholder-blue-300 backdrop-blur-sm
-                  focus:ring-2 focus:ring-blue-400 focus:border-blue-400 focus:bg-blue-900/40
-                  transition-all duration-300 font-serif
-                  ${errors.lastName ? 'border-red-400 focus:ring-red-400' : ''}`}
-                required
-              />
-              {errors.lastName && (
-                <div className="flex items-center mt-2 text-red-300 text-sm font-serif">
-                  <XCircle className="h-4 w-4 mr-1" />
-                  {errors.lastName}
-                </div>
-              )}
-            </div>
-          </div>
-
-          <div className="relative group">
-            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-              <User className="h-5 w-5 text-blue-300 group-focus-within:text-blue-100 transition-colors" />
-            </div>
-            <input
-              type="text"
-              name="username"
-              value={formData.username}
+            <LabeledInput
+              icon={<User className="h-5 w-5" />}
+              name="firstName"
+              value={formData.firstName}
               onChange={handleInputChange}
-              placeholder="Username"
-              className={`w-full pl-12 pr-4 py-4 bg-blue-900/30 border border-blue-700/50 rounded-xl 
-                text-white placeholder-blue-300 backdrop-blur-sm
-                focus:ring-2 focus:ring-blue-400 focus:border-blue-400 focus:bg-blue-900/40
-                transition-all duration-300 font-serif
-                ${errors.username ? 'border-red-400 focus:ring-red-400' : ''}`}
+              placeholder="First Name"
+              error={errors.firstName}
               required
             />
-            {errors.username && (
-              <div className="flex items-center mt-2 text-red-300 text-sm font-serif">
-                <XCircle className="h-4 w-4 mr-1" />
-                {errors.username}
-              </div>
-            )}
-          </div>
-
-          <div className="relative group">
-            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-              <Mail className="h-5 w-5 text-blue-300 group-focus-within:text-blue-100 transition-colors" />
-            </div>
-            <input
-              type="email"
-              name="email"
-              value={formData.email}
+            <LabeledInput
+              icon={<User className="h-5 w-5" />}
+              name="lastName"
+              value={formData.lastName}
               onChange={handleInputChange}
-              placeholder="Email Address"
-              className={`w-full pl-12 pr-4 py-4 bg-blue-900/30 border border-blue-700/50 rounded-xl 
-                text-white placeholder-blue-300 backdrop-blur-sm
-                focus:ring-2 focus:ring-blue-400 focus:border-blue-400 focus:bg-blue-900/40
-                transition-all duration-300 font-serif
-                ${errors.email ? 'border-red-400 focus:ring-red-400' : ''}`}
+              placeholder="Last Name"
+              error={errors.lastName}
               required
             />
-            {errors.email && (
-              <div className="flex items-center mt-2 text-red-300 text-sm font-serif">
-                <XCircle className="h-4 w-4 mr-1" />
-                {errors.email}
-              </div>
-            )}
           </div>
 
-          <div className="relative group">
-            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-              <Lock className="h-5 w-5 text-blue-300 group-focus-within:text-blue-100 transition-colors" />
-            </div>
-            <input
-              type={showPassword ? 'text' : 'password'}
-              name="password"
-              value={formData.password}
-              onChange={handleInputChange}
-              placeholder="Password"
-              className={`w-full pl-12 pr-12 py-4 bg-blue-900/30 border border-blue-700/50 rounded-xl 
-                text-white placeholder-blue-300 backdrop-blur-sm
-                focus:ring-2 focus:ring-blue-400 focus:border-blue-400 focus:bg-blue-900/40
-                transition-all duration-300 font-serif
-                ${errors.password ? 'border-red-400 focus:ring-red-400' : ''}`}
-              required
-            />
-            <button
-              type="button"
-              className="absolute inset-y-0 right-0 pr-4 flex items-center text-blue-300 hover:text-blue-100 transition-colors"
-              onClick={() => setShowPassword(!showPassword)}
-            >
-              {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-            </button>
-            {errors.password && (
-              <div className="flex items-center mt-2 text-red-300 text-sm font-serif">
-                <XCircle className="h-4 w-4 mr-1" />
-                {errors.password}
-              </div>
-            )}
-          </div>
+          <LabeledInput
+            icon={<User className="h-5 w-5" />}
+            name="username"
+            value={formData.username}
+            onKeyDown={(e) => { if (e.key === ' ') e.preventDefault(); }}
+            onChange={handleInputChange}
+            placeholder="Username"
+            error={errors.username}
+            required
+            autoComplete="username"
+          />
 
-          <div className="relative group">
-            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-              <Lock className="h-5 w-5 text-blue-300 group-focus-within:text-blue-100 transition-colors" />
-            </div>
-            <input
-              type={showConfirmPassword ? 'text' : 'password'}
-              name="confirmPassword"
-              value={formData.confirmPassword}
-              onChange={handleInputChange}
-              placeholder="Confirm Password"
-              className={`w-full pl-12 pr-12 py-4 bg-blue-900/30 border border-blue-700/50 rounded-xl 
-                text-white placeholder-blue-300 backdrop-blur-sm
-                focus:ring-2 focus:ring-blue-400 focus:border-blue-400 focus:bg-blue-900/40
-                transition-all duration-300 font-serif
-                ${errors.confirmPassword ? 'border-red-400 focus:ring-red-400' : ''}`}
-              required
-            />
-            <button
-              type="button"
-              className="absolute inset-y-0 right-0 pr-4 flex items-center text-blue-300 hover:text-blue-100 transition-colors"
-              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-            >
-              {showConfirmPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-            </button>
-            {errors.confirmPassword && (
-              <div className="flex items-center mt-2 text-red-300 text-sm font-serif">
-                <XCircle className="h-4 w-4 mr-1" />
-                {errors.confirmPassword}
-              </div>
-            )}
-          </div>
+          <LabeledInput
+            icon={<Mail className="h-5 w-5" />}
+            type="email"
+            name="email"
+            value={formData.email}
+            onChange={handleInputChange}
+            placeholder="Email Address"
+            error={errors.email}
+            required
+            autoComplete="email"
+          />
+
+          <PasswordInput
+            name="password"
+            value={formData.password}
+            onChange={handleInputChange}
+            placeholder="Password"
+            show={showPassword}
+            setShow={setShowPassword}
+            error={errors.password}
+            autoComplete="new-password"
+          />
+
+          <PasswordInput
+            name="confirmPassword"
+            value={formData.confirmPassword}
+            onChange={handleInputChange}
+            placeholder="Confirm Password"
+            show={showConfirmPassword}
+            setShow={setShowConfirmPassword}
+            error={errors.confirmPassword}
+            autoComplete="new-password"
+          />
 
           <div className="text-sm text-blue-200 bg-blue-900/30 p-4 rounded-xl font-serif backdrop-blur-sm">
             Password must contain at least 8 characters with uppercase, lowercase, number, and special character
@@ -480,14 +359,7 @@ const RegistrationPage = () => {
             disabled={loading}
             className="w-full bg-gradient-to-r from-blue-500 to-teal-500 hover:from-blue-400 hover:to-teal-400 text-white py-4 px-6 rounded-xl font-serif font-bold text-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center shadow-xl hover:shadow-2xl hover:scale-105"
           >
-            {loading ? (
-              <>
-                <Loader2 className="animate-spin h-6 w-6 mr-2" />
-                Creating Account...
-              </>
-            ) : (
-              'Join the Story Lab'
-            )}
+            {loading ? (<><Loader2 className="animate-spin h-6 w-6 mr-2" />Creating Account...</>) : ('Join the Story Lab')}
           </button>
         </form>
 
@@ -508,19 +380,19 @@ const RegistrationPage = () => {
         <div className="text-center mt-8">
           <p className="text-blue-200 text-sm font-serif">
             Already have an account?{' '}
-            <button 
+            <button
               type="button"
-              onClick={handleSignInClick}
+              onClick={() => (window.location.href = '/signin')}
               className="text-blue-300 hover:text-blue-100 font-medium transition-colors"
             >
               Sign in
             </button>
           </p>
         </div>
-        
-        <button 
+
+        <button
           type="button"
-          onClick={handleBackToLanding} 
+          onClick={handleBackToLanding}
           className="w-full mt-4 text-blue-300 text-sm hover:text-blue-100 font-serif transition-colors"
         >
           ← Back to Home
@@ -529,5 +401,76 @@ const RegistrationPage = () => {
     </div>
   );
 };
+
+// ---- Small presentational subcomponents to keep things tidy ----
+function LabeledInput({
+  icon, name, type = 'text', value, onChange, onKeyDown, placeholder, error, required, autoComplete
+}) {
+  return (
+    <div className="relative group">
+      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+        <span className="text-blue-300 group-focus-within:text-blue-100 transition-colors">{icon}</span>
+      </div>
+      <input
+        type={type}
+        name={name}
+        value={value}
+        onKeyDown={onKeyDown}
+        onChange={onChange}
+        placeholder={placeholder}
+        autoComplete={autoComplete}
+        className={`w-full pl-12 pr-4 py-4 bg-blue-900/30 border border-blue-700/50 rounded-xl 
+          text-white placeholder-blue-300 backdrop-blur-sm
+          focus:ring-2 focus:ring-blue-400 focus:border-blue-400 focus:bg-blue-900/40
+          transition-all duration-300 font-serif
+          ${error ? 'border-red-400 focus:ring-red-400' : ''}`}
+        required={required}
+      />
+      {error && (
+        <div className="flex items-center mt-2 text-red-300 text-sm font-serif">
+          <XCircle className="h-4 w-4 mr-1" />
+          {error}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PasswordInput({ name, value, onChange, placeholder, show, setShow, error, autoComplete }) {
+  return (
+    <div className="relative group">
+      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+        <Lock className="h-5 w-5 text-blue-300 group-focus-within:text-blue-100 transition-colors" />
+      </div>
+      <input
+        type={show ? 'text' : 'password'}
+        name={name}
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        autoComplete={autoComplete}
+        className={`w-full pl-12 pr-12 py-4 bg-blue-900/30 border border-blue-700/50 rounded-xl 
+          text-white placeholder-blue-300 backdrop-blur-sm
+          focus:ring-2 focus:ring-blue-400 focus:border-blue-400 focus:bg-blue-900/40
+          transition-all duration-300 font-serif
+          ${error ? 'border-red-400 focus:ring-red-400' : ''}`}
+        required
+      />
+      <button
+        type="button"
+        className="absolute inset-y-0 right-0 pr-4 flex items-center text-blue-300 hover:text-blue-100 transition-colors"
+        onClick={() => setShow(!show)}
+      >
+        {show ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+      </button>
+      {error && (
+        <div className="flex items-center mt-2 text-red-300 text-sm font-serif">
+          <XCircle className="h-4 w-4 mr-1" />
+          {error}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default RegistrationPage;
