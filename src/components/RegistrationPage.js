@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom'; // ADD THIS IMPORT
-import { Auth } from 'aws-amplify';
+import { signUp, confirmSignUp, resendSignUpCode } from 'aws-amplify/auth';
 import { Eye, EyeOff, User, Mail, Lock, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 
 const sanitize = (s = '') => s.trim();            // trim
