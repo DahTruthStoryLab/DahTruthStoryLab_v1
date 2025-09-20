@@ -17,15 +17,23 @@ export default function SignInPage() {
     e.preventDefault();
     setErr(''); setMsg('');
     if (!id || !password) { setErr('Please enter your username/email and password.'); return; }
+
     setLoading(true);
     try {
+      // 1) Sign in
       await Auth.signIn(id, password);
-      setMsg('Signed in! Redirecting…');
-      setTimeout(() => navigate('/dashboard'), 400);
+      // 2) Force-refresh the current user so tokens are definitely stored
+      await Auth.currentAuthenticatedUser({ bypassCache: true });
+      // 3) Navigate to a protected route
+      navigate('/dashboard');
     } catch (e) {
-      if (e?.code === 'UserNotConfirmedException') setErr('Account not confirmed. Check your email or confirm your registration.');
-      else if (e?.code === 'NotAuthorizedException') setErr('Incorrect username/email or password.');
-      else setErr(e?.message || e?.code || 'Sign-in failed.');
+      if (e?.code === 'UserNotConfirmedException') {
+        setErr('Account not confirmed. Check your email or confirm your registration.');
+      } else if (e?.code === 'NotAuthorizedException') {
+        setErr('Incorrect username/email or password.');
+      } else {
+        setErr(e?.message || e?.code || 'Sign-in failed.');
+      }
     } finally {
       setLoading(false);
     }
@@ -36,12 +44,16 @@ export default function SignInPage() {
       <div className="w-full max-w-md bg-slate-900/70 border border-white/10 rounded-2xl p-6">
         <h1 className="text-2xl font-semibold mb-6">Sign in</h1>
 
-        {msg && <div className="mb-4 flex items-center gap-2 rounded-lg px-3 py-2 text-sm bg-green-500/10 text-green-300 border border-green-500/20">
-          <CheckCircle size={16} /> {msg}
-        </div>}
-        {err && <div className="mb-4 flex items-center gap-2 rounded-lg px-3 py-2 text-sm bg-red-500/10 text-red-300 border border-red-500/20">
-          <XCircle size={16} /> {err}
-        </div>}
+        {msg && (
+          <div className="mb-4 flex items-center gap-2 rounded-lg px-3 py-2 text-sm bg-green-500/10 text-green-300 border border-green-500/20">
+            <CheckCircle size={16} /> {msg}
+          </div>
+        )}
+        {err && (
+          <div className="mb-4 flex items-center gap-2 rounded-lg px-3 py-2 text-sm bg-red-500/10 text-red-300 border border-red-500/20">
+            <XCircle size={16} /> {err}
+          </div>
+        )}
 
         <form onSubmit={onSubmit} className="space-y-4" noValidate>
           <div className="relative">
