@@ -55,10 +55,7 @@ const RegistrationPage = () => {
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     const transformed =
-      name === 'email' || name === 'username'
-        ? stripSpaces(value)
-        : value;
-
+      name === 'email' || name === 'username' ? stripSpaces(value) : value;
     setFormData(prev => ({ ...prev, [name]: transformed }));
     if (errors[name]) setErrors(prev => ({ ...prev, [name]: '' }));
   };
@@ -79,10 +76,10 @@ const RegistrationPage = () => {
 
     try {
       const { user } = await Auth.signUp({
-        username,                    // using username for your pool
+        username,
         password: formData.password,
         attributes: {
-          email,                     // ✅ v5 uses 'attributes'
+          email,
           given_name: given,
           family_name: family,
         },
@@ -120,7 +117,6 @@ const RegistrationPage = () => {
     try {
       await Auth.confirmSignUp(username, code);
 
-      // Persist minimal user context for your dashboard
       const userData = {
         firstName: sanitize(formData.firstName),
         lastName: sanitize(formData.lastName),
@@ -154,7 +150,7 @@ const RegistrationPage = () => {
     setMessage('');
 
     try {
-      await Auth.resendSignUp(username); // ✅ v5 name
+      await Auth.resendSignUp(username);
       setMessage('Confirmation code resent to your email.');
       setErrors({});
     } catch (error) {
@@ -170,6 +166,7 @@ const RegistrationPage = () => {
 
   const handleBackToLanding = () => { navigate('/'); };
 
+  // ---------- RENDER ----------
   if (step === 'confirm') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-indigo-950 flex items-center justify-center p-4 relative overflow-hidden">
@@ -258,9 +255,10 @@ const RegistrationPage = () => {
         </div>
       </div>
     </div>
-  );
+    );
   }
 
+  // registration page
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-indigo-950 flex items-center justify-center p-4 relative overflow-hidden">
       <div className="absolute inset-0 opacity-15">
