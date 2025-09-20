@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from 'react-router-dom'; // ADD THIS IMPORT
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { 
   Play, Plus, Settings, PencilLine, BookOpen, Calendar, Layers, 
@@ -79,17 +80,17 @@ const TopBanner = () => (
 );
 
 // --------- Sidebar Component ---------
-const Sidebar = ({ isOpen, onClose, authorName }) => {
+const Sidebar = ({ isOpen, onClose, authorName, navigate }) => { // ADD NAVIGATE PROP
   const menuItems = [
-    { icon: Home, label: "Dashboard", active: true },
-    { icon: PencilLine, label: "Write" },
-    { icon: BookOpen, label: "Table of Contents" },
-    { icon: Calendar, label: "Calendar" },
-    { icon: Layers, label: "Story Lab" },
-    { icon: UploadCloud, label: "Publishing" },
-    { icon: Store, label: "Store" },
-    { icon: User, label: "Profile" },
-    { icon: Info, label: "About" },
+    { icon: Home, label: "Dashboard", active: true, path: "/dashboard" },
+    { icon: PencilLine, label: "Write", active: false, path: "/write" }, // ADD PATH
+    { icon: BookOpen, label: "Table of Contents", active: false, path: "/contents" },
+    { icon: Calendar, label: "Calendar", active: false, path: "/calendar" },
+    { icon: Layers, label: "Story Lab", active: false, path: "/storylab" },
+    { icon: UploadCloud, label: "Publishing", active: false, path: "/publishing" },
+    { icon: Store, label: "Store", active: false, path: "/store" },
+    { icon: User, label: "Profile", active: false, path: "/profile" },
+    { icon: Info, label: "About", active: false, path: "/about" },
   ];
 
   return (
@@ -139,6 +140,7 @@ const Sidebar = ({ isOpen, onClose, authorName }) => {
           {menuItems.map((item, index) => (
             <button
               key={index}
+              onClick={() => navigate(item.path)} // ADD NAVIGATION
               className={`
                 w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left 
                 transition-all duration-200 transform hover:scale-105 hover:shadow-lg
@@ -210,7 +212,10 @@ const Sidebar = ({ isOpen, onClose, authorName }) => {
               <button className="w-full text-left px-3 py-2 text-xs text-slate-400 hover:text-white hover:bg-slate-700/50 rounded-lg transition-all duration-200">
                 Account Settings
               </button>
-              <button className="w-full text-left px-3 py-2 text-xs text-slate-400 hover:text-white hover:bg-slate-700/50 rounded-lg transition-all duration-200">
+              <button 
+                onClick={() => navigate('/')} // ADD SIGN OUT NAVIGATION
+                className="w-full text-left px-3 py-2 text-xs text-slate-400 hover:text-white hover:bg-slate-700/50 rounded-lg transition-all duration-200"
+              >
                 Sign Out
               </button>
             </div>
@@ -223,15 +228,22 @@ const Sidebar = ({ isOpen, onClose, authorName }) => {
 
 // --------- Main Dashboard Component ---------
 export default function Dashboard() {
+  const navigate = useNavigate(); // ADD THIS LINE
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [greeting, setGreeting] = useState("");
   const [authorName, setAuthorName] = useState("New Author");
   
-  // Get user data - using state instead of localStorage for demo
+  // Get user data from localStorage (from registration)
   useEffect(() => {
-    // This would normally come from your user authentication
-    const mockUser = { firstName: "New", lastName: "Author" };
-    setAuthorName(`${mockUser.firstName} ${mockUser.lastName}`);
+    const userData = localStorage.getItem('currentUser');
+    if (userData) {
+      const user = JSON.parse(userData);
+      setAuthorName(`${user.firstName} ${user.lastName}`);
+    } else {
+      // If no user data, they might need to sign in
+      const mockUser = { firstName: "New", lastName: "Author" };
+      setAuthorName(`${mockUser.firstName} ${mockUser.lastName}`);
+    }
   }, []);
   
   // Set greeting based on time of day
@@ -266,6 +278,7 @@ export default function Dashboard() {
           isOpen={sidebarOpen} 
           onClose={() => setSidebarOpen(false)}
           authorName={authorName}
+          navigate={navigate} // PASS NAVIGATE TO SIDEBAR
         />
 
         {/* Main Content Area */}
@@ -294,10 +307,16 @@ export default function Dashboard() {
                 </div>
                 
                 <div className="flex gap-3">
-                  <button className="inline-flex items-center gap-2 rounded-2xl bg-indigo-500/90 hover:bg-indigo-400 px-4 py-2 text-sm font-semibold shadow-lg hover:shadow-indigo-500/25 transition-all duration-200 hover:scale-105">
+                  <button 
+                    onClick={() => navigate('/write')} // ADD NAVIGATION TO WRITE
+                    className="inline-flex items-center gap-2 rounded-2xl bg-indigo-500/90 hover:bg-indigo-400 px-4 py-2 text-sm font-semibold shadow-lg hover:shadow-indigo-500/25 transition-all duration-200 hover:scale-105"
+                  >
                     <Plus size={16} /> Create Novel
                   </button>
-                  <button className="inline-flex items-center gap-2 rounded-2xl bg-slate-800 hover:bg-slate-700 px-4 py-2 text-sm font-semibold shadow-lg transition-all duration-200 hover:scale-105">
+                  <button 
+                    onClick={() => navigate('/write')} // ADD NAVIGATION TO WRITE
+                    className="inline-flex items-center gap-2 rounded-2xl bg-slate-800 hover:bg-slate-700 px-4 py-2 text-sm font-semibold shadow-lg transition-all duration-200 hover:scale-105"
+                  >
                     <Play size={16} /> Quick Start
                   </button>
                 </div>
@@ -321,7 +340,10 @@ export default function Dashboard() {
                     Track your progress, stay motivated, and turn your ideas into compelling narratives.
                   </p>
                   <div className="flex gap-4 justify-center">
-                    <button className="inline-flex items-center gap-2 rounded-2xl bg-indigo-500 hover:bg-indigo-400 px-6 py-3 font-semibold shadow-lg hover:shadow-indigo-500/25 transition-all duration-200 hover:scale-105">
+                    <button 
+                      onClick={() => navigate('/write')} // ADD NAVIGATION
+                      className="inline-flex items-center gap-2 rounded-2xl bg-indigo-500 hover:bg-indigo-400 px-6 py-3 font-semibold shadow-lg hover:shadow-indigo-500/25 transition-all duration-200 hover:scale-105"
+                    >
                       <Plus size={18} /> Create Your First Novel
                     </button>
                     <button className="inline-flex items-center gap-2 rounded-2xl bg-slate-700 hover:bg-slate-600 px-6 py-3 font-semibold shadow-lg transition-all duration-200 hover:scale-105">
