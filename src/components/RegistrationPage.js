@@ -1,13 +1,14 @@
+// src/components/RegistrationPage.js
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom'; // ADD THIS IMPORT
-import { signUp, confirmSignUp, resendSignUpCode } from 'aws-amplify/auth';
+import { useNavigate } from 'react-router-dom';
+import { Auth } from 'aws-amplify'; // ✅ v5 import
 import { Eye, EyeOff, User, Mail, Lock, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 
-const sanitize = (s = '') => s.trim();            // trim
-const stripSpaces = (s = '') => s.replace(/\s+/g, ''); // remove all whitespace
+const sanitize = (s = '') => s.trim();
+const stripSpaces = (s = '') => s.replace(/\s+/g, '');
 
 const RegistrationPage = () => {
-  const navigate = useNavigate(); // ADD THIS LINE
+  const navigate = useNavigate();
   const [step, setStep] = useState('register'); // 'register' | 'confirm'
   const [formData, setFormData] = useState({
     email: '',
@@ -26,7 +27,6 @@ const RegistrationPage = () => {
 
   const validateForm = () => {
     const newErrors = {};
-
     const email = stripSpaces(sanitize(formData.email));
     const username = stripSpaces(sanitize(formData.username));
 
@@ -54,18 +54,16 @@ const RegistrationPage = () => {
 
   const handleInputChange = (e) => {
     const { name, value } = e.target;
-
-    // live sanitization for email/username: strip spaces
     const transformed =
       name === 'email' || name === 'username'
         ? stripSpaces(value)
         : value;
 
     setFormData(prev => ({ ...prev, [name]: transformed }));
-
     if (errors[name]) setErrors(prev => ({ ...prev, [name]: '' }));
   };
 
+  // ---- v5 Auth: Sign Up ----
   const handleRegister = async (e) => {
     e.preventDefault();
     if (!validateForm()) return;
@@ -74,21 +72,20 @@ const RegistrationPage = () => {
     setMessage('');
     setErrors({});
 
-    const email = stripSpaces(sanitize(formData.email));
+    const email = stripSpaces(sanitize(formData.email)).toLowerCase();
     const username = stripSpaces(sanitize(formData.username));
     const given = sanitize(formData.firstName);
     const family = sanitize(formData.lastName);
 
     try {
       const { user } = await Auth.signUp({
-        username,                       // using username for your pool
+        username,                    // using username for your pool
         password: formData.password,
         attributes: {
-          email,                        // must be a verified email format
+          email,                     // ✅ v5 uses 'attributes'
           given_name: given,
           family_name: family,
-          // preferred_username can be added if you want a display handle
-        }
+        },
       });
 
       console.log('Registration successful:', user);
@@ -98,15 +95,14 @@ const RegistrationPage = () => {
       console.error('Registration error:', error);
       setErrors(prev => ({
         ...prev,
-        general:
-          (error && (error.message || error.code)) ||
-          'Registration failed. Please try again.'
+        general: (error && (error.message || error.code)) || 'Registration failed. Please try again.',
       }));
     } finally {
       setLoading(false);
     }
   };
 
+  // ---- v5 Auth: Confirm Sign Up ----
   const handleConfirmation = async (e) => {
     e.preventDefault();
     const code = stripSpaces(sanitize(confirmationCode));
@@ -129,29 +125,24 @@ const RegistrationPage = () => {
         firstName: sanitize(formData.firstName),
         lastName: sanitize(formData.lastName),
         username,
-        email: stripSpaces(sanitize(formData.email))
+        email: stripSpaces(sanitize(formData.email)),
       };
       localStorage.setItem('currentUser', JSON.stringify(userData));
 
       setMessage('Welcome to DahTruth Story Lab! Your writing journey begins now.');
-      
-      // CHANGE THIS LINE - Use React Router navigation instead of window.location
-      setTimeout(() => {
-        navigate('/dashboard');
-      }, 2000);
+      setTimeout(() => navigate('/dashboard'), 2000);
     } catch (error) {
       console.error('Confirmation error:', error);
       setErrors(prev => ({
         ...prev,
-        confirmation:
-          (error && (error.message || error.code)) ||
-          'Invalid confirmation code'
+        confirmation: (error && (error.message || error.code)) || 'Invalid confirmation code',
       }));
     } finally {
       setLoading(false);
     }
   };
 
+  // ---- v5 Auth: Resend Code ----
   const handleResendCode = async () => {
     const username = stripSpaces(sanitize(formData.username));
     if (!username) {
@@ -163,27 +154,22 @@ const RegistrationPage = () => {
     setMessage('');
 
     try {
-      await Auth.resendSignUp(username);
+      await Auth.resendSignUp(username); // ✅ v5 name
       setMessage('Confirmation code resent to your email.');
       setErrors({});
     } catch (error) {
       console.error('Resend error:', error);
       setErrors(prev => ({
         ...prev,
-        general:
-          (error && (error.message || error.code)) ||
-          'Failed to resend code'
+        general: (error && (error.message || error.code)) || 'Failed to resend code',
       }));
     } finally {
       setLoading(false);
     }
   };
 
-  // CHANGE THESE LINES - Use React Router navigation
   const handleBackToLanding = () => { navigate('/'); };
-  const handleSignInClick = () => { navigate('/signin'); };
 
-  // Rest of your component stays exactly the same...
   if (step === 'confirm') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-indigo-950 flex items-center justify-center p-4 relative overflow-hidden">
@@ -271,7 +257,8 @@ const RegistrationPage = () => {
           </button>
         </div>
       </div>
-    );
+    </div>
+  );
   }
 
   return (
@@ -390,7 +377,7 @@ const RegistrationPage = () => {
             Already have an account?{' '}
             <button
               type="button"
-              onClick={() => navigate('/signin')} // CHANGED THIS LINE
+              onClick={() => navigate('/signin')}
               className="text-blue-300 hover:text-blue-100 font-medium transition-colors"
             >
               Sign in
@@ -410,7 +397,7 @@ const RegistrationPage = () => {
   );
 };
 
-// ---- Small presentational subcomponents to keep things tidy ----
+// ---- Presentational inputs ----
 function LabeledInput({
   icon, name, type = 'text', value, onChange, onKeyDown, placeholder, error, required, autoComplete
 }) {
