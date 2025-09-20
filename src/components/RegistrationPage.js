@@ -135,13 +135,14 @@ export default function RegistrationPage() {
           {err && <Banner>{err}</Banner>}
 
           <form onSubmit={onConfirm} className="space-y-6" noValidate>
-            <Input
+           <Input
               type="email"
               name="email"
               value={form.email}
               onChange={onChange}
-              placeholder="Email"
+              placeholder="Email Address"
               autoComplete="email"
+              required
               leftIcon={<Mail className="h-5 w-5" />}
             />
             <Input
