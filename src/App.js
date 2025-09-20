@@ -9,28 +9,32 @@ import RegistrationPage from './components/RegistrationPage';
 import SignInPage from './components/SignInPage';
 import Dashboard from './components/Dashboard';
 import WriteSection from './components/WriteSection';
-import WhoAmI from './components/WhoAmI'; // ← optional debug page
+import WhoAmI from './components/WhoAmI'; // optional debug page
 
 Amplify.configure(awsconfig);
 
-// Robust protected route using bypassCache
+// Robust protected route using currentSession()
 function ProtectedRoute({ children }) {
-  const [state, setState] = React.useState({ loading: true, authed: false });
+  const [loading, setLoading] = React.useState(true);
+  const [authed, setAuthed] = React.useState(false);
 
   React.useEffect(() => {
-    let mounted = true;
+    let alive = true;
     (async () => {
       try {
-        await Auth.currentAuthenticatedUser({ bypassCache: true });
-        if (mounted) setState({ loading: false, authed: true });
-      } catch (e) {
-        if (mounted) setState({ loading: false, authed: false });
+        // If this resolves, we have valid tokens (user is signed in)
+        await Auth.currentSession();
+        if (alive) setAuthed(true);
+      } catch {
+        if (alive) setAuthed(false);
+      } finally {
+        if (alive) setLoading(false);
       }
     })();
-    return () => { mounted = false; };
+    return () => { alive = false; };
   }, []);
 
-  if (state.loading) {
+  if (loading) {
     return (
       <div className="min-h-screen bg-slate-950 flex items-center justify-center">
         <div className="text-white">Loading…</div>
@@ -38,7 +42,7 @@ function ProtectedRoute({ children }) {
     );
   }
 
-  return state.authed ? children : <Navigate to="/signin" replace />;
+  return authed ? children : <Navigate to="/signin" replace />;
 }
 
 function App() {
