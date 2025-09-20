@@ -95,7 +95,7 @@ export default function SignInPage() {
     } catch (e) {
       console.log('[Forgot submit error]', e);
       if (e?.code === 'CodeMismatchException') setErr('Invalid code.');
-      else if (e?.code === 'ExpiredCodeException') setErr('Code expired. Click “Resend code”.');
+      else if (e?.code === 'ExpiredCodeException') setErr('Code expired. Click "Resend code".');
       else setErr(e?.message || e?.code || 'Could not set new password.');
     } finally { setLoading(false); }
   };
@@ -148,9 +148,32 @@ export default function SignInPage() {
                     className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 px-4 py-2 font-medium disabled:opacity-60">
               {loading ? <Loader2 size={16} className="animate-spin"/> : null} Sign in
             </button>
-            <div className="text-center">
+            <div className="text-center space-y-2">
               <button type="button" onClick={()=>{setErr('');setMsg('');setMode('forgot');}}
                       className="text-indigo-300 hover:text-indigo-200 text-sm">Forgot password?</button>
+              
+              {/* ADD THIS SECTION - Registration link */}
+              <div className="pt-4 border-t border-white/10">
+                <p className="text-slate-400 text-sm mb-2">Don't have an account?</p>
+                <button 
+                  type="button" 
+                  onClick={() => navigate('/auth/register')}
+                  className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-slate-700 hover:bg-slate-600 px-4 py-2 font-medium text-slate-200 hover:text-white transition-colors"
+                >
+                  Create Account
+                </button>
+              </div>
+              
+              {/* Also add a link back to landing page */}
+              <div className="pt-2">
+                <button 
+                  type="button" 
+                  onClick={() => navigate('/')}
+                  className="text-slate-400 hover:text-slate-300 text-sm"
+                >
+                  ← Back to Home
+                </button>
+              </div>
             </div>
           </form>
         )}
