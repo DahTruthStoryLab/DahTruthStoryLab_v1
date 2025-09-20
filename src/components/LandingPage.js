@@ -1,9 +1,9 @@
 // src/components/LandingPage.js
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { BookOpen, Users, Brain, Heart } from 'lucide-react';
+import { BookOpen, Brain, Heart } from 'lucide-react';
 
-const LandingPage = () => {
+export default function LandingPage() {
   const navigate = useNavigate();
   const goRegister = () => navigate('/auth/register');
   const goSignIn  = () => navigate('/signin');
@@ -34,23 +34,35 @@ const LandingPage = () => {
                 <p className="text-blue-200 text-sm font-serif italic">Where your story comes to life</p>
               </div>
             </div>
-            <button
-              onClick={goSignIn}
-              className="px-6 py-2 bg-blue-700 hover:bg-blue-600 text-white rounded-full font-serif font-medium transition-all duration-300 shadow-lg hover:shadow-xl"
-            >
-              Sign In
-            </button>
+
+            <div className="flex items-center gap-3">
+              <button
+                onClick={goSignIn}
+                className="px-6 py-2 bg-blue-700 hover:bg-blue-600 text-white rounded-full font-serif font-medium transition-all duration-300 shadow-lg hover:shadow-xl"
+              >
+                Sign In
+              </button>
+              <button
+                onClick={goRegister}
+                className="px-6 py-2 bg-blue-900/40 hover:bg-blue-800/60 text-white border border-blue-500/50 rounded-full font-serif font-medium transition-all duration-300 backdrop-blur-sm"
+              >
+                Create Account
+              </button>
+            </div>
           </div>
         </div>
       </header>
 
-      {/* Main Content */}
+      {/* Hero */}
       <main className="relative z-10 max-w-7xl mx-auto px-6 py-16">
         <div className="text-center mb-16">
           <h2 className="text-6xl font-bold text-white mb-6 font-serif leading-tight">
             Write boldly. <span className="text-blue-400">Edit clearly.</span><br />
             <span className="text-teal-400">Publish confidently.</span>
           </h2>
+          <p className="text-blue-200 max-w-2xl mx-auto font-serif text-lg">
+            An inspiring, faith-centered space to plan, draft, and finish your novel—supported by smart tools and a caring community.
+          </p>
           <div className="flex flex-col sm:flex-row gap-6 justify-center mt-12">
             <button
               onClick={goRegister}
@@ -72,8 +84,7 @@ const LandingPage = () => {
           <div className="text-center mb-12">
             <h3 className="text-4xl font-bold text-white mb-4 font-serif">8-Week Novel Challenge</h3>
             <p className="text-xl text-blue-100 font-serif leading-relaxed max-w-3xl mx-auto">
-              Join our faith-based writing community to complete your 25,000-word novel in just 8 weeks.
-              Get AI assistance, character development tools, and spiritual guidance throughout your journey.
+              Complete your 25,000-word novel in 8 weeks. Get AI prompts, planning tools, and encouragement grounded in faith—every step of the way.
             </p>
             <button
               onClick={goRegister}
@@ -96,7 +107,7 @@ const LandingPage = () => {
               </div>
             </div>
             <p className="text-blue-200 font-serif leading-relaxed">
-              Our AI analyzes your chapters, characters, and plot to provide contextual prompts that help you overcome writer's block and stay on track.
+              Get contextual prompts, beat writer’s block, and keep your story moving with scene-aware suggestions.
             </p>
           </div>
 
@@ -110,7 +121,7 @@ const LandingPage = () => {
               </div>
             </div>
             <p className="text-blue-200 font-serif leading-relaxed">
-              Create detailed character profiles, track relationships, and build immersive worlds with our comprehensive planning tools.
+              Create rich character profiles, track arcs, and build immersive settings that anchor your plot.
             </p>
           </div>
 
@@ -124,13 +135,11 @@ const LandingPage = () => {
               </div>
             </div>
             <p className="text-blue-200 font-serif leading-relaxed">
-              Connect with fellow Christian writers, share encouragement, and grow together in both faith and craft through our supportive community features.
+              Be supported by fellow Christian writers—share progress, encouragement, and prayer.
             </p>
           </div>
         </div>
       </main>
     </div>
   );
-};
-
-export default LandingPage;
+}
