@@ -1,48 +1,133 @@
 // src/components/SignInPage.js
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Auth } from 'aws-amplify';
-import { Mail, User, Lock, Eye, EyeOff, Loader2, XCircle, CheckCircle } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, Loader2, XCircle, CheckCircle, ArrowLeft } from 'lucide-react';
+
+const lc = (s = '') => s.trim().toLowerCase();
 
 export default function SignInPage() {
   const navigate = useNavigate();
-  const [id, setId] = useState('');
+  const [mode, setMode] = useState<'signin' | 'forgot' | 'reset'>('signin');
+
+  // shared state
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+
+  // reset flow state
+  const [code, setCode] = useState('');
+  const [newPassword, setNewPassword] = useState('');
   const [showPwd, setShowPwd] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [msg, setMsg] = useState('');
   const [err, setErr] = useState('');
+  const [msg, setMsg] = useState('');
 
-  const onSubmit = async (e) => {
+  // Prefill email if we saved it during registration
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('currentUser') || '{}');
+      if (saved?.email) setEmail(lc(saved.email));
+    } catch {}
+  }, []);
+
+  const handleSignIn = async (e) => {
     e.preventDefault();
     setErr(''); setMsg('');
-    if (!id || !password) { setErr('Please enter your username/email and password.'); return; }
+    const id = lc(email);
+    if (!id || !password) { setErr('Enter your email and password.'); return; }
 
     setLoading(true);
     try {
-      // 1) Sign in
       await Auth.signIn(id, password);
-      // 2) Force-refresh the current user so tokens are definitely stored
-      await Auth.currentAuthenticatedUser({ bypassCache: true });
-      // 3) Navigate to a protected route
+      await Auth.currentAuthenticatedUser({ bypassCache: true }); // ensure tokens are stored
       navigate('/dashboard');
     } catch (e) {
-      if (e?.code === 'UserNotConfirmedException') {
-        setErr('Account not confirmed. Check your email or confirm your registration.');
-      } else if (e?.code === 'NotAuthorizedException') {
-        setErr('Incorrect username/email or password.');
-      } else {
-        setErr(e?.message || e?.code || 'Sign-in failed.');
-      }
+      console.log('[SignIn error]', e);
+      if (e?.code === 'UserNotConfirmedException') setErr('Please confirm your email before signing in.');
+      else if (e?.code === 'NotAuthorizedException') setErr('Incorrect email or password.');
+      else if (e?.code === 'UserNotFoundException') setErr('No account found for that email.');
+      else setErr(e?.message || e?.code || 'Sign-in failed.');
     } finally {
       setLoading(false);
     }
   };
 
+  const handleForgotStart = async (e) => {
+    e.preventDefault();
+    setErr(''); setMsg('');
+    const id = lc(email);
+    if (!id) { setErr('Enter your email.'); return; }
+
+    setLoading(true);
+    try {
+      await Auth.forgotPassword(id);         // send code
+      setMsg('We sent a reset code to your email.');
+      setMode('reset');                      // move to code + new password form
+    } catch (e) {
+      console.log('[Forgot error]', e);
+      if (e?.code === 'UserNotFoundException') setErr('No account found for that email.');
+      else setErr(e?.message || e?.code || 'Could not start password reset.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleForgotComplete = async (e) => {
+    e.preventDefault();
+    setErr(''); setMsg('');
+    const id = lc(email);
+    const c = code.trim();
+    const np = newPassword;
+    if (!id || !c || !np) { setErr('Enter your email, the 6-digit code, and a new password.'); return; }
+
+    setLoading(true);
+    try {
+      await Auth.forgotPasswordSubmit(id, c, np);
+      setMsg('Password updated! You can sign in now.');
+      setTimeout(() => setMode('signin'), 700);
+    } catch (e) {
+      console.log('[Forgot submit error]', e);
+      if (e?.code === 'CodeMismatchException') setErr('Invalid code. Please check the email and try again.');
+      else if (e?.code === 'ExpiredCodeException') setErr('Code expired. Click “Resend code” and try again.');
+      else setErr(e?.message || e?.code || 'Could not set new password.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const resendCode = async () => {
+    setErr(''); setMsg('');
+    const id = lc(email);
+    if (!id) { setErr('Enter your email first.'); return; }
+    setLoading(true);
+    try {
+      await Auth.forgotPassword(id);
+      setMsg('Code resent. Check your email.');
+    } catch (e) {
+      console.log('[Resend code error]', e);
+      setErr(e?.message || e?.code || 'Could not resend code.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ---------- UI ----------
   return (
     <div className="min-h-screen flex items-center justify-center p-6 bg-slate-950 text-slate-100">
       <div className="w-full max-w-md bg-slate-900/70 border border-white/10 rounded-2xl p-6">
-        <h1 className="text-2xl font-semibold mb-6">Sign in</h1>
+        {mode !== 'signin' && (
+          <button
+            type="button"
+            onClick={() => { setErr(''); setMsg(''); setMode('signin'); }}
+            className="mb-4 inline-flex items-center gap-2 text-slate-300 hover:text-white"
+          >
+            <ArrowLeft size={16} /> Back to sign in
+          </button>
+        )}
+
+        <h1 className="text-2xl font-semibold mb-6">
+          {mode === 'signin' ? 'Sign in' : mode === 'forgot' ? 'Forgot password' : 'Reset password'}
+        </h1>
 
         {msg && (
           <div className="mb-4 flex items-center gap-2 rounded-lg px-3 py-2 text-sm bg-green-500/10 text-green-300 border border-green-500/20">
@@ -55,57 +140,142 @@ export default function SignInPage() {
           </div>
         )}
 
-        <form onSubmit={onSubmit} className="space-y-4" noValidate>
-          <div className="relative">
-            <input
-              type="text"
-              value={id}
-              onChange={(e) => setId(e.target.value.trim())}
-              placeholder="Username or email"
-              autoComplete="username"
-              className="w-full pl-10 pr-3 py-3 rounded-lg bg-slate-800/50 border border-white/10 outline-none"
-              required
-            />
-            {id.includes('@')
-              ? <Mail className="absolute left-3 top-3.5 h-5 w-5 text-slate-400" />
-              : <User className="absolute left-3 top-3.5 h-5 w-5 text-slate-400" />}
-          </div>
+        {mode === 'signin' && (
+          <form onSubmit={handleSignIn} className="space-y-4" noValidate>
+            <div className="relative">
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Email"
+                autoComplete="email"
+                className="w-full pl-10 pr-3 py-3 rounded-lg bg-slate-800/50 border border-white/10 outline-none"
+                required
+              />
+              <Mail className="absolute left-3 top-3.5 h-5 w-5 text-slate-400" />
+            </div>
 
-          <div className="relative">
-            <input
-              type={showPwd ? 'text' : 'password'}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Password"
-              autoComplete="current-password"
-              className="w-full pl-10 pr-10 py-3 rounded-lg bg-slate-800/50 border border-white/10 outline-none"
-              required
-            />
-            <Lock className="absolute left-3 top-3.5 h-5 w-5 text-slate-400" />
-            <button type="button" className="absolute right-3 top-3.5 text-slate-400" onClick={() => setShowPwd(v => !v)}>
-              {showPwd ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+            <div className="relative">
+              <input
+                type={showPwd ? 'text' : 'password'}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Password"
+                autoComplete="current-password"
+                className="w-full pl-10 pr-10 py-3 rounded-lg bg-slate-800/50 border border-white/10 outline-none"
+                required
+              />
+              <Lock className="absolute left-3 top-3.5 h-5 w-5 text-slate-400" />
+              <button type="button" className="absolute right-3 top-3.5 text-slate-400" onClick={() => setShowPwd(v => !v)}>
+                {showPwd ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+              </button>
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 px-4 py-2 font-medium disabled:opacity-60"
+            >
+              {loading ? <Loader2 size={16} className="animate-spin" /> : null}
+              Sign in
             </button>
-          </div>
 
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 px-4 py-2 font-medium disabled:opacity-60"
-          >
-            {loading ? <Loader2 size={16} className="animate-spin" /> : null}
-            Sign in
-          </button>
-        </form>
+            <div className="text-center">
+              <button
+                type="button"
+                onClick={() => { setErr(''); setMsg(''); setMode('forgot'); }}
+                className="text-indigo-300 hover:text-indigo-200 text-sm"
+              >
+                Forgot password?
+              </button>
+            </div>
 
-        <div className="text-center mt-4">
-          <button
-            type="button"
-            onClick={() => navigate('/auth/register')}
-            className="text-indigo-300 hover:text-indigo-200 text-sm"
-          >
-            Need an account? Register
-          </button>
-        </div>
+            <div className="text-center">
+              <button
+                type="button"
+                onClick={() => navigate('/auth/register')}
+                className="text-slate-300 hover:text-white text-sm"
+              >
+                Need an account? Register
+              </button>
+            </div>
+          </form>
+        )}
+
+        {mode === 'forgot' && (
+          <form onSubmit={handleForgotStart} className="space-y-4" noValidate>
+            <div className="relative">
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Email"
+                autoComplete="email"
+                className="w-full pl-10 pr-3 py-3 rounded-lg bg-slate-800/50 border border-white/10 outline-none"
+                required
+              />
+              <Mail className="absolute left-3 top-3.5 h-5 w-5 text-slate-400" />
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 px-4 py-2 font-medium disabled:opacity-60"
+            >
+              {loading ? <Loader2 size={16} className="animate-spin" /> : null}
+              Send reset code
+            </button>
+          </form>
+        )}
+
+        {mode === 'reset' && (
+          <form onSubmit={handleForgotComplete} className="space-y-4" noValidate>
+            <div className="relative">
+              <input
+                type="text"
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                placeholder="6-digit code"
+                maxLength={6}
+                inputMode="numeric"
+                className="w-full pl-10 pr-3 py-3 rounded-lg bg-slate-800/50 border border-white/10 outline-none tracking-widest"
+                required
+              />
+              <Mail className="absolute left-3 top-3.5 h-5 w-5 text-slate-400" />
+            </div>
+
+            <div className="relative">
+              <input
+                type={showPwd ? 'text' : 'password'}
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="New password"
+                autoComplete="new-password"
+                className="w-full pl-10 pr-10 py-3 rounded-lg bg-slate-800/50 border border-white/10 outline-none"
+                required
+              />
+              <Lock className="absolute left-3 top-3.5 h-5 w-5 text-slate-400" />
+              <button type="button" className="absolute right-3 top-3.5 text-slate-400" onClick={() => setShowPwd(v => !v)}>
+                {showPwd ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+              </button>
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-green-600 hover:bg-green-500 px-4 py-2 font-medium disabled:opacity-60"
+            >
+              {loading ? <Loader2 size={16} className="animate-spin" /> : null}
+              Set new password
+            </button>
+
+            <div className="text-center">
+              <button type="button" onClick={resendCode} disabled={loading || !email} className="text-indigo-300 hover:text-indigo-200 text-sm">
+                Resend code
+              </button>
+            </div>
+          </form>
+        )}
       </div>
     </div>
   );
