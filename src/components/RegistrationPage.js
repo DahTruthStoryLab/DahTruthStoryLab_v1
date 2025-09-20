@@ -4,12 +4,12 @@ import { useNavigate } from 'react-router-dom';
 import { Auth } from 'aws-amplify';
 import { Eye, EyeOff, Mail, Lock, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 
-const clean = (s='') => s.trim();
-const lc = (s='') => s.trim().toLowerCase();
+const clean = (s = '') => s.trim();
+const lc = (s = '') => s.trim().toLowerCase();
 
 export default function RegistrationPage() {
   const navigate = useNavigate();
-  const [step, setStep] = useState<'register' | 'confirm'>('register');
+  const [step, setStep] = useState('register'); // <-- plain JS
 
   const [form, setForm] = useState({
     email: '',
@@ -40,13 +40,12 @@ export default function RegistrationPage() {
 
     const email = lc(form.email);
     const pw = form.password;
-    const conf = form.confirmPassword;
 
-    if (!email || !pw || !conf || !form.firstName || !form.lastName) {
+    if (!email || !pw || !form.confirmPassword || !form.firstName || !form.lastName) {
       setErr('Please complete all fields.');
       return;
     }
-    if (pw !== conf) {
+    if (pw !== form.confirmPassword) {
       setErr('Passwords do not match.');
       return;
     }
@@ -54,7 +53,7 @@ export default function RegistrationPage() {
     setLoading(true);
     try {
       await Auth.signUp({
-        username: email,                 // <-- email as username
+        username: email, // email as username
         password: pw,
         attributes: {
           email,
@@ -255,6 +254,7 @@ export default function RegistrationPage() {
 function Banner({ children, ok }) {
   return (
     <div className={`mb-4 flex items-center gap-2 rounded-lg px-3 py-2 text-sm border ${ok ? 'bg-green-500/10 text-green-300 border-green-500/20' : 'bg-red-500/10 text-red-300 border-red-500/20'}`}>
+      {ok ? <CheckCircle size={16} /> : <XCircle size={16} />}
       {children}
     </div>
   );
