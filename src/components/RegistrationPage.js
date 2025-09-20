@@ -78,50 +78,46 @@ export default function RegistrationPage() {
   };
 
   // ---------- Confirm then AUTO SIGN-IN ----------
-  const onConfirm = async (e) => {
-    e.preventDefault();
-    setErr(''); setMsg('');
+ const onConfirm = async (e) => {
+  e.preventDefault();
+  setErr(''); setMsg('');
 
-    const email = lc(form.email);
-    const c = clean(code).replace(/\s+/g, '');
-    if (!email || !c) {
-      setErr('Enter your email and the 6-digit code.');
-      return;
-    }
+  const email = lc(form.email);
+  const c = clean(code).replace(/\s+/g, '');
+  if (!email || !c) {
+    setErr('Enter your email and the 6-digit code.');
+    return;
+  }
 
-    setLoading(true);
-    try {
-      await Auth.confirmSignUp(email, c);
-      await Auth.signIn(email, form.password); // auto sign-in
-      await Auth.currentAuthenticatedUser({ bypassCache: true });
-      setMsg('Email confirmed! Redirecting…');
-      navigate('/dashboard');
-    } catch (e) {
-      console.log('[Confirm/signin error]', e);
-      if (e?.code === 'CodeMismatchException') setErr('Invalid code. Please check and try again.');
-      else if (e?.code === 'ExpiredCodeException') setErr('Code expired. Click “Resend code”.');
-      else if (e?.code === 'NotAuthorizedException') setErr('Confirmation worked, but password was not accepted. Use “Forgot password?” on Sign In.');
-      else setErr(e?.message || e?.code || 'Could not confirm/sign in.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const resend = async () => {
-    setErr(''); setMsg('');
-    const email = lc(form.email);
-    if (!email) { setErr('Enter your email to resend.'); return; }
-    setLoading(true);
-    try {
-      await Auth.resendSignUp(email);
-      setMsg('Code resent. Check your email.');
-    } catch (e) {
-      console.log('[Resend error]', e);
-      setErr(e?.message || e?.code || 'Could not resend code.');
-    } finally {
-      setLoading(false);
-    }
-  };
+  setLoading(true);
+  try {
+    // Step 1: Confirm the signup
+    await Auth.confirmSignUp(email, c);
+    
+    // Step 2: Sign in to get access
+    await Auth.signIn(email, form.password);
+    
+    // Step 3: Get the current user and mark email as verified (KEY FIX!)
+    const user = await Auth.currentAuthenticatedUser({ bypassCache: true });
+    
+    // Step 4: Update user attributes to mark email as verified
+    await Auth.updateUserAttributes(user, {
+      'email_verified': 'true'
+    });
+    
+    console.log('Email marked as verified for password reset capability');
+    setMsg('Email confirmed and verified! Redirecting…');
+    navigate('/dashboard');
+  } catch (e) {
+    console.log('[Confirm/signin error]', e);
+    if (e?.code === 'CodeMismatchException') setErr('Invalid code. Please check and try again.');
+    else if (e?.code === 'ExpiredCodeException') setErr('Code expired. Click "Resend code".');
+    else if (e?.code === 'NotAuthorizedException') setErr('Confirmation worked, but password was not accepted. Use "Forgot password?" on Sign In.');
+    else setErr(e?.message || e?.code || 'Could not confirm/sign in.');
+  } finally {
+    setLoading(false);
+  }
+};
 
   // ---------- UI (keeps your “beautiful” styling) ----------
   if (step === 'confirm') {
