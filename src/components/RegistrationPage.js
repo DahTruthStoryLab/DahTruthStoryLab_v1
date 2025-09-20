@@ -1,468 +1,314 @@
 // src/components/RegistrationPage.js
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Auth } from 'aws-amplify'; // v5
-import { Eye, EyeOff, User, Mail, Lock, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { Auth } from 'aws-amplify';
+import { Eye, EyeOff, Mail, Lock, CheckCircle, XCircle, Loader2, User } from 'lucide-react';
 
-const sanitize = (s = '') => s.trim();
-const stripSpaces = (s = '') => s.replace(/\s+/g, '');
-
-function LabeledInput({
-  icon, name, type = 'text', value, onChange, onKeyDown, placeholder, error, required, autoComplete
-}) {
-  return (
-    <div className="relative group">
-      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-        <span className="text-blue-300 group-focus-within:text-blue-100 transition-colors">{icon}</span>
-      </div>
-      <input
-        type={type}
-        name={name}
-        value={value}
-        onKeyDown={onKeyDown}
-        onChange={onChange}
-        placeholder={placeholder}
-        autoComplete={autoComplete}
-        className={`w-full pl-12 pr-4 py-4 bg-blue-900/30 border border-blue-700/50 rounded-xl 
-          text-white placeholder-blue-300 backdrop-blur-sm
-          focus:ring-2 focus:ring-blue-400 focus:border-blue-400 focus:bg-blue-900/40
-          transition-all duration-300 font-serif
-          ${error ? 'border-red-400 focus:ring-red-400' : ''}`}
-        required={required}
-      />
-      {error && (
-        <div className="flex items-center mt-2 text-red-300 text-sm font-serif">
-          <XCircle className="h-4 w-4 mr-1" />
-          {error}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function PasswordInput({ name, value, onChange, placeholder, show, setShow, error, autoComplete }) {
-  return (
-    <div className="relative group">
-      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-        <Lock className="h-5 w-5 text-blue-300 group-focus-within:text-blue-100 transition-colors" />
-      </div>
-      <input
-        type={show ? 'text' : 'password'}
-        name={name}
-        value={value}
-        onChange={onChange}
-        placeholder={placeholder}
-        autoComplete={autoComplete}
-        className={`w-full pl-12 pr-12 py-4 bg-blue-900/30 border border-blue-700/50 rounded-xl 
-          text-white placeholder-blue-300 backdrop-blur-sm
-          focus:ring-2 focus:ring-blue-400 focus:border-blue-400 focus:bg-blue-900/40
-          transition-all duration-300 font-serif
-          ${error ? 'border-red-400 focus:ring-red-400' : ''}`}
-        required
-      />
-      <button
-        type="button"
-        className="absolute inset-y-0 right-0 pr-4 flex items-center text-blue-300 hover:text-blue-100 transition-colors"
-        onClick={() => setShow(!show)}
-      >
-        {show ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-      </button>
-      {error && (
-        <div className="flex items-center mt-2 text-red-300 text-sm font-serif">
-          <XCircle className="h-4 w-4 mr-1" />
-          {error}
-        </div>
-      )}
-    </div>
-  );
-}
-
-const RegistrationPage = () => {
+export default function RegistrationPage() {
   const navigate = useNavigate();
   const [step, setStep] = useState('register'); // 'register' | 'confirm'
-  const [formData, setFormData] = useState({
+  const [form, setForm] = useState({
     email: '',
+    username: '',
     password: '',
     confirmPassword: '',
-    username: '',
     firstName: '',
-    lastName: ''
+    lastName: '',
   });
-  const [confirmationCode, setConfirmationCode] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [errors, setErrors] = useState({});
+  const [code, setCode] = useState('');
+  const [showPwd, setShowPwd] = useState(false);
+  const [showPwd2, setShowPwd2] = useState(false);
+  const [msg, setMsg] = useState('');
+  const [err, setErr] = useState('');
   const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState('');
 
-  const validateForm = () => {
-    const newErrors = {};
-    const email = stripSpaces(sanitize(formData.email));
-    const username = stripSpaces(sanitize(formData.username));
+  const sanitize = (s = '') => s.trim();
+  const stripSpaces = (s = '') => s.replace(/\s+/g, '');
 
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!email) newErrors.email = 'Email is required';
-    else if (!emailRegex.test(email)) newErrors.email = 'Please enter a valid email address';
-
-    if (!username) newErrors.username = 'Username is required';
-    else if (username.length < 3) newErrors.username = 'Username must be at least 3 characters';
-
-    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
-    if (!formData.password) newErrors.password = 'Password is required';
-    else if (!passwordRegex.test(formData.password))
-      newErrors.password = 'Password must be at least 8 characters with uppercase, lowercase, number, and special character';
-
-    if (formData.password !== formData.confirmPassword)
-      newErrors.confirmPassword = 'Passwords do not match';
-
-    if (!sanitize(formData.firstName)) newErrors.firstName = 'First name is required';
-    if (!sanitize(formData.lastName)) newErrors.lastName = 'Last name is required';
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleInputChange = (e) => {
+  const onChange = (e) => {
     const { name, value } = e.target;
-    const transformed =
-      name === 'email' || name === 'username' ? stripSpaces(value) : value;
-    setFormData(prev => ({ ...prev, [name]: transformed }));
-    if (errors[name]) setErrors(prev => ({ ...prev, [name]: '' }));
+    const v = (name === 'email' || name === 'username') ? stripSpaces(value) : value;
+    setForm((f) => ({ ...f, [name]: v }));
+    if (err) setErr('');
+    if (msg) setMsg('');
   };
 
-  // ---- v5 Auth: Sign Up ----
-  const handleRegister = async (e) => {
+  // ---------- Register ----------
+  const onRegister = async (e) => {
     e.preventDefault();
-    if (!validateForm()) return;
+    setErr(''); setMsg('');
+
+    const email = stripSpaces(sanitize(form.email)).toLowerCase();
+    const username = stripSpaces(sanitize(form.username));
+    const password = form.password;
+    const confirm = form.confirmPassword;
+
+    if (!email || !username || !password || !confirm) {
+      setErr('Please fill out all required fields.');
+      return;
+    }
+    if (password !== confirm) {
+      setErr('Passwords do not match.');
+      return;
+    }
 
     setLoading(true);
-    setMessage('');
-    setErrors({});
-
-    const email = stripSpaces(sanitize(formData.email)).toLowerCase();
-    const username = stripSpaces(sanitize(formData.username));
-    const given = sanitize(formData.firstName);
-    const family = sanitize(formData.lastName);
-
     try {
-      const { user } = await Auth.signUp({
+      await Auth.signUp({
         username,
-        password: formData.password,
+        password,
         attributes: {
           email,
-          given_name: given,
-          family_name: family,
+          given_name: sanitize(form.firstName),
+          family_name: sanitize(form.lastName),
         },
       });
-
-      console.log('Registration successful:', user);
-      setMessage('Registration successful! Please check your email for the confirmation code.');
+      setMsg('Registration successful! Check your email for the code.');
       setStep('confirm');
-    } catch (error) {
-      console.error('Registration error:', error);
-      setErrors(prev => ({
-        ...prev,
-        general: (error && (error.message || error.code)) || 'Registration failed. Please try again.',
-      }));
+    } catch (e) {
+      setErr(e?.message || e?.code || 'Registration failed.');
     } finally {
       setLoading(false);
     }
   };
 
-  // ---- v5 Auth: Confirm Sign Up ----
-  const handleConfirmation = async (e) => {
+  // ---------- Confirm ----------
+  const onConfirm = async (e) => {
     e.preventDefault();
-    const code = stripSpaces(sanitize(confirmationCode));
-    if (!code) {
-      setErrors(prev => ({ ...prev, confirmation: 'Please enter the confirmation code' }));
+    setErr(''); setMsg('');
+
+    const username = stripSpaces(sanitize(form.username));
+    const c = stripSpaces(sanitize(code));
+    if (!username || !c) {
+      setErr('Enter your username and the 6-digit code.');
       return;
     }
 
     setLoading(true);
-    setMessage('');
-    setErrors({});
-
-    const username = stripSpaces(sanitize(formData.username));
-
     try {
-      await Auth.confirmSignUp(username, code);
-
-      const userData = {
-        firstName: sanitize(formData.firstName),
-        lastName: sanitize(formData.lastName),
-        username,
-        email: stripSpaces(sanitize(formData.email)),
-      };
-      localStorage.setItem('currentUser', JSON.stringify(userData));
-
-      setMessage('Welcome to DahTruth Story Lab! Your writing journey begins now.');
-      setTimeout(() => navigate('/dashboard'), 2000);
-    } catch (error) {
-      console.error('Confirmation error:', error);
-      setErrors(prev => ({
-        ...prev,
-        confirmation: (error && (error.message || error.code)) || 'Invalid confirmation code',
-      }));
+      await Auth.confirmSignUp(username, c);
+      setMsg('Account confirmed! Redirecting…');
+      setTimeout(() => navigate('/dashboard'), 800);
+    } catch (e) {
+      setErr(e?.message || e?.code || 'Invalid confirmation code.');
     } finally {
       setLoading(false);
     }
   };
 
-  // ---- v5 Auth: Resend Code ----
-  const handleResendCode = async () => {
-    const username = stripSpaces(sanitize(formData.username));
-    if (!username) {
-      setErrors(prev => ({ ...prev, general: 'Username is required to resend code' }));
-      return;
-    }
-
+  const resend = async () => {
+    setErr(''); setMsg('');
+    const username = stripSpaces(sanitize(form.username));
+    if (!username) { setErr('Username is required to resend code.'); return; }
     setLoading(true);
-    setMessage('');
-
     try {
       await Auth.resendSignUp(username);
-      setMessage('Confirmation code resent to your email.');
-      setErrors({});
-    } catch (error) {
-      console.error('Resend error:', error);
-      setErrors(prev => ({
-        ...prev,
-        general: (error && (error.message || error.code)) || 'Failed to resend code',
-      }));
+      setMsg('Code resent. Check your email.');
+    } catch (e) {
+      setErr(e?.message || e?.code || 'Could not resend code.');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleBackToLanding = () => { navigate('/'); };
-
-  // ---------- RENDER ----------
+  // ---------- UI ----------
   if (step === 'confirm') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-indigo-950 flex items-center justify-center p-4 relative overflow-hidden">
-        <div className="absolute inset-0 opacity-15">
-          <div className="absolute top-20 left-10 w-72 h-72 bg-blue-500 rounded-full mix-blend-multiply filter blur-xl animate-pulse"></div>
-          <div className="absolute bottom-20 right-10 w-72 h-72 bg-teal-500 rounded-full mix-blend-multiply filter blur-xl animate-pulse delay-700"></div>
-        </div>
+      <div className="min-h-screen flex items-center justify-center p-6 bg-slate-950 text-slate-100">
+        <div className="w-full max-w-md bg-slate-900/70 border border-white/10 rounded-2xl p-6">
+          <h1 className="text-xl font-semibold mb-6">Confirm your email</h1>
 
-        <div className="relative z-10 bg-blue-950/50 backdrop-blur-xl rounded-3xl shadow-2xl p-12 w-full max-w-md border border-blue-800/40">
-          <div className="text-center mb-10">
-            <div className="w-20 h-20 rounded-full overflow-hidden shadow-2xl border-2 border-blue-400/30 mx-auto mb-6">
-              <img src="/dahtruth-logo.png" alt="DahTruth Story Lab Logo" className="w-full h-full object-cover" />
+          {msg && (
+            <div className="mb-4 flex items-center gap-2 rounded-lg px-3 py-2 text-sm bg-green-500/10 text-green-300 border border-green-500/20">
+              <CheckCircle size={16} /> {msg}
             </div>
-            <div className="bg-blue-600/30 rounded-full p-4 w-20 h-20 mx-auto mb-6 flex items-center justify-center">
-              <Mail className="h-10 w-10 text-blue-300" />
+          )}
+          {err && (
+            <div className="mb-4 flex items-center gap-2 rounded-lg px-3 py-2 text-sm bg-red-500/10 text-red-300 border border-red-500/20">
+              <XCircle size={16} /> {err}
             </div>
-            <h2 className="text-3xl font-bold text-white font-serif mb-3">Confirm Your Email</h2>
-            <p className="text-blue-200 font-serif">
-              We sent a confirmation code to <span className="font-medium text-white">{formData.email}</span>
-            </p>
-          </div>
+          )}
 
-          <form onSubmit={handleConfirmation} className="space-y-8" noValidate>
-            <div>
+          <form onSubmit={onConfirm} className="space-y-4" noValidate>
+            <div className="relative">
               <input
                 type="text"
-                value={confirmationCode}
-                onChange={(e) => setConfirmationCode(stripSpaces(e.target.value))}
-                placeholder="Enter confirmation code"
-                className="w-full px-6 py-4 bg-blue-900/30 border border-blue-700/50 rounded-xl text-center text-xl font-mono text-white placeholder-blue-300 focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-all duration-300 backdrop-blur-sm"
-                maxLength={6}
-                inputMode="numeric"
-                autoComplete="one-time-code"
-                pattern="[0-9]{6}"
+                name="username"
+                value={form.username}
+                onChange={onChange}
+                placeholder="Username"
+                autoComplete="username"
+                className="w-full pl-10 pr-3 py-3 rounded-lg bg-slate-800/50 border border-white/10 outline-none"
                 required
               />
-              {errors.confirmation && (
-                <div className="flex items-center mt-2 text-red-300 text-sm font-serif">
-                  <XCircle className="h-4 w-4 mr-1" />
-                  {errors.confirmation}
-                </div>
-              )}
+              <User className="absolute left-3 top-3.5 h-5 w-5 text-slate-400" />
+            </div>
+
+            <div className="relative">
+              <input
+                type="text"
+                value={code}
+                onChange={(e) => setCode(stripSpaces(e.target.value))}
+                placeholder="6-digit code"
+                inputMode="numeric"
+                maxLength={6}
+                className="w-full pl-10 pr-3 py-3 rounded-lg bg-slate-800/50 border border-white/10 outline-none tracking-widest"
+                required
+              />
+              <Mail className="absolute left-3 top-3.5 h-5 w-5 text-slate-400" />
             </div>
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-gradient-to-r from-blue-500 to-teal-500 hover:from-blue-400 hover:to-teal-400 text-white py-4 px-6 rounded-xl font-serif font-bold text-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center shadow-xl hover:shadow-2xl hover:scale-105"
+              className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-green-600 hover:bg-green-500 px-4 py-2 font-medium disabled:opacity-60"
             >
-              {loading ? (<><Loader2 className="animate-spin h-6 w-6 mr-2" />Confirming...</>) : ('Confirm Email')}
+              {loading ? <Loader2 size={16} className="animate-spin" /> : null}
+              Confirm
             </button>
-
-            <div className="text-center">
-              <button
-                type="button"
-                onClick={handleResendCode}
-                disabled={loading || !formData.username}
-                className="text-blue-300 hover:text-blue-100 font-serif text-sm font-medium disabled:opacity-50 transition-colors"
-              >
-                Didn't receive the code? Resend
-              </button>
-            </div>
           </form>
 
-          {message && (
-            <div className="mt-6 p-4 bg-green-500/20 border border-green-400/30 rounded-xl flex items-center backdrop-blur-sm">
-              <CheckCircle className="h-5 w-5 text-green-300 mr-2" />
-              <span className="text-green-100 text-sm font-serif">{message}</span>
-            </div>
-          )}
-
-          {errors.general && (
-            <div className="mt-6 p-4 bg-red-500/20 border border-red-400/30 rounded-xl flex items-center backdrop-blur-sm">
-              <XCircle className="h-5 w-5 text-red-300 mr-2" />
-              <span className="text-red-100 text-sm font-serif">{errors.general}</span>
-            </div>
-          )}
+          <div className="mt-3 text-center">
+            <button
+              type="button"
+              onClick={resend}
+              disabled={loading || !form.username}
+              className="text-indigo-300 hover:text-indigo-200 text-sm"
+            >
+              Resend code
+            </button>
+          </div>
 
           <button
             type="button"
             onClick={() => setStep('register')}
-            className="w-full mt-6 text-blue-300 text-sm hover:text-blue-100 font-serif transition-colors"
+            className="w-full mt-6 text-indigo-300 text-sm hover:text-indigo-200"
           >
-            ← Back to Registration
+            ← Back to registration
           </button>
         </div>
       </div>
-    </div>
     );
   }
 
-  // Registration screen
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-indigo-950 flex items-center justify-center p-4 relative overflow-hidden">
-      <div className="absolute inset-0 opacity-15">
-        <div className="absolute top-20 left-10 w-72 h-72 bg-blue-500 rounded-full mix-blend-multiply filter blur-xl animate-pulse"></div>
-        <div className="absolute bottom-20 right-10 w-72 h-72 bg-teal-500 rounded-full mix-blend-multiply filter blur-xl animate-pulse delay-700"></div>
-      </div>
+    <div className="min-h-screen flex items-center justify-center p-6 bg-slate-950 text-slate-100">
+      <div className="w-full max-w-lg bg-slate-900/70 border border-white/10 rounded-2xl p-6">
+        <h1 className="text-2xl font-semibold mb-6">Create your account</h1>
 
-      <div className="relative z-10 bg-blue-950/50 backdrop-blur-xl rounded-3xl shadow-2xl p-12 w-full max-w-lg border border-blue-800/40">
-        <div className="text-center mb-10">
-          <div className="w-20 h-20 rounded-full overflow-hidden shadow-2xl border-2 border-blue-400/30 mx-auto mb-6">
-            <img src="/dahtruth-logo.png" alt="DahTruth Story Lab Logo" className="w-full h-full object-cover" />
+        {msg && (
+          <div className="mb-4 flex items-center gap-2 rounded-lg px-3 py-2 text-sm bg-green-500/10 text-green-300 border border-green-500/20">
+            <CheckCircle size={16} /> {msg}
           </div>
-          <h2 className="text-4xl font-bold text-white font-serif mb-3">Join DahTruth Story Lab</h2>
-          <p className="text-blue-200 font-serif text-lg">Begin your writing journey today</p>
-        </div>
+        )}
+        {err && (
+          <div className="mb-4 flex items-center gap-2 rounded-lg px-3 py-2 text-sm bg-red-500/10 text-red-300 border border-red-500/20">
+            <XCircle size={16} /> {err}
+          </div>
+        )}
 
-        <form onSubmit={handleRegister} className="space-y-6" noValidate>
-          <div className="grid grid-cols-2 gap-4">
-            <LabeledInput
-              icon={<User className="h-5 w-5" />}
+        <form onSubmit={onRegister} className="space-y-4" noValidate>
+          <div className="grid grid-cols-2 gap-3">
+            <input
               name="firstName"
-              value={formData.firstName}
-              onChange={handleInputChange}
-              placeholder="First Name"
-              error={errors.firstName}
+              value={form.firstName}
+              onChange={onChange}
+              placeholder="First name"
+              className="w-full px-3 py-3 rounded-lg bg-slate-800/50 border border-white/10 outline-none"
               required
             />
-            <LabeledInput
-              icon={<User className="h-5 w-5" />}
+            <input
               name="lastName"
-              value={formData.lastName}
-              onChange={handleInputChange}
-              placeholder="Last Name"
-              error={errors.lastName}
+              value={form.lastName}
+              onChange={onChange}
+              placeholder="Last name"
+              className="w-full px-3 py-3 rounded-lg bg-slate-800/50 border border-white/10 outline-none"
               required
             />
           </div>
 
-          <LabeledInput
-            icon={<User className="h-5 w-5" />}
-            name="username"
-            value={formData.username}
-            onKeyDown={(e) => { if (e.key === ' ') e.preventDefault(); }}
-            onChange={handleInputChange}
-            placeholder="Username"
-            error={errors.username}
-            required
-            autoComplete="username"
-          />
+          <div className="relative">
+            <input
+              name="username"
+              value={form.username}
+              onChange={onChange}
+              onKeyDown={(e) => { if (e.key === ' ') e.preventDefault(); }}
+              placeholder="Username"
+              autoComplete="username"
+              className="w-full pl-10 pr-3 py-3 rounded-lg bg-slate-800/50 border border-white/10 outline-none"
+              required
+            />
+            <User className="absolute left-3 top-3.5 h-5 w-5 text-slate-400" />
+          </div>
 
-          <LabeledInput
-            icon={<Mail className="h-5 w-5" />}
-            type="email"
-            name="email"
-            value={formData.email}
-            onChange={handleInputChange}
-            placeholder="Email Address"
-            error={errors.email}
-            required
-            autoComplete="email"
-          />
+          <div className="relative">
+            <input
+              type="email"
+              name="email"
+              value={form.email}
+              onChange={onChange}
+              placeholder="Email"
+              autoComplete="email"
+              className="w-full pl-10 pr-3 py-3 rounded-lg bg-slate-800/50 border border-white/10 outline-none"
+              required
+            />
+            <Mail className="absolute left-3 top-3.5 h-5 w-5 text-slate-400" />
+          </div>
 
-          <PasswordInput
-            name="password"
-            value={formData.password}
-            onChange={handleInputChange}
-            placeholder="Password"
-            show={showPassword}
-            setShow={setShowPassword}
-            error={errors.password}
-            autoComplete="new-password"
-          />
+          <div className="relative">
+            <input
+              type={showPwd ? 'text' : 'password'}
+              name="password"
+              value={form.password}
+              onChange={onChange}
+              placeholder="Password"
+              autoComplete="new-password"
+              className="w-full pl-10 pr-10 py-3 rounded-lg bg-slate-800/50 border border-white/10 outline-none"
+              required
+            />
+            <Lock className="absolute left-3 top-3.5 h-5 w-5 text-slate-400" />
+            <button type="button" className="absolute right-3 top-3.5 text-slate-400" onClick={() => setShowPwd(v => !v)}>
+              {showPwd ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+            </button>
+          </div>
 
-          <PasswordInput
-            name="confirmPassword"
-            value={formData.confirmPassword}
-            onChange={handleInputChange}
-            placeholder="Confirm Password"
-            show={showConfirmPassword}
-            setShow={setShowConfirmPassword}
-            error={errors.confirmPassword}
-            autoComplete="new-password"
-          />
-
-          <div className="text-sm text-blue-200 bg-blue-900/30 p-4 rounded-xl font-serif backdrop-blur-sm">
-            Password must contain at least 8 characters with uppercase, lowercase, number, and special character
+          <div className="relative">
+            <input
+              type={showPwd2 ? 'text' : 'password'}
+              name="confirmPassword"
+              value={form.confirmPassword}
+              onChange={onChange}
+              placeholder="Confirm password"
+              autoComplete="new-password"
+              className="w-full pl-10 pr-10 py-3 rounded-lg bg-slate-800/50 border border-white/10 outline-none"
+              required
+            />
+            <Lock className="absolute left-3 top-3.5 h-5 w-5 text-slate-400" />
+            <button type="button" className="absolute right-3 top-3.5 text-slate-400" onClick={() => setShowPwd2(v => !v)}>
+              {showPwd2 ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+            </button>
           </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-gradient-to-r from-blue-500 to-teal-500 hover:from-blue-400 hover:to-teal-400 text-white py-4 px-6 rounded-xl font-serif font-bold text-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center shadow-xl hover:shadow-2xl hover:scale-105"
+            className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 px-4 py-2 font-medium disabled:opacity-60"
           >
-            {loading ? (<><Loader2 className="animate-spin h-6 w-6 mr-2" />Creating Account...</>) : ('Join the Story Lab')}
+            {loading ? <Loader2 size={16} className="animate-spin" /> : null}
+            Create account
           </button>
         </form>
 
-        {message && (
-          <div className="mt-6 p-4 bg-green-500/20 border border-green-400/30 rounded-xl flex items-center backdrop-blur-sm">
-            <CheckCircle className="h-5 w-5 text-green-300 mr-2" />
-            <span className="text-green-100 text-sm font-serif">{message}</span>
-          </div>
-        )}
-
-        {errors.general && (
-          <div className="mt-6 p-4 bg-red-500/20 border border-red-400/30 rounded-xl flex items-center backdrop-blur-sm">
-            <XCircle className="h-5 w-5 text-red-300 mr-2" />
-            <span className="text-red-100 text-sm font-serif">{errors.general}</span>
-          </div>
-        )}
-
-        <div className="text-center mt-8">
-          <p className="text-blue-200 text-sm font-serif">
-            Already have an account?{' '}
-            <button
-              type="button"
-              onClick={() => navigate('/signin')}
-              className="text-blue-300 hover:text-blue-100 font-medium transition-colors"
-            >
-              Sign in
-            </button>
-          </p>
+        <div className="text-center mt-4">
+          <button
+            type="button"
+            onClick={() => navigate('/signin')}
+            className="text-indigo-300 hover:text-indigo-200 text-sm"
+          >
+            Already have an account? Sign in
+          </button>
         </div>
-
-        <button
-          type="button"
-          onClick={handleBackToLanding}
-          className="w-full mt-4 text-blue-300 text-sm hover:text-blue-100 font-serif transition-colors"
-        >
-          ← Back to Home
-        </button>
       </div>
     </div>
   );
-};
-
-export default RegistrationPage;
+}
