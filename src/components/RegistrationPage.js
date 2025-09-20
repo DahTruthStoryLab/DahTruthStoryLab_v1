@@ -1,11 +1,81 @@
 // src/components/RegistrationPage.js
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Auth } from 'aws-amplify'; // ✅ v5 import
+import { Auth } from 'aws-amplify'; // v5
 import { Eye, EyeOff, User, Mail, Lock, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 
 const sanitize = (s = '') => s.trim();
 const stripSpaces = (s = '') => s.replace(/\s+/g, '');
+
+function LabeledInput({
+  icon, name, type = 'text', value, onChange, onKeyDown, placeholder, error, required, autoComplete
+}) {
+  return (
+    <div className="relative group">
+      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+        <span className="text-blue-300 group-focus-within:text-blue-100 transition-colors">{icon}</span>
+      </div>
+      <input
+        type={type}
+        name={name}
+        value={value}
+        onKeyDown={onKeyDown}
+        onChange={onChange}
+        placeholder={placeholder}
+        autoComplete={autoComplete}
+        className={`w-full pl-12 pr-4 py-4 bg-blue-900/30 border border-blue-700/50 rounded-xl 
+          text-white placeholder-blue-300 backdrop-blur-sm
+          focus:ring-2 focus:ring-blue-400 focus:border-blue-400 focus:bg-blue-900/40
+          transition-all duration-300 font-serif
+          ${error ? 'border-red-400 focus:ring-red-400' : ''}`}
+        required={required}
+      />
+      {error && (
+        <div className="flex items-center mt-2 text-red-300 text-sm font-serif">
+          <XCircle className="h-4 w-4 mr-1" />
+          {error}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PasswordInput({ name, value, onChange, placeholder, show, setShow, error, autoComplete }) {
+  return (
+    <div className="relative group">
+      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+        <Lock className="h-5 w-5 text-blue-300 group-focus-within:text-blue-100 transition-colors" />
+      </div>
+      <input
+        type={show ? 'text' : 'password'}
+        name={name}
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        autoComplete={autoComplete}
+        className={`w-full pl-12 pr-12 py-4 bg-blue-900/30 border border-blue-700/50 rounded-xl 
+          text-white placeholder-blue-300 backdrop-blur-sm
+          focus:ring-2 focus:ring-blue-400 focus:border-blue-400 focus:bg-blue-900/40
+          transition-all duration-300 font-serif
+          ${error ? 'border-red-400 focus:ring-red-400' : ''}`}
+        required
+      />
+      <button
+        type="button"
+        className="absolute inset-y-0 right-0 pr-4 flex items-center text-blue-300 hover:text-blue-100 transition-colors"
+        onClick={() => setShow(!show)}
+      >
+        {show ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+      </button>
+      {error && (
+        <div className="flex items-center mt-2 text-red-300 text-sm font-serif">
+          <XCircle className="h-4 w-4 mr-1" />
+          {error}
+        </div>
+      )}
+    </div>
+  );
+}
 
 const RegistrationPage = () => {
   const navigate = useNavigate();
@@ -258,7 +328,7 @@ const RegistrationPage = () => {
     );
   }
 
-  // registration page
+  // Registration screen
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-indigo-950 flex items-center justify-center p-4 relative overflow-hidden">
       <div className="absolute inset-0 opacity-15">
@@ -394,76 +464,5 @@ const RegistrationPage = () => {
     </div>
   );
 };
-
-// ---- Presentational inputs ----
-function LabeledInput({
-  icon, name, type = 'text', value, onChange, onKeyDown, placeholder, error, required, autoComplete
-}) {
-  return (
-    <div className="relative group">
-      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-        <span className="text-blue-300 group-focus-within:text-blue-100 transition-colors">{icon}</span>
-      </div>
-      <input
-        type={type}
-        name={name}
-        value={value}
-        onKeyDown={onKeyDown}
-        onChange={onChange}
-        placeholder={placeholder}
-        autoComplete={autoComplete}
-        className={`w-full pl-12 pr-4 py-4 bg-blue-900/30 border border-blue-700/50 rounded-xl 
-          text-white placeholder-blue-300 backdrop-blur-sm
-          focus:ring-2 focus:ring-blue-400 focus:border-blue-400 focus:bg-blue-900/40
-          transition-all duration-300 font-serif
-          ${error ? 'border-red-400 focus:ring-red-400' : ''}`}
-        required={required}
-      />
-      {error && (
-        <div className="flex items-center mt-2 text-red-300 text-sm font-serif">
-          <XCircle className="h-4 w-4 mr-1" />
-          {error}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function PasswordInput({ name, value, onChange, placeholder, show, setShow, error, autoComplete }) {
-  return (
-    <div className="relative group">
-      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-        <Lock className="h-5 w-5 text-blue-300 group-focus-within:text-blue-100 transition-colors" />
-      </div>
-      <input
-        type={show ? 'text' : 'password'}
-        name={name}
-        value={value}
-        onChange={onChange}
-        placeholder={placeholder}
-        autoComplete={autoComplete}
-        className={`w-full pl-12 pr-12 py-4 bg-blue-900/30 border border-blue-700/50 rounded-xl 
-          text-white placeholder-blue-300 backdrop-blur-sm
-          focus:ring-2 focus:ring-blue-400 focus:border-blue-400 focus:bg-blue-900/40
-          transition-all duration-300 font-serif
-          ${error ? 'border-red-400 focus:ring-red-400' : ''}`}
-        required
-      />
-      <button
-        type="button"
-        className="absolute inset-y-0 right-0 pr-4 flex items-center text-blue-300 hover:text-blue-100 transition-colors"
-        onClick={() => setShow(!show)}
-      >
-        {show ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
-      </button>
-      {error && (
-        <div className="flex items-center mt-2 text-red-300 text-sm font-serif">
-          <XCircle className="h-4 w-4 mr-1" />
-          {error}
-        </div>
-      )}
-    </div>
-  );
-}
 
 export default RegistrationPage;
