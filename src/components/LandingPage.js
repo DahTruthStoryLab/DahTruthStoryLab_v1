@@ -1,12 +1,12 @@
+// src/components/LandingPage.js
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { BookOpen, Users, Brain, Heart } from 'lucide-react';
 
 const LandingPage = () => {
-  const handleNavigateToRegister = () => {
-    // Use your router navigation here
-    // Example: navigate('/auth/register') or window.location.href = '/auth/register'
-    window.location.href = '/auth/register';
-  };
+  const navigate = useNavigate();
+  const goRegister = () => navigate('/auth/register');
+  const goSignIn  = () => navigate('/signin');
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-indigo-950 relative overflow-hidden">
@@ -23,9 +23,9 @@ const LandingPage = () => {
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-4">
               <div className="w-16 h-16 rounded-full overflow-hidden shadow-2xl border-2 border-blue-400/30">
-                <img 
-                  src="/dahtruth-logo.png" 
-                  alt="DahTruth Story Lab Logo" 
+                <img
+                  src="/dahtruth-logo.png"
+                  alt="DahTruth Story Lab Logo"
                   className="w-full h-full object-cover"
                 />
               </div>
@@ -34,8 +34,8 @@ const LandingPage = () => {
                 <p className="text-blue-200 text-sm font-serif italic">Where your story comes to life</p>
               </div>
             </div>
-            <button 
-              onClick={handleNavigateToRegister}
+            <button
+              onClick={goSignIn}
               className="px-6 py-2 bg-blue-700 hover:bg-blue-600 text-white rounded-full font-serif font-medium transition-all duration-300 shadow-lg hover:shadow-xl"
             >
               Sign In
@@ -52,14 +52,14 @@ const LandingPage = () => {
             <span className="text-teal-400">Publish confidently.</span>
           </h2>
           <div className="flex flex-col sm:flex-row gap-6 justify-center mt-12">
-            <button 
-              onClick={handleNavigateToRegister}
+            <button
+              onClick={goRegister}
               className="px-8 py-4 bg-gradient-to-r from-blue-500 to-teal-500 hover:from-blue-400 hover:to-teal-400 text-white rounded-full font-serif font-bold text-lg transition-all duration-300 shadow-2xl hover:shadow-3xl hover:scale-105"
             >
               Start 8-Week Challenge
             </button>
-            <button 
-              onClick={handleNavigateToRegister}
+            <button
+              onClick={goSignIn}
               className="px-8 py-4 bg-blue-900/40 hover:bg-blue-800/60 text-white border border-blue-500/50 rounded-full font-serif font-medium text-lg backdrop-blur-sm transition-all duration-300"
             >
               Sign In
@@ -72,11 +72,11 @@ const LandingPage = () => {
           <div className="text-center mb-12">
             <h3 className="text-4xl font-bold text-white mb-4 font-serif">8-Week Novel Challenge</h3>
             <p className="text-xl text-blue-100 font-serif leading-relaxed max-w-3xl mx-auto">
-              Join our faith-based writing community to complete your 25,000-word novel in just 8 weeks. 
+              Join our faith-based writing community to complete your 25,000-word novel in just 8 weeks.
               Get AI assistance, character development tools, and spiritual guidance throughout your journey.
             </p>
-            <button 
-              onClick={handleNavigateToRegister}
+            <button
+              onClick={goRegister}
               className="mt-8 px-8 py-4 bg-gradient-to-r from-teal-500 to-blue-500 hover:from-teal-400 hover:to-blue-400 text-white rounded-full font-serif font-bold text-lg transition-all duration-300 shadow-xl hover:shadow-2xl hover:scale-105"
             >
               Join the Challenge →
