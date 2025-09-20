@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom'; // ADD THIS IMPORT
 import { Auth } from 'aws-amplify';
 import { Eye, EyeOff, User, Mail, Lock, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 
@@ -6,6 +7,7 @@ const sanitize = (s = '') => s.trim();            // trim
 const stripSpaces = (s = '') => s.replace(/\s+/g, ''); // remove all whitespace
 
 const RegistrationPage = () => {
+  const navigate = useNavigate(); // ADD THIS LINE
   const [step, setStep] = useState('register'); // 'register' | 'confirm'
   const [formData, setFormData] = useState({
     email: '',
@@ -132,7 +134,11 @@ const RegistrationPage = () => {
       localStorage.setItem('currentUser', JSON.stringify(userData));
 
       setMessage('Welcome to DahTruth Story Lab! Your writing journey begins now.');
-      setTimeout(() => { window.location.href = '/dashboard'; }, 2000);
+      
+      // CHANGE THIS LINE - Use React Router navigation instead of window.location
+      setTimeout(() => {
+        navigate('/dashboard');
+      }, 2000);
     } catch (error) {
       console.error('Confirmation error:', error);
       setErrors(prev => ({
@@ -173,9 +179,11 @@ const RegistrationPage = () => {
     }
   };
 
-  const handleBackToLanding = () => { window.location.href = '/'; };
-  const handleSignInClick = () => { window.location.href = '/signin'; };
+  // CHANGE THESE LINES - Use React Router navigation
+  const handleBackToLanding = () => { navigate('/'); };
+  const handleSignInClick = () => { navigate('/signin'); };
 
+  // Rest of your component stays exactly the same...
   if (step === 'confirm') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-indigo-950 flex items-center justify-center p-4 relative overflow-hidden">
@@ -382,7 +390,7 @@ const RegistrationPage = () => {
             Already have an account?{' '}
             <button
               type="button"
-              onClick={() => (window.location.href = '/signin')}
+              onClick={() => navigate('/signin')} // CHANGED THIS LINE
               className="text-blue-300 hover:text-blue-100 font-medium transition-colors"
             >
               Sign in
