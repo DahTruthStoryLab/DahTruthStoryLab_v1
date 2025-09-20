@@ -1,7 +1,7 @@
+// src/App.js
 import React, { useEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { Amplify } from 'aws-amplify';
-import { getCurrentUser } from 'aws-amplify/auth';
+import { Amplify, Auth } from 'aws-amplify'; // ⬅️ add Auth here (v5 style)
 import awsconfig from './aws-exports';
 
 // Import your components
@@ -10,6 +10,7 @@ import RegistrationPage from './components/RegistrationPage';
 import Dashboard from './components/Dashboard';
 import WriteSection from './components/WriteSection';
 
+// v5 configure (unchanged)
 Amplify.configure(awsconfig);
 
 // Protected Route Component
@@ -19,11 +20,13 @@ function ProtectedRoute({ children }) {
 
   useEffect(() => {
     checkAuthState();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function checkAuthState() {
     try {
-      const currentUser = await getCurrentUser();
+      // ⬅️ v5 replacement for getCurrentUser()
+      const currentUser = await Auth.currentAuthenticatedUser();
       setUser(currentUser);
     } catch (err) {
       console.log('User not authenticated');
@@ -56,25 +59,25 @@ function App() {
         {/* Public Routes */}
         <Route path="/" element={<LandingPage />} />
         <Route path="/auth/register" element={<RegistrationPage />} />
-        
+
         {/* Protected Routes */}
-        <Route 
-          path="/dashboard" 
+        <Route
+          path="/dashboard"
           element={
             <ProtectedRoute>
               <Dashboard />
             </ProtectedRoute>
-          } 
+          }
         />
-        <Route 
-          path="/write" 
+        <Route
+          path="/write"
           element={
             <ProtectedRoute>
               <WriteSection />
             </ProtectedRoute>
-          } 
+          }
         />
-        
+
         {/* Redirect any unknown routes */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
