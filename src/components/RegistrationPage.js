@@ -81,7 +81,7 @@ export default function RegistrationPage() {
     }
   };
 
-  // ---------- Confirm then AUTO SIGN-IN ----------
+  // ---------- Confirm ONLY (no auto sign-in) ----------
   const onConfirm = async (e) => {
     e.preventDefault();
     setErr(''); setMsg('');
@@ -95,29 +95,23 @@ export default function RegistrationPage() {
 
     setLoading(true);
     try {
-      // Step 1: Confirm the signup using username
+      // Step 1: Just confirm the signup - no auto sign-in
       await Auth.confirmSignUp(username, c);
       
-      // Step 2: Sign in to get access
-      await Auth.signIn(username, form.password);
-      
-      // Step 3: Get the current user and mark email as verified
-      const user = await Auth.currentAuthenticatedUser({ bypassCache: true });
-      
-      // Step 4: Update user attributes to mark email as verified
-      await Auth.updateUserAttributes(user, {
-        'email_verified': 'true'
-      });
-      
-      console.log('Email confirmed and user signed in successfully');
-      setMsg('Email confirmed and verified! Redirecting…');
+      console.log('Email confirmation successful');
+      setMsg('Email confirmed successfully! Please sign in manually.');
       localStorage.removeItem('currentUser'); // Clean up
-      navigate('/dashboard');
+      
+      // Redirect to sign-in page after 2 seconds
+      setTimeout(() => {
+        navigate('/signin');
+      }, 2000);
+      
     } catch (e) {
-      console.log('[Confirm/signin error]', e);
+      console.log('[Confirm error]', e);
       if (e?.code === 'CodeMismatchException') setErr('Invalid code. Please check and try again.');
       else if (e?.code === 'ExpiredCodeException') setErr('Code expired. Click "Resend code".');
-      else if (e?.code === 'NotAuthorizedException') setErr('Confirmation worked, but sign-in failed. Try signing in manually.');
+      else if (e?.code === 'NotAuthorizedException') setErr('Confirmation failed. Please try again.');
       else setErr(e?.message || e?.code || 'Could not confirm account.');
     } finally {
       setLoading(false);
@@ -179,7 +173,7 @@ export default function RegistrationPage() {
               <button
                 type="button"
                 onClick={resend}
-                disabled={loading || !form.username}
+                disabled={loading || !form.username}  {/* ← Changed from form.email to form.username */}
                 className="text-blue-300 hover:text-blue-100 font-serif text-sm font-medium disabled:opacity-50 transition-colors"
               >
                 Didn't receive the code? Resend
