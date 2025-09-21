@@ -281,11 +281,16 @@ export default function TOCPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#e9f0fa] py-8">
-      <div className="mx-auto max-w-5xl px-4">
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-indigo-950 py-8 relative overflow-hidden">
+      {/* Animated blobs */}
+      <div className="absolute inset-0 opacity-15">
+        <div className="absolute top-20 left-10 w-72 h-72 bg-blue-500 rounded-full mix-blend-multiply filter blur-xl animate-pulse"></div>
+        <div className="absolute bottom-20 right-10 w-72 h-72 bg-teal-500 rounded-full mix-blend-multiply filter blur-xl animate-pulse delay-700"></div>
+      </div>
+      <div className="relative z-10 mx-auto max-w-5xl px-4">
 
         {/* Header banner */}
-        <div className="rounded-2xl bg-gradient-to-r from-slate-900 via-indigo-900 to-slate-900 text-white shadow-xl border border-white/10">
+        <div className="rounded-3xl bg-gradient-to-r from-slate-900/90 via-indigo-900/90 to-slate-900/90 backdrop-blur-xl text-white shadow-2xl border border-blue-800/40">
           <div className="flex items-center justify-between px-6 py-5">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center">
@@ -332,7 +337,7 @@ export default function TOCPage() {
         </div>
 
         {/* Book banner */}
-        <div className="mt-4 rounded-2xl bg-slate-800 text-white shadow border border-white/10">
+        <div className="mt-4 rounded-3xl bg-blue-950/50 backdrop-blur-xl text-white shadow-2xl border border-blue-800/40">
           <div className="px-6 py-4">
             <div className="flex items-center justify-between">
               <div>
@@ -361,7 +366,7 @@ export default function TOCPage() {
         </div>
 
         {/* Search and Quick add */}
-        <div className="mt-4 rounded-2xl bg-slate-800 text-white shadow border border-white/10">
+        <div className="mt-4 rounded-3xl bg-blue-950/50 backdrop-blur-xl text-white shadow-2xl border border-blue-800/40">
           <div className="px-6 py-4 space-y-4">
             {/* Search */}
             <div className="relative">
@@ -370,7 +375,7 @@ export default function TOCPage() {
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder="Search chapters by title, content, or synopsis..."
-                className="w-full pl-10 pr-10 py-3 rounded-xl bg-slate-900/60 border border-white/10 text-sm outline-none placeholder:text-slate-400"
+                className="w-full pl-10 pr-10 py-3 rounded-xl bg-blue-900/30 border border-blue-700/50 text-sm outline-none placeholder:text-slate-400 backdrop-blur-sm font-serif"
               />
               {searchTerm && (
                 <button
@@ -389,7 +394,7 @@ export default function TOCPage() {
                 onChange={(e) => setQuickTitle(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") addChapter(); }}
                 placeholder="Quick add: Chapter title…"
-                className="flex-1 rounded-xl bg-slate-900/60 border border-white/10 px-4 py-3 text-sm outline-none placeholder:text-slate-400"
+                className="flex-1 rounded-xl bg-blue-900/30 border border-blue-700/50 px-4 py-3 text-sm outline-none placeholder:text-slate-400 backdrop-blur-sm font-serif"
               />
               <button
                 onClick={addChapter}
@@ -410,7 +415,7 @@ export default function TOCPage() {
         {/* Chapters list */}
         <div className="mt-6 space-y-4">
           {filteredChapters.length === 0 && searchTerm ? (
-            <div className="rounded-2xl bg-slate-800 text-white shadow border border-white/10 p-8 text-center">
+            <div className="rounded-3xl bg-blue-950/50 backdrop-blur-xl text-white shadow-2xl border border-blue-800/40 p-8 text-center">
               <Search className="mx-auto mb-3 text-slate-400" size={32} />
               <div className="text-lg font-medium mb-1">No chapters found</div>
               <div className="text-sm text-slate-400">
@@ -427,12 +432,12 @@ export default function TOCPage() {
               return (
                 <div
                   key={ch.id}
-                  className="rounded-2xl bg-slate-800 text-white shadow border border-white/10 overflow-hidden"
+                  className="rounded-3xl bg-blue-950/50 backdrop-blur-xl text-white shadow-2xl border border-blue-800/40 overflow-hidden"
                 >
                   <div className="px-5 py-4 flex items-start gap-3">
                     <button
                       onClick={() => toggleOpen(ch.id)}
-                      className="mt-0.5 shrink-0 p-2 rounded-lg bg-slate-900/40 hover:bg-slate-900/60"
+                      className="mt-0.5 shrink-0 p-2 rounded-lg bg-blue-900/40 hover:bg-blue-900/60 backdrop-blur-sm"
                       title={isOpen ? "Collapse" : "Expand"}
                     >
                       {isOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
@@ -487,14 +492,14 @@ export default function TOCPage() {
                             <input
                               value={ch.title}
                               onChange={(e) => updateChapter(ch.id, { title: e.target.value })}
-                              className="w-full px-3 py-2 rounded-lg bg-slate-900/60 border border-white/10 text-sm outline-none"
+                              className="w-full px-3 py-2 rounded-lg bg-blue-900/30 border border-blue-700/50 text-sm outline-none backdrop-blur-sm font-serif"
                             />
                           </div>
 
                           {/* AI Synopsis */}
                           <div className="mb-4">
                             <div className="font-medium mb-1 text-slate-200">AI Synopsis</div>
-                            <div className="rounded-lg bg-slate-900/40 border border-white/5 p-3">
+                            <div className="rounded-lg bg-blue-900/40 border border-blue-700/30 p-3 backdrop-blur-sm">
                               {ch.synopsis ? ch.synopsis : (
                                 <span className="opacity-60">No synopsis yet. Click "AI" to generate.</span>
                               )}
@@ -511,7 +516,7 @@ export default function TOCPage() {
                               value={ch.content}
                               onChange={(e) => updateChapter(ch.id, { content: e.target.value })}
                               placeholder="Draft your chapter content here…"
-                              className="w-full min-h-[120px] rounded-lg bg-slate-900/60 border border-white/10 px-3 py-2 text-sm outline-none placeholder:text-slate-500 resize-vertical"
+                              className="w-full min-h-[120px] rounded-lg bg-blue-900/30 border border-blue-700/50 px-3 py-2 text-sm outline-none placeholder:text-slate-500 resize-vertical backdrop-blur-sm font-serif"
                             />
                           </div>
                         </div>
@@ -527,7 +532,7 @@ export default function TOCPage() {
         {/* Delete confirmation modal */}
         {showConfirm && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-            <div className="bg-slate-800 rounded-2xl p-6 max-w-md w-full border border-white/10">
+            <div className="bg-blue-950/90 backdrop-blur-xl rounded-3xl p-6 max-w-md w-full border border-blue-800/40 shadow-2xl">
               <div className="flex items-center gap-3 mb-4">
                 <AlertCircle className="text-red-400" size={20} />
                 <div className="text-lg font-semibold text-white">Delete Chapter</div>
