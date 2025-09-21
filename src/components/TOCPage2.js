@@ -170,6 +170,62 @@ const calculateStreak = (daily) => {
 };
 
 /* ──────────────────────────────────────────────────────────────
+   Animated Blobs Component
+──────────────────────────────────────────────────────────────── */
+function DecorBlobs() {
+  return (
+    <div className="absolute inset-0 opacity-15">
+      <div className="absolute top-20 left-10 w-72 h-72 bg-blue-500 rounded-full mix-blend-multiply filter blur-xl animate-pulse"></div>
+      <div className="absolute bottom-20 right-10 w-72 h-72 bg-teal-500 rounded-full mix-blend-multiply filter blur-xl animate-pulse delay-700"></div>
+      <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-72 h-72 bg-indigo-500 rounded-full mix-blend-multiply filter blur-xl animate-pulse delay-1000"></div>
+    </div>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────
+   UI Helper Components
+──────────────────────────────────────────────────────────────── */
+function Banner({ children, ok }) {
+  return (
+    <div className={`mb-6 p-4 rounded-xl flex items-center backdrop-blur-sm border ${ok ? 'bg-green-500/20 border-green-400/30 text-green-100' : 'bg-red-500/20 border-red-400/30 text-red-100'}`}>
+      {ok ? <CheckCircle className="h-5 w-5 mr-2" /> : <X className="h-5 w-5 mr-2" />}
+      <span className="text-sm font-serif">{children}</span>
+    </div>
+  );
+}
+
+function Input({ leftIcon, className = '', ...props }) {
+  return (
+    <div className="relative group">
+      {leftIcon ? <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-blue-300">{leftIcon}</div> : null}
+      <input
+        {...props}
+        className={`w-full ${leftIcon ? 'pl-12' : 'pl-4'} pr-4 py-4 bg-blue-900/30 border border-blue-700/50 rounded-xl 
+          text-white placeholder-blue-300 backdrop-blur-sm
+          focus:ring-2 focus:ring-blue-400 focus:border-blue-400 focus:bg-blue-900/40
+          transition-all duration-300 font-serif ${className}`}
+      />
+    </div>
+  );
+}
+
+function Button({ children, loading, grad, ...rest }) {
+  const base = grad
+    ? 'bg-gradient-to-r from-blue-500 to-teal-500 hover:from-blue-400 hover:to-teal-400'
+    : 'bg-indigo-600 hover:bg-indigo-500';
+  return (
+    <button
+      {...rest}
+      disabled={loading}
+      className={`w-full ${base} text-white py-4 px-6 rounded-xl font-serif font-bold text-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center shadow-xl hover:shadow-2xl hover:scale-105`}
+    >
+      {loading ? <Loader2 className="animate-spin h-6 w-6 mr-2" /> : null}
+      {children}
+    </button>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────
    Component
 ──────────────────────────────────────────────────────────────── */
 export default function TOCPage2() {
@@ -220,20 +276,6 @@ export default function TOCPage2() {
   const prevTotalRef = React.useRef(
     chapters.reduce((t, ch) => t + countWords(ch.content || ""), 0)
   );
-
-  // Theme classes
-  const isDark = settings.theme === 'dark';
-  const themeClasses = {
-    bg: isDark ? 'bg-[#e9f0fa]' : 'bg-slate-100',
-    cardBg: isDark ? 'bg-slate-800' : 'bg-white',
-    headerBg: isDark ? 'bg-gradient-to-r from-slate-900 via-indigo-900 to-slate-900' : 'bg-gradient-to-r from-slate-700 via-indigo-700 to-slate-700',
-    text: isDark ? 'text-white' : 'text-slate-900',
-    textMuted: isDark ? 'text-slate-300' : 'text-slate-600',
-    textVeryMuted: isDark ? 'text-slate-400' : 'text-slate-500',
-    border: isDark ? 'border-white/10' : 'border-slate-200',
-    inputBg: isDark ? 'bg-slate-900/60' : 'bg-slate-50',
-    inputBorder: isDark ? 'border-white/10' : 'border-slate-300',
-  };
 
   // Debounced auto-save
   React.useEffect(() => {
@@ -478,17 +520,18 @@ export default function TOCPage2() {
   const yesterdayCount = daily.counts[yesterday] || 0;
   const goalPct = progressPct(todayCount, daily.goal);
 
-  // Focus mode - simplified interface
+  // Focus mode - simplified interface with your beautiful styling
   if (settings.focusMode) {
     return (
-      <div className={`min-h-screen ${themeClasses.bg} py-8`}>
-        <div className="mx-auto max-w-4xl px-4">
-          <div className={`rounded-2xl ${themeClasses.cardBg} ${themeClasses.text} shadow border ${themeClasses.border} p-6 mb-6`}>
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-indigo-950 py-8 relative overflow-hidden">
+        <DecorBlobs />
+        <div className="relative z-10 mx-auto max-w-4xl px-4">
+          <div className="rounded-3xl bg-blue-950/50 backdrop-blur-xl shadow-2xl border border-blue-800/40 p-8 mb-8">
             <div className="flex items-center justify-between">
-              <h1 className="text-2xl font-bold">{book.title}</h1>
+              <h1 className="text-3xl font-bold text-white font-serif">{book.title}</h1>
               <button
                 onClick={() => setSettings(s => ({ ...s, focusMode: false }))}
-                className="p-2 rounded-lg hover:bg-slate-700 text-slate-400"
+                className="p-3 rounded-xl bg-blue-900/40 hover:bg-blue-900/60 text-blue-300 backdrop-blur-sm transition-all duration-300 hover:scale-105"
                 title="Exit focus mode (Ctrl/Cmd+F)"
               >
                 <Maximize2 size={20} />
@@ -496,17 +539,17 @@ export default function TOCPage2() {
             </div>
           </div>
           
-          <div className="space-y-4">
+          <div className="space-y-6">
             {chapters.map(ch => (
-              <div key={ch.id} className={`rounded-xl ${themeClasses.cardBg} ${themeClasses.text} shadow border ${themeClasses.border} p-4`}>
-                <div className="text-lg font-semibold mb-3">{ch.title}</div>
+              <div key={ch.id} className="rounded-3xl bg-blue-950/50 backdrop-blur-xl shadow-2xl border border-blue-800/40 p-8">
+                <div className="text-xl font-bold text-white font-serif mb-4">{ch.title}</div>
                 <textarea
                   value={ch.content}
                   onChange={(e) => updateChapter(ch.id, { content: e.target.value })}
                   placeholder="Write your chapter content here..."
-                  className={`w-full min-h-[200px] ${themeClasses.inputBg} border ${themeClasses.inputBorder} rounded-lg px-3 py-2 text-sm outline-none resize-vertical`}
+                  className="w-full min-h-[200px] bg-blue-900/30 border border-blue-700/50 rounded-xl text-white placeholder-blue-300 backdrop-blur-sm focus:ring-2 focus:ring-blue-400 focus:border-blue-400 focus:bg-blue-900/40 transition-all duration-300 font-serif px-4 py-4 resize-vertical outline-none"
                 />
-                <div className={`mt-2 text-xs ${themeClasses.textVeryMuted}`}>
+                <div className="mt-3 text-sm text-blue-200 font-serif">
                   {countWords(ch.content)} words
                 </div>
               </div>
@@ -518,65 +561,59 @@ export default function TOCPage2() {
   }
 
   return (
-    <div className={`min-h-screen ${themeClasses.bg} py-8`}>
-      <div className="mx-auto max-w-5xl px-4">
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-indigo-950 py-8 relative overflow-hidden">
+      <DecorBlobs />
+      <div className="relative z-10 mx-auto max-w-5xl px-4">
 
         {/* Top banner */}
-        <div className={`rounded-2xl ${themeClasses.headerBg} text-white shadow-xl border border-white/10`}>
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between px-6 py-5">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center">
-                <BookOpen size={18} />
+        <div className="rounded-3xl bg-gradient-to-r from-slate-900/90 via-indigo-900/90 to-slate-900/90 backdrop-blur-xl text-white shadow-2xl border border-blue-800/40">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between px-8 py-6">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-blue-600/30 backdrop-blur-sm flex items-center justify-center border border-blue-400/30">
+                <BookOpen size={24} />
               </div>
-              <h1 className="text-3xl font-extrabold drop-shadow-sm">
+              <h1 className="text-4xl font-bold drop-shadow-lg font-serif">
                 Table of Contents
               </h1>
             </div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <button
-                onClick={() => setSettings(s => ({ ...s, theme: s.theme === 'dark' ? 'light' : 'dark' }))}
-                className="p-3 lg:p-2 rounded-xl bg-white/10 hover:bg-white/20 text-white"
-                title="Toggle theme"
-              >
-                {isDark ? <Sun size={16} /> : <Moon size={16} />}
-              </button>
+            <div className="flex items-center gap-3 flex-wrap">
               <button
                 onClick={() => setSettings(s => ({ ...s, focusMode: true }))}
-                className="hidden sm:inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-purple-600/30 border border-purple-400/30 hover:bg-purple-600/40 text-purple-100 text-sm"
+                className="inline-flex items-center gap-2 px-4 py-3 rounded-xl bg-purple-600/30 border border-purple-400/30 hover:bg-purple-600/40 text-purple-100 text-sm font-serif backdrop-blur-sm transition-all duration-300 hover:scale-105"
                 title="Focus mode (Ctrl/Cmd+F)"
               >
                 <Minimize2 size={16} /> Focus
               </button>
               <button
                 onClick={() => setShowAnalytics(!showAnalytics)}
-                className="hidden sm:inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-teal-600/30 border border-teal-400/30 hover:bg-teal-600/40 text-teal-100 text-sm"
+                className="inline-flex items-center gap-2 px-4 py-3 rounded-xl bg-teal-600/30 border border-teal-400/30 hover:bg-teal-600/40 text-teal-100 text-sm font-serif backdrop-blur-sm transition-all duration-300 hover:scale-105"
                 title="Writing analytics"
               >
                 <TrendingUp size={16} /> Analytics
               </button>
               <button
                 onClick={() => { saveState({ book, chapters, daily, settings }); setLastSaved(Date.now()); }}
-                className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-green-600/30 border border-green-400/30 hover:bg-green-600/40 text-green-100 text-sm"
+                className="inline-flex items-center gap-2 px-4 py-3 rounded-xl bg-green-600/30 border border-green-400/30 hover:bg-green-600/40 text-green-100 text-sm font-serif backdrop-blur-sm transition-all duration-300 hover:scale-105"
                 title="Save now (Ctrl/Cmd+S)"
               >
-                <Save size={16} /> <span className="hidden sm:inline">Save</span>
+                <Save size={16} /> Save
               </button>
               <button
                 onClick={() => exportText(book, chapters)}
-                className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-blue-600/30 border border-blue-400/30 hover:bg-blue-600/40 text-blue-100 text-sm"
+                className="inline-flex items-center gap-2 px-4 py-3 rounded-xl bg-blue-600/30 border border-blue-400/30 hover:bg-blue-600/40 text-blue-100 text-sm font-serif backdrop-blur-sm transition-all duration-300 hover:scale-105"
                 title="Export as .txt"
               >
-                <Download size={16} /> <span className="hidden sm:inline">.txt</span>
+                <Download size={16} /> Export
               </button>
               <button
                 onClick={() => exportJSON({ book, chapters, daily, settings })}
-                className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-indigo-600/30 border border-indigo-400/30 hover:bg-indigo-600/40 text-indigo-100 text-sm"
+                className="inline-flex items-center gap-2 px-4 py-3 rounded-xl bg-indigo-600/30 border border-indigo-400/30 hover:bg-indigo-600/40 text-indigo-100 text-sm font-serif backdrop-blur-sm transition-all duration-300 hover:scale-105"
                 title="Export backup JSON"
               >
-                <Download size={16} /> <span className="hidden sm:inline">.json</span>
+                <Download size={16} /> Backup
               </button>
-              <label className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-slate-600/30 border border-slate-400/30 hover:bg-slate-600/40 text-slate-100 text-sm cursor-pointer">
-                <Upload size={16} /> <span className="hidden sm:inline">Import</span>
+              <label className="inline-flex items-center gap-2 px-4 py-3 rounded-xl bg-slate-600/30 border border-slate-400/30 hover:bg-slate-600/40 text-slate-100 text-sm font-serif cursor-pointer backdrop-blur-sm transition-all duration-300 hover:scale-105">
+                <Upload size={16} /> Import
                 <input
                   type="file"
                   accept="application/json"
@@ -586,17 +623,17 @@ export default function TOCPage2() {
               </label>
               <button
                 onClick={generateAll}
-                className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-purple-600/30 border border-purple-400/30 hover:bg-purple-600/40 text-purple-100 text-sm"
+                className="inline-flex items-center gap-2 px-4 py-3 rounded-xl bg-purple-600/30 border border-purple-400/30 hover:bg-purple-600/40 text-purple-100 text-sm font-serif backdrop-blur-sm transition-all duration-300 hover:scale-105"
                 title="Generate AI synopses"
               >
-                <Sparkles size={16} /> <span className="hidden sm:inline">AI</span>
+                <Sparkles size={16} /> AI Synopses
               </button>
               <button
                 onClick={() => addChapter()}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-500 hover:bg-indigo-400 text-white text-sm shadow"
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-indigo-500 hover:bg-indigo-400 text-white text-sm font-serif shadow-xl backdrop-blur-sm transition-all duration-300 hover:scale-105 hover:shadow-2xl"
                 title="New chapter (Ctrl/Cmd+N)"
               >
-                <Plus size={16} /> <span className="hidden sm:inline">New</span>
+                <Plus size={16} /> New Chapter
               </button>
             </div>
           </div>
@@ -604,123 +641,131 @@ export default function TOCPage2() {
 
         {/* Analytics panel */}
         {showAnalytics && (
-          <div className={`mt-4 rounded-2xl ${themeClasses.cardBg} ${themeClasses.text} shadow border ${themeClasses.border} p-6`}>
-            <div className="flex items-center gap-2 mb-4">
-              <TrendingUp className="text-indigo-400" size={20} />
-              <h2 className="text-lg font-semibold">Writing Analytics</h2>
+          <div className="mt-6 rounded-3xl bg-blue-950/50 backdrop-blur-xl shadow-2xl border border-blue-800/40 p-8">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 rounded-xl bg-indigo-600/30 flex items-center justify-center">
+                <TrendingUp className="text-indigo-300" size={20} />
+              </div>
+              <h2 className="text-2xl font-bold text-white font-serif">Writing Analytics</h2>
             </div>
-            <div className="grid md:grid-cols-4 gap-4">
-              <div className={`p-4 rounded-xl ${themeClasses.inputBg} border ${themeClasses.inputBorder}`}>
-                <div className="text-2xl font-bold">{streak}</div>
-                <div className={`text-sm ${themeClasses.textMuted}`}>Day streak</div>
+            <div className="grid md:grid-cols-4 gap-6">
+              <div className="p-6 rounded-2xl bg-blue-900/30 border border-blue-700/50 backdrop-blur-sm">
+                <div className="text-3xl font-bold text-white font-serif">{streak}</div>
+                <div className="text-sm text-blue-200 font-serif mt-1">Day streak</div>
+                {streak > 0 && (
+                  <div className="flex items-center gap-1 mt-2">
+                    <Flame className="text-orange-400" size={16} />
+                    <span className="text-orange-300 text-xs font-serif">On fire!</span>
+                  </div>
+                )}
               </div>
-              <div className={`p-4 rounded-xl ${themeClasses.inputBg} border ${themeClasses.inputBorder}`}>
-                <div className="text-2xl font-bold">{todayCount}</div>
-                <div className={`text-sm ${themeClasses.textMuted}`}>Words today</div>
+              <div className="p-6 rounded-2xl bg-blue-900/30 border border-blue-700/50 backdrop-blur-sm">
+                <div className="text-3xl font-bold text-white font-serif">{todayCount}</div>
+                <div className="text-sm text-blue-200 font-serif mt-1">Words today</div>
               </div>
-              <div className={`p-4 rounded-xl ${themeClasses.inputBg} border ${themeClasses.inputBorder}`}>
-                <div className="text-2xl font-bold">{yesterdayCount}</div>
-                <div className={`text-sm ${themeClasses.textMuted}`}>Words yesterday</div>
+              <div className="p-6 rounded-2xl bg-blue-900/30 border border-blue-700/50 backdrop-blur-sm">
+                <div className="text-3xl font-bold text-white font-serif">{yesterdayCount}</div>
+                <div className="text-sm text-blue-200 font-serif mt-1">Words yesterday</div>
               </div>
-              <div className={`p-4 rounded-xl ${themeClasses.inputBg} border ${themeClasses.inputBorder}`}>
-                <div className="text-2xl font-bold">{chapters.filter(c => c.bookmarked).length}</div>
-                <div className={`text-sm ${themeClasses.textMuted}`}>Bookmarked</div>
+              <div className="p-6 rounded-2xl bg-blue-900/30 border border-blue-700/50 backdrop-blur-sm">
+                <div className="text-3xl font-bold text-white font-serif">{chapters.filter(c => c.bookmarked).length}</div>
+                <div className="text-sm text-blue-200 font-serif mt-1">Bookmarked</div>
               </div>
             </div>
           </div>
         )}
 
         {/* Book + goals */}
-        <div className="mt-4 grid lg:grid-cols-2 gap-4">
+        <div className="mt-6 grid lg:grid-cols-2 gap-6">
           {/* Book banner */}
-          <div className={`rounded-2xl ${themeClasses.cardBg} ${themeClasses.text} shadow border ${themeClasses.border}`}>
-            <div className="px-6 py-4">
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex-1 min-w-0">
-                  <input
-                    value={book.title}
-                    onChange={(e) => commitSnapshot({ book: { ...book, title: e.target.value } })}
-                    className={`w-full bg-transparent text-xl font-semibold outline-none border-b border-transparent focus:border-current`}
-                  />
-                  <div className={`text-sm ${themeClasses.textMuted} mt-1`}>
-                    {totalWords.toLocaleString()} / {book.targetWords.toLocaleString()} words
-                    {readTime > 0 && ` • ~${readTime} min read`}
-                  </div>
-                  <div className={`mt-2 w-full ${isDark ? 'bg-slate-700' : 'bg-slate-300'} rounded-full h-2`}>
-                    <div className="bg-indigo-500 h-2 rounded-full transition-all" style={{ width: `${pct}%` }} />
-                  </div>
-                  <div className={`text-xs ${themeClasses.textVeryMuted} mt-1`}>
-                    {pct.toFixed(1)}% complete • Last saved {Math.round((Date.now() - lastSaved) / 60000) || 0}m ago
-                  </div>
+          <div className="rounded-3xl bg-blue-950/50 backdrop-blur-xl shadow-2xl border border-blue-800/40 p-8">
+            <div className="flex items-start justify-between gap-6">
+              <div className="flex-1 min-w-0">
+                <input
+                  value={book.title}
+                  onChange={(e) => commitSnapshot({ book: { ...book, title: e.target.value } })}
+                  className="w-full bg-transparent text-2xl font-bold text-white font-serif outline-none border-b border-transparent focus:border-blue-400/50 transition-colors"
+                />
+                <div className="text-blue-200 font-serif mt-3">
+                  {totalWords.toLocaleString()} / {book.targetWords.toLocaleString()} words
+                  {readTime > 0 && ` • ~${readTime} min read`}
                 </div>
-                <div className="w-40 shrink-0">
-                  <div className="text-3xl font-extrabold text-right">{chapters.length}</div>
-                  <div className={`text-xs uppercase tracking-wide text-right ${themeClasses.textMuted}`}>Chapters</div>
-                  <div className={`mt-3 text-xs text-right ${themeClasses.textVeryMuted}`}>
-                    Target words
-                    <input
-                      type="number"
-                      min={1}
-                      value={book.targetWords}
-                      onChange={(e) => commitSnapshot({ book: { ...book, targetWords: Number(e.target.value) || 1 } })}
-                      className={`w-full mt-1 rounded ${themeClasses.inputBg} border ${themeClasses.inputBorder} px-2 py-1 text-right outline-none`}
-                    />
-                  </div>
+                <div className="mt-4 w-full bg-blue-900/50 rounded-full h-3 backdrop-blur-sm">
+                  <div className="bg-gradient-to-r from-indigo-500 to-teal-500 h-3 rounded-full transition-all duration-700 shadow-lg" style={{ width: `${pct}%` }}></div>
+                </div>
+                <div className="text-xs text-blue-300 font-serif mt-2">
+                  {pct.toFixed(1)}% complete • Last saved {Math.round((Date.now() - lastSaved) / 60000) || 0}m ago
+                </div>
+              </div>
+              <div className="text-right">
+                <div className="text-4xl font-bold text-white font-serif">{chapters.length}</div>
+                <div className="text-xs uppercase tracking-wider text-blue-300 font-serif">Chapters</div>
+                <div className="mt-4 text-xs text-blue-300 font-serif">
+                  Target words
+                  <input
+                    type="number"
+                    min={1}
+                    value={book.targetWords}
+                    onChange={(e) => commitSnapshot({ book: { ...book, targetWords: Number(e.target.value) || 1 } })}
+                    className="w-24 mt-2 rounded-xl bg-blue-900/60 border border-blue-700/50 px-3 py-2 text-right text-white font-serif backdrop-blur-sm outline-none focus:ring-2 focus:ring-blue-400 transition-all duration-300"
+                  />
                 </div>
               </div>
             </div>
           </div>
 
           {/* Daily goal + streak */}
-          <div className={`rounded-2xl ${themeClasses.cardBg} ${themeClasses.text} shadow border ${themeClasses.border}`}>
-            <div className="px-6 py-4">
-              <div className="flex items-center gap-2 mb-2">
-                <Target size={18} className="text-indigo-400" />
-                <div className="text-lg font-semibold">Daily Goal</div>
-                {streak > 0 && (
-                  <div className="flex items-center gap-1 ml-auto">
-                    <Flame className="text-orange-400" size={16} />
-                    <span className="text-sm font-medium">{streak} day{streak !== 1 ? 's' : ''}</span>
-                  </div>
-                )}
+          <div className="rounded-3xl bg-blue-950/50 backdrop-blur-xl shadow-2xl border border-blue-800/40 p-8">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-indigo-600/30 flex items-center justify-center">
+                <Target className="text-indigo-300" size={20} />
               </div>
-              <div className={`text-sm ${themeClasses.textMuted} mb-2`}>
-                Today: <b>{todayCount.toLocaleString()}</b> / {daily.goal.toLocaleString()} words
-              </div>
-              <div className={`w-full ${isDark ? 'bg-slate-700' : 'bg-slate-300'} rounded-full h-2`}>
-                <div className="bg-teal-500 h-2 rounded-full transition-all" style={{ width: `${goalPct}%` }} />
-              </div>
-              <div className="mt-3 flex items-center gap-2">
-                <span className={`text-xs ${themeClasses.textVeryMuted}`}>Set goal:</span>
-                <input
-                  type="number"
-                  min={100}
-                  step={100}
-                  value={daily.goal}
-                  onChange={(e) => commitSnapshot({ daily: { ...daily, goal: Math.max(100, Number(e.target.value) || 100) } })}
-                  className={`w-28 rounded ${themeClasses.inputBg} border ${themeClasses.inputBorder} px-2 py-1 text-sm outline-none`}
-                />
-              </div>
+              <div className="text-xl font-bold text-white font-serif">Daily Goal</div>
+              {streak > 0 && (
+                <div className="flex items-center gap-2 ml-auto">
+                  <Flame className="text-orange-400" size={20} />
+                  <span className="text-orange-300 font-serif font-medium">{streak} day{streak !== 1 ? 's' : ''}</span>
+                </div>
+              )}
+            </div>
+            <div className="text-blue-200 font-serif mb-4">
+              Today: <span className="font-bold text-white">{todayCount.toLocaleString()}</span> / {daily.goal.toLocaleString()} words
+            </div>
+            <div className="w-full bg-blue-900/50 rounded-full h-3 backdrop-blur-sm">
+              <div className="bg-gradient-to-r from-teal-500 to-emerald-500 h-3 rounded-full transition-all duration-700 shadow-lg" style={{ width: `${goalPct}%` }}></div>
+            </div>
+            <div className="mt-4 flex items-center gap-3">
+              <span className="text-xs text-blue-300 font-serif">Set goal:</span>
+              <input
+                type="number"
+                min={100}
+                step={100}
+                value={daily.goal}
+                onChange={(e) => commitSnapshot({ daily: { ...daily, goal: Math.max(100, Number(e.target.value) || 100) } })}
+                className="rounded-xl bg-blue-900/60 border border-blue-700/50 px-3 py-2 text-white font-serif backdrop-blur-sm outline-none focus:ring-2 focus:ring-blue-400 transition-all duration-300"
+              />
             </div>
           </div>
         </div>
 
         {/* Search / filters / quick add + template */}
-        <div className={`mt-4 rounded-2xl ${themeClasses.cardBg} ${themeClasses.text} shadow border ${themeClasses.border}`}>
-          <div className="px-6 py-4 space-y-4">
+        <div className="mt-6 rounded-3xl bg-blue-950/50 backdrop-blur-xl shadow-2xl border border-blue-800/40 p-8">
+          <div className="space-y-6">
             {/* Search row */}
-            <div className="flex flex-col lg:flex-row gap-3 lg:items-center">
+            <div className="flex flex-col lg:flex-row gap-4 lg:items-center">
               <div className="relative flex-1">
-                <Search className={`absolute left-3 top-1/2 -translate-y-1/2 ${themeClasses.textVeryMuted}`} size={16} />
+                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-blue-300">
+                  <Search size={20} />
+                </div>
                 <input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Search chapters by title, content, synopsis, or tags…"
-                  className={`w-full pl-10 pr-10 py-3 rounded-xl ${themeClasses.inputBg} border ${themeClasses.inputBorder} text-sm outline-none`}
+                  className="w-full pl-12 pr-6 py-4 rounded-xl bg-blue-900/30 border border-blue-700/50 text-white placeholder-blue-300 backdrop-blur-sm focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-all duration-300 font-serif outline-none"
                 />
                 {search && (
-                  <button onClick={() => setSearch("")} className={`absolute right-3 top-1/2 -translate-y-1/2 ${themeClasses.textVeryMuted} hover:${themeClasses.text}`}>
-                    <X size={16} />
+                  <button onClick={() => setSearch("")} className="absolute right-4 top-1/2 -translate-y-1/2 text-blue-300 hover:text-white transition-colors">
+                    <X size={20} />
                   </button>
                 )}
               </div>
@@ -729,18 +774,18 @@ export default function TOCPage2() {
                   <select
                     value={tagFilter}
                     onChange={(e) => setTagFilter(e.target.value)}
-                    className={`rounded-xl ${themeClasses.inputBg} border ${themeClasses.inputBorder} px-3 py-3 text-sm outline-none`}
+                    className="rounded-xl bg-blue-900/30 border border-blue-700/50 px-4 py-4 text-white backdrop-blur-sm font-serif outline-none focus:ring-2 focus:ring-blue-400 transition-all duration-300"
                   >
                     <option value="">All tags</option>
                     {allTags.map(tag => <option key={tag} value={tag}>{tag}</option>)}
                   </select>
                 )}
-                <label className="inline-flex items-center gap-2 text-sm cursor-pointer">
+                <label className="inline-flex items-center gap-3 text-blue-200 font-serif cursor-pointer">
                   <input
                     type="checkbox"
                     checked={onlyBookmarked}
                     onChange={(e) => setOnlyBookmarked(e.target.checked)}
-                    className="accent-indigo-500"
+                    className="accent-indigo-500 w-4 h-4"
                   />
                   Bookmarked
                 </label>
@@ -748,43 +793,43 @@ export default function TOCPage2() {
             </div>
 
             {/* Quick add + template */}
-            <div className="flex flex-col lg:flex-row gap-3">
+            <div className="flex flex-col lg:flex-row gap-4">
               <input
                 value={quickTitle}
                 onChange={(e) => setQuickTitle(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") addChapter(); }}
                 placeholder="Quick add: Chapter title…"
-                className={`flex-1 rounded-xl ${themeClasses.inputBg} border ${themeClasses.inputBorder} px-4 py-3 text-sm outline-none`}
+                className="flex-1 rounded-xl bg-blue-900/30 border border-blue-700/50 px-4 py-4 text-white placeholder-blue-300 backdrop-blur-sm focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-all duration-300 font-serif outline-none"
               />
               <select
                 value={templateKey}
                 onChange={(e) => setTemplateKey(e.target.value)}
-                className={`rounded-xl ${themeClasses.inputBg} border ${themeClasses.inputBorder} px-3 py-3 text-sm outline-none`}
+                className="rounded-xl bg-blue-900/30 border border-blue-700/50 px-4 py-4 text-white backdrop-blur-sm font-serif outline-none focus:ring-2 focus:ring-blue-400 transition-all duration-300"
               >
                 {Object.keys(TEMPLATES).map((k) => <option key={k} value={k}>{k}</option>)}
               </select>
               <button
                 onClick={() => addChapter()}
-                className="px-6 py-3 rounded-xl bg-indigo-500 hover:bg-indigo-400 text-white text-sm min-w-[120px]"
+                className="px-8 py-4 rounded-xl bg-indigo-500 hover:bg-indigo-400 text-white font-serif font-bold shadow-xl transition-all duration-300 hover:scale-105 hover:shadow-2xl backdrop-blur-sm"
               >
                 Add Chapter
               </button>
             </div>
 
-            <div className={`text-xs ${themeClasses.textVeryMuted}`}>
-              <b>Shortcuts:</b> Ctrl/Cmd+S save • Ctrl/Cmd+N new • Ctrl/Cmd+Z undo • Ctrl/Cmd+Y redo • Ctrl/Cmd+F focus mode
+            <div className="text-xs text-blue-300 font-serif">
+              <span className="font-bold">Shortcuts:</span> Ctrl/Cmd+S save • Ctrl/Cmd+N new • Ctrl/Cmd+Z undo • Ctrl/Cmd+Y redo • Ctrl/Cmd+F focus mode
               {search && <span> • Showing {filtered.length} of {chapters.length}</span>}
             </div>
           </div>
         </div>
 
         {/* Chapters */}
-        <div className="mt-6 space-y-4">
+        <div className="mt-8 space-y-6">
           {filtered.length === 0 ? (
-            <div className={`rounded-2xl ${themeClasses.cardBg} ${themeClasses.text} shadow border ${themeClasses.border} p-8 text-center`}>
-              <Search className={`mx-auto mb-3 ${themeClasses.textVeryMuted}`} size={32} />
-              <div className="text-lg font-medium mb-1">No chapters found</div>
-              <div className={`text-sm ${themeClasses.textMuted}`}>Try clearing the search or changing filters.</div>
+            <div className="rounded-3xl bg-blue-950/50 backdrop-blur-xl shadow-2xl border border-blue-800/40 p-12 text-center">
+              <Search className="mx-auto mb-4 text-blue-300" size={48} />
+              <div className="text-xl font-bold text-white font-serif mb-2">No chapters found</div>
+              <div className="text-blue-200 font-serif">Try clearing the search or changing filters.</div>
             </div>
           ) : (
             filtered.map((ch) => {
@@ -795,52 +840,52 @@ export default function TOCPage2() {
               const wordGoalPct = progressPct(words, ch.wordGoal || 2000);
 
               return (
-                <div key={ch.id} className={`rounded-2xl ${themeClasses.cardBg} ${themeClasses.text} shadow border ${themeClasses.border} overflow-hidden`}>
-                  <div className="px-5 py-4 flex items-start gap-3">
+                <div key={ch.id} className="rounded-3xl bg-blue-950/50 backdrop-blur-xl shadow-2xl border border-blue-800/40 overflow-hidden">
+                  <div className="px-8 py-6 flex items-start gap-4">
                     <button
                       onClick={() => toggleOpen(ch.id)}
-                      className={`mt-0.5 shrink-0 p-3 lg:p-2 rounded-lg ${isDark ? 'bg-slate-900/40 hover:bg-slate-900/60' : 'bg-slate-100 hover:bg-slate-200'}`}
+                      className="mt-1 shrink-0 p-3 rounded-xl bg-blue-900/40 hover:bg-blue-900/60 backdrop-blur-sm transition-all duration-300 hover:scale-105"
                       title={open ? "Collapse" : "Expand"}
                     >
-                      {open ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                      {open ? <ChevronDown className="text-blue-300" size={20} /> : <ChevronRight className="text-blue-300" size={20} />}
                     </button>
 
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="text-lg font-semibold truncate">{ch.title}</div>
-                        <div className={`text-xs ${themeClasses.textMuted} flex items-center gap-2 lg:gap-3 shrink-0 flex-wrap`}>
-                          <span className="flex items-center gap-1">
-                            <FileText size={14} /> {words} words{mins ? ` • ${mins}m` : ""}
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="text-xl font-bold text-white font-serif truncate">{ch.title}</div>
+                        <div className="text-xs text-blue-200 flex items-center gap-4 shrink-0 font-serif">
+                          <span className="flex items-center gap-2">
+                            <FileText size={16} /> {words} words{mins ? ` • ${mins}m` : ""}
                           </span>
-                          <span className="flex items-center gap-1">
-                            <Clock size={14} /> {daysAgoLabel(ch.updatedAt)}
+                          <span className="flex items-center gap-2">
+                            <Clock size={16} /> {daysAgoLabel(ch.updatedAt)}
                           </span>
 
-                          {/* Mobile-friendly action buttons */}
-                          <div className="flex items-center gap-1">
-                            <button onClick={() => moveUp(ch.id)} className={`p-2 lg:p-1 rounded hover:${isDark ? 'bg-slate-700' : 'bg-slate-200'}`} title="Move up">
-                              <ArrowUp size={14} />
+                          {/* Action buttons */}
+                          <div className="flex items-center gap-2">
+                            <button onClick={() => moveUp(ch.id)} className="p-2 rounded-lg hover:bg-blue-700/50 text-blue-300 transition-all duration-300" title="Move up">
+                              <ArrowUp size={16} />
                             </button>
-                            <button onClick={() => moveDown(ch.id)} className={`p-2 lg:p-1 rounded hover:${isDark ? 'bg-slate-700' : 'bg-slate-200'}`} title="Move down">
-                              <ArrowDown size={14} />
+                            <button onClick={() => moveDown(ch.id)} className="p-2 rounded-lg hover:bg-blue-700/50 text-blue-300 transition-all duration-300" title="Move down">
+                              <ArrowDown size={16} />
                             </button>
-                            <button onClick={() => toggleBookmark(ch.id)} className={`p-2 lg:p-1 rounded hover:${isDark ? 'bg-slate-700' : 'bg-slate-200'}`} title={ch.bookmarked ? "Remove bookmark" : "Bookmark"}>
-                              {ch.bookmarked ? <Star size={14} className="text-yellow-400" /> : <StarOff size={14} />}
+                            <button onClick={() => toggleBookmark(ch.id)} className="p-2 rounded-lg hover:bg-blue-700/50 text-blue-300 transition-all duration-300" title={ch.bookmarked ? "Remove bookmark" : "Bookmark"}>
+                              {ch.bookmarked ? <Star className="text-yellow-400" size={16} /> : <StarOff size={16} />}
                             </button>
-                            <button onClick={() => duplicateChapter(ch.id)} className={`p-2 lg:p-1 rounded hover:${isDark ? 'bg-slate-700' : 'bg-slate-200'}`} title="Duplicate">
-                              <Copy size={14} />
+                            <button onClick={() => duplicateChapter(ch.id)} className="p-2 rounded-lg hover:bg-blue-700/50 text-blue-300 transition-all duration-300" title="Duplicate">
+                              <Copy size={16} />
                             </button>
-                            <button onClick={() => setConfirmDeleteId(ch.id)} className={`p-2 lg:p-1 rounded hover:bg-red-500/20 text-red-400`} title="Delete">
-                              <Trash2 size={14} />
+                            <button onClick={() => setConfirmDeleteId(ch.id)} className="p-2 rounded-lg hover:bg-red-500/20 text-red-400 transition-all duration-300" title="Delete">
+                              <Trash2 size={16} />
                             </button>
                             <button
                               onClick={() => generateOne(ch.id)}
                               disabled={busy}
-                              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-indigo-600/30 border border-indigo-400/30 hover:bg-indigo-600/40 text-indigo-100"
+                              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-indigo-600/30 border border-indigo-400/30 hover:bg-indigo-600/40 text-indigo-100 font-serif transition-all duration-300 backdrop-blur-sm"
                               title="Generate/regenerate AI synopsis"
                             >
-                              {busy ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
-                              <span className="hidden lg:inline">{busy ? "…" : "AI"}</span>
+                              {busy ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
+                              {busy ? "Generating…" : "AI Synopsis"}
                             </button>
                           </div>
                         </div>
@@ -848,9 +893,9 @@ export default function TOCPage2() {
 
                       {/* Tags */}
                       {(ch.tags || []).length > 0 && (
-                        <div className="mt-2 flex items-center gap-1 flex-wrap">
+                        <div className="mt-4 flex items-center gap-2 flex-wrap">
                           {(ch.tags || []).map(tag => (
-                            <span key={tag} className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs ${isDark ? 'bg-indigo-900/40 text-indigo-200' : 'bg-indigo-100 text-indigo-700'}`}>
+                            <span key={tag} className="inline-flex items-center gap-2 px-3 py-1 rounded-lg text-xs bg-indigo-900/40 text-indigo-200 border border-indigo-700/50 backdrop-blur-sm font-serif">
                               <Tag size={12} />
                               {tag}
                             </span>
@@ -859,46 +904,46 @@ export default function TOCPage2() {
                       )}
 
                       {open && (
-                        <div className={`mt-3 text-sm ${themeClasses.textMuted}`}>
+                        <div className="mt-6 text-blue-200 font-serif">
                           {/* Title */}
-                          <div className="mb-3">
-                            <div className={`text-xs ${themeClasses.textVeryMuted} mb-1`}>Chapter title</div>
+                          <div className="mb-4">
+                            <div className="text-xs text-blue-300 mb-2 font-serif">Chapter title</div>
                             <input
                               value={ch.title}
                               onChange={(e) => updateChapter(ch.id, { title: e.target.value })}
-                              className={`w-full px-3 py-2 rounded-lg ${themeClasses.inputBg} border ${themeClasses.inputBorder} text-sm outline-none`}
+                              className="w-full px-4 py-3 rounded-xl bg-blue-900/30 border border-blue-700/50 text-white backdrop-blur-sm outline-none focus:ring-2 focus:ring-blue-400 transition-all duration-300 font-serif"
                             />
                           </div>
 
                           {/* Word goal */}
-                          <div className="mb-3">
-                            <div className={`text-xs ${themeClasses.textVeryMuted} mb-1`}>Word goal for this chapter</div>
-                            <div className="flex items-center gap-3">
+                          <div className="mb-4">
+                            <div className="text-xs text-blue-300 mb-2 font-serif">Word goal for this chapter</div>
+                            <div className="flex items-center gap-4">
                               <input
                                 type="number"
                                 min={100}
                                 step={100}
                                 value={ch.wordGoal || 2000}
                                 onChange={(e) => updateChapter(ch.id, { wordGoal: Number(e.target.value) || 2000 })}
-                                className={`w-32 rounded ${themeClasses.inputBg} border ${themeClasses.inputBorder} px-2 py-1 text-sm outline-none`}
+                                className="w-32 rounded-xl bg-blue-900/60 border border-blue-700/50 px-3 py-2 text-white font-serif backdrop-blur-sm outline-none focus:ring-2 focus:ring-blue-400 transition-all duration-300"
                               />
-                              <div className={`flex-1 ${isDark ? 'bg-slate-700' : 'bg-slate-300'} rounded-full h-2`}>
-                                <div className="bg-teal-500 h-2 rounded-full transition-all" style={{ width: `${wordGoalPct}%` }} />
+                              <div className="flex-1 bg-blue-900/50 rounded-full h-3 backdrop-blur-sm">
+                                <div className="bg-gradient-to-r from-teal-500 to-emerald-500 h-3 rounded-full transition-all duration-700 shadow-lg" style={{ width: `${wordGoalPct}%` }}></div>
                               </div>
-                              <span className={`text-xs ${themeClasses.textVeryMuted}`}>{wordGoalPct.toFixed(0)}%</span>
+                              <span className="text-xs text-blue-300 font-serif">{wordGoalPct.toFixed(0)}%</span>
                             </div>
                           </div>
 
                           {/* Tags */}
-                          <div className="mb-3">
-                            <div className={`text-xs ${themeClasses.textVeryMuted} mb-1`}>Tags</div>
+                          <div className="mb-4">
+                            <div className="text-xs text-blue-300 mb-2 font-serif">Tags</div>
                             <div className="flex items-center gap-2 flex-wrap">
                               {(ch.tags || []).map(tag => (
-                                <span key={tag} className={`inline-flex items-center gap-1 px-2 py-1 rounded text-xs ${isDark ? 'bg-indigo-900/40 text-indigo-200' : 'bg-indigo-100 text-indigo-700'}`}>
+                                <span key={tag} className="inline-flex items-center gap-1 px-3 py-1 rounded-lg text-xs bg-indigo-900/40 text-indigo-200 border border-indigo-700/50 backdrop-blur-sm font-serif">
                                   {tag}
                                   <button
                                     onClick={() => removeTagFromChapter(ch.id, tag)}
-                                    className="hover:text-red-400"
+                                    className="hover:text-red-400 transition-colors"
                                   >
                                     <X size={12} />
                                   </button>
@@ -911,7 +956,7 @@ export default function TOCPage2() {
                                     e.target.value = "";
                                   }
                                 }}
-                                className={`text-xs rounded ${themeClasses.inputBg} border ${themeClasses.inputBorder} px-2 py-1 outline-none`}
+                                className="text-xs rounded-lg bg-blue-900/30 border border-blue-700/50 px-3 py-2 text-white backdrop-blur-sm outline-none font-serif"
                               >
                                 <option value="">Add tag...</option>
                                 {PREDEFINED_TAGS.filter(tag => !(ch.tags || []).includes(tag)).map(tag => (
@@ -922,21 +967,21 @@ export default function TOCPage2() {
                           </div>
 
                           {/* Synopsis */}
-                          <div className="mb-4">
-                            <div className={`font-medium mb-1 ${themeClasses.text}`}>AI Synopsis</div>
-                            <div className={`rounded-lg ${isDark ? 'bg-slate-900/40' : 'bg-slate-50'} border ${isDark ? 'border-white/5' : 'border-slate-200'} p-3`}>
-                              {ch.synopsis ? ch.synopsis : <span className="opacity-60">No synopsis yet. Click "AI".</span>}
+                          <div className="mb-6">
+                            <div className="font-bold mb-3 text-white font-serif text-lg">AI Synopsis</div>
+                            <div className="rounded-2xl bg-blue-900/40 border border-blue-700/30 p-4 backdrop-blur-sm">
+                              {ch.synopsis ? <p className="font-serif leading-relaxed">{ch.synopsis}</p> : <span className="opacity-60 font-serif">No synopsis yet. Click "AI Synopsis" to generate.</span>}
                             </div>
                           </div>
 
                           {/* Content */}
                           <div>
-                            <div className={`text-xs ${themeClasses.textVeryMuted} mb-1`}>Chapter content</div>
+                            <div className="text-xs text-blue-300 mb-2 font-serif">Chapter content</div>
                             <textarea
                               value={ch.content}
                               onChange={(e) => updateChapter(ch.id, { content: e.target.value })}
                               placeholder="Draft your chapter content here…"
-                              className={`w-full min-h-[140px] rounded-lg ${themeClasses.inputBg} border ${themeClasses.inputBorder} px-3 py-2 text-sm outline-none resize-vertical`}
+                              className="w-full min-h-[200px] rounded-2xl bg-blue-900/30 border border-blue-700/50 px-4 py-4 text-white placeholder-blue-300 backdrop-blur-sm focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-all duration-300 font-serif outline-none resize-vertical"
                             />
                           </div>
                         </div>
@@ -949,27 +994,27 @@ export default function TOCPage2() {
           )}
         </div>
 
-        {/* Delete confirmation */}
+        {/* Delete confirmation modal */}
         {confirmDeleteId && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-            <div className={`${themeClasses.cardBg} rounded-2xl p-6 max-w-md w-full border ${themeClasses.border}`}>
-              <div className="flex items-center gap-3 mb-4">
-                <AlertCircle className="text-red-400" size={20} />
-                <div className={`text-lg font-semibold ${themeClasses.text}`}>Delete Chapter</div>
+            <div className="bg-blue-950/90 backdrop-blur-xl rounded-3xl p-8 max-w-md w-full border border-blue-800/40 shadow-2xl">
+              <div className="flex items-center gap-3 mb-6">
+                <AlertCircle className="text-red-400" size={24} />
+                <div className="text-xl font-bold text-white font-serif">Delete Chapter</div>
               </div>
-              <div className={`${themeClasses.textMuted} mb-6`}>
-                Are you sure you want to delete "{chapters.find(c => c.id === confirmDeleteId)?.title}"? This cannot be undone.
+              <div className="text-blue-200 font-serif mb-8 leading-relaxed">
+                Are you sure you want to delete "{chapters.find(c => c.id === confirmDeleteId)?.title}"? This action cannot be undone.
               </div>
-              <div className="flex gap-3">
+              <div className="flex gap-4">
                 <button 
                   onClick={() => setConfirmDeleteId(null)} 
-                  className={`flex-1 px-4 py-2 rounded-xl ${isDark ? 'bg-slate-700 hover:bg-slate-600' : 'bg-slate-200 hover:bg-slate-300'} ${themeClasses.text}`}
+                  className="flex-1 px-6 py-3 rounded-xl bg-blue-900/40 hover:bg-blue-900/60 text-white font-serif backdrop-blur-sm transition-all duration-300 hover:scale-105"
                 >
                   Cancel
                 </button>
                 <button 
                   onClick={() => deleteChapter(confirmDeleteId)} 
-                  className="flex-1 px-4 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white"
+                  className="flex-1 px-6 py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white font-serif shadow-xl transition-all duration-300 hover:scale-105 hover:shadow-2xl"
                 >
                   Delete
                 </button>
