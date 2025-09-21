@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Auth } from 'aws-amplify';
-import { Eye, EyeOff, Mail, Lock, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, CheckCircle, XCircle, Loader2, User as UserIcon } from 'lucide-react';
 
 const clean = (s = '') => s.trim();
 const lc = (s = '') => s.trim().toLowerCase();
@@ -14,6 +14,7 @@ export default function RegistrationPage() {
   const [form, setForm] = useState({
     firstName: '',
     lastName: '',
+    username: '',
     email: '',
     password: '',
     confirmPassword: ''
@@ -33,16 +34,21 @@ export default function RegistrationPage() {
     if (msg) setMsg('');
   };
 
-  // ---------- Register (email-only identifier) ----------
+  // ---------- Register (username + email) ----------
   const onRegister = async (e) => {
     e.preventDefault();
     setErr(''); setMsg('');
 
+    const username = clean(form.username);
     const email = lc(form.email);
     const pw = form.password;
 
-    if (!email || !pw || !form.confirmPassword || !form.firstName || !form.lastName) {
+    if (!form.firstName || !form.lastName || !username || !email || !pw || !form.confirmPassword) {
       setErr('Please complete all fields.');
+      return;
+    }
+    if (/\s/.test(username)) {
+      setErr('Username cannot contain spaces.');
       return;
     }
     if (pw !== form.confirmPassword) {
@@ -52,24 +58,28 @@ export default function RegistrationPage() {
 
     setLoading(true);
     try {
-      // Use email as the Cognito "username"
       const signUpResult = await Auth.signUp({
-        username: email,
+        username,                 // Cognito login username
         password: pw,
         attributes: {
-          email,
+          email,                  // email attribute
           given_name: clean(form.firstName),
           family_name: clean(form.lastName),
+          preferred_username: username, // nice display handle
         },
       });
       console.log('SignUp result:', signUpResult);
-      localStorage.setItem('currentUser', JSON.stringify({ email }));
+      localStorage.setItem('currentUser', JSON.stringify({ username, email }));
       setMsg('Registration successful! We sent a 6-digit code to your email.');
       setStep('confirm');
     } catch (e) {
       console.log('[SignUp error]', e);
       if (e?.code === 'UsernameExistsException') {
-        setErr('An account with that email already exists. Try signing in or reset your password.');
+        setErr('That username is already taken. Please choose a different username.');
+      } else if (e?.code === 'InvalidPasswordException') {
+        setErr('Password must meet complexity rules.');
+      } else if (e?.code === 'InvalidParameterException' && String(e?.message).toLowerCase().includes('email')) {
+        setErr('Please enter a valid email address.');
       } else {
         setErr(e?.message || e?.code || 'Registration failed.');
       }
@@ -78,22 +88,24 @@ export default function RegistrationPage() {
     }
   };
 
-  // ---------- Confirm (email + code) ----------
+  // ---------- Confirm (accepts username OR email) ----------
   const onConfirm = async (e) => {
     e.preventDefault();
     setErr(''); setMsg('');
 
-    const email = lc(form.email);
+    // Prefer username if provided; otherwise use email
+    const rawId = clean(form.username) || lc(form.email);
+    const identifier = rawId.includes('@') ? lc(rawId) : rawId;
     const c = clean(code).replace(/\s+/g, '');
 
-    if (!email || !c) {
-      setErr('Enter your email and the 6-digit code.');
+    if (!identifier || !c) {
+      setErr('Enter your username or email and the 6-digit code.');
       return;
     }
 
     setLoading(true);
     try {
-      await Auth.confirmSignUp(email, c);
+      await Auth.confirmSignUp(identifier, c);
       console.log('Email confirmation successful');
       setMsg('Email confirmed successfully! Please sign in manually.');
       localStorage.removeItem('currentUser');
@@ -109,14 +121,16 @@ export default function RegistrationPage() {
     }
   };
 
-  // ---------- RESEND CODE ----------
+  // ---------- RESEND (accepts username OR email) ----------
   const resend = async () => {
     setErr(''); setMsg('');
-    const email = lc(form.email);
-    if (!email) { setErr('Enter your email to resend.'); return; }
+    const raw = clean(form.username) || lc(form.email);
+    if (!raw) { setErr('Enter your username or email to resend.'); return; }
+    const identifier = raw.includes('@') ? lc(raw) : raw;
+
     setLoading(true);
     try {
-      await Auth.resendSignUp(email);
+      await Auth.resendSignUp(identifier);
       setMsg('Code resent. Check your email.');
     } catch (e) {
       console.log('[Resend error]', e);
@@ -132,19 +146,27 @@ export default function RegistrationPage() {
       <div className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-indigo-950 flex items-center justify-center p-4 relative overflow-hidden">
         <DecorBlobs />
         <div className="relative z-10 bg-blue-950/50 backdrop-blur-xl rounded-3xl shadow-2xl p-12 w-full max-w-md border border-blue-800/40">
-          <Header title="Confirm Your Email" icon={<Mail className="h-10 w-10 text-blue-300" />} />
+          <Header title="Confirm Your Account" icon={<Mail className="h-10 w-10 text-blue-300" />} />
           {msg && <Banner ok>{msg}</Banner>}
           {err && <Banner>{err}</Banner>}
 
           <form onSubmit={onConfirm} className="space-y-6" noValidate>
             <Input
+              type="text"
+              name="username"
+              value={form.username}
+              onChange={onChange}
+              placeholder="Username (or leave blank and use email)"
+              autoComplete="username"
+              leftIcon={<UserIcon className="h-5 w-5" />}
+            />
+            <Input
               type="email"
               name="email"
               value={form.email}
               onChange={onChange}
-              placeholder="Email"
+              placeholder="Email (optional if you filled username)"
               autoComplete="email"
-              required
               leftIcon={<Mail className="h-5 w-5" />}
             />
             <Input
@@ -155,6 +177,7 @@ export default function RegistrationPage() {
               maxLength={6}
               inputMode="numeric"
               leftIcon={<Mail className="h-5 w-5" />}
+              required
             />
             <Button type="submit" loading={loading} grad>
               Confirm & Continue
@@ -163,7 +186,7 @@ export default function RegistrationPage() {
               <button
                 type="button"
                 onClick={resend}
-                disabled={loading || !form.email}
+                disabled={loading || (!form.username && !form.email)}
                 className="text-blue-300 hover:text-blue-100 font-serif text-sm font-medium disabled:opacity-50 transition-colors"
               >
                 Didn't receive the code? Resend
@@ -194,21 +217,20 @@ export default function RegistrationPage() {
 
         <form onSubmit={onRegister} className="space-y-6" noValidate>
           <div className="grid grid-cols-2 gap-4">
-            <Input
-              name="firstName"
-              value={form.firstName}
-              onChange={onChange}
-              placeholder="First Name"
-              required
-            />
-            <Input
-              name="lastName"
-              value={form.lastName}
-              onChange={onChange}
-              placeholder="Last Name"
-              required
-            />
+            <Input name="firstName" value={form.firstName} onChange={onChange} placeholder="First Name" required />
+            <Input name="lastName"  value={form.lastName}  onChange={onChange} placeholder="Last Name"  required />
           </div>
+
+          <Input
+            type="text"
+            name="username"
+            value={form.username}
+            onChange={onChange}
+            placeholder="Username"
+            autoComplete="username"
+            required
+            leftIcon={<UserIcon className="h-5 w-5" />}
+          />
 
           <Input
             type="email"
@@ -241,7 +263,7 @@ export default function RegistrationPage() {
             autoComplete="new-password"
           />
 
-          <div className="text-sm text-blue-200 bg-blue-900/30 p-4 rounded-xl font-serif backdrop-blur-sm">
+          <div className="text-sm text-blue-200 bg-blue-900/30 p-4 rounded-xl font-serif">
             Password must contain at least 8 characters with uppercase, lowercase, number, and special character.
           </div>
 
