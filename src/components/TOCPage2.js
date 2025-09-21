@@ -172,7 +172,7 @@ const calculateStreak = (daily) => {
 /* ──────────────────────────────────────────────────────────────
    Component
 ──────────────────────────────────────────────────────────────── */
-export default function TOCPage3() {
+export default function TOCPage2() {
   // Initial state
   const initial = loadState() || {
     book: { title: "Jacque is a rock star!!", targetWords: 25000 },
