@@ -21,18 +21,24 @@ export default function SignInPage() {
 
   // Prefill from registration
   useEffect(() => {
-    try { const saved = JSON.parse(localStorage.getItem('currentUser') || '{}');
+    try { 
+      const saved = JSON.parse(localStorage.getItem('currentUser') || '{}');
       if (saved?.email) setEmail(lc(saved.email));
     } catch {}
   }, []);
 
   const signIn = async (e) => {
-    e.preventDefault(); setErr(''); setMsg('');
-    const id = lc(email);
-    if (!id || !password) return setErr('Enter your email and password.');
+    e.preventDefault(); 
+    setErr(''); 
+    setMsg('');
+    
+    const emailAddress = lc(email);
+    if (!emailAddress || !password) return setErr('Enter your email and password.');
+    
     setLoading(true);
     try {
-      const user = await Auth.signIn(id, password);
+      // Use email as username (consistent with registration)
+      const user = await Auth.signIn(emailAddress, password);
 
       // Handle NEW_PASSWORD_REQUIRED (rare, but breaks sign-in if not handled)
       if (user?.challengeName === 'NEW_PASSWORD_REQUIRED') {
@@ -42,21 +48,47 @@ export default function SignInPage() {
         return;
       }
 
+      // Verify user is authenticated
       await Auth.currentAuthenticatedUser({ bypassCache: true });
+      
+      // Clear any stored registration data and navigate
+      localStorage.removeItem('currentUser');
       navigate('/dashboard');
+      
     } catch (e) {
       console.log('[SignIn error]', e);
-      if (e?.code === 'UserNotConfirmedException') setErr('Please confirm your email before signing in.');
-      else if (e?.code === 'NotAuthorizedException') setErr('Incorrect email or password.');
-      else if (e?.code === 'UserNotFoundException') setErr('No account found for that email.');
-      else setErr(e?.message || e?.code || 'Sign-in failed.');
-    } finally { setLoading(false); }
+      console.log('Error code:', e?.code);
+      console.log('Error message:', e?.message);
+      console.log('Full error object:', JSON.stringify(e, null, 2));
+      console.log('Email being used:', emailAddress);
+      
+      // Enhanced error handling
+      if (e?.code === 'UserNotConfirmedException') {
+        setErr('Please check your email and click the confirmation link before signing in.');
+      } else if (e?.code === 'NotAuthorizedException') {
+        setErr('Incorrect email or password. Please try again or use "Forgot password". (Check browser console for details)');
+      } else if (e?.code === 'UserNotFoundException') {
+        setErr('No account found for that email. Please check your email or create a new account.');
+      } else if (e?.code === 'TooManyRequestsException') {
+        setErr('Too many failed attempts. Please wait a few minutes and try again.');
+      } else if (e?.code === 'PasswordResetRequiredException') {
+        setErr('Password reset required. Please use "Forgot password" to reset.');
+      } else {
+        setErr(`${e?.message || e?.code || 'Sign-in failed'} (Error: ${e?.code}) - Check browser console for details.`);
+      }
+    } finally { 
+      setLoading(false); 
+    }
   };
 
   const completeNewPassword = async (e) => {
-    e.preventDefault(); setErr(''); setMsg('');
+    e.preventDefault(); 
+    setErr(''); 
+    setMsg('');
+    
     if (!challengedUser) return setErr('No pending challenge.');
     if (!newPassword) return setErr('Enter a new password.');
+    
     setLoading(true);
     try {
       await Auth.completeNewPassword(challengedUser, newPassword);
@@ -65,48 +97,90 @@ export default function SignInPage() {
     } catch (e) {
       console.log('[CompleteNewPassword error]', e);
       setErr(e?.message || e?.code || 'Could not set new password.');
-    } finally { setLoading(false); }
+    } finally { 
+      setLoading(false); 
+    }
   };
 
   const forgotStart = async (e) => {
-    e.preventDefault(); setErr(''); setMsg('');
-    const id = lc(email);
-    if (!id) return setErr('Enter your email.');
+    e.preventDefault(); 
+    setErr(''); 
+    setMsg('');
+    
+    const emailAddress = lc(email);
+    if (!emailAddress) return setErr('Enter your email.');
+    
     setLoading(true);
     try {
-      await Auth.forgotPassword(id);
-      setMsg('We sent a reset code to your email.'); setMode('reset');
+      // Use email as username for forgot password too
+      await Auth.forgotPassword(emailAddress);
+      setMsg('We sent a reset code to your email.'); 
+      setMode('reset');
     } catch (e) {
       console.log('[Forgot error]', e);
-      if (e?.code === 'UserNotFoundException') setErr('No account found for that email.');
-      else setErr(e?.message || e?.code || 'Could not start password reset.');
-    } finally { setLoading(false); }
+      if (e?.code === 'UserNotFoundException') {
+        setErr('No account found for that email. Please check your email or create a new account.');
+      } else if (e?.code === 'TooManyRequestsException') {
+        setErr('Too many requests. Please wait a few minutes and try again.');
+      } else {
+        setErr(e?.message || e?.code || 'Could not start password reset.');
+      }
+    } finally { 
+      setLoading(false); 
+    }
   };
 
   const forgotComplete = async (e) => {
-    e.preventDefault(); setErr(''); setMsg('');
-    const id = lc(email); const c = code.trim();
-    if (!id || !c || !newPassword) return setErr('Enter email, the 6-digit code, and a new password.');
+    e.preventDefault(); 
+    setErr(''); 
+    setMsg('');
+    
+    const emailAddress = lc(email); 
+    const resetCode = code.trim();
+    
+    if (!emailAddress || !resetCode || !newPassword) {
+      return setErr('Enter email, the 6-digit code, and a new password.');
+    }
+    
     setLoading(true);
     try {
-      await Auth.forgotPasswordSubmit(id, c, newPassword);
+      await Auth.forgotPasswordSubmit(emailAddress, resetCode, newPassword);
       setMsg('Password updated! You can sign in now.');
-      setTimeout(() => setMode('signin'), 700);
+      setPassword(''); // Clear old password
+      setTimeout(() => setMode('signin'), 1500);
     } catch (e) {
       console.log('[Forgot submit error]', e);
-      if (e?.code === 'CodeMismatchException') setErr('Invalid code.');
-      else if (e?.code === 'ExpiredCodeException') setErr('Code expired. Click "Resend code".');
-      else setErr(e?.message || e?.code || 'Could not set new password.');
-    } finally { setLoading(false); }
+      if (e?.code === 'CodeMismatchException') {
+        setErr('Invalid code. Please check the code and try again.');
+      } else if (e?.code === 'ExpiredCodeException') {
+        setErr('Code expired. Please click "Resend code" to get a new one.');
+      } else if (e?.code === 'InvalidPasswordException') {
+        setErr('Password must be at least 8 characters with uppercase, lowercase, number, and special character.');
+      } else {
+        setErr(e?.message || e?.code || 'Could not set new password.');
+      }
+    } finally { 
+      setLoading(false); 
+    }
   };
 
   const resendCode = async () => {
-    setErr(''); setMsg(''); const id = lc(email);
-    if (!id) return setErr('Enter your email first.');
+    setErr(''); 
+    setMsg(''); 
+    
+    const emailAddress = lc(email);
+    if (!emailAddress) return setErr('Enter your email first.');
+    
     setLoading(true);
-    try { await Auth.forgotPassword(id); setMsg('Code resent. Check your email.'); }
-    catch (e) { console.log('[Resend code error]', e); setErr(e?.message || e?.code || 'Could not resend code.'); }
-    finally { setLoading(false); }
+    try { 
+      await Auth.forgotPassword(emailAddress); 
+      setMsg('Code resent. Check your email.'); 
+    } catch (e) { 
+      console.log('[Resend code error]', e); 
+      setErr(e?.message || e?.code || 'Could not resend code.'); 
+    } finally { 
+      setLoading(false); 
+    }
   };
 
   const Back = () => (
@@ -130,46 +204,64 @@ export default function SignInPage() {
         {mode === 'signin' && (
           <form onSubmit={signIn} className="space-y-4" noValidate>
             <div className="relative">
-              <input type="email" value={email} onChange={e=>setEmail(e.target.value)}
-                     placeholder="Email" autoComplete="email"
-                     className="w-full pl-10 pr-3 py-3 rounded-lg bg-slate-800/50 border border-white/10 outline-none" required />
+              <input 
+                type="email" 
+                value={email} 
+                onChange={e=>setEmail(e.target.value)}
+                placeholder="Email Address" 
+                autoComplete="email"
+                className="w-full pl-10 pr-3 py-3 rounded-lg bg-slate-800/50 border border-white/10 outline-none focus:border-indigo-500 focus:bg-slate-800/70 transition-colors" 
+                required 
+              />
               <Mail className="absolute left-3 top-3.5 h-5 w-5 text-slate-400"/>
             </div>
             <div className="relative">
-              <input type={showPwd?'text':'password'} value={password} onChange={e=>setPassword(e.target.value)}
-                     placeholder="Password" autoComplete="current-password"
-                     className="w-full pl-10 pr-10 py-3 rounded-lg bg-slate-800/50 border border-white/10 outline-none" required />
+              <input 
+                type={showPwd?'text':'password'} 
+                value={password} 
+                onChange={e=>setPassword(e.target.value)}
+                placeholder="Password" 
+                autoComplete="current-password"
+                className="w-full pl-10 pr-10 py-3 rounded-lg bg-slate-800/50 border border-white/10 outline-none focus:border-indigo-500 focus:bg-slate-800/70 transition-colors" 
+                required 
+              />
               <Lock className="absolute left-3 top-3.5 h-5 w-5 text-slate-400"/>
-              <button type="button" className="absolute right-3 top-3.5 text-slate-400" onClick={()=>setShowPwd(v=>!v)}>
+              <button type="button" className="absolute right-3 top-3.5 text-slate-400 hover:text-slate-300" onClick={()=>setShowPwd(v=>!v)}>
                 {showPwd ? <EyeOff className="h-5 w-5"/> : <Eye className="h-5 w-5"/>}
               </button>
             </div>
-            <button type="submit" disabled={loading}
-                    className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 px-4 py-2 font-medium disabled:opacity-60">
+            <button 
+              type="submit" 
+              disabled={loading}
+              className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 px-4 py-3 font-medium disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+            >
               {loading ? <Loader2 size={16} className="animate-spin"/> : null} Sign in
             </button>
             <div className="text-center space-y-2">
-              <button type="button" onClick={()=>{setErr('');setMsg('');setMode('forgot');}}
-                      className="text-indigo-300 hover:text-indigo-200 text-sm">Forgot password?</button>
+              <button 
+                type="button" 
+                onClick={()=>{setErr('');setMsg('');setMode('forgot');}}
+                className="text-indigo-300 hover:text-indigo-200 text-sm transition-colors"
+              >
+                Forgot password?
+              </button>
               
-              {/* ADD THIS SECTION - Registration link */}
               <div className="pt-4 border-t border-white/10">
                 <p className="text-slate-400 text-sm mb-2">Don't have an account?</p>
                 <button 
                   type="button" 
-                  onClick={() => navigate('/auth/register')}
+                  onClick={() => navigate('/register')}
                   className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-slate-700 hover:bg-slate-600 px-4 py-2 font-medium text-slate-200 hover:text-white transition-colors"
                 >
                   Create Account
                 </button>
               </div>
               
-              {/* Also add a link back to landing page */}
               <div className="pt-2">
                 <button 
                   type="button" 
                   onClick={() => navigate('/')}
-                  className="text-slate-400 hover:text-slate-300 text-sm"
+                  className="text-slate-400 hover:text-slate-300 text-sm transition-colors"
                 >
                   ← Back to Home
                 </button>
@@ -181,13 +273,22 @@ export default function SignInPage() {
         {mode === 'forgot' && (
           <form onSubmit={forgotStart} className="space-y-4" noValidate>
             <div className="relative">
-              <input type="email" value={email} onChange={e=>setEmail(e.target.value)}
-                     placeholder="Email" autoComplete="email"
-                     className="w-full pl-10 pr-3 py-3 rounded-lg bg-slate-800/50 border border-white/10 outline-none" required />
+              <input 
+                type="email" 
+                value={email} 
+                onChange={e=>setEmail(e.target.value)}
+                placeholder="Email Address" 
+                autoComplete="email"
+                className="w-full pl-10 pr-3 py-3 rounded-lg bg-slate-800/50 border border-white/10 outline-none focus:border-indigo-500 focus:bg-slate-800/70 transition-colors" 
+                required 
+              />
               <Mail className="absolute left-3 top-3.5 h-5 w-5 text-slate-400"/>
             </div>
-            <button type="submit" disabled={loading}
-                    className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 px-4 py-2 font-medium disabled:opacity-60">
+            <button 
+              type="submit" 
+              disabled={loading}
+              className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 px-4 py-3 font-medium disabled:opacity-60 transition-colors"
+            >
               {loading ? <Loader2 size={16} className="animate-spin"/> : null} Send reset code
             </button>
           </form>
@@ -196,27 +297,52 @@ export default function SignInPage() {
         {mode === 'reset' && (
           <form onSubmit={forgotComplete} className="space-y-4" noValidate>
             <div className="relative">
-              <input type="text" value={code} onChange={e=>setCode(e.target.value)}
-                     placeholder="6-digit code" maxLength={6} inputMode="numeric"
-                     className="w-full pl-10 pr-3 py-3 rounded-lg bg-slate-800/50 border border-white/10 outline-none tracking-widest" required />
+              <input 
+                type="text" 
+                value={code} 
+                onChange={e=>setCode(e.target.value)}
+                placeholder="6-digit code" 
+                maxLength={6} 
+                inputMode="numeric"
+                className="w-full pl-10 pr-3 py-3 rounded-lg bg-slate-800/50 border border-white/10 outline-none tracking-widest focus:border-indigo-500 focus:bg-slate-800/70 transition-colors" 
+                required 
+              />
               <Mail className="absolute left-3 top-3.5 h-5 w-5 text-slate-400"/>
             </div>
             <div className="relative">
-              <input type={showPwd?'text':'password'} value={newPassword} onChange={e=>setNewPassword(e.target.value)}
-                     placeholder="New password" autoComplete="new-password"
-                     className="w-full pl-10 pr-10 py-3 rounded-lg bg-slate-800/50 border border-white/10 outline-none" required />
+              <input 
+                type={showPwd?'text':'password'} 
+                value={newPassword} 
+                onChange={e=>setNewPassword(e.target.value)}
+                placeholder="New password" 
+                autoComplete="new-password"
+                className="w-full pl-10 pr-10 py-3 rounded-lg bg-slate-800/50 border border-white/10 outline-none focus:border-indigo-500 focus:bg-slate-800/70 transition-colors" 
+                required 
+              />
               <Lock className="absolute left-3 top-3.5 h-5 w-5 text-slate-400"/>
-              <button type="button" className="absolute right-3 top-3.5 text-slate-400" onClick={()=>setShowPwd(v=>!v)}>
+              <button type="button" className="absolute right-3 top-3.5 text-slate-400 hover:text-slate-300" onClick={()=>setShowPwd(v=>!v)}>
                 {showPwd ? <EyeOff className="h-5 w-5"/> : <Eye className="h-5 w-5"/>}
               </button>
             </div>
-            <button type="submit" disabled={loading}
-                    className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-green-600 hover:bg-green-500 px-4 py-2 font-medium disabled:opacity-60">
+            <div className="text-xs text-slate-400 bg-slate-800/30 p-3 rounded-lg">
+              Password must be at least 8 characters with uppercase, lowercase, number, and special character.
+            </div>
+            <button 
+              type="submit" 
+              disabled={loading}
+              className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-green-600 hover:bg-green-500 px-4 py-3 font-medium disabled:opacity-60 transition-colors"
+            >
               {loading ? <Loader2 size={16} className="animate-spin"/> : null} Set new password
             </button>
             <div className="text-center">
-              <button type="button" onClick={resendCode} disabled={loading || !email}
-                      className="text-indigo-300 hover:text-indigo-200 text-sm">Resend code</button>
+              <button 
+                type="button" 
+                onClick={resendCode} 
+                disabled={loading || !email}
+                className="text-indigo-300 hover:text-indigo-200 text-sm disabled:opacity-50 transition-colors"
+              >
+                Resend code
+              </button>
             </div>
           </form>
         )}
@@ -224,16 +350,25 @@ export default function SignInPage() {
         {mode === 'newpwd' && (
           <form onSubmit={completeNewPassword} className="space-y-4" noValidate>
             <div className="relative">
-              <input type={showPwd?'text':'password'} value={newPassword} onChange={e=>setNewPassword(e.target.value)}
-                     placeholder="New password" autoComplete="new-password"
-                     className="w-full pl-10 pr-10 py-3 rounded-lg bg-slate-800/50 border border-white/10 outline-none" required />
+              <input 
+                type={showPwd?'text':'password'} 
+                value={newPassword} 
+                onChange={e=>setNewPassword(e.target.value)}
+                placeholder="New password" 
+                autoComplete="new-password"
+                className="w-full pl-10 pr-10 py-3 rounded-lg bg-slate-800/50 border border-white/10 outline-none focus:border-indigo-500 focus:bg-slate-800/70 transition-colors" 
+                required 
+              />
               <Lock className="absolute left-3 top-3.5 h-5 w-5 text-slate-400"/>
-              <button type="button" className="absolute right-3 top-3.5 text-slate-400" onClick={()=>setShowPwd(v=>!v)}>
+              <button type="button" className="absolute right-3 top-3.5 text-slate-400 hover:text-slate-300" onClick={()=>setShowPwd(v=>!v)}>
                 {showPwd ? <EyeOff className="h-5 w-5"/> : <Eye className="h-5 w-5"/>}
               </button>
             </div>
-            <button type="submit" disabled={loading}
-                    className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-green-600 hover:bg-green-500 px-4 py-2 font-medium disabled:opacity-60">
+            <button 
+              type="submit" 
+              disabled={loading}
+              className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-green-600 hover:bg-green-500 px-4 py-3 font-medium disabled:opacity-60 transition-colors"
+            >
               {loading ? <Loader2 size={16} className="animate-spin"/> : null} Continue
             </button>
           </form>
