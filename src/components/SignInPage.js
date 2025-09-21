@@ -9,7 +9,7 @@ const lc = (s='') => s.trim().toLowerCase();
 export default function SignInPage() {
   const navigate = useNavigate();
   const [mode, setMode] = useState('signin'); // 'signin' | 'forgot' | 'reset' | 'newpwd'
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPwd, setShowPwd] = useState(false);
   const [code, setCode] = useState('');
@@ -23,7 +23,7 @@ export default function SignInPage() {
   useEffect(() => {
     try { 
       const saved = JSON.parse(localStorage.getItem('currentUser') || '{}');
-      if (saved?.email) setEmail(lc(saved.email));
+      if (saved?.username) setUsername(saved.username);
     } catch {}
   }, []);
 
@@ -32,13 +32,13 @@ export default function SignInPage() {
     setErr(''); 
     setMsg('');
     
-    const emailAddress = lc(email);
-    if (!emailAddress || !password) return setErr('Enter your email and password.');
+    const usernameValue = username.trim();
+    if (!usernameValue || !password) return setErr('Enter your username and password.');
     
     setLoading(true);
     try {
-      // For email alias user pools, sign in with email directly
-      const user = await Auth.signIn(emailAddress, password);
+      // Sign in with username
+      const user = await Auth.signIn(usernameValue, password);
 
       // Handle NEW_PASSWORD_REQUIRED (rare, but breaks sign-in if not handled)
       if (user?.challengeName === 'NEW_PASSWORD_REQUIRED') {
@@ -60,15 +60,15 @@ export default function SignInPage() {
       console.log('Error code:', e?.code);
       console.log('Error message:', e?.message);
       console.log('Full error object:', JSON.stringify(e, null, 2));
-      console.log('Email being used:', emailAddress);
+      console.log('Username being used:', usernameValue);
       
       // Enhanced error handling
       if (e?.code === 'UserNotConfirmedException') {
         setErr('Please check your email and click the confirmation link before signing in.');
       } else if (e?.code === 'NotAuthorizedException') {
-        setErr('Incorrect email or password. Please try again or use "Forgot password". (Check browser console for details)');
+        setErr('Incorrect username or password. Please try again or use "Forgot password". (Check browser console for details)');
       } else if (e?.code === 'UserNotFoundException') {
-        setErr('No account found for that email. Please check your email or create a new account.');
+        setErr('No account found for that username. Please check your username or create a new account.');
       } else if (e?.code === 'TooManyRequestsException') {
         setErr('Too many failed attempts. Please wait a few minutes and try again.');
       } else if (e?.code === 'PasswordResetRequiredException') {
@@ -109,19 +109,19 @@ export default function SignInPage() {
     setErr(''); 
     setMsg('');
     
-    const emailAddress = lc(email);
-    if (!emailAddress) return setErr('Enter your email.');
+    const usernameValue = username.trim();
+    if (!usernameValue) return setErr('Enter your username.');
     
     setLoading(true);
     try {
-      // Use email as username for forgot password too
-      await Auth.forgotPassword(emailAddress);
+      // Use username for forgot password
+      await Auth.forgotPassword(usernameValue);
       setMsg('We sent a reset code to your email.'); 
       setMode('reset');
     } catch (e) {
       console.log('[Forgot error]', e);
       if (e?.code === 'UserNotFoundException') {
-        setErr('No account found for that email. Please check your email or create a new account.');
+        setErr('No account found for that username. Please check your username or create a new account.');
       } else if (e?.code === 'TooManyRequestsException') {
         setErr('Too many requests. Please wait a few minutes and try again.');
       } else {
@@ -137,16 +137,16 @@ export default function SignInPage() {
     setErr(''); 
     setMsg('');
     
-    const emailAddress = lc(email); 
+    const usernameValue = username.trim(); 
     const resetCode = code.trim();
     
-    if (!emailAddress || !resetCode || !newPassword) {
-      return setErr('Enter email, the 6-digit code, and a new password.');
+    if (!usernameValue || !resetCode || !newPassword) {
+      return setErr('Enter username, the 6-digit code, and a new password.');
     }
     
     setLoading(true);
     try {
-      await Auth.forgotPasswordSubmit(emailAddress, resetCode, newPassword);
+      await Auth.forgotPasswordSubmit(usernameValue, resetCode, newPassword);
       setMsg('Password updated! You can sign in now.');
       setPassword(''); // Clear old password
       setTimeout(() => setMode('signin'), 1500);
@@ -170,12 +170,12 @@ export default function SignInPage() {
     setErr(''); 
     setMsg(''); 
     
-    const emailAddress = lc(email);
-    if (!emailAddress) return setErr('Enter your email first.');
+    const usernameValue = username.trim();
+    if (!usernameValue) return setErr('Enter your username first.');
     
     setLoading(true);
     try { 
-      await Auth.forgotPassword(emailAddress); 
+      await Auth.forgotPassword(usernameValue); 
       setMsg('Code resent. Check your email.'); 
     } catch (e) { 
       console.log('[Resend code error]', e); 
@@ -207,11 +207,11 @@ export default function SignInPage() {
           <form onSubmit={signIn} className="space-y-4" noValidate>
             <div className="relative">
               <input 
-                type="email" 
-                value={email} 
-                onChange={e=>setEmail(e.target.value)}
-                placeholder="Email Address" 
-                autoComplete="email"
+                type="text" 
+                value={username} 
+                onChange={e=>setUsername(e.target.value)}
+                placeholder="Username" 
+                autoComplete="username"
                 className="w-full pl-10 pr-3 py-3 rounded-lg bg-slate-800/50 border border-white/10 outline-none focus:border-indigo-500 focus:bg-slate-800/70 transition-colors" 
                 required 
               />
@@ -276,11 +276,11 @@ export default function SignInPage() {
           <form onSubmit={forgotStart} className="space-y-4" noValidate>
             <div className="relative">
               <input 
-                type="email" 
-                value={email} 
-                onChange={e=>setEmail(e.target.value)}
-                placeholder="Email Address" 
-                autoComplete="email"
+                type="text" 
+                value={username} 
+                onChange={e=>setUsername(e.target.value)}
+                placeholder="Username" 
+                autoComplete="username"
                 className="w-full pl-10 pr-3 py-3 rounded-lg bg-slate-800/50 border border-white/10 outline-none focus:border-indigo-500 focus:bg-slate-800/70 transition-colors" 
                 required 
               />
@@ -340,7 +340,7 @@ export default function SignInPage() {
               <button 
                 type="button" 
                 onClick={resendCode} 
-                disabled={loading || !email}
+                disabled={loading || !username}
                 className="text-indigo-300 hover:text-indigo-200 text-sm disabled:opacity-50 transition-colors"
               >
                 Resend code
