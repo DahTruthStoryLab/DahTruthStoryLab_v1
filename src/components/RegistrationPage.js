@@ -12,12 +12,12 @@ export default function RegistrationPage() {
   const [step, setStep] = useState('register'); // 'register' | 'confirm'  ← plain JS
 
   const [form, setForm] = useState({
-    email: '',
-    password: '',
-    confirmPassword: '',
     firstName: '',
     lastName: '',
-  });
+    username: '',     // ← Changed to username
+    password: '',
+    confirmPassword: ''
+});
 
   const [code, setCode] = useState('');
   const [showPwd, setShowPwd] = useState(false);
@@ -38,7 +38,7 @@ export default function RegistrationPage() {
     e.preventDefault();
     setErr(''); setMsg('');
 
-    const email = lc(form.email);
+    const email = lc(form.username);  // ← Changed from form.email to form.username
     const pw = form.password;
 
     if (!email || !pw || !form.confirmPassword || !form.firstName || !form.lastName) {
@@ -82,7 +82,7 @@ export default function RegistrationPage() {
     e.preventDefault();
     setErr(''); setMsg('');
 
-    const email = lc(form.email);
+    const email = lc(form.username);  // ← Changed from form.email to form.username
     const c = clean(code).replace(/\s+/g, '');
     if (!email || !c) {
       setErr('Enter your email and the 6-digit code.');
@@ -119,10 +119,10 @@ export default function RegistrationPage() {
     }
   };
 
-  // ---------- MISSING RESEND FUNCTION (THIS WAS THE ISSUE!) ----------
+  // ---------- RESEND FUNCTION ----------
   const resend = async () => {
     setErr(''); setMsg('');
-    const email = lc(form.email);
+    const email = lc(form.username);  // ← Changed from form.email to form.username
     if (!email) { setErr('Enter your email to resend.'); return; }
     setLoading(true);
     try {
@@ -148,10 +148,10 @@ export default function RegistrationPage() {
           {err && <Banner>{err}</Banner>}
 
           <form onSubmit={onConfirm} className="space-y-6" noValidate>
-           <Input
+          <Input
               type="email"
-              name="email"
-              value={form.email}
+              name="username"  // ← Changed to username
+              value={form.username}  // ← Changed to username
               onChange={onChange}
               placeholder="Email Address"
               autoComplete="email"
@@ -174,7 +174,7 @@ export default function RegistrationPage() {
               <button
                 type="button"
                 onClick={resend}
-                disabled={loading || !form.email}
+                disabled={loading || !form.username}  {/* ← Changed from form.email to form.username */}
                 className="text-blue-300 hover:text-blue-100 font-serif text-sm font-medium disabled:opacity-50 transition-colors"
               >
                 Didn't receive the code? Resend
@@ -224,8 +224,8 @@ export default function RegistrationPage() {
 
           <Input
             type="email"
-            name="email"
-            value={form.email}
+            name="username"  // ← Changed from "email" to "username"
+            value={form.username}  // ← Changed from form.email to form.username
             onChange={onChange}
             placeholder="Email Address"
             autoComplete="email"
