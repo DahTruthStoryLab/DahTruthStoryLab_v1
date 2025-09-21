@@ -37,7 +37,7 @@ export default function SignInPage() {
     
     setLoading(true);
     try {
-      // Use email as username (consistent with registration)
+      // For email alias user pools, sign in with email directly
       const user = await Auth.signIn(emailAddress, password);
 
       // Handle NEW_PASSWORD_REQUIRED (rare, but breaks sign-in if not handled)
@@ -73,6 +73,8 @@ export default function SignInPage() {
         setErr('Too many failed attempts. Please wait a few minutes and try again.');
       } else if (e?.code === 'PasswordResetRequiredException') {
         setErr('Password reset required. Please use "Forgot password" to reset.');
+      } else if (e?.message?.includes('email format') || e?.message?.includes('email alias')) {
+        setErr('Authentication configuration issue detected. You may need to create a new account. Contact support if this persists.');
       } else {
         setErr(`${e?.message || e?.code || 'Sign-in failed'} (Error: ${e?.code}) - Check browser console for details.`);
       }
