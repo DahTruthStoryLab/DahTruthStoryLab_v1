@@ -9,7 +9,7 @@ const lc = (s='') => s.trim().toLowerCase();
 export default function SignInPage() {
   const navigate = useNavigate();
   const [mode, setMode] = useState('signin'); // 'signin' | 'forgot' | 'reset' | 'newpwd'
-  const [username, setUsername] = useState('');
+  const [username, setUsername] = useState(''); // can be username OR email
   const [password, setPassword] = useState('');
   const [showPwd, setShowPwd] = useState(false);
   const [code, setCode] = useState('');
@@ -24,6 +24,7 @@ export default function SignInPage() {
     try { 
       const saved = JSON.parse(localStorage.getItem('currentUser') || '{}');
       if (saved?.username) setUsername(saved.username);
+      else if (saved?.email) setUsername(saved.email);
     } catch {}
   }, []);
 
@@ -32,15 +33,17 @@ export default function SignInPage() {
     setErr(''); 
     setMsg('');
     
-    const usernameValue = username.trim();
-    if (!usernameValue || !password) return setErr('Enter your username and password.');
+    const raw = (username || '').trim();
+    if (!raw || !password) return setErr('Enter your username or email and password.');
+
+    // If it looks like an email, normalize to lowercase
+    const identifier = raw.includes('@') ? lc(raw) : raw;
     
     setLoading(true);
     try {
-      // Sign in with username
-      const user = await Auth.signIn(usernameValue, password);
+      const user = await Auth.signIn(identifier, password);
 
-      // Handle NEW_PASSWORD_REQUIRED (rare, but breaks sign-in if not handled)
+      // Handle NEW_PASSWORD_REQUIRED challenge
       if (user?.challengeName === 'NEW_PASSWORD_REQUIRED') {
         setChallengedUser(user);
         setMode('newpwd');
@@ -48,35 +51,24 @@ export default function SignInPage() {
         return;
       }
 
-      // Verify user is authenticated
       await Auth.currentAuthenticatedUser({ bypassCache: true });
-      
-      // Clear any stored registration data and navigate
       localStorage.removeItem('currentUser');
       navigate('/dashboard');
       
     } catch (e) {
       console.log('[SignIn error]', e);
-      console.log('Error code:', e?.code);
-      console.log('Error message:', e?.message);
-      console.log('Full error object:', JSON.stringify(e, null, 2));
-      console.log('Username being used:', usernameValue);
-      
-      // Enhanced error handling
       if (e?.code === 'UserNotConfirmedException') {
-        setErr('Please check your email and click the confirmation link before signing in.');
+        setErr('Please confirm your email first. Check your inbox for the code.');
       } else if (e?.code === 'NotAuthorizedException') {
-        setErr('Incorrect username or password. Please try again or use "Forgot password". (Check browser console for details)');
+        setErr('Incorrect username/email or password. Try again or use “Forgot password”.');
       } else if (e?.code === 'UserNotFoundException') {
-        setErr('No account found for that username. Please check your username or create a new account.');
+        setErr('No account found for that username/email.');
       } else if (e?.code === 'TooManyRequestsException') {
-        setErr('Too many failed attempts. Please wait a few minutes and try again.');
+        setErr('Too many attempts. Please wait a few minutes and try again.');
       } else if (e?.code === 'PasswordResetRequiredException') {
-        setErr('Password reset required. Please use "Forgot password" to reset.');
-      } else if (e?.message?.includes('email format') || e?.message?.includes('email alias')) {
-        setErr('Authentication configuration issue detected. You may need to create a new account. Contact support if this persists.');
+        setErr('Password reset required. Use “Forgot password”.');
       } else {
-        setErr(`${e?.message || e?.code || 'Sign-in failed'} (Error: ${e?.code}) - Check browser console for details.`);
+        setErr(e?.message || e?.code || 'Sign-in failed.');
       }
     } finally { 
       setLoading(false); 
@@ -109,19 +101,19 @@ export default function SignInPage() {
     setErr(''); 
     setMsg('');
     
-    const usernameValue = username.trim();
-    if (!usernameValue) return setErr('Enter your username.');
+    const raw = (username || '').trim();
+    if (!raw) return setErr('Enter your username or email.');
+    const identifier = raw.includes('@') ? lc(raw) : raw;
     
     setLoading(true);
     try {
-      // Use username for forgot password
-      await Auth.forgotPassword(usernameValue);
+      await Auth.forgotPassword(identifier);
       setMsg('We sent a reset code to your email.'); 
       setMode('reset');
     } catch (e) {
       console.log('[Forgot error]', e);
       if (e?.code === 'UserNotFoundException') {
-        setErr('No account found for that username. Please check your username or create a new account.');
+        setErr('No account found for that username/email.');
       } else if (e?.code === 'TooManyRequestsException') {
         setErr('Too many requests. Please wait a few minutes and try again.');
       } else {
@@ -137,27 +129,28 @@ export default function SignInPage() {
     setErr(''); 
     setMsg('');
     
-    const usernameValue = username.trim(); 
-    const resetCode = code.trim();
+    const raw = (username || '').trim(); 
+    const identifier = raw.includes('@') ? lc(raw) : raw;
+    const resetCode = (code || '').trim();
     
-    if (!usernameValue || !resetCode || !newPassword) {
-      return setErr('Enter username, the 6-digit code, and a new password.');
+    if (!identifier || !resetCode || !newPassword) {
+      return setErr('Enter username/email, the 6-digit code, and a new password.');
     }
     
     setLoading(true);
     try {
-      await Auth.forgotPasswordSubmit(usernameValue, resetCode, newPassword);
+      await Auth.forgotPasswordSubmit(identifier, resetCode, newPassword);
       setMsg('Password updated! You can sign in now.');
-      setPassword(''); // Clear old password
+      setPassword('');
       setTimeout(() => setMode('signin'), 1500);
     } catch (e) {
       console.log('[Forgot submit error]', e);
       if (e?.code === 'CodeMismatchException') {
-        setErr('Invalid code. Please check the code and try again.');
+        setErr('Invalid code. Please check and try again.');
       } else if (e?.code === 'ExpiredCodeException') {
-        setErr('Code expired. Please click "Resend code" to get a new one.');
+        setErr('Code expired. Click “Resend code”.');
       } else if (e?.code === 'InvalidPasswordException') {
-        setErr('Password must be at least 8 characters with uppercase, lowercase, number, and special character.');
+        setErr('Password must meet complexity rules.');
       } else {
         setErr(e?.message || e?.code || 'Could not set new password.');
       }
@@ -169,13 +162,13 @@ export default function SignInPage() {
   const resendCode = async () => {
     setErr(''); 
     setMsg(''); 
-    
-    const usernameValue = username.trim();
-    if (!usernameValue) return setErr('Enter your username first.');
-    
+    const raw = (username || '').trim();
+    if (!raw) return setErr('Enter your username or email first.');
+    const identifier = raw.includes('@') ? lc(raw) : raw;
+
     setLoading(true);
     try { 
-      await Auth.forgotPassword(usernameValue); 
+      await Auth.forgotPassword(identifier); 
       setMsg('Code resent. Check your email.'); 
     } catch (e) { 
       console.log('[Resend code error]', e); 
@@ -210,7 +203,7 @@ export default function SignInPage() {
                 type="text" 
                 value={username} 
                 onChange={e=>setUsername(e.target.value)}
-                placeholder="Username" 
+                placeholder="Username or Email"   // updated label
                 autoComplete="username"
                 className="w-full pl-10 pr-3 py-3 rounded-lg bg-slate-800/50 border border-white/10 outline-none focus:border-indigo-500 focus:bg-slate-800/70 transition-colors" 
                 required 
@@ -279,7 +272,7 @@ export default function SignInPage() {
                 type="text" 
                 value={username} 
                 onChange={e=>setUsername(e.target.value)}
-                placeholder="Username" 
+                placeholder="Username or Email"
                 autoComplete="username"
                 className="w-full pl-10 pr-3 py-3 rounded-lg bg-slate-800/50 border border-white/10 outline-none focus:border-indigo-500 focus:bg-slate-800/70 transition-colors" 
                 required 
