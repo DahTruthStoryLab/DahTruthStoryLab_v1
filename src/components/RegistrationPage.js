@@ -14,7 +14,8 @@ export default function RegistrationPage() {
   const [form, setForm] = useState({
     firstName: '',
     lastName: '',
-    username: '',     // ← Changed to username
+    username: '',     // Username field
+    email: '',        // Email field
     password: '',
     confirmPassword: ''
 });
@@ -33,15 +34,16 @@ export default function RegistrationPage() {
     if (msg) setMsg('');
   };
 
-  // ---------- Register (email becomes Cognito username) ----------
+  // ---------- Register (username + email) ----------
   const onRegister = async (e) => {
     e.preventDefault();
     setErr(''); setMsg('');
 
-    const email = lc(form.username);  // ← Changed from form.email to form.username
+    const username = form.username.trim();
+    const email = lc(form.email);
     const pw = form.password;
 
-    if (!email || !pw || !form.confirmPassword || !form.firstName || !form.lastName) {
+    if (!username || !email || !pw || !form.confirmPassword || !form.firstName || !form.lastName) {
       setErr('Please complete all fields.');
       return;
     }
@@ -52,9 +54,9 @@ export default function RegistrationPage() {
 
     setLoading(true);
     try {
-      // For email alias user pools - let Cognito auto-generate the username
+      // Use username and email separately
       const signUpResult = await Auth.signUp({
-        // Don't pass username at all - let Cognito auto-generate it
+        username: username,
         password: pw,
         attributes: {
           email: email,
@@ -64,13 +66,13 @@ export default function RegistrationPage() {
       });
       
       console.log('SignUp result:', signUpResult);
-      localStorage.setItem('currentUser', JSON.stringify({ email }));
+      localStorage.setItem('currentUser', JSON.stringify({ username, email }));
       setMsg('Registration successful! We sent a 6-digit code to your email.');
       setStep('confirm');
     } catch (e) {
       console.log('[SignUp error]', e);
       if (e?.code === 'UsernameExistsException') {
-        setErr('An account with this email already exists. Try Sign In or "Forgot password?".');
+        setErr('That username is already taken. Please choose a different username.');
       } else {
         setErr(e?.message || e?.code || 'Registration failed.');
       }
@@ -84,20 +86,20 @@ export default function RegistrationPage() {
     e.preventDefault();
     setErr(''); setMsg('');
 
-    const email = lc(form.username);  
+    const username = form.username.trim();
     const c = clean(code).replace(/\s+/g, '');
-    if (!email || !c) {
-      setErr('Enter your email and the 6-digit code.');
+    if (!username || !c) {
+      setErr('Enter your username and the 6-digit code.');
       return;
     }
 
     setLoading(true);
     try {
-      // Step 1: Confirm the signup using email
-      await Auth.confirmSignUp(email, c);
+      // Step 1: Confirm the signup using username
+      await Auth.confirmSignUp(username, c);
       
       // Step 2: Sign in to get access
-      await Auth.signIn(email, form.password);
+      await Auth.signIn(username, form.password);
       
       // Step 3: Get the current user and mark email as verified
       const user = await Auth.currentAuthenticatedUser({ bypassCache: true });
@@ -125,11 +127,11 @@ export default function RegistrationPage() {
   // ---------- RESEND FUNCTION ----------
   const resend = async () => {
     setErr(''); setMsg('');
-    const email = lc(form.username);  // ← Changed from form.email to form.username
-    if (!email) { setErr('Enter your email to resend.'); return; }
+    const username = form.username.trim();
+    if (!username) { setErr('Enter your username to resend.'); return; }
     setLoading(true);
     try {
-      await Auth.resendSignUp(email);
+      await Auth.resendSignUp(username);
       setMsg('Code resent. Check your email.');
     } catch (e) {
       console.log('[Resend error]', e);
@@ -169,7 +171,7 @@ export default function RegistrationPage() {
               maxLength={6}
               inputMode="numeric"
               leftIcon={<Mail className="h-5 w-5" />}
-           />
+            />
             <Button type="submit" loading={loading} grad>
               Confirm & Continue
             </Button>
@@ -177,7 +179,7 @@ export default function RegistrationPage() {
               <button
                 type="button"
                 onClick={resend}
-                disabled={loading || !form.username}
+                disabled={loading || !form.username}  {/* ← Changed from form.email to form.username */}
                 className="text-blue-300 hover:text-blue-100 font-serif text-sm font-medium disabled:opacity-50 transition-colors"
               >
                 Didn't receive the code? Resend
@@ -226,9 +228,20 @@ export default function RegistrationPage() {
           </div>
 
           <Input
+            type="text"
+            name="username"
+            value={form.username}
+            onChange={onChange}
+            placeholder="Username"
+            autoComplete="username"
+            required
+            leftIcon={<Mail className="h-5 w-5" />}
+          />
+
+          <Input
             type="email"
-            name="username"  // ← Changed from "email" to "username"
-            value={form.username}  // ← Changed from form.email to form.username
+            name="email"
+            value={form.email}
             onChange={onChange}
             placeholder="Email Address"
             autoComplete="email"
