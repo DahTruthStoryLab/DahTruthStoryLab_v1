@@ -9,16 +9,16 @@ const lc = (s = '') => s.trim().toLowerCase();
 
 export default function RegistrationPage() {
   const navigate = useNavigate();
-  const [step, setStep] = useState('register'); // 'register' | 'confirm'  ← plain JS
+  const [step, setStep] = useState('register'); // 'register' | 'confirm'
 
   const [form, setForm] = useState({
     firstName: '',
     lastName: '',
-    username: '',     // Username field
-    email: '',        // Email field
+    username: '',
+    email: '',
     password: '',
     confirmPassword: ''
-});
+  });
 
   const [code, setCode] = useState('');
   const [showPwd, setShowPwd] = useState(false);
@@ -54,17 +54,15 @@ export default function RegistrationPage() {
 
     setLoading(true);
     try {
-      // Use username and email separately
       const signUpResult = await Auth.signUp({
-        username: username,
+        username,
         password: pw,
         attributes: {
-          email: email,
+          email,
           given_name: clean(form.firstName),
           family_name: clean(form.lastName),
         },
       });
-      
       console.log('SignUp result:', signUpResult);
       localStorage.setItem('currentUser', JSON.stringify({ username, email }));
       setMsg('Registration successful! We sent a 6-digit code to your email.');
@@ -88,6 +86,7 @@ export default function RegistrationPage() {
 
     const username = form.username.trim();
     const c = clean(code).replace(/\s+/g, '');
+
     if (!username || !c) {
       setErr('Enter your username and the 6-digit code.');
       return;
@@ -95,18 +94,14 @@ export default function RegistrationPage() {
 
     setLoading(true);
     try {
-      // Step 1: Just confirm the signup - no auto sign-in
       await Auth.confirmSignUp(username, c);
-      
       console.log('Email confirmation successful');
       setMsg('Email confirmed successfully! Please sign in manually.');
-      localStorage.removeItem('currentUser'); // Clean up
-      
-      // Redirect to sign-in page after 2 seconds
+      localStorage.removeItem('currentUser');
+
       setTimeout(() => {
         navigate('/signin');
       }, 2000);
-      
     } catch (e) {
       console.log('[Confirm error]', e);
       if (e?.code === 'CodeMismatchException') setErr('Invalid code. Please check and try again.');
@@ -135,11 +130,10 @@ export default function RegistrationPage() {
     }
   };
 
-  // ---------- UI (keeps your "beautiful" styling) ----------
+  // ---------- UI ----------
   if (step === 'confirm') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-indigo-950 flex items-center justify-center p-4 relative overflow-hidden">
-        {/* animated blobs */}
         <DecorBlobs />
         <div className="relative z-10 bg-blue-950/50 backdrop-blur-xl rounded-3xl shadow-2xl p-12 w-full max-w-md border border-blue-800/40">
           <Header title="Confirm Your Email" icon={<Mail className="h-10 w-10 text-blue-300" />} />
@@ -147,13 +141,13 @@ export default function RegistrationPage() {
           {err && <Banner>{err}</Banner>}
 
           <form onSubmit={onConfirm} className="space-y-6" noValidate>
-          <Input
-              type="email"
-              name="username"  // ← Changed to username
-              value={form.username}  // ← Changed to username
+            <Input
+              type="text"
+              name="username"
+              value={form.username}
               onChange={onChange}
-              placeholder="Email Address"
-              autoComplete="email"
+              placeholder="Username (email if you used it)"
+              autoComplete="username"
               required
               leftIcon={<Mail className="h-5 w-5" />}
             />
@@ -173,7 +167,7 @@ export default function RegistrationPage() {
               <button
                 type="button"
                 onClick={resend}
-                disabled={loading || !form.username}  {/* ← Changed from form.email to form.username */}
+                disabled={loading || !form.username}
                 className="text-blue-300 hover:text-blue-100 font-serif text-sm font-medium disabled:opacity-50 transition-colors"
               >
                 Didn't receive the code? Resend
@@ -196,7 +190,6 @@ export default function RegistrationPage() {
   // Register step
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-indigo-950 flex items-center justify-center p-4 relative overflow-hidden">
-      {/* animated blobs */}
       <DecorBlobs />
       <div className="relative z-10 bg-blue-950/50 backdrop-blur-xl rounded-3xl shadow-2xl p-12 w-full max-w-lg border border-blue-800/40">
         <Header title="Join DahTruth Story Lab" subtitle="Begin your writing journey today" />
