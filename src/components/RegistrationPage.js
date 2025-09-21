@@ -52,16 +52,18 @@ export default function RegistrationPage() {
 
     setLoading(true);
     try {
-      await Auth.signUp({
-        username: email, // EMAIL as username (no separate username field)
+      // For email alias user pools - let Cognito auto-generate the username
+      const signUpResult = await Auth.signUp({
+        // Don't pass username at all - let Cognito auto-generate it
         password: pw,
         attributes: {
-          email,
+          email: email,
           given_name: clean(form.firstName),
           family_name: clean(form.lastName),
         },
       });
-
+      
+      console.log('SignUp result:', signUpResult);
       localStorage.setItem('currentUser', JSON.stringify({ email }));
       setMsg('Registration successful! We sent a 6-digit code to your email.');
       setStep('confirm');
@@ -82,7 +84,7 @@ export default function RegistrationPage() {
     e.preventDefault();
     setErr(''); setMsg('');
 
-    const email = lc(form.username);  // ← Changed from form.email to form.username
+    const email = lc(form.username);  
     const c = clean(code).replace(/\s+/g, '');
     if (!email || !c) {
       setErr('Enter your email and the 6-digit code.');
@@ -91,13 +93,13 @@ export default function RegistrationPage() {
 
     setLoading(true);
     try {
-      // Step 1: Confirm the signup
+      // Step 1: Confirm the signup using email
       await Auth.confirmSignUp(email, c);
       
       // Step 2: Sign in to get access
       await Auth.signIn(email, form.password);
       
-      // Step 3: Get the current user and mark email as verified (KEY FIX!)
+      // Step 3: Get the current user and mark email as verified
       const user = await Auth.currentAuthenticatedUser({ bypassCache: true });
       
       // Step 4: Update user attributes to mark email as verified
@@ -105,15 +107,16 @@ export default function RegistrationPage() {
         'email_verified': 'true'
       });
       
-      console.log('Email marked as verified for password reset capability');
+      console.log('Email confirmed and user signed in successfully');
       setMsg('Email confirmed and verified! Redirecting…');
+      localStorage.removeItem('currentUser'); // Clean up
       navigate('/dashboard');
     } catch (e) {
       console.log('[Confirm/signin error]', e);
       if (e?.code === 'CodeMismatchException') setErr('Invalid code. Please check and try again.');
       else if (e?.code === 'ExpiredCodeException') setErr('Code expired. Click "Resend code".');
-      else if (e?.code === 'NotAuthorizedException') setErr('Confirmation worked, but password was not accepted. Use "Forgot password?" on Sign In.');
-      else setErr(e?.message || e?.code || 'Could not confirm/sign in.');
+      else if (e?.code === 'NotAuthorizedException') setErr('Confirmation worked, but sign-in failed. Try signing in manually.');
+      else setErr(e?.message || e?.code || 'Could not confirm account.');
     } finally {
       setLoading(false);
     }
@@ -166,7 +169,7 @@ export default function RegistrationPage() {
               maxLength={6}
               inputMode="numeric"
               leftIcon={<Mail className="h-5 w-5" />}
-           />
+            />
             <Button type="submit" loading={loading} grad>
               Confirm & Continue
             </Button>
@@ -174,7 +177,7 @@ export default function RegistrationPage() {
               <button
                 type="button"
                 onClick={resend}
-                disabled={loading || !form.username}
+                disabled={loading || !form.username}  {/* ← Changed from form.email to form.username */}
                 className="text-blue-300 hover:text-blue-100 font-serif text-sm font-medium disabled:opacity-50 transition-colors"
               >
                 Didn't receive the code? Resend
