@@ -1,6 +1,6 @@
 // src/App.js
 import React from "react";
-import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, Navigate, useSearchParams } from "react-router-dom";
 
 // ⚠️ Do NOT configure Amplify here (it’s already in src/index.js)
 
@@ -14,8 +14,7 @@ import TOCPage2 from "./components/TOCPage2";
 import ProjectPage from "./components/ProjectPage";
 import WhoAmI from "./components/WhoAmI";
 
-// ✅ Writer is in /pages per your file
-// ✅ points to the actual file
+// ✅ Writer is in /components per your file
 import WriteSection from "./components/WriteSection";
 
 // Tiny inline placeholder for pages you’ll build later
@@ -31,6 +30,20 @@ const Placeholder = ({ title = "Coming soon" }) => (
 // For now: bypass auth while you wire pages. Later you can enforce Auth here.
 function ProtectedRoute({ children }) {
   return children;
+}
+
+/** ── Wrapper: single /toc route that can render TOCPage or TOCPage2 ──
+ *  Use /toc?v=1 for TOCPage  (classic)
+ *  Use /toc?v=2 for TOCPage2 (default)
+ *  /toc (no query) will remember your last choice in localStorage.
+ */
+function TableOfContentsRouter() {
+  const [params] = useSearchParams();
+  const chosen = params.get("v") || localStorage.getItem("tocVersion") || "2";
+  if (chosen !== localStorage.getItem("tocVersion")) {
+    localStorage.setItem("tocVersion", chosen);
+  }
+  return chosen === "1" ? <TOCPage /> : <TOCPage2 />;
 }
 
 export default function App() {
@@ -70,24 +83,17 @@ export default function App() {
           }
         />
 
-        {/* Existing pages */}
+        {/* Table of Contents (single route + wrapper) */}
         <Route
           path="/toc"
           element={
             <ProtectedRoute>
-              <TOCPage />
+              <TableOfContentsRouter />
             </ProtectedRoute>
           }
         />
-        <Route
-          path="/toc2"
-          element={
-            <ProtectedRoute>
-              <TOCPage2 />
-            </ProtectedRoute>
-          }
-        />
-        {/* ✅ Match the sidebar link: /project (singular) */}
+
+        {/* Project */}
         <Route
           path="/project"
           element={
@@ -96,6 +102,7 @@ export default function App() {
             </ProtectedRoute>
           }
         />
+
         <Route path="/whoami" element={<WhoAmI />} />
 
         {/* NEW: placeholders you’ll build later */}
