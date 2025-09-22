@@ -1,7 +1,9 @@
-import React from "react";
+// src/components/ProjectPage.js
+import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
-  BookOpen, Save, Download, Upload, Target, Calendar, Tag, Image, AlertCircle,
-  TrendingUp, Clock, Users, Star, BarChart3, CheckCircle, Edit3
+  BookOpen, Save, Download, Upload, Target, Tag, Image, AlertCircle,
+  TrendingUp, Clock, Star, BarChart3, CheckCircle, Edit3
 } from "lucide-react";
 
 /* ──────────────────────────────────────────────────────────────
@@ -36,40 +38,53 @@ const daysUntil = (yyyy_mm_dd) => {
   if (!yyyy_mm_dd) return null;
   const today = new Date();
   const d = new Date(yyyy_mm_dd + "T00:00:00");
-  const diff = Math.ceil((d - today) / 86400000);
-  return diff;
+  return Math.ceil((d - today) / 86400000);
 };
 
 const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
 const progressPct = (cur, tgt) => Math.min((cur / Math.max(tgt || 1, 1)) * 100, 100);
+const getReadingTime = (wordCount) => Math.ceil(wordCount / 200);
 
 const getStatusColor = (status) => {
   const colors = {
-    "Idea": "bg-purple-500/20 text-purple-300 border-purple-500/40",
-    "Outline": "bg-blue-500/20 text-blue-300 border-blue-500/40", 
-    "Draft": "bg-yellow-500/20 text-yellow-300 border-yellow-500/40",
-    "Revision": "bg-orange-500/20 text-orange-300 border-orange-500/40",
-    "Editing": "bg-green-500/20 text-green-300 border-green-500/40",
-    "Published": "bg-emerald-500/20 text-emerald-300 border-emerald-500/40"
+    Idea: "bg-purple-500/20 text-purple-300 border-purple-500/40",
+    Outline: "bg-blue-500/20 text-blue-300 border-blue-500/40",
+    Draft: "bg-yellow-500/20 text-yellow-300 border-yellow-500/40",
+    Revision: "bg-orange-500/20 text-orange-300 border-orange-500/40",
+    Editing: "bg-green-500/20 text-green-300 border-green-500/40",
+    Published: "bg-emerald-500/20 text-emerald-300 border-emerald-500/40",
   };
-  return colors[status] || colors["Draft"];
+  return colors[status] || colors.Draft;
 };
-
-const getReadingTime = (wordCount) => Math.ceil(wordCount / 200);
 
 /* ──────────────────────────────────────────────────────────────
    Component
 ──────────────────────────────────────────────────────────────── */
 export default function ProjectPage() {
-  // Load existing app state (book/chapters/daily/settings)
-  const existing = loadState() || {
-    book: { title: "Untitled Book", subtitle: "", author: "", genre: "", tags: [], targetWords: 25000, deadline: "", status: "Draft", logline: "", synopsis: "", cover: "" },
-    chapters: [],
-    daily: { goal: 500, counts: {} },
-    settings: { theme: "dark", focusMode: false },
-  };
+  const navigate = useNavigate();
 
-  const [book, setBook] = React.useState({
+  // Load existing app state (book/chapters/daily/settings)
+  const existing =
+    loadState() || {
+      book: {
+        title: "Untitled Book",
+        subtitle: "",
+        author: "",
+        genre: "",
+        tags: [],
+        targetWords: 25000,
+        deadline: "",
+        status: "Draft",
+        logline: "",
+        synopsis: "",
+        cover: "",
+      },
+      chapters: [],
+      daily: { goal: 500, counts: {} },
+      settings: { theme: "dark", focusMode: false },
+    };
+
+  const [book, setBook] = useState({
     title: "Untitled Book",
     subtitle: "",
     author: "",
@@ -81,18 +96,16 @@ export default function ProjectPage() {
     logline: "",
     synopsis: "",
     cover: "",
-    ...(existing.book || {})
+    ...(existing.book || {}),
   });
-
-  const [chapters, setChapters] = React.useState(existing.chapters || []);
-  const [daily, setDaily] = React.useState(existing.daily || { goal: 500, counts: {} });
-  const [settings, setSettings] = React.useState(existing.settings || { theme: "dark", focusMode: false });
-  const [newTag, setNewTag] = React.useState("");
-  const [lastSaved, setLastSaved] = React.useState(Date.now());
-  const [isEditingTitle, setIsEditingTitle] = React.useState(false);
+  const [chapters, setChapters] = useState(existing.chapters || []);
+  const [daily, setDaily] = useState(existing.daily || { goal: 500, counts: {} });
+  const [settings, setSettings] = useState(existing.settings || { theme: "dark", focusMode: false });
+  const [newTag, setNewTag] = useState("");
+  const [lastSaved, setLastSaved] = useState(Date.now());
 
   // Live sync: if other pages change the project, refresh
-  React.useEffect(() => {
+  useEffect(() => {
     const sync = () => {
       const s = loadState();
       if (!s) return;
@@ -110,7 +123,7 @@ export default function ProjectPage() {
   }, []);
 
   // Debounced auto-save whenever the book object changes
-  React.useEffect(() => {
+  useEffect(() => {
     const t = setTimeout(() => {
       const current = loadState() || {};
       saveState({
@@ -160,7 +173,6 @@ export default function ProjectPage() {
     reader.onload = () => setBook((b) => ({ ...b, cover: reader.result }));
     reader.readAsDataURL(file);
   };
-
   const removeCover = () => setBook((b) => ({ ...b, cover: "" }));
 
   // Tags
@@ -178,20 +190,21 @@ export default function ProjectPage() {
   const pct = progressPct(totalWords, book.targetWords || 25000);
   const daysLeft = daysUntil(book.deadline);
   const wordsRemaining = Math.max((book.targetWords || 0) - totalWords, 0);
-  const wordsPerDayNeeded = daysLeft != null && daysLeft > 0
-    ? Math.ceil(wordsRemaining / daysLeft)
-    : null;
+  const wordsPerDayNeeded =
+    daysLeft != null && daysLeft > 0 ? Math.ceil(wordsRemaining / daysLeft) : null;
   const totalReadingTime = getReadingTime(totalWords);
   const avgWordsPerChapter = chapters.length > 0 ? Math.round(totalWords / chapters.length) : 0;
-  const completedChapters = chapters.filter(ch => (ch.content || "").trim().length > 100).length;
+  const completedChapters = chapters.filter(
+    (ch) => (ch.content || "").trim().length > 100
+  ).length;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-indigo-950 py-8 relative overflow-hidden">
       {/* Animated blobs */}
       <div className="absolute inset-0 opacity-15">
-        <div className="absolute top-20 left-10 w-72 h-72 bg-blue-500 rounded-full mix-blend-multiply filter blur-xl animate-pulse"></div>
-        <div className="absolute bottom-20 right-10 w-72 h-72 bg-teal-500 rounded-full mix-blend-multiply filter blur-xl animate-pulse delay-700"></div>
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-indigo-500 rounded-full mix-blend-multiply filter blur-xl animate-pulse delay-1000"></div>
+        <div className="absolute top-20 left-10 w-72 h-72 bg-blue-500 rounded-full mix-blend-multiply filter blur-xl animate-pulse" />
+        <div className="absolute bottom-20 right-10 w-72 h-72 bg-teal-500 rounded-full mix-blend-multiply filter blur-xl animate-pulse delay-700" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-indigo-500 rounded-full mix-blend-multiply filter blur-xl animate-pulse delay-1000" />
       </div>
 
       <div className="relative z-10 mx-auto max-w-6xl px-4">
@@ -203,9 +216,7 @@ export default function ProjectPage() {
                 <BookOpen size={20} />
               </div>
               <div>
-                <h1 className="text-3xl font-extrabold drop-shadow-sm">
-                  Project Overview
-                </h1>
+                <h1 className="text-3xl font-extrabold drop-shadow-sm">Project Overview</h1>
                 <div className="text-sm text-slate-300 mt-1">
                   {book.author && `by ${book.author} • `}
                   {chapters.length} chapters • {totalWords.toLocaleString()} words
@@ -244,7 +255,10 @@ export default function ProjectPage() {
             </div>
             <div className="text-2xl font-bold">{pct.toFixed(1)}%</div>
             <div className="w-full bg-blue-900/30 rounded-full h-2 mt-2">
-              <div className="bg-gradient-to-r from-green-500 to-emerald-500 h-2 rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
+              <div
+                className="bg-gradient-to-r from-green-500 to-emerald-500 h-2 rounded-full transition-all duration-500"
+                style={{ width: `${pct}%` }}
+              />
             </div>
           </div>
 
@@ -255,7 +269,7 @@ export default function ProjectPage() {
               <div className="text-sm text-slate-300">Read Time</div>
             </div>
             <div className="text-2xl font-bold">{totalReadingTime}m</div>
-            <div className="text-xs text-slate-400 mt-1">~{Math.round(totalReadingTime/60)}h total</div>
+            <div className="text-xs text-slate-400 mt-1">~{Math.round(totalReadingTime / 60)}h total</div>
           </div>
 
           {/* Completion */}
@@ -274,7 +288,11 @@ export default function ProjectPage() {
               <Star size={16} className="text-yellow-400" />
               <div className="text-sm text-slate-300">Status</div>
             </div>
-            <div className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(book.status)}`}>
+            <div
+              className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(
+                book.status
+              )}`}
+            >
               {book.status}
             </div>
           </div>
@@ -290,7 +308,7 @@ export default function ProjectPage() {
                 <Image size={18} className="text-indigo-400" />
                 Book Cover
               </div>
-              
+
               <div className="rounded-2xl overflow-hidden border border-blue-700/30 bg-blue-900/20 aspect-[3/4] flex items-center justify-center mb-4">
                 {book.cover ? (
                   <img src={book.cover} alt="Cover" className="w-full h-full object-cover" />
@@ -301,7 +319,7 @@ export default function ProjectPage() {
                   </div>
                 )}
               </div>
-              
+
               <div className="flex gap-2">
                 <label className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 rounded-xl bg-indigo-600/30 border border-indigo-400/30 hover:bg-indigo-600/40 text-indigo-100 text-sm cursor-pointer backdrop-blur-sm">
                   <Upload size={16} /> Upload
@@ -329,7 +347,7 @@ export default function ProjectPage() {
                 <Tag size={18} className="text-yellow-400" />
                 Tags & Genre
               </div>
-              
+
               <div className="mb-4">
                 <input
                   value={book.genre || ""}
@@ -346,16 +364,20 @@ export default function ProjectPage() {
                     className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs bg-indigo-500/20 text-indigo-200 border border-indigo-400/30"
                   >
                     {t}
-                    <button className="hover:text-red-400 ml-1" onClick={() => removeTag(t)}>×</button>
+                    <button className="hover:text-red-400 ml-1" onClick={() => removeTag(t)}>
+                      ×
+                    </button>
                   </span>
                 ))}
               </div>
-              
+
               <div className="flex gap-2">
                 <input
                   value={newTag}
                   onChange={(e) => setNewTag(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === "Enter") addTag(); }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") addTag();
+                  }}
                   placeholder="Add tag..."
                   className="flex-1 rounded-xl bg-blue-900/30 border border-blue-700/50 px-3 py-2 text-sm outline-none placeholder:text-slate-400 backdrop-blur-sm font-serif"
                 />
@@ -374,7 +396,7 @@ export default function ProjectPage() {
                 <Target size={18} className="text-green-400" />
                 Goals & Deadline
               </div>
-              
+
               <div className="space-y-4">
                 <div>
                   <label className="text-xs text-slate-400 mb-1 block">Target Words</label>
@@ -384,12 +406,15 @@ export default function ProjectPage() {
                     step={500}
                     value={book.targetWords || 0}
                     onChange={(e) =>
-                      setBook((b) => ({ ...b, targetWords: clamp(Number(e.target.value) || 0, 0, 5_000_000) }))
+                      setBook((b) => ({
+                        ...b,
+                        targetWords: clamp(Number(e.target.value) || 0, 0, 5_000_000),
+                      }))
                     }
                     className="w-full rounded-xl bg-blue-900/30 border border-blue-700/50 px-4 py-3 text-sm outline-none backdrop-blur-sm font-serif"
                   />
                 </div>
-                
+
                 <div>
                   <label className="text-xs text-slate-400 mb-1 block">Deadline</label>
                   <input
@@ -400,12 +425,8 @@ export default function ProjectPage() {
                   />
                   {book.deadline && (
                     <div className="text-xs text-slate-400 mt-2">
-                      {daysLeft >= 0
-                        ? `${daysLeft} days remaining`
-                        : `${Math.abs(daysLeft)} days overdue`}
-                      {wordsPerDayNeeded && (
-                        <div className="mt-1">Need {wordsPerDayNeeded.toLocaleString()} words/day</div>
-                      )}
+                      {daysLeft >= 0 ? `${daysLeft} days remaining` : `${Math.abs(daysLeft)} days overdue`}
+                      {wordsPerDayNeeded && <div className="mt-1">Need {wordsPerDayNeeded.toLocaleString()} words/day</div>}
                     </div>
                   )}
                 </div>
@@ -421,7 +442,7 @@ export default function ProjectPage() {
                 <Edit3 size={18} className="text-blue-400" />
                 Story Details
               </div>
-              
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                 <div className="md:col-span-2">
                   <label className="text-xs text-slate-400 mb-1 block">Title (updates across entire app)</label>
@@ -432,7 +453,7 @@ export default function ProjectPage() {
                     placeholder="Your story title..."
                   />
                 </div>
-                
+
                 <div>
                   <label className="text-xs text-slate-400 mb-1 block">Subtitle</label>
                   <input
@@ -442,7 +463,7 @@ export default function ProjectPage() {
                     placeholder="Optional subtitle..."
                   />
                 </div>
-                
+
                 <div>
                   <label className="text-xs text-slate-400 mb-1 block">Author</label>
                   <input
@@ -452,7 +473,7 @@ export default function ProjectPage() {
                     placeholder="Your name..."
                   />
                 </div>
-                
+
                 <div>
                   <label className="text-xs text-slate-400 mb-1 block">Status</label>
                   <select
@@ -460,12 +481,14 @@ export default function ProjectPage() {
                     onChange={(e) => setBook((b) => ({ ...b, status: e.target.value }))}
                     className="w-full rounded-xl bg-blue-900/30 border border-blue-700/50 px-4 py-3 text-sm outline-none backdrop-blur-sm font-serif"
                   >
-                    {["Idea", "Outline", "Draft", "Revision", "Editing", "Published"].map(s => (
-                      <option key={s} value={s}>{s}</option>
+                    {["Idea", "Outline", "Draft", "Revision", "Editing", "Published"].map((s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
                     ))}
                   </select>
                 </div>
-                
+
                 <div>
                   <label className="text-xs text-slate-400 mb-1 block">Logline</label>
                   <input
@@ -494,7 +517,7 @@ export default function ProjectPage() {
                 <BarChart3 size={18} className="text-teal-400" />
                 Writing Statistics
               </div>
-              
+
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="text-center">
                   <div className="text-2xl font-bold text-blue-300">{totalWords.toLocaleString()}</div>
@@ -517,14 +540,16 @@ export default function ProjectPage() {
               <div className="mt-6 p-4 rounded-xl bg-blue-900/20 border border-blue-700/30">
                 <div className="flex justify-between items-center mb-2">
                   <span className="text-sm">Word Count Progress</span>
-                  <span className="text-sm text-slate-300">{totalWords.toLocaleString()} / {book.targetWords.toLocaleString()}</span>
+                  <span className="text-sm text-slate-300">
+                    {totalWords.toLocaleString()} / {book.targetWords.toLocaleString()}
+                  </span>
                 </div>
                 <div className="w-full bg-blue-900/40 rounded-full h-3">
-                  <div 
+                  <div
                     className="bg-gradient-to-r from-blue-500 to-teal-500 h-3 rounded-full transition-all duration-700 relative overflow-hidden"
                     style={{ width: `${Math.min(pct, 100)}%` }}
                   >
-                    <div className="absolute inset-0 bg-white/20 animate-pulse"></div>
+                    <div className="absolute inset-0 bg-white/20 animate-pulse" />
                   </div>
                 </div>
               </div>
@@ -538,7 +563,10 @@ export default function ProjectPage() {
                 <div className="text-sm text-amber-200/80 mb-4">
                   Head over to your Table of Contents to create your first chapter and begin your story.
                 </div>
-                <button className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500/20 border border-amber-400/30 hover:bg-amber-500/30 text-amber-100 text-sm backdrop-blur-sm">
+                <button
+                  onClick={() => navigate("/toc")}
+                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500/20 border border-amber-400/30 hover:bg-amber-500/30 text-amber-100 text-sm backdrop-blur-sm"
+                >
                   <BookOpen size={16} />
                   Go to Table of Contents
                 </button>
