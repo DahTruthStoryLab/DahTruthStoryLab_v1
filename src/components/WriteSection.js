@@ -108,19 +108,17 @@ const Sidebar = ({ isOpen, onClose, authorName }) => {
 
   // inside Sidebar
 const menuItems = [
-  { icon: Home,      label: "Dashboard",             to: "/dashboard" },
-  { icon: PencilLine,label: "Writer",                to: "/writer" },
-  { icon: BookOpen,  label: "Table of Contents",     to: "/toc" },
-  { icon: BookOpen,  label: "Table of Contents (v2)",to: "/toc2" },
-  { icon: FileText,  label: "Project",               to: "/projects" },
-  { icon: Calendar,  label: "Calendar",              to: "/calendar" },      // placeholder route already in App.js
-  { icon: Layers,    label: "Story Lab",             to: "/story-lab" },     // placeholder
-  { icon: UploadCloud,label:"Publishing",            to: "/publishing" },    // placeholder
-  { icon: Store,     label: "Store",                 to: "/store" },         // placeholder
-  { icon: User,      label: "Profile",               to: "/profile" },       // placeholder
-  { icon: Info,      label: "About",                 to: "/about" },         // placeholder
+  { icon: Home,       label: "Dashboard",         to: "/dashboard" },
+  { icon: PencilLine, label: "Writer",            to: "/writer" },
+  { icon: BookOpen,   label: "Table of Contents", to: "/toc" }, // ← single TOC
+  { icon: Layers,     label: "Projects",          to: "/projects" },
+  { icon: Calendar,   label: "Calendar",          to: "/calendar" },
+  { icon: Layers,     label: "Story Lab",         to: "/story-lab" },
+  { icon: UploadCloud,label: "Publishing",        to: "/publishing" },
+  { icon: Store,      label: "Store",             to: "/store" },
+  { icon: User,       label: "Profile",           to: "/profile" },
+  { icon: Info,       label: "About",             to: "/about" },
 ];
-
   const itemClass = ({ isActive }) =>
     `w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-200 transform hover:scale-105 hover:shadow-lg group relative overflow-hidden ${
       isActive
