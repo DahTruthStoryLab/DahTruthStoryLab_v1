@@ -1,6 +1,6 @@
 // src/App.js
 import React from "react";
-import { BrowserRouter as Router, Routes, Route, Navigate, useSearchParams } from "react-router-dom";
+import { BrowserRouter as Router, Routes, Route, useSearchParams } from "react-router-dom";
 
 // ⚠️ Do NOT configure Amplify here (it’s already in src/index.js)
 
@@ -39,10 +39,13 @@ function ProtectedRoute({ children }) {
  */
 function TableOfContentsRouter() {
   const [params] = useSearchParams();
-  const chosen = params.get("v") || localStorage.getItem("tocVersion") || "2";
-  if (chosen !== localStorage.getItem("tocVersion")) {
+  const saved = typeof window !== "undefined" ? localStorage.getItem("tocVersion") : null;
+  const chosen = params.get("v") || saved || "2";
+
+  if (typeof window !== "undefined" && chosen !== saved) {
     localStorage.setItem("tocVersion", chosen);
   }
+
   return chosen === "1" ? <TOCPage /> : <TOCPage2 />;
 }
 
@@ -155,7 +158,7 @@ export default function App() {
           }
         />
 
-        {/* Fallback: show Not Found (don’t redirect to /signin to avoid “kicked out”) */}
+        {/* Fallback */}
         <Route path="*" element={<Placeholder title="Not Found" />} />
       </Routes>
     </Router>
