@@ -103,22 +103,32 @@ const TopBanner = () => {
 };
 
 /* ---------------- Sidebar with NavLink routes ---------------- */
-const Sidebar = ({ isOpen, onClose, authorName }) => {
-  const navigate = useNavigate();
+ const Sidebar = ({ isOpen, onClose, authorName }) => {
+-  const menuItems = [
+-    { icon: Home, label: "Dashboard", to: "/dashboard" },
+-    { icon: PencilLine, label: "Write", to: "/writer" },
+-    // The rest are placeholders until you wire routes:
+-    { icon: BookOpen, label: "Table of Contents", to: "/toc" },
+-    { icon: Calendar, label: "Calendar", to: "/calendar" },
+-    { icon: Layers, label: "Story Lab", to: "/story-lab" },
+-    { icon: UploadCloud, label: "Publishing", to: "/publishing" },
+-    { icon: Store, label: "Store", to: "/store" },
+-    { icon: User, label: "Profile", to: "/profile" },
+-    { icon: Info, label: "About", to: "/about" },
+-  ];
++  const menuItems = [
++    { icon: Home,       label: "Dashboard",         to: "/dashboard" },
++    { icon: PencilLine, label: "Writer",            to: "/writer" },
++    { icon: BookOpen,   label: "Table of Contents", to: "/toc" },      // ← single TOC link
++    { icon: FolderOpen, label: "Project",           to: "/project" },  // ← add Project
++    { icon: Calendar,   label: "Calendar",          to: "/calendar" },
++    { icon: Layers,     label: "Story Lab",         to: "/story-lab" },
++    { icon: UploadCloud,label: "Publishing",        to: "/publishing" },
++    { icon: Store,      label: "Store",             to: "/store" },
++    { icon: User,       label: "Profile",           to: "/profile" },
++    { icon: Info,       label: "About",             to: "/about" },
++  ];
 
-  // inside Sidebar
-const menuItems = [
-  { icon: Home,       label: "Dashboard",         to: "/dashboard" },
-  { icon: PencilLine, label: "Writer",            to: "/writer" },
-  { icon: BookOpen,   label: "Table of Contents", to: "/toc" }, // ← single TOC
-  { icon: Layers,     label: "Projects",          to: "/projects" },
-  { icon: Calendar,   label: "Calendar",          to: "/calendar" },
-  { icon: Layers,     label: "Story Lab",         to: "/story-lab" },
-  { icon: UploadCloud,label: "Publishing",        to: "/publishing" },
-  { icon: Store,      label: "Store",             to: "/store" },
-  { icon: User,       label: "Profile",           to: "/profile" },
-  { icon: Info,       label: "About",             to: "/about" },
-];
   const itemClass = ({ isActive }) =>
     `w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-200 transform hover:scale-105 hover:shadow-lg group relative overflow-hidden ${
       isActive
