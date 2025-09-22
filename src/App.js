@@ -13,6 +13,7 @@ import TOCPage from "./components/TOCPage";
 import TOCPage2 from "./components/TOCPage2";
 import ProjectPage from "./components/ProjectPage";
 import WhoAmI from "./components/WhoAmI";
+import Calander from "./components/Calander";
 
 // ✅ Writer is in /components per your file
 import WriteSection from "./components/WriteSection";
@@ -108,14 +109,15 @@ export default function App() {
 
         <Route path="/whoami" element={<WhoAmI />} />
 
-        {/* NEW: placeholders you’ll build later */}
-        <Route
+       <Route
           path="/calendar"
           element={
             <ProtectedRoute>
-              <Placeholder title="Calendar" />
+              <Calander />
             </ProtectedRoute>
           }
+        />
+
         />
         <Route
           path="/story-lab"
