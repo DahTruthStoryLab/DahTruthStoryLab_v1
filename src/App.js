@@ -2,21 +2,20 @@
 import React from "react";
 import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 
-// ⚠️ Do NOT configure Amplify here (you already did it once in src/index.js)
-// import { Amplify } from "aws-amplify";   // ← remove
-// import awsconfig from "./aws-exports";   // ← remove
-// Amplify.configure(awsconfig);            // ← remove
+// ⚠️ Do NOT configure Amplify here (it’s already in src/index.js)
 
 // PAGES (using your current components folder)
 import LandingPage from "./components/LandingPage";
 import RegistrationPage from "./components/RegistrationPage";
 import SignInPage from "./components/SignInPage";
 import Dashboard from "./components/Dashboard";
-import WriteSection from "./components/WriteSection";
 import TOCPage from "./components/TOCPage";
 import TOCPage2 from "./components/TOCPage2";
 import ProjectPage from "./components/ProjectPage";
 import WhoAmI from "./components/WhoAmI";
+
+// ✅ Writer is in /pages per your file
+import WriteSection from "./pages/Writer";
 
 // Tiny inline placeholder for pages you’ll build later
 const Placeholder = ({ title = "Coming soon" }) => (
@@ -87,8 +86,9 @@ export default function App() {
             </ProtectedRoute>
           }
         />
+        {/* ✅ Match the sidebar link: /project (singular) */}
         <Route
-          path="/projects"
+          path="/project"
           element={
             <ProtectedRoute>
               <ProjectPage />
@@ -98,12 +98,54 @@ export default function App() {
         <Route path="/whoami" element={<WhoAmI />} />
 
         {/* NEW: placeholders you’ll build later */}
-        <Route path="/calendar" element={<ProtectedRoute><Placeholder title="Calendar" /></ProtectedRoute>} />
-        <Route path="/story-lab" element={<ProtectedRoute><Placeholder title="Story Lab" /></ProtectedRoute>} />
-        <Route path="/publishing" element={<ProtectedRoute><Placeholder title="Publishing" /></ProtectedRoute>} />
-        <Route path="/store" element={<ProtectedRoute><Placeholder title="Store" /></ProtectedRoute>} />
-        <Route path="/profile" element={<ProtectedRoute><Placeholder title="Profile" /></ProtectedRoute>} />
-        <Route path="/about" element={<ProtectedRoute><Placeholder title="About" /></ProtectedRoute>} />
+        <Route
+          path="/calendar"
+          element={
+            <ProtectedRoute>
+              <Placeholder title="Calendar" />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/story-lab"
+          element={
+            <ProtectedRoute>
+              <Placeholder title="Story Lab" />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/publishing"
+          element={
+            <ProtectedRoute>
+              <Placeholder title="Publishing" />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/store"
+          element={
+            <ProtectedRoute>
+              <Placeholder title="Store" />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/profile"
+          element={
+            <ProtectedRoute>
+              <Placeholder title="Profile" />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/about"
+          element={
+            <ProtectedRoute>
+              <Placeholder title="About" />
+            </ProtectedRoute>
+          }
+        />
 
         {/* Fallback: show Not Found (don’t redirect to /signin to avoid “kicked out”) */}
         <Route path="*" element={<Placeholder title="Not Found" />} />
