@@ -1,11 +1,29 @@
 // src/pages/Writer.jsx
+import React, { useState, useEffect } from "react";
 import {
   Plus, Save, Eye, BookOpen, FileText, Edit3, Trash2, ChevronDown,
   Menu, X, Settings, Search, Bell, PencilLine, Home, Calendar, Layers,
   UploadCloud, Store, User, Info, Target, Clock, RotateCcw, Download,
   Sparkles, CheckCircle, AlertCircle, Lightbulb, Zap, Brain, MessageSquare,
-  RefreshCw, Wand2, FolderOpen   // ← added
+  RefreshCw, Wand2, FolderOpen
 } from "lucide-react";
+import { NavLink, useNavigate } from "react-router-dom";
+import { Auth } from "aws-amplify";
+
+/* ──────────────────────────────────────────────────────────────
+   Shared storage (title sync with ProjectPage)
+──────────────────────────────────────────────────────────────── */
+const STORAGE_KEY = "dahtruth-story-lab-toc-v3";
+const getBookTitle = () => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return "";
+    const data = JSON.parse(raw);
+    return data?.book?.title || "";
+  } catch {
+    return "";
+  }
+};
 
 // --------- Mock Story Data (would come from project selection) ---------
 const currentStory = {
@@ -19,7 +37,7 @@ const currentStory = {
   setting: "Modern-day Los Angeles music scene",
   theme: "Finding your authentic voice",
   progress: 6.5,
-  lastUpdated: "2 hours ago"
+  lastUpdated: "2 hours ago",
 };
 
 const initialChapters = [
@@ -33,9 +51,9 @@ const initialChapters = [
     status: "draft",
     aiSuggestions: [
       "Consider adding more sensory details about the stage environment",
-      "Develop Jacque's internal conflict more deeply"
+      "Develop Jacque's internal conflict more deeply",
     ],
-    grammarIssues: []
+    grammarIssues: [],
   },
   {
     id: 2,
@@ -47,14 +65,14 @@ const initialChapters = [
     status: "draft",
     aiSuggestions: [
       "Show more character interaction and relationship dynamics",
-      "Consider adding dialogue tags for clarity"
+      "Consider adding dialogue tags for clarity",
     ],
-    grammarIssues: [{ type: "suggestion", text: "Consider a comma after 'themselves'" }]
-  }
+    grammarIssues: [{ type: "suggestion", text: "Consider a comma after 'themselves'" }],
+  },
 ];
 
 /* ---------------- Top Banner with real nav ---------------- */
-const TopBanner = () => {
+const TopBanner = ({ projectTitle }) => {
   const navLink =
     ({ isActive }) =>
       `px-3 py-2 rounded-md text-sm transition-colors ${
@@ -73,22 +91,39 @@ const TopBanner = () => {
               <span className="font-bold text-lg">DahTruth StoryLab</span>
             </div>
             <div className="hidden md:block text-sm opacity-90">
-              Transform your ideas into compelling stories
+              {projectTitle
+                ? `Project: ${projectTitle}`
+                : "Transform your ideas into compelling stories"}
             </div>
           </div>
 
           {/* NEW: real navigation links */}
           <nav className="hidden md:flex items-center gap-2">
-            <NavLink to="/dashboard" className={navLink} end>Dashboard</NavLink>
-            <NavLink to="/writer" className={navLink}>Writer</NavLink>
-            <NavLink to="/" className={navLink}>Home</NavLink>
+            <NavLink to="/dashboard" className={navLink} end>
+              Dashboard
+            </NavLink>
+            <NavLink to="/writer" className={navLink}>
+              Writer
+            </NavLink>
+            <NavLink to="/project" className={navLink}>
+              Project
+            </NavLink>
+            <NavLink to="/toc" className={navLink}>
+              Table of Contents
+            </NavLink>
+            <NavLink to="/" className={navLink}>
+              Home
+            </NavLink>
           </nav>
 
           <div className="flex items-center gap-2 md:gap-4">
             <button type="button" className="p-2 rounded-lg hover:bg-white/10 transition-colors">
               <Search size={16} />
             </button>
-            <button type="button" className="p-2 rounded-lg hover:bg-white/10 transition-colors relative">
+            <button
+              type="button"
+              className="p-2 rounded-lg hover:bg-white/10 transition-colors relative"
+            >
               <Bell size={16} />
               <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full" />
             </button>
@@ -100,18 +135,21 @@ const TopBanner = () => {
 };
 
 /* ---------------- Sidebar with NavLink routes ---------------- */
- const menuItems = [
-  { icon: Home,       label: "Dashboard",         to: "/dashboard" },
-  { icon: PencilLine, label: "Writer",            to: "/writer" },
-  { icon: BookOpen,   label: "Table of Contents", to: "/toc" },      // single TOC link
-  { icon: FolderOpen, label: "Project",           to: "/project" },  // project page
-  { icon: Calendar,   label: "Calendar",          to: "/calendar" },
-  { icon: Layers,     label: "Story Lab",         to: "/story-lab" },
-  { icon: UploadCloud,label: "Publishing",        to: "/publishing" },
-  { icon: Store,      label: "Store",             to: "/store" },
-  { icon: User,       label: "Profile",           to: "/profile" },
-  { icon: Info,       label: "About",             to: "/about" },
-];
+const Sidebar = ({ isOpen, onClose, authorName }) => {
+  const navigate = useNavigate();
+
+  const menuItems = [
+    { icon: Home,       label: "Dashboard",         to: "/dashboard" },
+    { icon: PencilLine, label: "Writer",            to: "/writer" },
+    { icon: BookOpen,   label: "Table of Contents", to: "/toc" },     // single TOC
+    { icon: FolderOpen, label: "Project",           to: "/project" }, // new Project link
+    { icon: Calendar,   label: "Calendar",          to: "/calendar" },
+    { icon: Layers,     label: "Story Lab",         to: "/story-lab" },
+    { icon: UploadCloud,label: "Publishing",        to: "/publishing" },
+    { icon: Store,      label: "Store",             to: "/store" },
+    { icon: User,       label: "Profile",           to: "/profile" },
+    { icon: Info,       label: "About",             to: "/about" },
+  ];
 
   const itemClass = ({ isActive }) =>
     `w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-200 transform hover:scale-105 hover:shadow-lg group relative overflow-hidden ${
@@ -121,23 +159,23 @@ const TopBanner = () => {
     }`;
 
   async function handleSignOut() {
-    try { await Auth.signOut(); }
-    finally { navigate("/signin"); }
+    try {
+      await Auth.signOut();
+    } finally {
+      navigate("/signin");
+    }
   }
 
   return (
     <>
       {/* Mobile overlay (click to close). Hidden on lg+. */}
       {isOpen && (
-        <div
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
-          onClick={onClose}
-        />
+        <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={onClose} />
       )}
 
       <aside
         className={`
-          fixed top-16 left-0 h[calc(100vh-4rem)] w-80 bg-slate-900/95 backdrop-blur-xl border-r border-white/10 z-40
+          fixed top-16 left-0 h-[calc(100vh-4rem)] w-80 bg-slate-900/95 backdrop-blur-xl border-r border-white/10 z-40
           transform transition-transform duration-300 ease-in-out
           ${isOpen ? "translate-x-0" : "-translate-x-full"}
           lg:translate-x-0 lg:static lg:z-auto lg:h-[calc(100vh-4rem)]
@@ -177,7 +215,10 @@ const TopBanner = () => {
               onClick={() => onClose?.()} // close drawer on mobile after click
             >
               <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/10 to-purple-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
-              <item.icon size={18} className="relative z-10 group-hover:scale-110 transition-transform duration-200" />
+              <item.icon
+                size={18}
+                className="relative z-10 group-hover:scale-110 transition-transform duration-200"
+              />
               <span className="font-medium relative z-10">{item.label}</span>
               <div className="absolute right-2 w-2 h-2 bg-indigo-400 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
             </NavLink>
@@ -196,12 +237,18 @@ const TopBanner = () => {
                 <p className="text-sm font-medium text-white truncate">{authorName}</p>
                 <p className="text-xs text-slate-400">Author</p>
               </div>
-              <button type="button" className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-700/50 transition-all duration-200">
+              <button
+                type="button"
+                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-700/50 transition-all duration-200"
+              >
                 <Settings size={16} />
               </button>
             </div>
             <div className="space-y-2">
-              <button type="button" className="w-full text-left px-3 py-2 text-xs text-slate-400 hover:text-white hover:bg-slate-700/50 rounded-lg transition-all duration-200">
+              <button
+                type="button"
+                className="w-full text-left px-3 py-2 text-xs text-slate-400 hover:text-white hover:bg-slate-700/50 rounded-lg transition-all duration-200"
+              >
                 Account Settings
               </button>
               <button
@@ -354,7 +401,10 @@ const AIAssistantPanel = ({ chapter, onApplySuggestion }) => {
                         <AlertCircle size={14} className="text-orange-400 mt-0.5" />
                         <div className="flex-1">
                           <p className="text-sm text-orange-300">{issue.text}</p>
-                          <button type="button" className="mt-2 text-xs text-orange-400 hover:text-orange-300 transition-colors">
+                          <button
+                            type="button"
+                            className="mt-2 text-xs text-orange-400 hover:text-orange-300 transition-colors"
+                          >
                             Fix
                           </button>
                         </div>
@@ -379,7 +429,9 @@ const AIAssistantPanel = ({ chapter, onApplySuggestion }) => {
                     <MessageSquare size={14} className="text-purple-400 mt-0.5" />
                     <div>
                       <p className="text-sm text-purple-300 font-medium">Character Development</p>
-                      <p className="text-xs text-purple-400 mt-1">What secret is Jacque hiding about their musical past?</p>
+                      <p className="text-xs text-purple-400 mt-1">
+                        What secret is Jacque hiding about their musical past?
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -389,7 +441,9 @@ const AIAssistantPanel = ({ chapter, onApplySuggestion }) => {
                     <Zap size={14} className="text-blue-400 mt-0.5" />
                     <div>
                       <p className="text-sm text-blue-300 font-medium">Plot Twist</p>
-                      <p className="text-xs text-blue-400 mt-1">Consider a conflict between bandmates that tests their friendship.</p>
+                      <p className="text-xs text-blue-400 mt-1">
+                        Consider a conflict between bandmates that tests their friendship.
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -399,7 +453,9 @@ const AIAssistantPanel = ({ chapter, onApplySuggestion }) => {
                     <Brain size={14} className="text-indigo-400 mt-0.5" />
                     <div>
                       <p className="text-sm text-indigo-300 font-medium">Scene Building</p>
-                      <p className="text-xs text-indigo-400 mt-1">Describe the sensory experience of being on stage.</p>
+                      <p className="text-xs text-indigo-400 mt-1">
+                        Describe the sensory experience of being on stage.
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -433,7 +489,9 @@ const StoryDetailsMenus = ({ story }) => {
           </div>
           <ChevronDown
             size={16}
-            className={`text-slate-400 transition-transform duration-200 ${openMenu === "characters" ? "rotate-180" : ""}`}
+            className={`text-slate-400 transition-transform duration-200 ${
+              openMenu === "characters" ? "rotate-180" : ""
+            }`}
           />
         </button>
 
@@ -441,7 +499,10 @@ const StoryDetailsMenus = ({ story }) => {
           <div className="absolute top-full left-0 right-0 mt-2 p-3 bg-slate-900/95 backdrop-blur-xl rounded-lg border border-white/10 shadow-xl z-10">
             <div className="space-y-2">
               {story.characters.map((character, index) => (
-                <div key={index} className="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-800/30 transition-colors">
+                <div
+                  key={index}
+                  className="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-800/30 transition-colors"
+                >
                   <div className="w-6 h-6 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full flex items-center justify-center">
                     <span className="text-white text-xs font-bold">{character.charAt(0)}</span>
                   </div>
@@ -472,7 +533,9 @@ const StoryDetailsMenus = ({ story }) => {
           </div>
           <ChevronDown
             size={16}
-            className={`text-slate-400 transition-transform duration-200 ${openMenu === "setting" ? "rotate-180" : ""}`}
+            className={`text-slate-400 transition-transform duration-200 ${
+              openMenu === "setting" ? "rotate-180" : ""
+            }`}
           />
         </button>
 
@@ -502,7 +565,9 @@ const StoryDetailsMenus = ({ story }) => {
           </div>
           <ChevronDown
             size={16}
-            className={`text-slate-400 transition-transform duration-200 ${openMenu === "theme" ? "rotate-180" : ""}`}
+            className={`text-slate-400 transition-transform duration-200 ${
+              openMenu === "theme" ? "rotate-180" : ""
+            }`}
           />
         </button>
 
@@ -532,7 +597,9 @@ const StoryDetailsMenus = ({ story }) => {
           </div>
           <ChevronDown
             size={16}
-            className={`text-slate-400 transition-transform duration-200 ${openMenu === "description" ? "rotate-180" : ""}`}
+            className={`text-slate-400 transition-transform duration-200 ${
+              openMenu === "description" ? "rotate-180" : ""
+            }`}
           />
         </button>
 
@@ -553,7 +620,14 @@ const StoryDetailsMenus = ({ story }) => {
 };
 
 /* ---------------- Chapter List ---------------- */
-const ChapterList = ({ chapters, selectedChapter, onSelectChapter, onAddChapter, onDeleteChapter, story }) => {
+const ChapterList = ({
+  chapters,
+  selectedChapter,
+  onSelectChapter,
+  onAddChapter,
+  onDeleteChapter,
+  story,
+}) => {
   return (
     <div className="w-80 h-full border-r border-white/10 bg-slate-900/50 flex flex-col">
       <div className="p-4 border-b border-white/10 flex-shrink-0">
@@ -568,7 +642,8 @@ const ChapterList = ({ chapters, selectedChapter, onSelectChapter, onAddChapter,
           </button>
         </div>
         <div className="text-sm text-slate-400">
-          {chapters.length} chapters • {chapters.reduce((total, ch) => total + ch.wordCount, 0)} words total
+          {chapters.length} chapters •{" "}
+          {chapters.reduce((total, ch) => total + ch.wordCount, 0)} words total
         </div>
       </div>
 
@@ -600,10 +675,16 @@ const ChapterList = ({ chapters, selectedChapter, onSelectChapter, onAddChapter,
                     {chapter.status}
                   </span>
                   {chapter.aiSuggestions?.length > 0 && (
-                    <span className="w-2 h-2 bg-purple-400 rounded-full" title="AI suggestions available" />
+                    <span
+                      className="w-2 h-2 bg-purple-400 rounded-full"
+                      title="AI suggestions available"
+                    />
                   )}
                   {chapter.grammarIssues?.length > 0 && (
-                    <span className="w-2 h-2 bg-orange-400 rounded-full" title="Grammar issues found" />
+                    <span
+                      className="w-2 h-2 bg-orange-400 rounded-full"
+                      title="Grammar issues found"
+                    />
                   )}
                 </div>
               </div>
@@ -644,7 +725,10 @@ const WritingEditor = ({ chapter, onSave, onUpdateChapter, onCreateNewChapter })
   }, [chapter]);
 
   useEffect(() => {
-    const words = content.trim().split(/\s+/).filter((w) => w.length > 0).length;
+    const words = content
+      .trim()
+      .split(/\s+/)
+      .filter((w) => w.length > 0).length;
     setWordCount(words);
   }, [content]);
 
@@ -655,7 +739,7 @@ const WritingEditor = ({ chapter, onSave, onUpdateChapter, onCreateNewChapter })
         title,
         content,
         wordCount,
-        lastEdited: "Just now"
+        lastEdited: "Just now",
       });
     }
     onSave();
@@ -669,7 +753,9 @@ const WritingEditor = ({ chapter, onSave, onUpdateChapter, onCreateNewChapter })
             <Edit3 size={24} className="text-slate-400" />
           </div>
           <h3 className="text-xl font-bold text-white mb-2">Start Writing</h3>
-          <p className="text-slate-400 mb-6">Select a chapter or create a new one to begin writing your story.</p>
+          <p className="text-slate-400 mb-6">
+            Select a chapter or create a new one to begin writing your story.
+          </p>
           <button
             type="button"
             onClick={onCreateNewChapter}
@@ -706,7 +792,9 @@ const WritingEditor = ({ chapter, onSave, onUpdateChapter, onCreateNewChapter })
               type="button"
               onClick={() => setIsPreview(!isPreview)}
               className={`p-2 rounded-lg transition-colors ${
-                isPreview ? "bg-indigo-500/20 text-indigo-300" : "text-slate-400 hover:text-white hover:bg-slate-800/50"
+                isPreview
+                  ? "bg-indigo-500/20 text-indigo-300"
+                  : "text-slate-400 hover:text-white hover:bg-slate-800/50"
               }`}
             >
               <Eye size={16} />
@@ -775,6 +863,18 @@ export default function WriteSection() {
   const [chapters, setChapters] = useState(initialChapters);
   const [selectedChapter, setSelectedChapter] = useState(initialChapters[0]);
 
+  // Live project title sync
+  const [projectTitle, setProjectTitle] = useState(getBookTitle());
+  useEffect(() => {
+    const sync = () => setProjectTitle(getBookTitle());
+    window.addEventListener("project:change", sync);
+    window.addEventListener("storage", sync);
+    return () => {
+      window.removeEventListener("project:change", sync);
+      window.removeEventListener("storage", sync);
+    };
+  }, []);
+
   useEffect(() => {
     const mockUser = { firstName: "John", lastName: "Doe" };
     setAuthorName(`${mockUser.firstName} ${mockUser.lastName}`);
@@ -789,7 +889,7 @@ export default function WriteSection() {
       lastEdited: "Just now",
       status: "draft",
       aiSuggestions: [],
-      grammarIssues: []
+      grammarIssues: [],
     };
     setChapters((prev) => [...prev, newChapter]);
     setSelectedChapter(newChapter);
@@ -818,14 +918,10 @@ export default function WriteSection() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-slate-100">
-      <TopBanner />
+      <TopBanner projectTitle={projectTitle} />
 
       <div className="flex">
-        <Sidebar
-          isOpen={sidebarOpen}
-          onClose={() => setSidebarOpen(false)}
-          authorName={authorName}
-        />
+        <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} authorName={authorName} />
 
         <div className="flex-1 lg:ml-0 h-[calc(100vh-4rem)] flex flex-col">
           {/* Write Header */}
@@ -845,7 +941,9 @@ export default function WriteSection() {
                       Write Your Story
                     </h1>
                     <div className="mt-1 text-slate-400">
-                      <p className="font-medium text-sm">Craft compelling chapters with AI-powered assistance</p>
+                      <p className="font-medium text-sm">
+                        {projectTitle ? `Working on: ${projectTitle}` : "Craft compelling chapters with AI-powered assistance"}
+                      </p>
                     </div>
                   </div>
                 </div>
@@ -869,12 +967,9 @@ export default function WriteSection() {
             </div>
           </div>
 
-          <StoryDetailsPanel story={currentStory} />
+          <StoryDetailsPanel story={{ ...currentStory, title: projectTitle || currentStory.title }} />
 
-          <AIAssistantPanel
-            chapter={selectedChapter}
-            onApplySuggestion={handleApplySuggestion}
-          />
+          <AIAssistantPanel chapter={selectedChapter} onApplySuggestion={handleApplySuggestion} />
 
           <div className="flex-1 flex overflow-hidden">
             <ChapterList
