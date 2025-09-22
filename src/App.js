@@ -15,7 +15,8 @@ import ProjectPage from "./components/ProjectPage";
 import WhoAmI from "./components/WhoAmI";
 
 // ✅ Writer is in /pages per your file
-import WriteSection from "./pages/Writer";
+// ✅ points to the actual file
+import WriteSection from "./components/WriteSection";
 
 // Tiny inline placeholder for pages you’ll build later
 const Placeholder = ({ title = "Coming soon" }) => (
