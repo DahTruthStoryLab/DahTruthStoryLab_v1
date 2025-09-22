@@ -3,7 +3,7 @@ import {
   BookOpen, Plus, FileText, Clock, Sparkles, Loader2,
   ChevronRight, ChevronDown, Search, X, Trash2, Copy, Download,
   Save, AlertCircle, ArrowUp, ArrowDown, Star, StarOff, Upload, Target,
-  Tag, Flame, Moon, Sun, Minimize2, Maximize2, TrendingUp, Award
+  Tag, Flame, Moon, Sun, Minimize2, Maximize2, TrendingUp, Award, CheckCircle
 } from "lucide-react";
 
 /* ──────────────────────────────────────────────────────────────
