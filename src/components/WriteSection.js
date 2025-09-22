@@ -8,6 +8,7 @@ import {
   RefreshCw, Wand2
 } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
+import { Auth } from "aws-amplify";
 
 // --------- Mock Story Data (would come from project selection) ---------
 const currentStory = {
@@ -104,17 +105,17 @@ const TopBanner = () => {
 /* ---------------- Sidebar with NavLink routes ---------------- */
 const Sidebar = ({ isOpen, onClose, authorName }) => {
   const navigate = useNavigate();
+
   const menuItems = [
-    { icon: Home, label: "Dashboard", to: "/dashboard" },
-    { icon: PencilLine, label: "Write", to: "/writer" },
-    // The rest are placeholders until you wire routes:
-    { icon: BookOpen, label: "Table of Contents", to: "/toc" },
-    { icon: Calendar, label: "Calendar", to: "/calendar" },
-    { icon: Layers, label: "Story Lab", to: "/story-lab" },
-    { icon: UploadCloud, label: "Publishing", to: "/publishing" },
-    { icon: Store, label: "Store", to: "/store" },
-    { icon: User, label: "Profile", to: "/profile" },
-    { icon: Info, label: "About", to: "/about" },
+    { icon: Home,       label: "Dashboard",          to: "/dashboard" },
+    { icon: PencilLine, label: "Write",              to: "/writer" },
+    { icon: BookOpen,   label: "Table of Contents",  to: "/toc" },
+    { icon: Calendar,   label: "Calendar",           to: "/calendar" },
+    { icon: Layers,     label: "Story Lab",          to: "/story-lab" },
+    { icon: UploadCloud,label: "Publishing",         to: "/publishing" },
+    { icon: Store,      label: "Store",              to: "/store" },
+    { icon: User,       label: "Profile",            to: "/profile" },
+    { icon: Info,       label: "About",              to: "/about" },
   ];
 
   const itemClass = ({ isActive }) =>
@@ -123,6 +124,11 @@ const Sidebar = ({ isOpen, onClose, authorName }) => {
         ? "bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 shadow-lg shadow-indigo-500/10"
         : "text-slate-300 hover:bg-slate-800/50 hover:text-white hover:border hover:border-slate-600/30"
     }`;
+
+  async function handleSignOut() {
+    try { await Auth.signOut(); }
+    finally { navigate("/signin"); }
+  }
 
   return (
     <>
@@ -136,7 +142,7 @@ const Sidebar = ({ isOpen, onClose, authorName }) => {
 
       <aside
         className={`
-          fixed top-16 left-0 h-[calc(100vh-4rem)] w-80 bg-slate-900/95 backdrop-blur-xl border-r border-white/10 z-40
+          fixed top-16 left-0 h[calc(100vh-4rem)] w-80 bg-slate-900/95 backdrop-blur-xl border-r border-white/10 z-40
           transform transition-transform duration-300 ease-in-out
           ${isOpen ? "translate-x-0" : "-translate-x-full"}
           lg:translate-x-0 lg:static lg:z-auto lg:h-[calc(100vh-4rem)]
@@ -168,15 +174,12 @@ const Sidebar = ({ isOpen, onClose, authorName }) => {
         </div>
 
         <nav className="p-4 space-y-2 flex-1 overflow-y-auto">
-          {menuItems.map((item, index) => (
+          {menuItems.map((item) => (
             <NavLink
-              key={index}
+              key={item.to}
               to={item.to}
               className={itemClass}
-              onClick={() => {
-                // close the sidebar on mobile after navigating
-                onClose?.();
-              }}
+              onClick={() => onClose?.()} // close drawer on mobile after click
             >
               <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/10 to-purple-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
               <item.icon size={18} className="relative z-10 group-hover:scale-110 transition-transform duration-200" />
@@ -208,7 +211,7 @@ const Sidebar = ({ isOpen, onClose, authorName }) => {
               </button>
               <button
                 type="button"
-                onClick={() => navigate("/signin")}
+                onClick={handleSignOut}
                 className="w-full text-left px-3 py-2 text-xs text-slate-400 hover:text-white hover:bg-slate-700/50 rounded-lg transition-all duration-200"
               >
                 Sign Out
@@ -262,9 +265,7 @@ const AIAssistantPanel = ({ chapter, onApplySuggestion }) => {
 
   const generateSuggestions = () => {
     setIsGenerating(true);
-    setTimeout(() => {
-      setIsGenerating(false);
-    }, 2000);
+    setTimeout(() => setIsGenerating(false), 2000);
   };
 
   return (
@@ -634,7 +635,7 @@ const ChapterList = ({ chapters, selectedChapter, onSelectChapter, onAddChapter,
 };
 
 /* ---------------- Writing Editor ---------------- */
-const WritingEditor = ({ chapter, onSave, onUpdateChapter }) => {
+const WritingEditor = ({ chapter, onSave, onUpdateChapter, onCreateNewChapter }) => {
   const [title, setTitle] = useState(chapter?.title || "");
   const [content, setContent] = useState(chapter?.content || "");
   const [wordCount, setWordCount] = useState(0);
@@ -676,6 +677,7 @@ const WritingEditor = ({ chapter, onSave, onUpdateChapter }) => {
           <p className="text-slate-400 mb-6">Select a chapter or create a new one to begin writing your story.</p>
           <button
             type="button"
+            onClick={onCreateNewChapter}
             className="inline-flex items-center gap-2 px-6 py-3 bg-indigo-500 hover:bg-indigo-400 text-white rounded-xl font-medium transition-colors"
           >
             <Plus size={18} />
@@ -794,7 +796,7 @@ export default function WriteSection() {
       aiSuggestions: [],
       grammarIssues: []
     };
-    setChapters([...chapters, newChapter]);
+    setChapters((prev) => [...prev, newChapter]);
     setSelectedChapter(newChapter);
   };
 
@@ -807,7 +809,7 @@ export default function WriteSection() {
   };
 
   const handleUpdateChapter = (updatedChapter) => {
-    setChapters(chapters.map((ch) => (ch.id === updatedChapter.id ? updatedChapter : ch)));
+    setChapters((prev) => prev.map((ch) => (ch.id === updatedChapter.id ? updatedChapter : ch)));
     setSelectedChapter(updatedChapter);
   };
 
@@ -893,6 +895,7 @@ export default function WriteSection() {
               chapter={selectedChapter}
               onSave={handleSave}
               onUpdateChapter={handleUpdateChapter}
+              onCreateNewChapter={handleAddChapter}
             />
           </div>
         </div>
