@@ -1,14 +1,11 @@
 // src/pages/Writer.jsx
-import React, { useState, useEffect } from "react";
 import {
   Plus, Save, Eye, BookOpen, FileText, Edit3, Trash2, ChevronDown,
   Menu, X, Settings, Search, Bell, PencilLine, Home, Calendar, Layers,
   UploadCloud, Store, User, Info, Target, Clock, RotateCcw, Download,
   Sparkles, CheckCircle, AlertCircle, Lightbulb, Zap, Brain, MessageSquare,
-  RefreshCw, Wand2
+  RefreshCw, Wand2, FolderOpen   // ← added
 } from "lucide-react";
-import { NavLink, useNavigate } from "react-router-dom";
-import { Auth } from "aws-amplify";
 
 // --------- Mock Story Data (would come from project selection) ---------
 const currentStory = {
@@ -103,31 +100,18 @@ const TopBanner = () => {
 };
 
 /* ---------------- Sidebar with NavLink routes ---------------- */
- const Sidebar = ({ isOpen, onClose, authorName }) => {
--  const menuItems = [
--    { icon: Home, label: "Dashboard", to: "/dashboard" },
--    { icon: PencilLine, label: "Write", to: "/writer" },
--    // The rest are placeholders until you wire routes:
--    { icon: BookOpen, label: "Table of Contents", to: "/toc" },
--    { icon: Calendar, label: "Calendar", to: "/calendar" },
--    { icon: Layers, label: "Story Lab", to: "/story-lab" },
--    { icon: UploadCloud, label: "Publishing", to: "/publishing" },
--    { icon: Store, label: "Store", to: "/store" },
--    { icon: User, label: "Profile", to: "/profile" },
--    { icon: Info, label: "About", to: "/about" },
--  ];
-+  const menuItems = [
-+    { icon: Home,       label: "Dashboard",         to: "/dashboard" },
-+    { icon: PencilLine, label: "Writer",            to: "/writer" },
-+    { icon: BookOpen,   label: "Table of Contents", to: "/toc" },      // ← single TOC link
-+    { icon: FolderOpen, label: "Project",           to: "/project" },  // ← add Project
-+    { icon: Calendar,   label: "Calendar",          to: "/calendar" },
-+    { icon: Layers,     label: "Story Lab",         to: "/story-lab" },
-+    { icon: UploadCloud,label: "Publishing",        to: "/publishing" },
-+    { icon: Store,      label: "Store",             to: "/store" },
-+    { icon: User,       label: "Profile",           to: "/profile" },
-+    { icon: Info,       label: "About",             to: "/about" },
-+  ];
+ const menuItems = [
+  { icon: Home,       label: "Dashboard",         to: "/dashboard" },
+  { icon: PencilLine, label: "Writer",            to: "/writer" },
+  { icon: BookOpen,   label: "Table of Contents", to: "/toc" },      // single TOC link
+  { icon: FolderOpen, label: "Project",           to: "/project" },  // project page
+  { icon: Calendar,   label: "Calendar",          to: "/calendar" },
+  { icon: Layers,     label: "Story Lab",         to: "/story-lab" },
+  { icon: UploadCloud,label: "Publishing",        to: "/publishing" },
+  { icon: Store,      label: "Store",             to: "/store" },
+  { icon: User,       label: "Profile",           to: "/profile" },
+  { icon: Info,       label: "About",             to: "/about" },
+];
 
   const itemClass = ({ isActive }) =>
     `w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-200 transform hover:scale-105 hover:shadow-lg group relative overflow-hidden ${
