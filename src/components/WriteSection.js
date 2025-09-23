@@ -1,9 +1,9 @@
 // src/components/WriteSection.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  Plus, Save, Eye, FileText, Edit3, Trash2, ChevronDown,
+  Plus, Save, Eye, FileText, Edit3, Trash2,
   Menu, X, Target, Clock, RotateCcw, Download,
-  Sparkles, CheckCircle, AlertCircle, Lightbulb, Zap, Brain, MessageSquare,
+  CheckCircle, AlertCircle, Lightbulb, Zap, Brain, MessageSquare,
   RefreshCw, Wand2, Users, BookOpen, MapPin, ArrowLeft
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
@@ -124,85 +124,121 @@ const TopBanner = ({ bookTitle, onNewChapter, onExport }) => {
 };
 
 /* ──────────────────────────────────────────────────────────────
-   Left: slim Chapter rail (collapsible on mobile)
+   RIGHT: Chapter rail (collapsible on mobile, static on xl)
 ──────────────────────────────────────────────────────────────── */
-const ChapterRail = ({ chapters, selectedId, onSelect, onAdd, onDelete, open, setOpen }) => {
+const ChapterRail = ({
+  chapters, selectedId, onSelect, onAdd, onDelete, open, setOpen, side = "right"
+}) => {
+  const isRight = side === "right";
+  const toggleBtnPos = isRight ? "right-3" : "left-3";
+  const fixedSide = isRight ? "right-0" : "left-0";
+  const borderSide = isRight ? "border-l" : "border-r";
+  const hiddenX = isRight ? "translate-x-full" : "-translate-x-full";
+
   return (
     <>
       {/* mobile toggle */}
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="lg:hidden fixed left-3 top-20 z-40 p-2 rounded-lg bg-white/10 text-white border border-white/20 backdrop-blur-md"
+        className={`xl:hidden fixed ${toggleBtnPos} top-20 z-40 p-2 rounded-lg bg-white/10 text-white border border-white/20 backdrop-blur-md`}
+        title="Toggle chapters"
       >
         {open ? <X size={18} /> : <Menu size={18} />}
       </button>
 
+      {/* Mobile drawer */}
       <aside
         className={[
-          "transition-all duration-300",
-          "bg-white/10 backdrop-blur-xl border-r border-white/20",
-          "h-[calc(100vh-4rem)] fixed lg:static z-30 top-16 left-0",
-          open ? "w-72 translate-x-0" : "w-0 -translate-x-full lg:w-72 lg:translate-x-0",
-          "overflow-hidden",
+          "xl:hidden fixed top-16", fixedSide,
+          "h-[calc(100vh-4rem)] w-72 z-30",
+          "bg-white/10 backdrop-blur-xl", borderSide, "border-white/20",
+          "transition-transform duration-300",
+          open ? "translate-x-0" : hiddenX,
+          "overflow-hidden"
         ].join(" ")}
       >
-        <div className="h-full flex flex-col">
-          <div className="px-4 py-3 flex items-center justify-between border-b border-white/10">
-            <h2 className="text-white font-semibold">Chapters</h2>
-            <button
-              type="button"
-              onClick={onAdd}
-              className="p-2 rounded-md bg-white/10 hover:bg-white/20 text-white border border-white/20"
-              title="New chapter"
-            >
-              <Plus size={16} />
-            </button>
-          </div>
+        <RailInner
+          chapters={chapters}
+          selectedId={selectedId}
+          onSelect={onSelect}
+          onAdd={onAdd}
+          onDelete={onDelete}
+        />
+      </aside>
 
-          <div className="flex-1 overflow-y-auto p-3">
-            {chapters.map((ch) => (
-              <div
-                key={ch.id}
-                className={[
-                  "group mb-2 rounded-xl border",
-                  selectedId === ch.id
-                    ? "bg-indigo-500/20 border-indigo-400/40"
-                    : "bg-white/5 border-white/10 hover:bg-white/10",
-                  "text-white"
-                ].join(" ")}
-              >
-                <button
-                  type="button"
-                  onClick={() => onSelect(ch.id)}
-                  className="w-full text-left px-3 py-2"
-                >
-                  <div className="text-sm font-medium truncate">{ch.title}</div>
-                  <div className="text-xs text-white/70">
-                    {ch.wordCount} words • {ch.lastEdited}
-                  </div>
-                </button>
-                <div className="px-3 pb-2 flex gap-2">
-                  <span className="px-2 py-0.5 text-[10px] rounded bg-white/10 border border-white/20">
-                    {ch.status}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => onDelete(ch.id)}
-                    className="ml-auto text-rose-200/90 hover:text-rose-100 p-1"
-                    title="Delete"
-                  >
-                    <Trash2 size={14} />
-                  </button>
-                </div>
-              </div>
-            ))}
+      {/* Desktop/static column content (placed inside grid) */}
+      <div className="hidden xl:block">
+        <div className="sticky top-20">
+          <div className="rounded-2xl bg-white/10 backdrop-blur-xl border border-white/20 overflow-hidden">
+            <RailInner
+              chapters={chapters}
+              selectedId={selectedId}
+              onSelect={onSelect}
+              onAdd={onAdd}
+              onDelete={onDelete}
+            />
           </div>
         </div>
-      </aside>
+      </div>
     </>
   );
 };
+
+const RailInner = ({ chapters, selectedId, onSelect, onAdd, onDelete }) => (
+  <div className="h-full flex flex-col">
+    <div className="px-4 py-3 flex items-center justify-between border-b border-white/10">
+      <h2 className="text-white font-semibold">Chapters</h2>
+      <button
+        type="button"
+        onClick={onAdd}
+        className="p-2 rounded-md bg-white/10 hover:bg-white/20 text-white border border-white/20"
+        title="New chapter"
+      >
+        <Plus size={16} />
+      </button>
+    </div>
+
+    <div className="flex-1 overflow-y-auto p-3">
+      {chapters.map((ch) => (
+        <div
+          key={ch.id}
+          className={[
+            "group mb-2 rounded-xl border",
+            selectedId === ch.id
+              ? "bg-indigo-500/20 border-indigo-400/40"
+              : "bg-white/5 border-white/10 hover:bg-white/10",
+            "text-white"
+          ].join(" ")}
+        >
+          <button
+            type="button"
+            onClick={() => onSelect(ch.id)}
+            className="w-full text-left px-3 py-2"
+          >
+            <div className="text-sm font-medium truncate">{ch.title}</div>
+            <div className="text-xs text-white/70">
+              {ch.wordCount} words • {ch.lastEdited}
+            </div>
+          </button>
+          <div className="px-3 pb-2 flex gap-2">
+            <span className="px-2 py-0.5 text-[10px] rounded bg-white/10 border border-white/20">
+              {ch.status}
+            </span>
+            <button
+              type="button"
+              onClick={() => onDelete(ch.id)}
+              className="ml-auto text-rose-200/90 hover:text-rose-100 p-1"
+              title="Delete"
+            >
+              <Trash2 size={14} />
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+);
 
 /* ──────────────────────────────────────────────────────────────
    Compact AI Assistant (raised above editor)
@@ -323,20 +359,38 @@ const AIAssistant = ({ chapter, onApply }) => {
 };
 
 /* ──────────────────────────────────────────────────────────────
-   Right: Story Meta sidebar (+ Back to Dashboard)
+   LEFT: Story Meta sidebar (+ Quick Nav)
 ──────────────────────────────────────────────────────────────── */
 const MetaSidebar = ({ book, chapterWordCount, totalWords }) => {
   return (
-    <aside className="w-80 hidden xl:block">
+    <aside className="hidden xl:block">
       <div className="sticky top-20 space-y-4">
-        {/* Back */}
-        <NavLink
-          to="/dashboard"
-          className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-white/10 text-white border border-white/20 hover:bg-white/15"
-        >
-          <ArrowLeft size={16} />
-          Back to Dashboard
-        </NavLink>
+        {/* Quick Nav */}
+        <div className="flex flex-col gap-2">
+          <NavLink
+            to="/dashboard"
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-white/10 text-white border border-white/20 hover:bg-white/15"
+          >
+            <ArrowLeft size={16} />
+            Back to Dashboard
+          </NavLink>
+          <div className="flex gap-2">
+            <NavLink
+              to="/toc"
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-white/10 text-white border border-white/20 hover:bg-white/15"
+            >
+              <BookOpen size={16} />
+              TOC
+            </NavLink>
+            <NavLink
+              to="/project"
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-white/10 text-white border border-white/20 hover:bg-white/15"
+            >
+              <FileText size={16} />
+              Project
+            </NavLink>
+          </div>
+        </div>
 
         {/* Stats */}
         <div className="rounded-2xl bg-white/80 backdrop-blur border border-slate-200 p-4">
@@ -453,7 +507,10 @@ const WritingEditor = ({ chapter, onSave, onUpdate, onCreateNew }) => {
   return (
     <div className="flex-1 flex flex-col gap-4">
       {/* raised AI assistant */}
-      <AIAssistant chapter={chapter} onApply={(s) => setContent((c) => c + (c.endsWith("\n") ? "" : "\n\n") + s)} />
+      <AIAssistant
+        chapter={chapter}
+        onApply={(s) => setContent((c) => c + (c.endsWith("\n") ? "" : "\n\n") + s)}
+      />
 
       {/* white canvas */}
       <div className="rounded-3xl bg-white shadow-2xl border border-slate-200 overflow-hidden flex-1 flex flex-col">
@@ -482,6 +539,7 @@ const WritingEditor = ({ chapter, onSave, onUpdate, onCreateNew }) => {
                   ? "bg-indigo-50 text-indigo-700 border-indigo-200"
                   : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50",
               ].join(" ")}
+              title="Preview"
             >
               <Eye size={16} />
             </button>
@@ -527,7 +585,7 @@ const WritingEditor = ({ chapter, onSave, onUpdate, onCreateNew }) => {
               <span>Auto-save enabled</span>
             </div>
           </div>
-          <button className="hover:text-slate-800">
+          <button className="hover:text-slate-800" title="Download">
             <Download size={14} />
           </button>
         </div>
@@ -544,7 +602,7 @@ export default function WriteSection() {
   const [book, setBook] = useState(initial.book);
   const [chapters, setChapters] = useState(initial.chapters);
   const [selectedId, setSelectedId] = useState(initial.chapters[0]?.id || null);
-  const [railOpen, setRailOpen] = useState(true);
+  const [railOpen, setRailOpen] = useState(false); // closed by default on mobile
 
   const selected = chapters.find((c) => c.id === selectedId) || null;
 
@@ -600,6 +658,7 @@ export default function WriteSection() {
     };
     setChapters((prev) => [ch, ...prev]);
     setSelectedId(id);
+    setRailOpen(true);
   };
 
   const deleteChapter = (id) => {
@@ -633,8 +692,24 @@ export default function WriteSection() {
       />
 
       <div className="max-w-7xl mx-auto px-3 sm:px-6">
-        <div className="flex gap-6">
-          {/* left rail */}
+        {/* 3-column layout on xl: [left meta | editor | right chapters] */}
+        <div className="grid grid-cols-1 xl:grid-cols-[20rem_1fr_20rem] gap-6 pt-6 lg:pt-8 w-full">
+          {/* left meta */}
+          <MetaSidebar
+            book={book}
+            chapterWordCount={selected?.wordCount || 0}
+            totalWords={totalWords}
+          />
+
+          {/* center editor */}
+          <WritingEditor
+            chapter={selected}
+            onSave={() => {}}
+            onUpdate={updateChapter}
+            onCreateNew={addChapter}
+          />
+
+          {/* right chapters (static on xl, drawer on mobile) */}
           <ChapterRail
             chapters={chapters}
             selectedId={selectedId}
@@ -643,23 +718,8 @@ export default function WriteSection() {
             onDelete={deleteChapter}
             open={railOpen}
             setOpen={setRailOpen}
+            side="right"
           />
-
-          {/* center editor + right meta */}
-          <div className="flex-1 grid grid-cols-1 xl:grid-cols-[1fr_20rem] gap-6 pt-6 lg:pt-8 ml-0 lg:ml-0 w-full">
-            <WritingEditor
-              chapter={selected}
-              onSave={() => {}}
-              onUpdate={updateChapter}
-              onCreateNew={addChapter}
-            />
-
-            <MetaSidebar
-              book={book}
-              chapterWordCount={selected?.wordCount || 0}
-              totalWords={totalWords}
-            />
-          </div>
         </div>
       </div>
     </div>
