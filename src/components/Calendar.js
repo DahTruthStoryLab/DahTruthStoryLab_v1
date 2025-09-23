@@ -369,4 +369,6 @@ const Calendar = () => {
   );
 };
 
-export default Calendar;
+export default function Calendar() {
+  // component code...
+}
