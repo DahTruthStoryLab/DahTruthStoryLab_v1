@@ -13,7 +13,7 @@ import TOCPage from "./components/TOCPage";
 import TOCPage2 from "./components/TOCPage2";
 import ProjectPage from "./components/ProjectPage";
 import WhoAmI from "./components/WhoAmI";
-import Calander from "./components/Calander";
+import Calendar from "./components/Calendar";
 
 // ✅ Writer is in /components per your file
 import WriteSection from "./components/WriteSection";
@@ -105,20 +105,17 @@ export default function App() {
               <ProjectPage />
             </ProtectedRoute>
           }
-        />
+          />
+            
+     <Route
+      path="/calendar"
+      element={
+        <ProtectedRoute>
+          <Calendar />
+        </ProtectedRoute>
+      }
+      />
 
-        <Route path="/whoami" element={<WhoAmI />} />
-
-       <Route
-          path="/calendar"
-          element={
-            <ProtectedRoute>
-              <Calander />
-            </ProtectedRoute>
-          }
-        />
-
-        />
         <Route
           path="/story-lab"
           element={
