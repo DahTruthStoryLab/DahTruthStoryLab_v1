@@ -21,7 +21,7 @@ const getDailyGoal = () => {
   }
 };
 
-const Calendar = () => {
+export default function Calendar() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [hoveredDate, setHoveredDate] = useState(null);
@@ -33,7 +33,7 @@ const Calendar = () => {
     "July","August","September","October","November","December",
   ];
 
-  // Demo data (swap with real data later)
+  // Sample writing data (replace with real data later)
   const writingData = useMemo(
     () => ({
       "2025-09-15": { wordCount: 1500, projectId: 1, hasDeadline: false },
@@ -97,8 +97,7 @@ const Calendar = () => {
     const startDow = first.getDay();
 
     const days = [];
-
-    // previous month placeholders
+    // prev month fillers
     const prevMonthLast = new Date(year, month, 0).getDate();
     for (let i = startDow - 1; i >= 0; i--) {
       days.push({
@@ -106,11 +105,11 @@ const Calendar = () => {
         isCurrentMonth: false,
       });
     }
-    // current month
+    // this month
     for (let i = 1; i <= daysInMonth; i++) {
       days.push({ date: new Date(year, month, i), isCurrentMonth: true });
     }
-    // next month placeholders to fill 6 rows (6*7=42 cells)
+    // next month fillers
     const remaining = 42 - days.length;
     for (let i = 1; i <= remaining; i++) {
       days.push({ date: new Date(year, month + 1, i), isCurrentMonth: false });
@@ -123,7 +122,7 @@ const Calendar = () => {
     const cursor = new Date();
     while (true) {
       const key = formatDateKey(cursor);
-      if (writingData[key]?.wordCount > 0) {
+      if ((writingData[key]?.wordCount || 0) > 0) {
         streak++;
         cursor.setDate(cursor.getDate() - 1);
       } else {
@@ -159,25 +158,25 @@ const Calendar = () => {
   const currentStreak = calculateStreak();
   const days = getDaysInMonth(currentMonth);
 
-  // 0..1 heat for a date
+  // heat amount (0..1) for a given date key
   const heat = (key) => {
     const wc = writingData[key]?.wordCount || 0;
     if (!stats.maxWords) return 0;
     return Math.min(1, wc / stats.maxWords);
   };
 
-  // 0..1 progress vs daily goal
+  // Mini progress (0..1) vs daily goal
   const dayProgress = (wc) => {
     if (!dailyGoal || !wc) return 0;
     return Math.min(1, wc / dailyGoal);
   };
 
   return (
-    <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-slate-950 via-blue-950 to-indigo-950 p-8">
+    <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-slate-950 via-slate-950 to-slate-900 p-8">
       {/* ambient blobs */}
       <div className="pointer-events-none absolute inset-0 opacity-20">
-        <div className="absolute -top-10 -left-10 w-72 h-72 bg-indigo-500/40 blur-3xl rounded-full" />
-        <div className="absolute bottom-0 right-0 w-96 h-96 bg-teal-500/30 blur-3xl rounded-full" />
+        <div className="absolute -top-10 -left-10 w-72 h-72 bg-sky-400/30 blur-3xl rounded-full" />
+        <div className="absolute bottom-0 right-0 w-96 h-96 bg-indigo-400/25 blur-3xl rounded-full" />
       </div>
 
       <div className="relative max-w-5xl mx-auto">
@@ -186,10 +185,10 @@ const Calendar = () => {
           <h1 className="text-4xl font-bold text-white font-serif mb-2">
             Writing Calendar
           </h1>
-          <p className="text-blue-200">Track your writing journey</p>
+          <p className="text-sky-200">Track your writing journey</p>
         </div>
 
-        {/* Stats Row */}
+        {/* Stats Row (lighter glass) */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
           {[
             {
@@ -202,7 +201,7 @@ const Calendar = () => {
               label: "Words This Month",
               value: stats.totalWords.toLocaleString(),
               Icon: PenTool,
-              iconClass: "text-blue-300",
+              iconClass: "text-sky-300",
             },
             {
               label: "Writing Days",
@@ -219,12 +218,12 @@ const Calendar = () => {
           ].map(({ label, value, Icon, iconClass }) => (
             <div
               key={label}
-              className="bg-white/5 backdrop-blur-xl rounded-2xl p-4 border border-white/10 shadow-xl relative overflow-hidden"
+              className="relative bg-white/15 backdrop-blur-xl rounded-2xl p-4 border border-white/20 shadow-xl overflow-hidden"
             >
-              <div className="absolute inset-0 bg-gradient-to-tr from-white/5 to-transparent opacity-50" />
+              <div className="absolute inset-0 bg-gradient-to-tr from-white/10 to-transparent opacity-70" />
               <div className="flex items-center justify-between relative">
                 <div>
-                  <p className="text-blue-200 text-xs font-serif">{label}</p>
+                  <p className="text-sky-200 text-xs font-serif">{label}</p>
                   <p className="text-2xl font-bold text-white">{value}</p>
                 </div>
                 <Icon className={`h-8 w-8 ${iconClass}`} />
@@ -233,16 +232,16 @@ const Calendar = () => {
           ))}
         </div>
 
-        {/* Calendar Card */}
-        <div className="relative bg-white/5 backdrop-blur-2xl rounded-3xl shadow-2xl p-6 md:p-8 border border-white/10 overflow-hidden">
+        {/* Calendar Card (lighter glass) */}
+        <div className="relative bg-white/15 backdrop-blur-2xl rounded-3xl shadow-2xl p-6 md:p-8 border border-white/20 overflow-hidden">
           {/* sheen */}
-          <div className="pointer-events-none absolute -top-24 left-1/2 -translate-x-1/2 w-[120%] h-48 bg-gradient-to-b from-white/10 to-transparent rounded-full blur-2xl" />
+          <div className="pointer-events-none absolute -top-24 left-1/2 -translate-x-1/2 w-[120%] h-48 bg-gradient-to-b from-white/20 to-transparent rounded-full blur-2xl" />
 
           {/* Calendar Header */}
           <div className="flex items-center justify-between mb-6">
             <button
               onClick={() => navigateMonth(-1)}
-              className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-blue-100 hover:text-white transition-all duration-300 border border-white/10"
+              className="p-2 rounded-xl bg-white/15 hover:bg-white/25 text-sky-100 hover:text-white transition-all duration-300 border border-white/20"
               aria-label="Previous month"
             >
               <ChevronLeft className="h-5 w-5" />
@@ -255,7 +254,7 @@ const Calendar = () => {
               </h2>
               <button
                 onClick={jumpToToday}
-                className="px-3 py-1.5 rounded-full text-xs bg-white/10 hover:bg-white/20 text-white/90 border border-white/20 transition-all"
+                className="px-3 py-1.5 rounded-full text-xs bg-white/20 hover:bg-white/30 text-white/90 border border-white/30 transition-all"
               >
                 Today
               </button>
@@ -263,7 +262,7 @@ const Calendar = () => {
 
             <button
               onClick={() => navigateMonth(1)}
-              className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-blue-100 hover:text-white transition-all duration-300 border border-white/10"
+              className="p-2 rounded-xl bg-white/15 hover:bg-white/25 text-sky-100 hover:text-white transition-all duration-300 border border-white/20"
               aria-label="Next month"
             >
               <ChevronRight className="h-5 w-5" />
@@ -275,7 +274,7 @@ const Calendar = () => {
             {weekDays.map((d) => (
               <div
                 key={d}
-                className="text-center text-blue-200/80 font-semibold text-xs tracking-wide"
+                className="text-center text-sky-200/90 font-semibold text-xs tracking-wide"
               >
                 {d}
               </div>
@@ -284,38 +283,54 @@ const Calendar = () => {
 
           {/* Days */}
           <div className="grid grid-cols-7 gap-2">
-            {days.map((day, index) => {
+            {days.map((day, idx) => {
               const dateKey = formatDateKey(day.date);
               const dayData = writingData[dateKey];
               const hasWriting = (dayData?.wordCount || 0) > 0;
               const hasDeadline = !!dayData?.hasDeadline;
               const selected =
                 selectedDate?.toDateString() === day.date.toDateString();
-              const heatAmt = heat(dateKey);
-              const prog = dayProgress(dayData?.wordCount || 0);
+              const heatAmt = heat(dateKey); // 0..1
+              const prog = dayProgress(dayData?.wordCount || 0); // 0..1
 
               return (
                 <div
-                  key={index}
+                  key={idx}
                   onMouseEnter={() => setHoveredDate(dateKey)}
                   onMouseLeave={() => setHoveredDate(null)}
                   onClick={() => setSelectedDate(day.date)}
                   className={[
-                    "relative h-20 p-2 rounded-2xl transition-all duration-300 cursor-pointer group overflow-hidden",
-                    day.isCurrentMonth ? "bg-white/5" : "bg-white/5 opacity-60",
+                    "relative h-20 p-2 rounded-2xl transition-all duration-300 cursor-pointer group overflow-hidden border",
+                    day.isCurrentMonth
+                      ? "bg-white/18"
+                      : "bg-white/10 opacity-70",
                     isToday(day.date) ? "ring-2 ring-sky-300" : "",
                     selected ? "outline outline-2 outline-teal-300/70" : "",
-                    "hover:scale-105 hover:shadow-xl border border-white/10",
+                    "hover:scale-[1.03] hover:shadow-xl border-white/20",
                   ].join(" ")}
                 >
                   {/* heat overlay */}
                   <div
                     className="absolute inset-0 pointer-events-none"
                     style={{
-                      background: `linear-gradient(180deg, rgba(34,197,94,${
-                        0.12 + 0.25 * heatAmt
-                      }) 0%, rgba(34,197,94,${0.06 * heatAmt}) 100%)`,
+                      background: `linear-gradient(180deg, rgba(16,185,129,${
+                        0.14 + 0.28 * heatAmt
+                      }) 0%, rgba(16,185,129,${0.08 * heatAmt}) 100%)`,
                       opacity: hasWriting ? 1 : 0,
+                    }}
+                  />
+
+                  {/* glow border on hover */}
+                  <div
+                    className="absolute -inset-px rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity"
+                    style={{
+                      background:
+                        "linear-gradient(135deg, rgba(56,189,248,0.35), rgba(99,102,241,0.3))",
+                      WebkitMask:
+                        "linear-gradient(#000, #000) content-box, linear-gradient(#000, #000)",
+                      WebkitMaskComposite: "xor",
+                      maskComposite: "exclude",
+                      padding: 1,
                     }}
                   />
 
@@ -323,13 +338,15 @@ const Calendar = () => {
                     <div className="flex items-start justify-between">
                       <span
                         className={`text-sm font-medium ${
-                          day.isCurrentMonth ? "text-white" : "text-blue-200/70"
+                          day.isCurrentMonth
+                            ? "text-white"
+                            : "text-sky-100/70"
                         }`}
                       >
                         {day.date.getDate()}
                       </span>
                       {hasDeadline && (
-                        <span className="px-1.5 py-0.5 rounded-md text-[10px] bg-rose-500/20 text-rose-200 border border-rose-400/30">
+                        <span className="px-1.5 py-0.5 rounded-md text-[10px] bg-rose-500/25 text-rose-100 border border-rose-300/40">
                           Due
                         </span>
                       )}
@@ -337,9 +354,9 @@ const Calendar = () => {
 
                     {/* mini progress bar vs daily goal */}
                     {day.isCurrentMonth && dailyGoal && (
-                      <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden mt-1">
+                      <div className="w-full h-1.5 bg-white/20 rounded-full overflow-hidden mt-1">
                         <div
-                          className="h-full rounded-full bg-gradient-to-r from-teal-400 to-emerald-400 transition-all"
+                          className="h-full rounded-full bg-gradient-to-r from-teal-300 to-emerald-300 transition-all"
                           style={{ width: `${prog * 100}%` }}
                         />
                       </div>
@@ -347,7 +364,7 @@ const Calendar = () => {
 
                     <div className="flex items-center justify-between">
                       {hasWriting ? (
-                        <div className="text-[11px] text-teal-200 font-semibold">
+                        <div className="text-[11px] text-teal-100 font-semibold">
                           {dayData.wordCount.toLocaleString()} w
                         </div>
                       ) : (
@@ -356,10 +373,10 @@ const Calendar = () => {
                       {day.isCurrentMonth && (
                         <div className="flex gap-1">
                           {hasWriting && (
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-300" />
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-200" />
                           )}
                           {hasDeadline && (
-                            <span className="w-1.5 h-1.5 rounded-full bg-rose-300" />
+                            <span className="w-1.5 h-1.5 rounded-full bg-rose-200" />
                           )}
                         </div>
                       )}
@@ -369,7 +386,7 @@ const Calendar = () => {
                   {/* Tooltip */}
                   {hoveredDate === dateKey && (hasWriting || hasDeadline) && (
                     <div className="absolute z-20 bottom-full mb-2 left-1/2 -translate-x-1/2 w-56">
-                      <div className="bg-white/10 backdrop-blur-xl border border-white/20 rounded-xl p-3 shadow-2xl">
+                      <div className="bg-white/20 backdrop-blur-xl border border-white/30 rounded-xl p-3 shadow-2xl">
                         <div className="text-white text-sm font-semibold">
                           {day.date.toLocaleDateString("en-US", {
                             weekday: "short",
@@ -378,7 +395,7 @@ const Calendar = () => {
                           })}
                         </div>
                         {hasWriting && (
-                          <div className="text-teal-200 text-xs mt-1">
+                          <div className="text-teal-50 text-xs mt-1">
                             <span className="font-semibold">
                               {dayData.wordCount.toLocaleString()}
                             </span>{" "}
@@ -391,7 +408,7 @@ const Calendar = () => {
                           </div>
                         )}
                         {hasDeadline && (
-                          <div className="text-rose-200 text-xs mt-1">
+                          <div className="text-rose-50 text-xs mt-1">
                             📅 {dayData.deadlineTitle}
                           </div>
                         )}
@@ -407,21 +424,19 @@ const Calendar = () => {
           <div className="mt-6 flex flex-wrap gap-6 justify-center text-sm">
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-emerald-300" />
-              <span className="text-blue-100/90">Writing Session</span>
+              <span className="text-sky-50/90">Writing Session</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-rose-300" />
-              <span className="text-blue-100/90">Deadline</span>
+              <span className="text-sky-50/90">Deadline</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="ring-2 ring-sky-300 w-4 h-4 rounded" />
-              <span className="text-blue-100/90">Today</span>
+              <span className="text-sky-50/90">Today</span>
             </div>
           </div>
         </div>
       </div>
     </div>
   );
-};
-
-export default Calendar;
+}
