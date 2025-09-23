@@ -1,131 +1,120 @@
-// src/pages/Writer.jsx
-import React, { useState, useEffect } from "react";
+// src/components/WriteSection.jsx
+import React, { useEffect, useMemo, useState } from "react";
 import {
-  Plus, Save, Eye, BookOpen, FileText, Edit3, Trash2, ChevronDown,
-  Menu, X, Settings, Search, Bell, PencilLine, Home, Calendar, Layers,
-  UploadCloud, Store, User, Info, Target, Clock, RotateCcw, Download,
+  Plus, Save, Eye, FileText, Edit3, Trash2, ChevronDown,
+  Menu, X, Target, Clock, RotateCcw, Download,
   Sparkles, CheckCircle, AlertCircle, Lightbulb, Zap, Brain, MessageSquare,
-  RefreshCw, Wand2, FolderOpen
+  RefreshCw, Wand2, Users, BookOpen, MapPin, ArrowLeft
 } from "lucide-react";
-import { NavLink, useNavigate } from "react-router-dom";
-import { Auth } from "aws-amplify";
+import { NavLink } from "react-router-dom";
 
 /* ──────────────────────────────────────────────────────────────
-   Shared storage (title sync with ProjectPage)
+   Shared storage helpers (same key as Project/TOC)
 ──────────────────────────────────────────────────────────────── */
 const STORAGE_KEY = "dahtruth-story-lab-toc-v3";
-const getBookTitle = () => {
+
+const loadState = () => {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return "";
-    const data = JSON.parse(raw);
-    return data?.book?.title || "";
+    if (!raw) return null;
+    return JSON.parse(raw);
   } catch {
-    return "";
+    return null;
   }
 };
 
-// --------- Mock Story Data (would come from project selection) ---------
-const currentStory = {
-  id: 1,
-  title: "Jacque is a rock star!",
-  genre: "Contemporary Fiction",
-  targetWords: 50000,
-  currentWords: 3247,
-  description: "A coming-of-age story about a young musician discovering their voice in the world of rock music.",
-  characters: ["Jacque Thompson", "Marcus Rivera", "Sarah Chen"],
-  setting: "Modern-day Los Angeles music scene",
-  theme: "Finding your authentic voice",
-  progress: 6.5,
-  lastUpdated: "2 hours ago",
+const saveState = (state) => {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    // let other tabs/pages update live
+    window.dispatchEvent(new Event("project:change"));
+  } catch {}
 };
 
-const initialChapters = [
-  {
-    id: 1,
-    title: "Chapter 1: First Chord",
-    content:
-      "Jacque's fingers trembled as they touched the guitar strings for the first time on stage. The lights were blinding, the crowd expectant, and everything they'd worked for came down to this moment. Music had always been their escape, but tonight it would become their destiny.\n\nThe sound check earlier had gone well, but now, standing before hundreds of faces, doubt crept in like a familiar song in a minor key.",
-    wordCount: 1205,
-    lastEdited: "2 hours ago",
-    status: "draft",
-    aiSuggestions: [
-      "Consider adding more sensory details about the stage environment",
-      "Develop Jacque's internal conflict more deeply",
-    ],
-    grammarIssues: [],
-  },
-  {
-    id: 2,
-    title: "Chapter 2: Backstage Revelations",
-    content:
-      "The dressing room smelled of stale coffee and nervous energy. Marcus paced back and forth, his bass guitar slung over his shoulder like a weapon he wasn't sure how to use. Sarah sat quietly in the corner, her drumsticks creating a rhythmic pattern against her knee.\n\n'We've got this,' Jacque whispered, more to convince themselves than the others.",
-    wordCount: 892,
-    lastEdited: "Yesterday",
-    status: "draft",
-    aiSuggestions: [
-      "Show more character interaction and relationship dynamics",
-      "Consider adding dialogue tags for clarity",
-    ],
-    grammarIssues: [{ type: "suggestion", text: "Consider a comma after 'themselves'" }],
-  },
-];
-
-/* ---------------- Top Banner with real nav ---------------- */
-const TopBanner = ({ projectTitle }) => {
-  const navLink =
-    ({ isActive }) =>
-      `px-3 py-2 rounded-md text-sm transition-colors ${
-        isActive ? "bg-indigo-600 text-white" : "text-slate-200 hover:bg-white/10"
-      }`;
-
+const getInitialState = () => {
+  const existing = loadState();
   return (
-    <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white sticky top-0 z-[9999]">
-      <div className="px-6 py-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
-                <PencilLine size={16} />
-              </div>
-              <span className="font-bold text-lg">DahTruth StoryLab</span>
-            </div>
-            <div className="hidden md:block text-sm opacity-90">
-              {projectTitle
-                ? `Project: ${projectTitle}`
-                : "Transform your ideas into compelling stories"}
+    existing || {
+      book: {
+        title: "Untitled Book",
+        subtitle: "",
+        author: "",
+        genre: "",
+        tags: [],
+        targetWords: 50000,
+        deadline: "",
+        status: "Draft",
+        logline: "",
+        synopsis: "",
+        cover: "",
+      },
+      chapters: [
+        {
+          id: 1,
+          title: "Chapter 1: First Chord",
+          content:
+            "Jacque's fingers trembled as they touched the guitar strings for the first time on stage...",
+          wordCount: 1205,
+          lastEdited: "2 hours ago",
+          status: "draft",
+          aiSuggestions: [
+            "Consider adding more sensory details about the stage environment",
+            "Develop Jacque's internal conflict more deeply",
+          ],
+          grammarIssues: [],
+        },
+        {
+          id: 2,
+          title: "Chapter 2: Backstage Revelations",
+          content:
+            "The dressing room smelled of stale coffee and nervous energy...",
+          wordCount: 892,
+          lastEdited: "Yesterday",
+          status: "draft",
+          aiSuggestions: [
+            "Show more character interaction and relationship dynamics",
+            "Consider adding dialogue tags for clarity",
+          ],
+          grammarIssues: [{ type: "suggestion", text: "Consider a comma after 'themselves'" }],
+        },
+      ],
+      daily: { goal: 500, counts: {} },
+      settings: { theme: "dark", focusMode: false },
+    }
+  );
+};
+
+/* ──────────────────────────────────────────────────────────────
+   Banner (simple): left title, center book name, right actions
+──────────────────────────────────────────────────────────────── */
+const TopBanner = ({ bookTitle, onNewChapter, onExport }) => {
+  return (
+    <div className="sticky top-0 z-50 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6">
+        <div className="h-16 flex items-center justify-between">
+          <div className="font-extrabold tracking-wide">Write your story</div>
+
+          <div className="hidden md:block text-center">
+            <div className="text-sm opacity-90">Current project</div>
+            <div className="text-lg font-semibold">
+              {bookTitle || "Untitled Book"}
             </div>
           </div>
 
-          {/* NEW: real navigation links */}
-          <nav className="hidden md:flex items-center gap-2">
-            <NavLink to="/dashboard" className={navLink} end>
-              Dashboard
-            </NavLink>
-            <NavLink to="/writer" className={navLink}>
-              Writer
-            </NavLink>
-            <NavLink to="/project" className={navLink}>
-              Project
-            </NavLink>
-            <NavLink to="/toc" className={navLink}>
-              Table of Contents
-            </NavLink>
-            <NavLink to="/" className={navLink}>
-              Home
-            </NavLink>
-          </nav>
-
-          <div className="flex items-center gap-2 md:gap-4">
-            <button type="button" className="p-2 rounded-lg hover:bg-white/10 transition-colors">
-              <Search size={16} />
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={onNewChapter}
+              className="inline-flex items-center gap-2 rounded-xl bg-white/15 hover:bg-white/25 px-3 py-2 text-sm font-medium border border-white/20"
+            >
+              <Plus size={16} /> New Chapter
             </button>
             <button
               type="button"
-              className="p-2 rounded-lg hover:bg-white/10 transition-colors relative"
+              onClick={onExport}
+              className="inline-flex items-center gap-2 rounded-xl bg-white/15 hover:bg-white/25 px-3 py-2 text-sm font-medium border border-white/20"
             >
-              <Bell size={16} />
-              <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full" />
+              <FileText size={16} /> Export
             </button>
           </div>
         </div>
@@ -134,131 +123,80 @@ const TopBanner = ({ projectTitle }) => {
   );
 };
 
-/* ---------------- Sidebar with NavLink routes ---------------- */
-const Sidebar = ({ isOpen, onClose, authorName }) => {
-  const navigate = useNavigate();
-
-  const menuItems = [
-    { icon: Home,       label: "Dashboard",         to: "/dashboard" },
-    { icon: PencilLine, label: "Writer",            to: "/writer" },
-    { icon: BookOpen,   label: "Table of Contents", to: "/toc" },     // single TOC
-    { icon: FolderOpen, label: "Project",           to: "/project" }, // new Project link
-    { icon: Calendar,   label: "Calendar",          to: "/calendar" },
-    { icon: Layers,     label: "Story Lab",         to: "/story-lab" },
-    { icon: UploadCloud,label: "Publishing",        to: "/publishing" },
-    { icon: Store,      label: "Store",             to: "/store" },
-    { icon: User,       label: "Profile",           to: "/profile" },
-    { icon: Info,       label: "About",             to: "/about" },
-  ];
-
-  const itemClass = ({ isActive }) =>
-    `w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-200 transform hover:scale-105 hover:shadow-lg group relative overflow-hidden ${
-      isActive
-        ? "bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 shadow-lg shadow-indigo-500/10"
-        : "text-slate-300 hover:bg-slate-800/50 hover:text-white hover:border hover:border-slate-600/30"
-    }`;
-
-  async function handleSignOut() {
-    try {
-      await Auth.signOut();
-    } finally {
-      navigate("/signin");
-    }
-  }
-
+/* ──────────────────────────────────────────────────────────────
+   Left: slim Chapter rail (collapsible on mobile)
+──────────────────────────────────────────────────────────────── */
+const ChapterRail = ({ chapters, selectedId, onSelect, onAdd, onDelete, open, setOpen }) => {
   return (
     <>
-      {/* Mobile overlay (click to close). Hidden on lg+. */}
-      {isOpen && (
-        <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={onClose} />
-      )}
+      {/* mobile toggle */}
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="lg:hidden fixed left-3 top-20 z-40 p-2 rounded-lg bg-white/10 text-white border border-white/20 backdrop-blur-md"
+      >
+        {open ? <X size={18} /> : <Menu size={18} />}
+      </button>
 
       <aside
-        className={`
-          fixed top-16 left-0 h-[calc(100vh-4rem)] w-80 bg-slate-900/95 backdrop-blur-xl border-r border-white/10 z-40
-          transform transition-transform duration-300 ease-in-out
-          ${isOpen ? "translate-x-0" : "-translate-x-full"}
-          lg:translate-x-0 lg:static lg:z-auto lg:h-[calc(100vh-4rem)]
-          flex flex-col
-        `}
+        className={[
+          "transition-all duration-300",
+          "bg-white/10 backdrop-blur-xl border-r border-white/20",
+          "h-[calc(100vh-4rem)] fixed lg:static z-30 top-16 left-0",
+          open ? "w-72 translate-x-0" : "w-0 -translate-x-full lg:w-72 lg:translate-x-0",
+          "overflow-hidden",
+        ].join(" ")}
       >
-        <div className="p-6 border-b border-white/10 flex-shrink-0">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 flex items-center justify-center shadow-lg">
-                <span className="text-white font-bold text-sm">
-                  {authorName.charAt(0).toUpperCase()}
-                </span>
-              </div>
-              <div>
-                <h2 className="text-lg font-bold text-white">DahTruth</h2>
-                <p className="text-sm text-slate-400">StoryLab</p>
-              </div>
-            </div>
+        <div className="h-full flex flex-col">
+          <div className="px-4 py-3 flex items-center justify-between border-b border-white/10">
+            <h2 className="text-white font-semibold">Chapters</h2>
             <button
               type="button"
-              onClick={onClose}
-              className="lg:hidden text-slate-400 hover:text-white transition-colors p-1 rounded-lg hover:bg-slate-800/50"
+              onClick={onAdd}
+              className="p-2 rounded-md bg-white/10 hover:bg-white/20 text-white border border-white/20"
+              title="New chapter"
             >
-              <X size={20} />
+              <Plus size={16} />
             </button>
           </div>
-          <p className="text-xs text-slate-400 mt-2">Where your story comes to life</p>
-        </div>
 
-        <nav className="p-4 space-y-2 flex-1 overflow-y-auto">
-          {menuItems.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              className={itemClass}
-              onClick={() => onClose?.()} // close drawer on mobile after click
-            >
-              <div className="absolute inset-0 bg-gradient-to-r from-indigo-500/10 to-purple-500/10 opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
-              <item.icon
-                size={18}
-                className="relative z-10 group-hover:scale-110 transition-transform duration-200"
-              />
-              <span className="font-medium relative z-10">{item.label}</span>
-              <div className="absolute right-2 w-2 h-2 bg-indigo-400 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
-            </NavLink>
-          ))}
-        </nav>
-
-        <div className="p-4 border-t border-white/10 flex-shrink-0">
-          <div className="p-4 bg-slate-800/30 rounded-xl border border-white/5">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-r from-indigo-500 to-purple-500 flex items-center justify-center">
-                <span className="text-white font-bold text-xs">
-                  {authorName.charAt(0).toUpperCase()}
-                </span>
+          <div className="flex-1 overflow-y-auto p-3">
+            {chapters.map((ch) => (
+              <div
+                key={ch.id}
+                className={[
+                  "group mb-2 rounded-xl border",
+                  selectedId === ch.id
+                    ? "bg-indigo-500/20 border-indigo-400/40"
+                    : "bg-white/5 border-white/10 hover:bg-white/10",
+                  "text-white"
+                ].join(" ")}
+              >
+                <button
+                  type="button"
+                  onClick={() => onSelect(ch.id)}
+                  className="w-full text-left px-3 py-2"
+                >
+                  <div className="text-sm font-medium truncate">{ch.title}</div>
+                  <div className="text-xs text-white/70">
+                    {ch.wordCount} words • {ch.lastEdited}
+                  </div>
+                </button>
+                <div className="px-3 pb-2 flex gap-2">
+                  <span className="px-2 py-0.5 text-[10px] rounded bg-white/10 border border-white/20">
+                    {ch.status}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => onDelete(ch.id)}
+                    className="ml-auto text-rose-200/90 hover:text-rose-100 p-1"
+                    title="Delete"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-white truncate">{authorName}</p>
-                <p className="text-xs text-slate-400">Author</p>
-              </div>
-              <button
-                type="button"
-                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-700/50 transition-all duration-200"
-              >
-                <Settings size={16} />
-              </button>
-            </div>
-            <div className="space-y-2">
-              <button
-                type="button"
-                className="w-full text-left px-3 py-2 text-xs text-slate-400 hover:text-white hover:bg-slate-700/50 rounded-lg transition-all duration-200"
-              >
-                Account Settings
-              </button>
-              <button
-                type="button"
-                onClick={handleSignOut}
-                className="w-full text-left px-3 py-2 text-xs text-slate-400 hover:text-white hover:bg-slate-700/50 rounded-lg transition-all duration-200"
-              >
-                Sign Out
-              </button>
-            </div>
+            ))}
           </div>
         </div>
       </aside>
@@ -266,503 +204,246 @@ const Sidebar = ({ isOpen, onClose, authorName }) => {
   );
 };
 
-/* ---------------- Story Details Panel ---------------- */
-const StoryDetailsPanel = ({ story }) => {
-  const progressPercent = (story.currentWords / story.targetWords) * 100;
+/* ──────────────────────────────────────────────────────────────
+   Compact AI Assistant (raised above editor)
+──────────────────────────────────────────────────────────────── */
+const AIAssistant = ({ chapter, onApply }) => {
+  const [tab, setTab] = useState("suggestions");
+  const [busy, setBusy] = useState(false);
 
-  return (
-    <div className="flex items-center justify-between p-4 bg-slate-900/50 border-b border-white/10">
-      <div className="flex items-center gap-6">
-        <div>
-          <h2 className="text-xl font-bold text-white">{story.title}</h2>
-          <p className="text-slate-400 text-sm">{story.genre}</p>
-        </div>
+  const ideas = chapter?.aiSuggestions || [];
+  const grammar = chapter?.grammarIssues || [];
 
-        <div className="flex items-center gap-4 text-sm">
-          <div>
-            <span className="text-slate-400">Words: </span>
-            <span className="text-white font-medium">
-              {story.currentWords.toLocaleString()} / {story.targetWords.toLocaleString()}
-            </span>
-          </div>
-          <div className="w-32 h-2 bg-slate-700 rounded-full">
-            <div
-              className="h-2 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full transition-all duration-300"
-              style={{ width: `${progressPercent}%` }}
-            />
-          </div>
-          <span className="text-indigo-300 font-medium">{story.progress}%</span>
-        </div>
-      </div>
-
-      <div className="text-sm text-slate-400">Last updated: {story.lastUpdated}</div>
-    </div>
-  );
-};
-
-/* ---------------- AI Assistant Panel ---------------- */
-const AIAssistantPanel = ({ chapter, onApplySuggestion }) => {
-  const [activeTab, setActiveTab] = useState("suggestions");
-  const [isGenerating, setIsGenerating] = useState(false);
-
-  const generateSuggestions = () => {
-    setIsGenerating(true);
-    setTimeout(() => setIsGenerating(false), 2000);
+  const generate = () => {
+    setBusy(true);
+    setTimeout(() => setBusy(false), 1200);
   };
 
   return (
-    <div className="bg-slate-900/50 border-b border-white/10 p-4">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-lg font-bold text-white flex items-center gap-2">
-          <Brain className="text-indigo-400" size={20} />
-          AI Writing Assistant
-        </h3>
-        <button
-          type="button"
-          onClick={generateSuggestions}
-          disabled={isGenerating}
-          className="p-2 rounded-lg bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500/30 transition-colors disabled:opacity-50"
-        >
-          {isGenerating ? <RefreshCw size={16} className="animate-spin" /> : <Wand2 size={16} />}
-        </button>
-      </div>
-
-      <div className="flex gap-4">
-        <div className="flex gap-2">
+    <div className="rounded-2xl bg-white/80 backdrop-blur border border-slate-200 p-3 shadow-sm">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2 font-semibold text-slate-800">
+          <Brain size={18} className="text-indigo-500" />
+          AI Assistant
+        </div>
+        <div className="flex items-center gap-2">
+          {["suggestions", "grammar", "prompts"].map((t) => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className={[
+                "px-2 py-1 rounded-md text-xs border",
+                tab === t
+                  ? "bg-indigo-50 border-indigo-200 text-indigo-700"
+                  : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50",
+              ].join(" ")}
+            >
+              {t === "suggestions" ? "Ideas" : t === "grammar" ? "Grammar" : "Prompts"}
+            </button>
+          ))}
           <button
-            type="button"
-            onClick={() => setActiveTab("suggestions")}
-            className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
-              activeTab === "suggestions" ? "bg-indigo-500/20 text-indigo-300" : "text-slate-400 hover:text-white"
-            }`}
+            onClick={generate}
+            disabled={busy}
+            className="px-2 py-1 rounded-md text-xs bg-indigo-600 text-white hover:bg-indigo-500 disabled:opacity-50"
           >
-            Story Ideas
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab("grammar")}
-            className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
-              activeTab === "grammar" ? "bg-indigo-500/20 text-indigo-300" : "text-slate-400 hover:text-white"
-            }`}
-          >
-            Grammar Check
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab("prompts")}
-            className={`px-3 py-1 rounded-lg text-sm font-medium transition-colors ${
-              activeTab === "prompts" ? "bg-indigo-500/20 text-indigo-300" : "text-slate-400 hover:text-white"
-            }`}
-          >
-            Writing Prompts
+            {busy ? <RefreshCw size={14} className="animate-spin" /> : <Wand2 size={14} />}
           </button>
         </div>
-
-        <div className="flex-1 overflow-x-auto">
-          <div className="flex gap-3 min-w-max">
-            {activeTab === "suggestions" && (
-              <>
-                {chapter?.aiSuggestions?.map((suggestion, index) => (
-                  <div key={index} className="flex-shrink-0 w-80 p-3 bg-slate-800/30 rounded-lg border border-white/5">
-                    <div className="flex items-start gap-2">
-                      <Lightbulb size={14} className="text-yellow-400 mt-0.5 flex-shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm text-slate-300">{suggestion}</p>
-                        <button
-                          type="button"
-                          onClick={() => onApplySuggestion(suggestion)}
-                          className="mt-2 text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
-                        >
-                          Apply suggestion
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-
-                <div className="flex-shrink-0 w-80 p-3 bg-green-500/10 rounded-lg border border-green-500/20">
-                  <div className="flex items-start gap-2">
-                    <Sparkles size={14} className="text-green-400 mt-0.5" />
-                    <div>
-                      <p className="text-sm text-green-300 font-medium">Great character development!</p>
-                      <p className="text-xs text-green-400 mt-1">Your character's internal conflict is compelling.</p>
-                    </div>
-                  </div>
-                </div>
-              </>
-            )}
-
-            {activeTab === "grammar" && (
-              <>
-                {chapter?.grammarIssues?.length > 0 ? (
-                  chapter.grammarIssues.map((issue, index) => (
-                    <div key={index} className="flex-shrink-0 w-80 p-3 bg-orange-500/10 rounded-lg border border-orange-500/20">
-                      <div className="flex items-start gap-2">
-                        <AlertCircle size={14} className="text-orange-400 mt-0.5" />
-                        <div className="flex-1">
-                          <p className="text-sm text-orange-300">{issue.text}</p>
-                          <button
-                            type="button"
-                            className="mt-2 text-xs text-orange-400 hover:text-orange-300 transition-colors"
-                          >
-                            Fix
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="flex-shrink-0 w-80 p-3 bg-green-500/10 rounded-lg border border-green-500/20">
-                    <div className="flex items-center gap-2">
-                      <CheckCircle size={14} className="text-green-400" />
-                      <p className="text-sm text-green-300">No grammar issues found!</p>
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-
-            {activeTab === "prompts" && (
-              <>
-                <div className="flex-shrink-0 w-80 p-3 bg-purple-500/10 rounded-lg border border-purple-500/20">
-                  <div className="flex items-start gap-2">
-                    <MessageSquare size={14} className="text-purple-400 mt-0.5" />
-                    <div>
-                      <p className="text-sm text-purple-300 font-medium">Character Development</p>
-                      <p className="text-xs text-purple-400 mt-1">
-                        What secret is Jacque hiding about their musical past?
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex-shrink-0 w-80 p-3 bg-blue-500/10 rounded-lg border border-blue-500/20">
-                  <div className="flex items-start gap-2">
-                    <Zap size={14} className="text-blue-400 mt-0.5" />
-                    <div>
-                      <p className="text-sm text-blue-300 font-medium">Plot Twist</p>
-                      <p className="text-xs text-blue-400 mt-1">
-                        Consider a conflict between bandmates that tests their friendship.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex-shrink-0 w-80 p-3 bg-indigo-500/10 rounded-lg border border-indigo-500/20">
-                  <div className="flex items-start gap-2">
-                    <Brain size={14} className="text-indigo-400 mt-0.5" />
-                    <div>
-                      <p className="text-sm text-indigo-300 font-medium">Scene Building</p>
-                      <p className="text-xs text-indigo-400 mt-1">
-                        Describe the sensory experience of being on stage.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
-        </div>
       </div>
-    </div>
-  );
-};
 
-/* ---------------- Story Details Floating Menus ---------------- */
-const StoryDetailsMenus = ({ story }) => {
-  const [openMenu, setOpenMenu] = useState(null);
-  const toggleMenu = (menuName) => setOpenMenu(openMenu === menuName ? null : menuName);
-
-  return (
-    <div className="p-4 space-y-3">
-      {/* Characters */}
-      <div className="relative">
-        <button
-          type="button"
-          onClick={() => toggleMenu("characters")}
-          className="w-full flex items-center justify-between p-3 bg-slate-800/30 hover:bg-slate-800/50 rounded-lg border border-white/5 transition-all duration-200"
-        >
-          <div className="flex items-center gap-2">
-            <User size={16} className="text-indigo-400" />
-            <span className="text-sm font-medium text-white">Characters</span>
-            <span className="text-xs text-slate-400">({story.characters.length})</span>
-          </div>
-          <ChevronDown
-            size={16}
-            className={`text-slate-400 transition-transform duration-200 ${
-              openMenu === "characters" ? "rotate-180" : ""
-            }`}
-          />
-        </button>
-
-        {openMenu === "characters" && (
-          <div className="absolute top-full left-0 right-0 mt-2 p-3 bg-slate-900/95 backdrop-blur-xl rounded-lg border border-white/10 shadow-xl z-10">
-            <div className="space-y-2">
-              {story.characters.map((character, index) => (
-                <div
-                  key={index}
-                  className="flex items-center gap-2 p-2 rounded-lg hover:bg-slate-800/30 transition-colors"
-                >
-                  <div className="w-6 h-6 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full flex items-center justify-center">
-                    <span className="text-white text-xs font-bold">{character.charAt(0)}</span>
-                  </div>
-                  <span className="text-sm text-slate-300">{character}</span>
-                </div>
-              ))}
-              <button
-                type="button"
-                className="w-full p-2 border border-dashed border-slate-600 rounded-lg hover:border-slate-500 transition-colors"
+      <div className="mt-3 flex gap-3 overflow-x-auto">
+        {tab === "suggestions" &&
+          (ideas.length ? (
+            ideas.map((s, i) => (
+              <div
+                key={i}
+                className="min-w-[16rem] p-3 rounded-xl border border-slate-200 bg-white"
               >
-                <span className="text-xs text-slate-400">+ Add Character</span>
-              </button>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Setting */}
-      <div className="relative">
-        <button
-          type="button"
-          onClick={() => toggleMenu("setting")}
-          className="w-full flex items-center justify-between p-3 bg-slate-800/30 hover:bg-slate-800/50 rounded-lg border border-white/5 transition-all duration-200"
-        >
-          <div className="flex items-center gap-2">
-            <Calendar size={16} className="text-green-400" />
-            <span className="text-sm font-medium text-white">Setting</span>
-          </div>
-          <ChevronDown
-            size={16}
-            className={`text-slate-400 transition-transform duration-200 ${
-              openMenu === "setting" ? "rotate-180" : ""
-            }`}
-          />
-        </button>
-
-        {openMenu === "setting" && (
-          <div className="absolute top-full left-0 right-0 mt-2 p-3 bg-slate-900/95 backdrop-blur-xl rounded-lg border border-white/10 shadow-xl z-10">
-            <div className="space-y-2">
-              <div className="text-sm text-slate-300">{story.setting}</div>
-              <textarea
-                className="w-full h-20 bg-slate-800/30 border border-white/5 rounded-lg p-2 text-sm text-slate-300 resize-none"
-                placeholder="Add more setting details..."
-              />
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Theme */}
-      <div className="relative">
-        <button
-          type="button"
-          onClick={() => toggleMenu("theme")}
-          className="w-full flex items-center justify-between p-3 bg-slate-800/30 hover:bg-slate-800/50 rounded-lg border border-white/5 transition-all duration-200"
-        >
-          <div className="flex items-center gap-2">
-            <Lightbulb size={16} className="text-yellow-400" />
-            <span className="text-sm font-medium text-white">Theme</span>
-          </div>
-          <ChevronDown
-            size={16}
-            className={`text-slate-400 transition-transform duration-200 ${
-              openMenu === "theme" ? "rotate-180" : ""
-            }`}
-          />
-        </button>
-
-        {openMenu === "theme" && (
-          <div className="absolute top-full left-0 right-0 mt-2 p-3 bg-slate-900/95 backdrop-blur-xl rounded-lg border border-white/10 shadow-xl z-10">
-            <div className="space-y-2">
-              <div className="text-sm text-slate-300">{story.theme}</div>
-              <textarea
-                className="w-full h-20 bg-slate-800/30 border border-white/5 rounded-lg p-2 text-sm text-slate-300 resize-none"
-                placeholder="Explore your theme further..."
-              />
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* Description */}
-      <div className="relative">
-        <button
-          type="button"
-          onClick={() => toggleMenu("description")}
-          className="w-full flex items-center justify-between p-3 bg-slate-800/30 hover:bg-slate-800/50 rounded-lg border border-white/5 transition-all duration-200"
-        >
-          <div className="flex items-center gap-2">
-            <FileText size={16} className="text-blue-400" />
-            <span className="text-sm font-medium text-white">Description</span>
-          </div>
-          <ChevronDown
-            size={16}
-            className={`text-slate-400 transition-transform duration-200 ${
-              openMenu === "description" ? "rotate-180" : ""
-            }`}
-          />
-        </button>
-
-        {openMenu === "description" && (
-          <div className="absolute top-full left-0 right-0 mt-2 p-3 bg-slate-900/95 backdrop-blur-xl rounded-lg border border-white/10 shadow-xl z-10">
-            <div className="space-y-2">
-              <div className="text-sm text-slate-300">{story.description}</div>
-              <textarea
-                className="w-full h-24 bg-slate-800/30 border border-white/5 rounded-lg p-2 text-sm text-slate-300 resize-none"
-                placeholder="Expand your story description..."
-              />
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
-
-/* ---------------- Chapter List ---------------- */
-const ChapterList = ({
-  chapters,
-  selectedChapter,
-  onSelectChapter,
-  onAddChapter,
-  onDeleteChapter,
-  story,
-}) => {
-  return (
-    <div className="w-80 h-full border-r border-white/10 bg-slate-900/50 flex flex-col">
-      <div className="p-4 border-b border-white/10 flex-shrink-0">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-bold text-white">Chapters</h2>
-          <button
-            type="button"
-            onClick={onAddChapter}
-            className="p-2 rounded-lg bg-indigo-500 hover:bg-indigo-400 transition-colors text-white"
-          >
-            <Plus size={16} />
-          </button>
-        </div>
-        <div className="text-sm text-slate-400">
-          {chapters.length} chapters •{" "}
-          {chapters.reduce((total, ch) => total + ch.wordCount, 0)} words total
-        </div>
-      </div>
-
-      <div className="flex-1 overflow-y-auto p-2">
-        {chapters.map((chapter) => (
-          <div
-            key={chapter.id}
-            onClick={() => onSelectChapter(chapter)}
-            className={`p-4 rounded-xl mb-2 cursor-pointer transition-all duration-200 group ${
-              selectedChapter?.id === chapter.id
-                ? "bg-indigo-500/20 border border-indigo-500/30 text-indigo-300"
-                : "hover:bg-slate-800/50 border border-transparent text-slate-300 hover:text-white"
-            }`}
-          >
-            <div className="flex items-start justify-between">
-              <div className="flex-1 min-w-0">
-                <h3 className="font-medium text-sm truncate">{chapter.title}</h3>
-                <p className="text-xs opacity-75 mt-1">
-                  {chapter.wordCount} words • {chapter.lastEdited}
-                </p>
-                <div className="flex items-center gap-2 mt-2">
-                  <span
-                    className={`px-2 py-1 rounded-md text-xs font-medium ${
-                      chapter.status === "published"
-                        ? "bg-green-500/20 text-green-300"
-                        : "bg-yellow-500/20 text-yellow-300"
-                    }`}
-                  >
-                    {chapter.status}
-                  </span>
-                  {chapter.aiSuggestions?.length > 0 && (
-                    <span
-                      className="w-2 h-2 bg-purple-400 rounded-full"
-                      title="AI suggestions available"
-                    />
-                  )}
-                  {chapter.grammarIssues?.length > 0 && (
-                    <span
-                      className="w-2 h-2 bg-orange-400 rounded-full"
-                      title="Grammar issues found"
-                    />
-                  )}
+                <div className="flex items-start gap-2">
+                  <Lightbulb size={16} className="text-amber-500 mt-0.5" />
+                  <div className="text-sm text-slate-700">
+                    {s}
+                    <div>
+                      <button
+                        onClick={() => onApply(s)}
+                        className="text-indigo-600 text-xs mt-2"
+                      >
+                        Apply
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDeleteChapter(chapter.id);
-                }}
-                className="opacity-0 group-hover:opacity-100 p-1 rounded-lg hover:bg-red-500/20 text-red-400 hover:text-red-300 transition-all duration-200"
-              >
-                <Trash2 size={14} />
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
+            ))
+          ) : (
+            <div className="text-sm text-slate-600">No suggestions yet.</div>
+          ))}
 
-      <div className="border-t border-white/10">
-        <StoryDetailsMenus story={story} />
+        {tab === "grammar" &&
+          (grammar.length ? (
+            grammar.map((g, i) => (
+              <div
+                key={i}
+                className="min-w-[16rem] p-3 rounded-xl border border-amber-200 bg-amber-50"
+              >
+                <div className="flex items-start gap-2">
+                  <AlertCircle size={16} className="text-amber-600 mt-0.5" />
+                  <div className="text-sm text-amber-900">{g.text}</div>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="min-w-[16rem] p-3 rounded-xl border border-emerald-200 bg-emerald-50">
+              <div className="flex items-center gap-2 text-sm text-emerald-900">
+                <CheckCircle size={16} className="text-emerald-600" />
+                No grammar issues found!
+              </div>
+            </div>
+          ))}
+
+        {tab === "prompts" && (
+          <>
+            <div className="min-w-[16rem] p-3 rounded-xl border border-violet-200 bg-violet-50">
+              <div className="flex items-start gap-2 text-sm text-violet-900">
+                <MessageSquare size={16} className="text-violet-600 mt-0.5" />
+                Character: What secret is your protagonist hiding?
+              </div>
+            </div>
+            <div className="min-w-[16rem] p-3 rounded-xl border border-blue-200 bg-blue-50">
+              <div className="flex items-start gap-2 text-sm text-blue-900">
+                <Zap size={16} className="text-blue-600 mt-0.5" />
+                Plot: Add a conflict that tests a friendship.
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
 };
 
-/* ---------------- Writing Editor ---------------- */
-const WritingEditor = ({ chapter, onSave, onUpdateChapter, onCreateNewChapter }) => {
+/* ──────────────────────────────────────────────────────────────
+   Right: Story Meta sidebar (+ Back to Dashboard)
+──────────────────────────────────────────────────────────────── */
+const MetaSidebar = ({ book, chapterWordCount, totalWords }) => {
+  return (
+    <aside className="w-80 hidden xl:block">
+      <div className="sticky top-20 space-y-4">
+        {/* Back */}
+        <NavLink
+          to="/dashboard"
+          className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-white/10 text-white border border-white/20 hover:bg-white/15"
+        >
+          <ArrowLeft size={16} />
+          Back to Dashboard
+        </NavLink>
+
+        {/* Stats */}
+        <div className="rounded-2xl bg-white/80 backdrop-blur border border-slate-200 p-4">
+          <div className="text-sm text-slate-600 mb-2 font-medium">Word Count</div>
+          <div className="text-slate-900">
+            <div className="flex justify-between text-sm">
+              <span>Current chapter</span>
+              <span className="font-semibold">{chapterWordCount.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between text-sm mt-1">
+              <span>Project total</span>
+              <span className="font-semibold">{totalWords.toLocaleString()}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Characters */}
+        <div className="rounded-2xl bg-white/80 backdrop-blur border border-slate-200 p-4">
+          <div className="flex items-center gap-2 text-slate-800 font-semibold mb-2">
+            <Users size={16} className="text-indigo-500" /> Characters
+          </div>
+          <div className="text-sm text-slate-700">
+            Add/track your key characters here.
+          </div>
+        </div>
+
+        {/* Setting */}
+        <div className="rounded-2xl bg-white/80 backdrop-blur border border-slate-200 p-4">
+          <div className="flex items-center gap-2 text-slate-800 font-semibold mb-2">
+            <MapPin size={16} className="text-emerald-600" /> Setting
+          </div>
+          <div className="text-sm text-slate-700">Where and when your story happens.</div>
+        </div>
+
+        {/* Theme */}
+        <div className="rounded-2xl bg-white/80 backdrop-blur border border-slate-200 p-4">
+          <div className="flex items-center gap-2 text-slate-800 font-semibold mb-2">
+            <Lightbulb size={16} className="text-amber-500" /> Theme
+          </div>
+          <div className="text-sm text-slate-700">The underlying idea you’re exploring.</div>
+        </div>
+
+        {/* Description */}
+        <div className="rounded-2xl bg-white/80 backdrop-blur border border-slate-200 p-4">
+          <div className="flex items-center gap-2 text-slate-800 font-semibold mb-2">
+            <BookOpen size={16} className="text-sky-600" /> Description
+          </div>
+          <div className="text-sm text-slate-700">
+            A quick summary of your book (synopsis/logline).
+          </div>
+        </div>
+      </div>
+    </aside>
+  );
+};
+
+/* ──────────────────────────────────────────────────────────────
+   Writing Editor (white canvas)
+──────────────────────────────────────────────────────────────── */
+const WritingEditor = ({ chapter, onSave, onUpdate, onCreateNew }) => {
   const [title, setTitle] = useState(chapter?.title || "");
   const [content, setContent] = useState(chapter?.content || "");
-  const [wordCount, setWordCount] = useState(0);
-  const [isPreview, setIsPreview] = useState(false);
+  const [count, setCount] = useState(0);
+  const [preview, setPreview] = useState(false);
 
   useEffect(() => {
     if (chapter) {
-      setTitle(chapter.title);
-      setContent(chapter.content);
+      setTitle(chapter.title || "");
+      setContent(chapter.content || "");
+    } else {
+      setTitle("");
+      setContent("");
     }
   }, [chapter]);
 
   useEffect(() => {
-    const words = content
-      .trim()
-      .split(/\s+/)
-      .filter((w) => w.length > 0).length;
-    setWordCount(words);
+    const words = content.trim().split(/\s+/).filter(Boolean).length;
+    setCount(words);
   }, [content]);
 
   const handleSave = () => {
-    if (chapter) {
-      onUpdateChapter({
-        ...chapter,
-        title,
-        content,
-        wordCount,
-        lastEdited: "Just now",
-      });
-    }
-    onSave();
+    if (!chapter) return;
+    onUpdate({
+      ...chapter,
+      title,
+      content,
+      wordCount: count,
+      lastEdited: "Just now",
+    });
+    onSave?.();
   };
 
   if (!chapter) {
     return (
-      <div className="flex-1 flex items-center justify-center">
+      <div className="flex-1 grid place-items-center">
         <div className="text-center">
-          <div className="w-16 h-16 bg-slate-800/50 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Edit3 size={24} className="text-slate-400" />
+          <div className="w-16 h-16 bg-white/70 rounded-full grid place-items-center mx-auto mb-4 border border-slate-200">
+            <Edit3 size={24} className="text-slate-600" />
           </div>
-          <h3 className="text-xl font-bold text-white mb-2">Start Writing</h3>
-          <p className="text-slate-400 mb-6">
-            Select a chapter or create a new one to begin writing your story.
-          </p>
+          <h3 className="text-xl font-bold text-white mb-2">Start writing</h3>
+          <p className="text-slate-300 mb-4">Create your first chapter to begin.</p>
           <button
-            type="button"
-            onClick={onCreateNewChapter}
-            className="inline-flex items-center gap-2 px-6 py-3 bg-indigo-500 hover:bg-indigo-400 text-white rounded-xl font-medium transition-colors"
+            onClick={onCreateNew}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 text-white hover:bg-indigo-500"
           >
-            <Plus size={18} />
-            Create New Chapter
+            <Plus size={16} />
+            New Chapter
           </button>
         </div>
       </div>
@@ -770,71 +451,72 @@ const WritingEditor = ({ chapter, onSave, onUpdateChapter, onCreateNewChapter })
   }
 
   return (
-    <div className="flex-1 flex flex-col">
-      <div className="p-4 border-b border-white/10 flex-shrink-0">
-        <div className="flex items-center justify-between">
+    <div className="flex-1 flex flex-col gap-4">
+      {/* raised AI assistant */}
+      <AIAssistant chapter={chapter} onApply={(s) => setContent((c) => c + (c.endsWith("\n") ? "" : "\n\n") + s)} />
+
+      {/* white canvas */}
+      <div className="rounded-3xl bg-white shadow-2xl border border-slate-200 overflow-hidden flex-1 flex flex-col">
+        <div className="px-5 py-3 border-b border-slate-200 bg-white/70 backdrop-blur flex items-center justify-between">
           <div className="flex items-center gap-4">
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="text-lg font-bold bg-transparent text-white border-none outline-none placeholder-slate-400"
-              placeholder="Chapter Title"
+              className="text-lg font-semibold bg-transparent text-slate-900 outline-none"
+              placeholder="Chapter title"
             />
-            <div className="flex items-center gap-2 text-sm text-slate-400">
+            <div className="hidden sm:flex items-center gap-2 text-sm text-slate-600">
               <Target size={14} />
-              <span>{wordCount} words</span>
+              <span>{count} words</span>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => setIsPreview(!isPreview)}
-              className={`p-2 rounded-lg transition-colors ${
-                isPreview
-                  ? "bg-indigo-500/20 text-indigo-300"
-                  : "text-slate-400 hover:text-white hover:bg-slate-800/50"
-              }`}
+              onClick={() => setPreview(!preview)}
+              className={[
+                "px-3 py-2 rounded-md text-sm border",
+                preview
+                  ? "bg-indigo-50 text-indigo-700 border-indigo-200"
+                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50",
+              ].join(" ")}
             >
               <Eye size={16} />
             </button>
             <button
               type="button"
               onClick={handleSave}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-green-500 hover:bg-green-400 text-white rounded-lg font-medium transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-emerald-600 text-white hover:bg-emerald-500"
             >
               <Save size={16} />
               Save
             </button>
           </div>
         </div>
-      </div>
 
-      <div className="flex-1 p-6">
-        {isPreview ? (
-          <div className="max-w-4xl mx-auto">
-            <h1 className="text-3xl font-bold text-white mb-8">{title}</h1>
-            <div className="prose prose-invert prose-lg max-w-none">
-              {content.split("\n").map((paragraph, index) => (
-                <p key={index} className="text-slate-200 leading-relaxed mb-4">
-                  {paragraph}
-                </p>
-              ))}
+        <div className="flex-1 p-6 overflow-auto">
+          {preview ? (
+            <div className="max-w-3xl">
+              <h1 className="text-3xl font-bold text-slate-900 mb-6">{title}</h1>
+              <div className="prose max-w-none">
+                {content.split("\n").map((p, i) => (
+                  <p key={i}>{p}</p>
+                ))}
+              </div>
             </div>
-          </div>
-        ) : (
-          <textarea
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            className="w-full h-full bg-transparent text-white resize-none border-none outline-none text-lg leading-relaxed placeholder-slate-400"
-            placeholder="Start writing your story here..."
-          />
-        )}
-      </div>
+          ) : (
+            <textarea
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              className="w-full h-[60vh] min-h-[420px] resize-none outline-none text-lg leading-7 text-slate-900"
+              placeholder="Start writing your story here..."
+            />
+          )}
+        </div>
 
-      <div className="p-4 border-t border-white/10 flex-shrink-0">
-        <div className="flex items-center justify-between text-sm text-slate-400">
+        <div className="px-5 py-3 border-t border-slate-200 bg-white/70 text-sm text-slate-600 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
               <Clock size={14} />
@@ -845,44 +527,69 @@ const WritingEditor = ({ chapter, onSave, onUpdateChapter, onCreateNewChapter })
               <span>Auto-save enabled</span>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button type="button" className="hover:text-white transition-colors">
-              <Download size={14} />
-            </button>
-          </div>
+          <button className="hover:text-slate-800">
+            <Download size={14} />
+          </button>
         </div>
       </div>
     </div>
   );
 };
 
-/* ---------------- Main Write Component ---------------- */
+/* ──────────────────────────────────────────────────────────────
+   Main
+──────────────────────────────────────────────────────────────── */
 export default function WriteSection() {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [authorName, setAuthorName] = useState("John Doe");
-  const [chapters, setChapters] = useState(initialChapters);
-  const [selectedChapter, setSelectedChapter] = useState(initialChapters[0]);
+  const initial = useMemo(getInitialState, []);
+  const [book, setBook] = useState(initial.book);
+  const [chapters, setChapters] = useState(initial.chapters);
+  const [selectedId, setSelectedId] = useState(initial.chapters[0]?.id || null);
+  const [railOpen, setRailOpen] = useState(true);
 
-  // Live project title sync
-  const [projectTitle, setProjectTitle] = useState(getBookTitle());
+  const selected = chapters.find((c) => c.id === selectedId) || null;
+
+  // derived totals
+  const totalWords = chapters.reduce((s, c) => s + (c.wordCount || 0), 0);
+
+  // persist (debounced)
   useEffect(() => {
-    const sync = () => setProjectTitle(getBookTitle());
+    const t = setTimeout(() => {
+      const current = loadState() || {};
+      saveState({
+        book,
+        chapters,
+        daily: current.daily || { goal: 500, counts: {} },
+        settings: current.settings || { theme: "dark", focusMode: false },
+      });
+    }, 500);
+    return () => clearTimeout(t);
+  }, [book, chapters]);
+
+  // live sync if other pages update
+  useEffect(() => {
+    const sync = () => {
+      const s = loadState();
+      if (!s) return;
+      if (s.book) setBook(s.book);
+      if (Array.isArray(s.chapters)) {
+        setChapters(s.chapters);
+        if (!s.chapters.find((c) => c.id === selectedId)) {
+          setSelectedId(s.chapters[0]?.id || null);
+        }
+      }
+    };
     window.addEventListener("project:change", sync);
     window.addEventListener("storage", sync);
     return () => {
       window.removeEventListener("project:change", sync);
       window.removeEventListener("storage", sync);
     };
-  }, []);
+  }, [selectedId]);
 
-  useEffect(() => {
-    const mockUser = { firstName: "John", lastName: "Doe" };
-    setAuthorName(`${mockUser.firstName} ${mockUser.lastName}`);
-  }, []);
-
-  const handleAddChapter = () => {
-    const newChapter = {
-      id: Date.now(),
+  const addChapter = () => {
+    const id = Date.now();
+    const ch = {
+      id,
       title: `Chapter ${chapters.length + 1}: Untitled`,
       content: "",
       wordCount: 0,
@@ -891,101 +598,66 @@ export default function WriteSection() {
       aiSuggestions: [],
       grammarIssues: [],
     };
-    setChapters((prev) => [...prev, newChapter]);
-    setSelectedChapter(newChapter);
+    setChapters((prev) => [ch, ...prev]);
+    setSelectedId(id);
   };
 
-  const handleDeleteChapter = (chapterId) => {
-    const updatedChapters = chapters.filter((ch) => ch.id !== chapterId);
-    setChapters(updatedChapters);
-    if (selectedChapter?.id === chapterId) {
-      setSelectedChapter(updatedChapters[0] || null);
-    }
+  const deleteChapter = (id) => {
+    const next = chapters.filter((c) => c.id !== id);
+    setChapters(next);
+    if (selectedId === id) setSelectedId(next[0]?.id || null);
   };
 
-  const handleUpdateChapter = (updatedChapter) => {
-    setChapters((prev) => prev.map((ch) => (ch.id === updatedChapter.id ? updatedChapter : ch)));
-    setSelectedChapter(updatedChapter);
+  const updateChapter = (updated) => {
+    setChapters((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
   };
 
-  const handleSave = () => {
-    console.log("Chapter saved!");
-  };
-
-  const handleApplySuggestion = (suggestion) => {
-    console.log("Applying suggestion:", suggestion);
+  const exportJSON = () => {
+    const blob = new Blob([JSON.stringify({ book, chapters }, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "story_export.json";
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-slate-100">
-      <TopBanner projectTitle={projectTitle} />
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
+      <TopBanner
+        bookTitle={book?.title}
+        onNewChapter={addChapter}
+        onExport={exportJSON}
+      />
 
-      <div className="flex">
-        <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} authorName={authorName} />
+      <div className="max-w-7xl mx-auto px-3 sm:px-6">
+        <div className="flex gap-6">
+          {/* left rail */}
+          <ChapterRail
+            chapters={chapters}
+            selectedId={selectedId}
+            onSelect={setSelectedId}
+            onAdd={addChapter}
+            onDelete={deleteChapter}
+            open={railOpen}
+            setOpen={setRailOpen}
+          />
 
-        <div className="flex-1 lg:ml-0 h-[calc(100vh-4rem)] flex flex-col">
-          {/* Write Header */}
-          <div className="sticky top-16 z-30 backdrop-blur-md supports-[backdrop-filter]:bg-slate-900/80 bg-slate-900/60 border-b border-white/10 shadow-lg">
-            <div className="px-6 py-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <button
-                    type="button"
-                    onClick={() => setSidebarOpen(true)}
-                    className="lg:hidden text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-800/50 transition-all duration-200"
-                  >
-                    <Menu size={24} />
-                  </button>
-                  <div>
-                    <h1 className="text-2xl md:text-3xl font-extrabold drop-shadow-sm bg-gradient-to-r from-white to-slate-300 bg-clip-text text-transparent">
-                      Write Your Story
-                    </h1>
-                    <div className="mt-1 text-slate-400">
-                      <p className="font-medium text-sm">
-                        {projectTitle ? `Working on: ${projectTitle}` : "Craft compelling chapters with AI-powered assistance"}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex gap-3">
-                  <button
-                    type="button"
-                    onClick={handleAddChapter}
-                    className="inline-flex items-center gap-2 rounded-2xl bg-indigo-500/90 hover:bg-indigo-400 px-4 py-2 text-sm font-semibold shadow-lg hover:shadow-indigo-500/25 transition-all duration-200 hover:scale-105"
-                  >
-                    <Plus size={16} /> New Chapter
-                  </button>
-                  <button
-                    type="button"
-                    className="inline-flex items-center gap-2 rounded-2xl bg-slate-800 hover:bg-slate-700 px-4 py-2 text-sm font-semibold shadow-lg transition-all duration-200 hover:scale-105"
-                  >
-                    <FileText size={16} /> Export
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <StoryDetailsPanel story={{ ...currentStory, title: projectTitle || currentStory.title }} />
-
-          <AIAssistantPanel chapter={selectedChapter} onApplySuggestion={handleApplySuggestion} />
-
-          <div className="flex-1 flex overflow-hidden">
-            <ChapterList
-              chapters={chapters}
-              selectedChapter={selectedChapter}
-              onSelectChapter={setSelectedChapter}
-              onAddChapter={handleAddChapter}
-              onDeleteChapter={handleDeleteChapter}
-              story={currentStory}
+          {/* center editor + right meta */}
+          <div className="flex-1 grid grid-cols-1 xl:grid-cols-[1fr_20rem] gap-6 pt-6 lg:pt-8 ml-0 lg:ml-0 w-full">
+            <WritingEditor
+              chapter={selected}
+              onSave={() => {}}
+              onUpdate={updateChapter}
+              onCreateNew={addChapter}
             />
 
-            <WritingEditor
-              chapter={selectedChapter}
-              onSave={handleSave}
-              onUpdateChapter={handleUpdateChapter}
-              onCreateNewChapter={handleAddChapter}
+            <MetaSidebar
+              book={book}
+              chapterWordCount={selected?.wordCount || 0}
+              totalWords={totalWords}
             />
           </div>
         </div>
