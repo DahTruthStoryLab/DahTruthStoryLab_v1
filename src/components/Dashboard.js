@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from 'react-router-dom'; // ADD THIS IMPORT
+import { useNavigate } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { 
   Play, Plus, Settings, PencilLine, BookOpen, Calendar, Layers, 
@@ -21,8 +21,11 @@ const recentChapters = [];
 const userNovels = [];
 
 // --------- Utility Components ---------
-const Card = ({ children, className = "" }) => (
-  <div className={`rounded-2xl bg-slate-900/70 border border-white/10 shadow-xl backdrop-blur-sm ${className}`}>
+const Card = ({ children, className = "", onClick }) => (
+  <div 
+    className={`rounded-2xl bg-slate-900/70 border border-white/10 shadow-xl backdrop-blur-sm ${className}`}
+    onClick={onClick}
+  >
     {children}
   </div>
 );
@@ -80,13 +83,14 @@ const TopBanner = () => (
 );
 
 // --------- Sidebar Component ---------
-const Sidebar = ({ isOpen, onClose, authorName, navigate }) => { // ADD NAVIGATE PROP
+const Sidebar = ({ isOpen, onClose, authorName, navigate }) => {
+  // FIXED PATHS TO MATCH YOUR APP.JS ROUTES
   const menuItems = [
     { icon: Home, label: "Dashboard", active: true, path: "/dashboard" },
-    { icon: PencilLine, label: "Write", active: false, path: "/write" }, // ADD PATH
-    { icon: BookOpen, label: "Table of Contents", active: false, path: "/contents" },
+    { icon: PencilLine, label: "Write", active: false, path: "/writer" },
+    { icon: BookOpen, label: "Table of Contents", active: false, path: "/toc" },
     { icon: Calendar, label: "Calendar", active: false, path: "/calendar" },
-    { icon: Layers, label: "Story Lab", active: false, path: "/storylab" },
+    { icon: Layers, label: "Story Lab", active: false, path: "/story-lab" },
     { icon: UploadCloud, label: "Publishing", active: false, path: "/publishing" },
     { icon: Store, label: "Store", active: false, path: "/store" },
     { icon: User, label: "Profile", active: false, path: "/profile" },
@@ -140,7 +144,7 @@ const Sidebar = ({ isOpen, onClose, authorName, navigate }) => { // ADD NAVIGATE
           {menuItems.map((item, index) => (
             <button
               key={index}
-              onClick={() => navigate(item.path)} // ADD NAVIGATION
+              onClick={() => navigate(item.path)}
               className={`
                 w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left 
                 transition-all duration-200 transform hover:scale-105 hover:shadow-lg
@@ -213,7 +217,7 @@ const Sidebar = ({ isOpen, onClose, authorName, navigate }) => { // ADD NAVIGATE
                 Account Settings
               </button>
               <button 
-                onClick={() => navigate('/')} // ADD SIGN OUT NAVIGATION
+                onClick={() => navigate('/')}
                 className="w-full text-left px-3 py-2 text-xs text-slate-400 hover:text-white hover:bg-slate-700/50 rounded-lg transition-all duration-200"
               >
                 Sign Out
@@ -228,7 +232,7 @@ const Sidebar = ({ isOpen, onClose, authorName, navigate }) => { // ADD NAVIGATE
 
 // --------- Main Dashboard Component ---------
 export default function Dashboard() {
-  const navigate = useNavigate(); // ADD THIS LINE
+  const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [greeting, setGreeting] = useState("");
   const [authorName, setAuthorName] = useState("New Author");
@@ -278,7 +282,7 @@ export default function Dashboard() {
           isOpen={sidebarOpen} 
           onClose={() => setSidebarOpen(false)}
           authorName={authorName}
-          navigate={navigate} // PASS NAVIGATE TO SIDEBAR
+          navigate={navigate}
         />
 
         {/* Main Content Area */}
@@ -308,13 +312,13 @@ export default function Dashboard() {
                 
                 <div className="flex gap-3">
                   <button 
-                    onClick={() => navigate('/write')} // ADD NAVIGATION TO WRITE
+                    onClick={() => navigate('/writer')}
                     className="inline-flex items-center gap-2 rounded-2xl bg-indigo-500/90 hover:bg-indigo-400 px-4 py-2 text-sm font-semibold shadow-lg hover:shadow-indigo-500/25 transition-all duration-200 hover:scale-105"
                   >
                     <Plus size={16} /> Create Novel
                   </button>
                   <button 
-                    onClick={() => navigate('/write')} // ADD NAVIGATION TO WRITE
+                    onClick={() => navigate('/writer')}
                     className="inline-flex items-center gap-2 rounded-2xl bg-slate-800 hover:bg-slate-700 px-4 py-2 text-sm font-semibold shadow-lg transition-all duration-200 hover:scale-105"
                   >
                     <Play size={16} /> Quick Start
@@ -341,7 +345,7 @@ export default function Dashboard() {
                   </p>
                   <div className="flex gap-4 justify-center">
                     <button 
-                      onClick={() => navigate('/write')} // ADD NAVIGATION
+                      onClick={() => navigate('/writer')}
                       className="inline-flex items-center gap-2 rounded-2xl bg-indigo-500 hover:bg-indigo-400 px-6 py-3 font-semibold shadow-lg hover:shadow-indigo-500/25 transition-all duration-200 hover:scale-105"
                     >
                       <Plus size={18} /> Create Your First Novel
@@ -411,6 +415,53 @@ export default function Dashboard() {
                 </CardBody>
               </Card>
               
+            </div>
+
+            {/* Quick Access to Writing Tools */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <Card 
+                className="hover:scale-105 transition-all cursor-pointer hover:border-indigo-400/50"
+                onClick={() => navigate('/toc')}
+              >
+                <CardBody className="text-center">
+                  <BookOpen size={24} className="mx-auto mb-2 text-indigo-400" />
+                  <p className="font-semibold">Table of Contents</p>
+                  <p className="text-xs text-slate-400 mt-1">Organize chapters</p>
+                </CardBody>
+              </Card>
+              
+              <Card 
+                className="hover:scale-105 transition-all cursor-pointer hover:border-indigo-400/50"
+                onClick={() => navigate('/writer')}
+              >
+                <CardBody className="text-center">
+                  <PencilLine size={24} className="mx-auto mb-2 text-indigo-400" />
+                  <p className="font-semibold">Writer</p>
+                  <p className="text-xs text-slate-400 mt-1">Start writing</p>
+                </CardBody>
+              </Card>
+              
+              <Card 
+                className="hover:scale-105 transition-all cursor-pointer hover:border-indigo-400/50"
+                onClick={() => navigate('/project')}
+              >
+                <CardBody className="text-center">
+                  <Layers size={24} className="mx-auto mb-2 text-indigo-400" />
+                  <p className="font-semibold">Project</p>
+                  <p className="text-xs text-slate-400 mt-1">Manage project</p>
+                </CardBody>
+              </Card>
+              
+              <Card 
+                className="hover:scale-105 transition-all cursor-pointer hover:border-indigo-400/50"
+                onClick={() => navigate('/calendar')}
+              >
+                <CardBody className="text-center">
+                  <Calendar size={24} className="mx-auto mb-2 text-indigo-400" />
+                  <p className="font-semibold">Calendar</p>
+                  <p className="text-xs text-slate-400 mt-1">Track progress</p>
+                </CardBody>
+              </Card>
             </div>
 
             {/* Charts and Recent Activity */}
