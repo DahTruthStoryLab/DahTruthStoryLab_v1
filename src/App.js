@@ -12,6 +12,7 @@ import TOCPage2 from "./components/TOCPage2";
 import ProjectPage from "./components/ProjectPage";
 import WhoAmI from "./components/WhoAmI";
 import WriteSection from "./components/WriteSection";
+import StoryLab from "./components/StoryLab"; // Add this import
 import Calendar from "./components/Calendar";
 
 // Simple placeholder
@@ -58,7 +59,7 @@ export default function App() {
           }
         />
 
-        {/* Writer - Multiple paths for the same component */}
+        {/* Writer - WriteSection for actual writing */}
         <Route
           path="/writer"
           element={
@@ -75,11 +76,13 @@ export default function App() {
             </ProtectedRoute>
           }
         />
+
+        {/* Story Lab - The workshop/lab component */}
         <Route
           path="/story-lab"
           element={
             <ProtectedRoute>
-              <WriteSection />
+              <StoryLab />
             </ProtectedRoute>
           }
         />
