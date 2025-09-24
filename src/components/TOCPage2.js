@@ -1,10 +1,12 @@
+// src/components/TOCPage2.jsx
 import React from "react";
 import {
   BookOpen, Plus, FileText, Clock, Sparkles, Loader2,
   ChevronRight, ChevronDown, Search, X, Trash2, Copy, Download,
   Save, AlertCircle, ArrowUp, ArrowDown, Star, StarOff, Upload, Target,
-  Tag, Flame, Moon, Sun, Minimize2, Maximize2, TrendingUp, Award, CheckCircle
+  Tag, Flame, Minimize2, Maximize2, TrendingUp, CheckCircle, ArrowLeft
 } from "lucide-react";
+import { NavLink } from "react-router-dom";
 
 /* ──────────────────────────────────────────────────────────────
    Small helpers
@@ -42,15 +44,18 @@ const loadState = () => {
       book: { title: "Untitled", targetWords: 25000, ...(parsed.book || {}) },
       chapters: Array.isArray(parsed.chapters) ? parsed.chapters : [],
       daily: parsed.daily || { goal: 500, counts: {} },
-      settings: { theme: 'dark', focusMode: false, ...(parsed.settings || {}) },
+      settings: { theme: "dark", focusMode: false, ...(parsed.settings || {}) },
     };
   } catch {
     return null;
   }
 };
+
 const saveState = (state) => {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    // notify Writer/Project/other tabs to live-sync
+    window.dispatchEvent(new Event("project:change"));
   } catch {}
 };
 
@@ -65,7 +70,9 @@ const exportText = (book, chapters) => {
         `${ch.title}\n${"-".repeat(ch.title.length)}`,
         ch.synopsis ? `Synopsis: ${ch.synopsis}\n` : "",
         ch.content || "(No content yet)\n",
-      ].filter(Boolean).join("\n")
+      ]
+        .filter(Boolean)
+        .join("\n")
     ),
   ].join("\n");
   const blob = new Blob([body], { type: "text/plain" });
@@ -80,7 +87,9 @@ const exportText = (book, chapters) => {
 };
 
 const exportJSON = (state) => {
-  const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
+  const blob = new Blob([JSON.stringify(state, null, 2)], {
+    type: "application/json",
+  });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -122,28 +131,40 @@ async function summarize(content) {
    Templates + Tags
 ──────────────────────────────────────────────────────────────── */
 const TEMPLATES = {
-  "Blank": { title: "", content: "" },
+  Blank: { title: "", content: "" },
   "Scene (POV)": {
     title: "New Scene",
     content: `# Setting\n\n# Characters\n\n# Goal/Conflict\n\n# Beats\n- \n- \n- \n\n# Exit/Hook`,
   },
   "Action Beat": {
     title: "Action Beat",
-    content: "The room explodes into motion. Describe fast, concrete actions in short sentences.",
+    content:
+      "The room explodes into motion. Describe fast, concrete actions in short sentences.",
   },
-  "Reflection": {
+  Reflection: {
     title: "Reflection",
-    content: "After the turning point, the POV character processes the event. What changed internally?",
+    content:
+      "After the turning point, the POV character processes the event. What changed internally?",
   },
   "Dialogue Heavy": {
-    title: "Dialogue Scene", 
-    content: `"We need to talk," [Character A] said.\n\n[Character B] looked up from [action]. "About what?"\n\n"You know what."`
+    title: "Dialogue Scene",
+    content: `"We need to talk," [Character A] said.\n\n[Character B] looked up from [action]. "About what?"\n\n"You know what."`,
   },
 };
 
 const PREDEFINED_TAGS = [
-  "Action", "Romance", "Conflict", "Backstory", "Climax", "Setup", "Payoff", 
-  "Character Development", "World Building", "Humor", "Tension", "Resolution"
+  "Action",
+  "Romance",
+  "Conflict",
+  "Backstory",
+  "Climax",
+  "Setup",
+  "Payoff",
+  "Character Development",
+  "World Building",
+  "Humor",
+  "Tension",
+  "Resolution",
 ];
 
 /* ──────────────────────────────────────────────────────────────
@@ -153,24 +174,24 @@ const calculateStreak = (daily) => {
   const { goal, counts } = daily;
   let streak = 0;
   const today = new Date();
-  
-  for (let i = 0; i < 365; i++) { // max 1 year lookback
+
+  for (let i = 0; i < 365; i++) {
     const date = new Date(today);
     date.setDate(date.getDate() - i);
     const key = date.toISOString().slice(0, 10);
-    
+
     if ((counts[key] || 0) >= goal) {
       streak++;
     } else {
       break;
     }
   }
-  
+
   return streak;
 };
 
 /* ──────────────────────────────────────────────────────────────
-   Animated Blobs Component
+   Animated Blobs
 ──────────────────────────────────────────────────────────────── */
 function DecorBlobs() {
   return (
@@ -183,49 +204,6 @@ function DecorBlobs() {
 }
 
 /* ──────────────────────────────────────────────────────────────
-   UI Helper Components
-──────────────────────────────────────────────────────────────── */
-function Banner({ children, ok }) {
-  return (
-    <div className={`mb-6 p-4 rounded-xl flex items-center backdrop-blur-sm border ${ok ? 'bg-green-500/20 border-green-400/30 text-green-100' : 'bg-red-500/20 border-red-400/30 text-red-100'}`}>
-      {ok ? <CheckCircle className="h-5 w-5 mr-2" /> : <X className="h-5 w-5 mr-2" />}
-      <span className="text-sm font-serif">{children}</span>
-    </div>
-  );
-}
-
-function Input({ leftIcon, className = '', ...props }) {
-  return (
-    <div className="relative group">
-      {leftIcon ? <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-blue-300">{leftIcon}</div> : null}
-      <input
-        {...props}
-        className={`w-full ${leftIcon ? 'pl-12' : 'pl-4'} pr-4 py-4 bg-blue-900/30 border border-blue-700/50 rounded-xl 
-          text-white placeholder-blue-300 backdrop-blur-sm
-          focus:ring-2 focus:ring-blue-400 focus:border-blue-400 focus:bg-blue-900/40
-          transition-all duration-300 font-serif ${className}`}
-      />
-    </div>
-  );
-}
-
-function Button({ children, loading, grad, ...rest }) {
-  const base = grad
-    ? 'bg-gradient-to-r from-blue-500 to-teal-500 hover:from-blue-400 hover:to-teal-400'
-    : 'bg-indigo-600 hover:bg-indigo-500';
-  return (
-    <button
-      {...rest}
-      disabled={loading}
-      className={`w-full ${base} text-white py-4 px-6 rounded-xl font-serif font-bold text-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center shadow-xl hover:shadow-2xl hover:scale-105`}
-    >
-      {loading ? <Loader2 className="animate-spin h-6 w-6 mr-2" /> : null}
-      {children}
-    </button>
-  );
-}
-
-/* ──────────────────────────────────────────────────────────────
    Component
 ──────────────────────────────────────────────────────────────── */
 export default function TOCPage2() {
@@ -233,21 +211,39 @@ export default function TOCPage2() {
   const initial = loadState() || {
     book: { title: "Jacque is a rock star!!", targetWords: 25000 },
     chapters: [
-      { 
-        id: 1, title: "Chapter 1", content: "", synopsis: "", bookmarked: false, 
-        updatedAt: Date.now() - 172800000, tags: [], wordGoal: 2000 
+      {
+        id: 1,
+        title: "Chapter 1",
+        content: "",
+        synopsis: "",
+        bookmarked: false,
+        updatedAt: Date.now() - 172800000,
+        tags: [],
+        wordGoal: 2000,
       },
-      { 
-        id: 2, title: "Chapter 2", content: "", synopsis: "", bookmarked: false, 
-        updatedAt: Date.now() - 172800000, tags: [], wordGoal: 2000 
+      {
+        id: 2,
+        title: "Chapter 2",
+        content: "",
+        synopsis: "",
+        bookmarked: false,
+        updatedAt: Date.now() - 172800000,
+        tags: [],
+        wordGoal: 2000,
       },
-      { 
-        id: 3, title: "Chapter 3", content: "", synopsis: "", bookmarked: false, 
-        updatedAt: Date.now() - 172800000, tags: [], wordGoal: 2000 
+      {
+        id: 3,
+        title: "Chapter 3",
+        content: "",
+        synopsis: "",
+        bookmarked: false,
+        updatedAt: Date.now() - 172800000,
+        tags: [],
+        wordGoal: 2000,
       },
     ],
     daily: { goal: 500, counts: {} },
-    settings: { theme: 'dark', focusMode: false },
+    settings: { theme: "dark", focusMode: false },
   };
 
   const [book, setBook] = React.useState(initial.book);
@@ -295,18 +291,39 @@ export default function TOCPage2() {
     return () => clearInterval(iv);
   }, [book, chapters, daily, settings]);
 
+  // Live sync across pages/tabs
+  React.useEffect(() => {
+    const sync = () => {
+      const s = loadState();
+      if (!s) return;
+      setBook(s.book || { title: "Untitled", targetWords: 25000 });
+      setChapters(Array.isArray(s.chapters) ? s.chapters : []);
+      setDaily(s.daily || { goal: 500, counts: {} });
+      setSettings(s.settings || { theme: "dark", focusMode: false });
+    };
+    window.addEventListener("project:change", sync);
+    window.addEventListener("storage", sync);
+    return () => {
+      window.removeEventListener("project:change", sync);
+      window.removeEventListener("storage", sync);
+    };
+  }, []);
+
   // History push on meaningful changes
-  const commitSnapshot = React.useCallback((next) => {
-    if (ignoreHistoryRef.current) return;
-    setPast((p) => [...p.slice(-24), { book, chapters, daily, settings }]);
-    setFuture([]);
-    if (next) {
-      setBook(next.book ?? book);
-      setChapters(next.chapters ?? chapters);
-      setDaily(next.daily ?? daily);
-      setSettings(next.settings ?? settings);
-    }
-  }, [book, chapters, daily, settings]);
+  const commitSnapshot = React.useCallback(
+    (next) => {
+      if (ignoreHistoryRef.current) return;
+      setPast((p) => [...p.slice(-24), { book, chapters, daily, settings }]);
+      setFuture([]);
+      if (next) {
+        setBook(next.book ?? book);
+        setChapters(next.chapters ?? chapters);
+        setDaily(next.daily ?? daily);
+        setSettings(next.settings ?? settings);
+      }
+    },
+    [book, chapters, daily, settings]
+  );
 
   const undo = () => {
     if (!past.length) return;
@@ -318,7 +335,9 @@ export default function TOCPage2() {
     setChapters(prev.chapters);
     setDaily(prev.daily);
     setSettings(prev.settings);
-    setTimeout(() => { ignoreHistoryRef.current = false; }, 0);
+    setTimeout(() => {
+      ignoreHistoryRef.current = false;
+    }, 0);
   };
 
   const redo = () => {
@@ -331,7 +350,9 @@ export default function TOCPage2() {
     setChapters(next.chapters);
     setDaily(next.daily);
     setSettings(next.settings);
-    setTimeout(() => { ignoreHistoryRef.current = false; }, 0);
+    setTimeout(() => {
+      ignoreHistoryRef.current = false;
+    }, 0);
   };
 
   // Keyboard shortcuts
@@ -339,11 +360,28 @@ export default function TOCPage2() {
     const onKey = (e) => {
       const meta = e.ctrlKey || e.metaKey;
       if (!meta) return;
-      if (e.key.toLowerCase() === "s") { e.preventDefault(); saveState({ book, chapters, daily, settings }); setLastSaved(Date.now()); }
-      if (e.key.toLowerCase() === "n") { e.preventDefault(); addChapter(); }
-      if (e.key.toLowerCase() === "z") { e.preventDefault(); undo(); }
-      if (e.key.toLowerCase() === "y") { e.preventDefault(); redo(); }
-      if (e.key.toLowerCase() === "f") { e.preventDefault(); setSettings(s => ({ ...s, focusMode: !s.focusMode })); }
+      const k = e.key.toLowerCase();
+      if (k === "s") {
+        e.preventDefault();
+        saveState({ book, chapters, daily, settings });
+        setLastSaved(Date.now());
+      }
+      if (k === "n") {
+        e.preventDefault();
+        addChapter();
+      }
+      if (k === "z") {
+        e.preventDefault();
+        undo();
+      }
+      if (k === "y") {
+        e.preventDefault();
+        redo();
+      }
+      if (k === "f") {
+        e.preventDefault();
+        setSettings((s) => ({ ...s, focusMode: !s.focusMode }));
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -351,23 +389,30 @@ export default function TOCPage2() {
 
   // Daily tracker
   React.useEffect(() => {
-    const nowTotal = chapters.reduce((t, ch) => t + countWords(ch.content || ""), 0);
+    const nowTotal = chapters.reduce(
+      (t, ch) => t + countWords(ch.content || ""),
+      0
+    );
     const delta = nowTotal - prevTotalRef.current;
     prevTotalRef.current = nowTotal;
     if (delta > 0) {
       const key = todayKey();
-      setDaily((d) => ({ ...d, counts: { ...d.counts, [key]: (d.counts[key] || 0) + delta } }));
+      setDaily((d) => ({
+        ...d,
+        counts: { ...d.counts, [key]: (d.counts[key] || 0) + delta },
+      }));
     }
   }, [chapters]);
 
-  /* ────────────── Data derivations ────────────── */
-  const totalWords = chapters.reduce((t, ch) => t + countWords(ch.content || ""), 0);
+  /* ────────────── Derived ────────────── */
+  const totalWords = chapters.reduce(
+    (t, ch) => t + countWords(ch.content || ""),
+    0
+  );
   const readTime = readingMins(totalWords);
   const pct = progressPct(totalWords, book.targetWords);
   const streak = calculateStreak(daily);
-
-  // Get all unique tags from chapters
-  const allTags = [...new Set(chapters.flatMap(ch => ch.tags || []))].sort();
+  const allTags = [...new Set(chapters.flatMap((ch) => ch.tags || []))].sort();
 
   const filtered = chapters.filter((c) => {
     if (onlyBookmarked && !c.bookmarked) return false;
@@ -378,14 +423,15 @@ export default function TOCPage2() {
       c.title.toLowerCase().includes(s) ||
       (c.synopsis || "").toLowerCase().includes(s) ||
       (c.content || "").toLowerCase().includes(s) ||
-      (c.tags || []).some(tag => tag.toLowerCase().includes(s))
+      (c.tags || []).some((tag) => tag.toLowerCase().includes(s))
     );
   });
 
   /* ────────────── Actions ────────────── */
   const addChapter = (tplKey = templateKey) => {
     const tpl = TEMPLATES[tplKey] || TEMPLATES.Blank;
-    const title = (quickTitle || tpl.title || `Chapter ${chapters.length + 1}`).trim();
+    const title =
+      (quickTitle || tpl.title || `Chapter ${chapters.length + 1}`).trim();
     const next = {
       id: Date.now(),
       title: title || `Chapter ${chapters.length + 1}`,
@@ -406,8 +452,17 @@ export default function TOCPage2() {
     const i = chapters.findIndex((c) => c.id === id);
     if (i < 0) return;
     const orig = chapters[i];
-    const dup = { ...orig, id: Date.now(), title: `${orig.title} (Copy)`, updatedAt: Date.now() };
-    const next = [...chapters.slice(0, i + 1), dup, ...chapters.slice(i + 1)];
+    const dup = {
+      ...orig,
+      id: Date.now(),
+      title: `${orig.title} (Copy)`,
+      updatedAt: Date.now(),
+    };
+    const next = [
+      ...chapters.slice(0, i + 1),
+      dup,
+      ...chapters.slice(i + 1),
+    ];
     commitSnapshot({ chapters: next });
   };
 
@@ -418,7 +473,9 @@ export default function TOCPage2() {
 
   const updateChapter = (id, patch) => {
     commitSnapshot({
-      chapters: chapters.map((c) => (c.id === id ? { ...c, ...patch, updatedAt: Date.now() } : c)),
+      chapters: chapters.map((c) =>
+        c.id === id ? { ...c, ...patch, updatedAt: Date.now() } : c
+      ),
     });
   };
 
@@ -450,7 +507,10 @@ export default function TOCPage2() {
     });
 
   const toggleBookmark = (id) =>
-    updateChapter(id, { bookmarked: !chapters.find((c) => c.id === id)?.bookmarked });
+    updateChapter(
+      id,
+      { bookmarked: !chapters.find((c) => c.id === id)?.bookmarked }
+    );
 
   const generateOne = async (id) => {
     setBusyIds((b) => new Set(b).add(id));
@@ -460,7 +520,9 @@ export default function TOCPage2() {
       updateChapter(id, { synopsis: summary });
     } finally {
       setBusyIds((b) => {
-        const n = new Set(b); n.delete(id); return n;
+        const n = new Set(b);
+        n.delete(id);
+        return n;
       });
     }
   };
@@ -469,7 +531,9 @@ export default function TOCPage2() {
     const pending = chapters.filter((c) => !c.synopsis);
     const batchSize = 3;
     for (let i = 0; i < pending.length; i += batchSize) {
-      await Promise.all(pending.slice(i, i + batchSize).map((c) => generateOne(c.id)));
+      await Promise.all(
+        pending.slice(i, i + batchSize).map((c) => generateOne(c.id))
+      );
     }
   };
 
@@ -478,9 +542,13 @@ export default function TOCPage2() {
     reader.onload = () => {
       try {
         const json = JSON.parse(reader.result);
-        if (!json || !json.book || !Array.isArray(json.chapters)) throw new Error("Invalid backup file");
+        if (!json || !json.book || !Array.isArray(json.chapters))
+          throw new Error("Invalid backup file");
         commitSnapshot({
-          book: { title: json.book.title || "Untitled", targetWords: json.book.targetWords || 25000 },
+          book: {
+            title: json.book.title || "Untitled",
+            targetWords: json.book.targetWords || 25000,
+          },
           chapters: json.chapters.map((c) => ({
             id: c.id || Date.now() + Math.random(),
             title: c.title || "Untitled",
@@ -491,7 +559,10 @@ export default function TOCPage2() {
             wordGoal: c.wordGoal || 2000,
             updatedAt: c.updatedAt || Date.now(),
           })),
-          daily: json.daily && json.daily.goal && json.daily.counts ? json.daily : daily,
+          daily:
+            json.daily && json.daily.goal && json.daily.counts
+              ? json.daily
+              : daily,
           settings: json.settings || settings,
         });
       } catch (e) {
@@ -502,15 +573,17 @@ export default function TOCPage2() {
   };
 
   const addTagToChapter = (chapterId, tag) => {
-    const chapter = chapters.find(c => c.id === chapterId);
+    const chapter = chapters.find((c) => c.id === chapterId);
     if (!chapter || (chapter.tags || []).includes(tag)) return;
     updateChapter(chapterId, { tags: [...(chapter.tags || []), tag] });
   };
 
   const removeTagFromChapter = (chapterId, tag) => {
-    const chapter = chapters.find(c => c.id === chapterId);
+    const chapter = chapters.find((c) => c.id === chapterId);
     if (!chapter) return;
-    updateChapter(chapterId, { tags: (chapter.tags || []).filter(t => t !== tag) });
+    updateChapter(chapterId, {
+      tags: (chapter.tags || []).filter((t) => t !== tag),
+    });
   };
 
   /* ────────────── Render ────────────── */
@@ -520,17 +593,29 @@ export default function TOCPage2() {
   const yesterdayCount = daily.counts[yesterday] || 0;
   const goalPct = progressPct(todayCount, daily.goal);
 
-  // Focus mode - simplified interface with your beautiful styling
+  // Focus mode
   if (settings.focusMode) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-indigo-950 py-8 relative overflow-hidden">
+      <div className="min-h-screen bg-gradient-to-br from-sky-950 via-blue-950 to-indigo-950 py-8 relative overflow-hidden">
         <DecorBlobs />
         <div className="relative z-10 mx-auto max-w-4xl px-4">
           <div className="rounded-3xl bg-blue-950/50 backdrop-blur-xl shadow-2xl border border-blue-800/40 p-8 mb-8">
-            <div className="flex items-center justify-between">
-              <h1 className="text-3xl font-bold text-white font-serif">{book.title}</h1>
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <NavLink
+                  to="/dashboard"
+                  className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-white/10 text-white border border-white/20 hover:bg-white/15"
+                  title="Back to Dashboard"
+                >
+                  <ArrowLeft size={16} />
+                  Back
+                </NavLink>
+                <h1 className="text-3xl font-bold text-white font-serif">
+                  {book.title}
+                </h1>
+              </div>
               <button
-                onClick={() => setSettings(s => ({ ...s, focusMode: false }))}
+                onClick={() => setSettings((s) => ({ ...s, focusMode: false }))}
                 className="p-3 rounded-xl bg-blue-900/40 hover:bg-blue-900/60 text-blue-300 backdrop-blur-sm transition-all duration-300 hover:scale-105"
                 title="Exit focus mode (Ctrl/Cmd+F)"
               >
@@ -538,16 +623,23 @@ export default function TOCPage2() {
               </button>
             </div>
           </div>
-          
+
           <div className="space-y-6">
-            {chapters.map(ch => (
-              <div key={ch.id} className="rounded-3xl bg-blue-950/50 backdrop-blur-xl shadow-2xl border border-blue-800/40 p-8">
-                <div className="text-xl font-bold text-white font-serif mb-4">{ch.title}</div>
+            {chapters.map((ch) => (
+              <div
+                key={ch.id}
+                className="rounded-3xl bg-blue-950/50 backdrop-blur-xl shadow-2xl border border-blue-800/40 p-8"
+              >
+                <div className="text-xl font-bold text-white font-serif mb-4">
+                  {ch.title}
+                </div>
                 <textarea
                   value={ch.content}
-                  onChange={(e) => updateChapter(ch.id, { content: e.target.value })}
+                  onChange={(e) =>
+                    updateChapter(ch.id, { content: e.target.value })
+                  }
                   placeholder="Write your chapter content here..."
-                  className="w-full min-h-[200px] bg-blue-900/30 border border-blue-700/50 rounded-xl text-white placeholder-blue-300 backdrop-blur-sm focus:ring-2 focus:ring-blue-400 focus:border-blue-400 focus:bg-blue-900/40 transition-all duration-300 font-serif px-4 py-4 resize-vertical outline-none"
+                  className="w-full min-h-[200px] bg-blue-900/30 border border-blue-700/50 rounded-xl text-white placeholder-blue-300 backdrop-blur-sm focus:ring-2 focus:ring-blue-400 focus:border-blue-400 focus:bg-blue-900/40 transition-all duration-300 font-serif px-4 py-4 resize-y outline-none"
                 />
                 <div className="mt-3 text-sm text-blue-200 font-serif">
                   {countWords(ch.content)} words
@@ -561,10 +653,9 @@ export default function TOCPage2() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-indigo-950 py-8 relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-sky-950 via-blue-950 to-indigo-950 py-8 relative overflow-hidden">
       <DecorBlobs />
       <div className="relative z-10 mx-auto max-w-5xl px-4">
-
         {/* Top banner */}
         <div className="rounded-3xl bg-gradient-to-r from-slate-900/90 via-indigo-900/90 to-slate-900/90 backdrop-blur-xl text-white shadow-2xl border border-blue-800/40">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between px-8 py-6">
@@ -577,8 +668,18 @@ export default function TOCPage2() {
               </h1>
             </div>
             <div className="flex items-center gap-3 flex-wrap">
+              {/* Back to Dashboard */}
+              <NavLink
+                to="/dashboard"
+                className="inline-flex items-center gap-2 px-4 py-3 rounded-xl bg-white/10 text-white border border-white/20 hover:bg-white/15"
+                title="Back to Dashboard"
+              >
+                <ArrowLeft size={16} />
+                Back
+              </NavLink>
+
               <button
-                onClick={() => setSettings(s => ({ ...s, focusMode: true }))}
+                onClick={() => setSettings((s) => ({ ...s, focusMode: true }))}
                 className="inline-flex items-center gap-2 px-4 py-3 rounded-xl bg-purple-600/30 border border-purple-400/30 hover:bg-purple-600/40 text-purple-100 text-sm font-serif backdrop-blur-sm transition-all duration-300 hover:scale-105"
                 title="Focus mode (Ctrl/Cmd+F)"
               >
@@ -592,7 +693,10 @@ export default function TOCPage2() {
                 <TrendingUp size={16} /> Analytics
               </button>
               <button
-                onClick={() => { saveState({ book, chapters, daily, settings }); setLastSaved(Date.now()); }}
+                onClick={() => {
+                  saveState({ book, chapters, daily, settings });
+                  setLastSaved(Date.now());
+                }}
                 className="inline-flex items-center gap-2 px-4 py-3 rounded-xl bg-green-600/30 border border-green-400/30 hover:bg-green-600/40 text-green-100 text-sm font-serif backdrop-blur-sm transition-all duration-300 hover:scale-105"
                 title="Save now (Ctrl/Cmd+S)"
               >
@@ -618,7 +722,11 @@ export default function TOCPage2() {
                   type="file"
                   accept="application/json"
                   className="hidden"
-                  onChange={(e) => e.target.files && e.target.files[0] && importJSON(e.target.files[0])}
+                  onChange={(e) =>
+                    e.target.files &&
+                    e.target.files[0] &&
+                    importJSON(e.target.files[0])
+                  }
                 />
               </label>
               <button
@@ -646,30 +754,50 @@ export default function TOCPage2() {
               <div className="w-10 h-10 rounded-xl bg-indigo-600/30 flex items-center justify-center">
                 <TrendingUp className="text-indigo-300" size={20} />
               </div>
-              <h2 className="text-2xl font-bold text-white font-serif">Writing Analytics</h2>
+              <h2 className="text-2xl font-bold text-white font-serif">
+                Writing Analytics
+              </h2>
             </div>
             <div className="grid md:grid-cols-4 gap-6">
               <div className="p-6 rounded-2xl bg-blue-900/30 border border-blue-700/50 backdrop-blur-sm">
-                <div className="text-3xl font-bold text-white font-serif">{streak}</div>
-                <div className="text-sm text-blue-200 font-serif mt-1">Day streak</div>
+                <div className="text-3xl font-bold text-white font-serif">
+                  {streak}
+                </div>
+                <div className="text-sm text-blue-200 font-serif mt-1">
+                  Day streak
+                </div>
                 {streak > 0 && (
                   <div className="flex items-center gap-1 mt-2">
                     <Flame className="text-orange-400" size={16} />
-                    <span className="text-orange-300 text-xs font-serif">On fire!</span>
+                    <span className="text-orange-300 text-xs font-serif">
+                      On fire!
+                    </span>
                   </div>
                 )}
               </div>
               <div className="p-6 rounded-2xl bg-blue-900/30 border border-blue-700/50 backdrop-blur-sm">
-                <div className="text-3xl font-bold text-white font-serif">{todayCount}</div>
-                <div className="text-sm text-blue-200 font-serif mt-1">Words today</div>
+                <div className="text-3xl font-bold text-white font-serif">
+                  {todayCount}
+                </div>
+                <div className="text-sm text-blue-200 font-serif mt-1">
+                  Words today
+                </div>
               </div>
               <div className="p-6 rounded-2xl bg-blue-900/30 border border-blue-700/50 backdrop-blur-sm">
-                <div className="text-3xl font-bold text-white font-serif">{yesterdayCount}</div>
-                <div className="text-sm text-blue-200 font-serif mt-1">Words yesterday</div>
+                <div className="text-3xl font-bold text-white font-serif">
+                  {yesterdayCount}
+                </div>
+                <div className="text-sm text-blue-200 font-serif mt-1">
+                  Words yesterday
+                </div>
               </div>
               <div className="p-6 rounded-2xl bg-blue-900/30 border border-blue-700/50 backdrop-blur-sm">
-                <div className="text-3xl font-bold text-white font-serif">{chapters.filter(c => c.bookmarked).length}</div>
-                <div className="text-sm text-blue-200 font-serif mt-1">Bookmarked</div>
+                <div className="text-3xl font-bold text-white font-serif">
+                  {chapters.filter((c) => c.bookmarked).length}
+                </div>
+                <div className="text-sm text-blue-200 font-serif mt-1">
+                  Bookmarked
+                </div>
               </div>
             </div>
           </div>
@@ -683,30 +811,48 @@ export default function TOCPage2() {
               <div className="flex-1 min-w-0">
                 <input
                   value={book.title}
-                  onChange={(e) => commitSnapshot({ book: { ...book, title: e.target.value } })}
+                  onChange={(e) =>
+                    commitSnapshot({ book: { ...book, title: e.target.value } })
+                  }
                   className="w-full bg-transparent text-2xl font-bold text-white font-serif outline-none border-b border-transparent focus:border-blue-400/50 transition-colors"
                 />
                 <div className="text-blue-200 font-serif mt-3">
-                  {totalWords.toLocaleString()} / {book.targetWords.toLocaleString()} words
+                  {totalWords.toLocaleString()} /{" "}
+                  {book.targetWords.toLocaleString()} words
                   {readTime > 0 && ` • ~${readTime} min read`}
                 </div>
                 <div className="mt-4 w-full bg-blue-900/50 rounded-full h-3 backdrop-blur-sm">
-                  <div className="bg-gradient-to-r from-indigo-500 to-teal-500 h-3 rounded-full transition-all duration-700 shadow-lg" style={{ width: `${pct}%` }}></div>
+                  <div
+                    className="bg-gradient-to-r from-indigo-500 to-teal-500 h-3 rounded-full transition-all duration-700 shadow-lg"
+                    style={{ width: `${pct}%` }}
+                  ></div>
                 </div>
                 <div className="text-xs text-blue-300 font-serif mt-2">
-                  {pct.toFixed(1)}% complete • Last saved {Math.round((Date.now() - lastSaved) / 60000) || 0}m ago
+                  {pct.toFixed(1)}% complete • Last saved{" "}
+                  {Math.round((Date.now() - lastSaved) / 60000) || 0}m ago
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-4xl font-bold text-white font-serif">{chapters.length}</div>
-                <div className="text-xs uppercase tracking-wider text-blue-300 font-serif">Chapters</div>
+                <div className="text-4xl font-bold text-white font-serif">
+                  {chapters.length}
+                </div>
+                <div className="text-xs uppercase tracking-wider text-blue-300 font-serif">
+                  Chapters
+                </div>
                 <div className="mt-4 text-xs text-blue-300 font-serif">
                   Target words
                   <input
                     type="number"
                     min={1}
                     value={book.targetWords}
-                    onChange={(e) => commitSnapshot({ book: { ...book, targetWords: Number(e.target.value) || 1 } })}
+                    onChange={(e) =>
+                      commitSnapshot({
+                        book: {
+                          ...book,
+                          targetWords: Number(e.target.value) || 1,
+                        },
+                      })
+                    }
                     className="w-24 mt-2 rounded-xl bg-blue-900/60 border border-blue-700/50 px-3 py-2 text-right text-white font-serif backdrop-blur-sm outline-none focus:ring-2 focus:ring-blue-400 transition-all duration-300"
                   />
                 </div>
@@ -720,19 +866,30 @@ export default function TOCPage2() {
               <div className="w-10 h-10 rounded-xl bg-indigo-600/30 flex items-center justify-center">
                 <Target className="text-indigo-300" size={20} />
               </div>
-              <div className="text-xl font-bold text-white font-serif">Daily Goal</div>
+              <div className="text-xl font-bold text-white font-serif">
+                Daily Goal
+              </div>
               {streak > 0 && (
                 <div className="flex items-center gap-2 ml-auto">
                   <Flame className="text-orange-400" size={20} />
-                  <span className="text-orange-300 font-serif font-medium">{streak} day{streak !== 1 ? 's' : ''}</span>
+                  <span className="text-orange-300 font-serif font-medium">
+                    {streak} day{streak !== 1 ? "s" : ""}
+                  </span>
                 </div>
               )}
             </div>
             <div className="text-blue-200 font-serif mb-4">
-              Today: <span className="font-bold text-white">{todayCount.toLocaleString()}</span> / {daily.goal.toLocaleString()} words
+              Today:{" "}
+              <span className="font-bold text-white">
+                {todayCount.toLocaleString()}
+              </span>{" "}
+              / {daily.goal.toLocaleString()} words
             </div>
             <div className="w-full bg-blue-900/50 rounded-full h-3 backdrop-blur-sm">
-              <div className="bg-gradient-to-r from-teal-500 to-emerald-500 h-3 rounded-full transition-all duration-700 shadow-lg" style={{ width: `${goalPct}%` }}></div>
+              <div
+                className="bg-gradient-to-r from-teal-500 to-emerald-500 h-3 rounded-full transition-all duration-700 shadow-lg"
+                style={{ width: `${goalPct}%` }}
+              ></div>
             </div>
             <div className="mt-4 flex items-center gap-3">
               <span className="text-xs text-blue-300 font-serif">Set goal:</span>
@@ -741,7 +898,14 @@ export default function TOCPage2() {
                 min={100}
                 step={100}
                 value={daily.goal}
-                onChange={(e) => commitSnapshot({ daily: { ...daily, goal: Math.max(100, Number(e.target.value) || 100) } })}
+                onChange={(e) =>
+                  commitSnapshot({
+                    daily: {
+                      ...daily,
+                      goal: Math.max(100, Number(e.target.value) || 100),
+                    },
+                  })
+                }
                 className="rounded-xl bg-blue-900/60 border border-blue-700/50 px-3 py-2 text-white font-serif backdrop-blur-sm outline-none focus:ring-2 focus:ring-blue-400 transition-all duration-300"
               />
             </div>
@@ -764,7 +928,10 @@ export default function TOCPage2() {
                   className="w-full pl-12 pr-6 py-4 rounded-xl bg-blue-900/30 border border-blue-700/50 text-white placeholder-blue-300 backdrop-blur-sm focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-all duration-300 font-serif outline-none"
                 />
                 {search && (
-                  <button onClick={() => setSearch("")} className="absolute right-4 top-1/2 -translate-y-1/2 text-blue-300 hover:text-white transition-colors">
+                  <button
+                    onClick={() => setSearch("")}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-blue-300 hover:text-white transition-colors"
+                  >
                     <X size={20} />
                   </button>
                 )}
@@ -777,7 +944,11 @@ export default function TOCPage2() {
                     className="rounded-xl bg-blue-900/30 border border-blue-700/50 px-4 py-4 text-white backdrop-blur-sm font-serif outline-none focus:ring-2 focus:ring-blue-400 transition-all duration-300"
                   >
                     <option value="">All tags</option>
-                    {allTags.map(tag => <option key={tag} value={tag}>{tag}</option>)}
+                    {allTags.map((tag) => (
+                      <option key={tag} value={tag}>
+                        {tag}
+                      </option>
+                    ))}
                   </select>
                 )}
                 <label className="inline-flex items-center gap-3 text-blue-200 font-serif cursor-pointer">
@@ -797,7 +968,9 @@ export default function TOCPage2() {
               <input
                 value={quickTitle}
                 onChange={(e) => setQuickTitle(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") addChapter(); }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") addChapter();
+                }}
                 placeholder="Quick add: Chapter title…"
                 className="flex-1 rounded-xl bg-blue-900/30 border border-blue-700/50 px-4 py-4 text-white placeholder-blue-300 backdrop-blur-sm focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-all duration-300 font-serif outline-none"
               />
@@ -806,7 +979,11 @@ export default function TOCPage2() {
                 onChange={(e) => setTemplateKey(e.target.value)}
                 className="rounded-xl bg-blue-900/30 border border-blue-700/50 px-4 py-4 text-white backdrop-blur-sm font-serif outline-none focus:ring-2 focus:ring-blue-400 transition-all duration-300"
               >
-                {Object.keys(TEMPLATES).map((k) => <option key={k} value={k}>{k}</option>)}
+                {Object.keys(TEMPLATES).map((k) => (
+                  <option key={k} value={k}>
+                    {k}
+                  </option>
+                ))}
               </select>
               <button
                 onClick={() => addChapter()}
@@ -817,8 +994,15 @@ export default function TOCPage2() {
             </div>
 
             <div className="text-xs text-blue-300 font-serif">
-              <span className="font-bold">Shortcuts:</span> Ctrl/Cmd+S save • Ctrl/Cmd+N new • Ctrl/Cmd+Z undo • Ctrl/Cmd+Y redo • Ctrl/Cmd+F focus mode
-              {search && <span> • Showing {filtered.length} of {chapters.length}</span>}
+              <span className="font-bold">Shortcuts:</span> Ctrl/Cmd+S save •
+              Ctrl/Cmd+N new • Ctrl/Cmd+Z undo • Ctrl/Cmd+Y redo • Ctrl/Cmd+F
+              focus mode
+              {search && (
+                <span>
+                  {" "}
+                  • Showing {filtered.length} of {chapters.length}
+                </span>
+              )}
             </div>
           </div>
         </div>
@@ -828,8 +1012,12 @@ export default function TOCPage2() {
           {filtered.length === 0 ? (
             <div className="rounded-3xl bg-blue-950/50 backdrop-blur-xl shadow-2xl border border-blue-800/40 p-12 text-center">
               <Search className="mx-auto mb-4 text-blue-300" size={48} />
-              <div className="text-xl font-bold text-white font-serif mb-2">No chapters found</div>
-              <div className="text-blue-200 font-serif">Try clearing the search or changing filters.</div>
+              <div className="text-xl font-bold text-white font-serif mb-2">
+                No chapters found
+              </div>
+              <div className="text-blue-200 font-serif">
+                Try clearing the search or changing filters.
+              </div>
             </div>
           ) : (
             filtered.map((ch) => {
@@ -840,22 +1028,32 @@ export default function TOCPage2() {
               const wordGoalPct = progressPct(words, ch.wordGoal || 2000);
 
               return (
-                <div key={ch.id} className="rounded-3xl bg-blue-950/50 backdrop-blur-xl shadow-2xl border border-blue-800/40 overflow-hidden">
+                <div
+                  key={ch.id}
+                  className="rounded-3xl bg-blue-950/50 backdrop-blur-xl shadow-2xl border border-blue-800/40 overflow-hidden"
+                >
                   <div className="px-8 py-6 flex items-start gap-4">
                     <button
                       onClick={() => toggleOpen(ch.id)}
                       className="mt-1 shrink-0 p-3 rounded-xl bg-blue-900/40 hover:bg-blue-900/60 backdrop-blur-sm transition-all duration-300 hover:scale-105"
                       title={open ? "Collapse" : "Expand"}
                     >
-                      {open ? <ChevronDown className="text-blue-300" size={20} /> : <ChevronRight className="text-blue-300" size={20} />}
+                      {open ? (
+                        <ChevronDown className="text-blue-300" size={20} />
+                      ) : (
+                        <ChevronRight className="text-blue-300" size={20} />
+                      )}
                     </button>
 
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-4">
-                        <div className="text-xl font-bold text-white font-serif truncate">{ch.title}</div>
+                        <div className="text-xl font-bold text-white font-serif truncate">
+                          {ch.title}
+                        </div>
                         <div className="text-xs text-blue-200 flex items-center gap-4 shrink-0 font-serif">
                           <span className="flex items-center gap-2">
-                            <FileText size={16} /> {words} words{mins ? ` • ${mins}m` : ""}
+                            <FileText size={16} /> {words} words
+                            {mins ? ` • ${mins}m` : ""}
                           </span>
                           <span className="flex items-center gap-2">
                             <Clock size={16} /> {daysAgoLabel(ch.updatedAt)}
@@ -863,19 +1061,43 @@ export default function TOCPage2() {
 
                           {/* Action buttons */}
                           <div className="flex items-center gap-2">
-                            <button onClick={() => moveUp(ch.id)} className="p-2 rounded-lg hover:bg-blue-700/50 text-blue-300 transition-all duration-300" title="Move up">
+                            <button
+                              onClick={() => moveUp(ch.id)}
+                              className="p-2 rounded-lg hover:bg-blue-700/50 text-blue-300 transition-all duration-300"
+                              title="Move up"
+                            >
                               <ArrowUp size={16} />
                             </button>
-                            <button onClick={() => moveDown(ch.id)} className="p-2 rounded-lg hover:bg-blue-700/50 text-blue-300 transition-all duration-300" title="Move down">
+                            <button
+                              onClick={() => moveDown(ch.id)}
+                              className="p-2 rounded-lg hover:bg-blue-700/50 text-blue-300 transition-all duration-300"
+                              title="Move down"
+                            >
                               <ArrowDown size={16} />
                             </button>
-                            <button onClick={() => toggleBookmark(ch.id)} className="p-2 rounded-lg hover:bg-blue-700/50 text-blue-300 transition-all duration-300" title={ch.bookmarked ? "Remove bookmark" : "Bookmark"}>
-                              {ch.bookmarked ? <Star className="text-yellow-400" size={16} /> : <StarOff size={16} />}
+                            <button
+                              onClick={() => toggleBookmark(ch.id)}
+                              className="p-2 rounded-lg hover:bg-blue-700/50 text-blue-300 transition-all duration-300"
+                              title={ch.bookmarked ? "Remove bookmark" : "Bookmark"}
+                            >
+                              {ch.bookmarked ? (
+                                <Star className="text-yellow-400" size={16} />
+                              ) : (
+                                <StarOff size={16} />
+                              )}
                             </button>
-                            <button onClick={() => duplicateChapter(ch.id)} className="p-2 rounded-lg hover:bg-blue-700/50 text-blue-300 transition-all duration-300" title="Duplicate">
+                            <button
+                              onClick={() => duplicateChapter(ch.id)}
+                              className="p-2 rounded-lg hover:bg-blue-700/50 text-blue-300 transition-all duration-300"
+                              title="Duplicate"
+                            >
                               <Copy size={16} />
                             </button>
-                            <button onClick={() => setConfirmDeleteId(ch.id)} className="p-2 rounded-lg hover:bg-red-500/20 text-red-400 transition-all duration-300" title="Delete">
+                            <button
+                              onClick={() => setConfirmDeleteId(ch.id)}
+                              className="p-2 rounded-lg hover:bg-red-500/20 text-red-400 transition-all duration-300"
+                              title="Delete"
+                            >
                               <Trash2 size={16} />
                             </button>
                             <button
@@ -884,18 +1106,25 @@ export default function TOCPage2() {
                               className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-indigo-600/30 border border-indigo-400/30 hover:bg-indigo-600/40 text-indigo-100 font-serif transition-all duration-300 backdrop-blur-sm"
                               title="Generate/regenerate AI synopsis"
                             >
-                              {busy ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
+                              {busy ? (
+                                <Loader2 size={16} className="animate-spin" />
+                              ) : (
+                                <Sparkles size={16} />
+                              )}
                               {busy ? "Generating…" : "AI Synopsis"}
                             </button>
                           </div>
                         </div>
                       </div>
 
-                      {/* Tags */}
+                      {/* Tags row */}
                       {(ch.tags || []).length > 0 && (
                         <div className="mt-4 flex items-center gap-2 flex-wrap">
-                          {(ch.tags || []).map(tag => (
-                            <span key={tag} className="inline-flex items-center gap-2 px-3 py-1 rounded-lg text-xs bg-indigo-900/40 text-indigo-200 border border-indigo-700/50 backdrop-blur-sm font-serif">
+                          {(ch.tags || []).map((tag) => (
+                            <span
+                              key={tag}
+                              className="inline-flex items-center gap-2 px-3 py-1 rounded-lg text-xs bg-indigo-900/40 text-indigo-200 border border-indigo-700/50 backdrop-blur-sm font-serif"
+                            >
                               <Tag size={12} />
                               {tag}
                             </span>
@@ -907,42 +1136,64 @@ export default function TOCPage2() {
                         <div className="mt-6 text-blue-200 font-serif">
                           {/* Title */}
                           <div className="mb-4">
-                            <div className="text-xs text-blue-300 mb-2 font-serif">Chapter title</div>
+                            <div className="text-xs text-blue-300 mb-2 font-serif">
+                              Chapter title
+                            </div>
                             <input
                               value={ch.title}
-                              onChange={(e) => updateChapter(ch.id, { title: e.target.value })}
+                              onChange={(e) =>
+                                updateChapter(ch.id, { title: e.target.value })
+                              }
                               className="w-full px-4 py-3 rounded-xl bg-blue-900/30 border border-blue-700/50 text-white backdrop-blur-sm outline-none focus:ring-2 focus:ring-blue-400 transition-all duration-300 font-serif"
                             />
                           </div>
 
                           {/* Word goal */}
                           <div className="mb-4">
-                            <div className="text-xs text-blue-300 mb-2 font-serif">Word goal for this chapter</div>
+                            <div className="text-xs text-blue-300 mb-2 font-serif">
+                              Word goal for this chapter
+                            </div>
                             <div className="flex items-center gap-4">
                               <input
                                 type="number"
                                 min={100}
                                 step={100}
                                 value={ch.wordGoal || 2000}
-                                onChange={(e) => updateChapter(ch.id, { wordGoal: Number(e.target.value) || 2000 })}
+                                onChange={(e) =>
+                                  updateChapter(ch.id, {
+                                    wordGoal: Number(e.target.value) || 2000,
+                                  })
+                                }
                                 className="w-32 rounded-xl bg-blue-900/60 border border-blue-700/50 px-3 py-2 text-white font-serif backdrop-blur-sm outline-none focus:ring-2 focus:ring-blue-400 transition-all duration-300"
                               />
                               <div className="flex-1 bg-blue-900/50 rounded-full h-3 backdrop-blur-sm">
-                                <div className="bg-gradient-to-r from-teal-500 to-emerald-500 h-3 rounded-full transition-all duration-700 shadow-lg" style={{ width: `${wordGoalPct}%` }}></div>
+                                <div
+                                  className="bg-gradient-to-r from-teal-500 to-emerald-500 h-3 rounded-full transition-all duration-700 shadow-lg"
+                                  style={{ width: `${wordGoalPct}%` }}
+                                ></div>
                               </div>
-                              <span className="text-xs text-blue-300 font-serif">{wordGoalPct.toFixed(0)}%</span>
+                              <span className="text-xs text-blue-300 font-serif">
+                                {wordGoalPct.toFixed(0)}%
+                              </span>
                             </div>
                           </div>
 
-                          {/* Tags */}
+                          {/* Tags editor */}
                           <div className="mb-4">
-                            <div className="text-xs text-blue-300 mb-2 font-serif">Tags</div>
+                            <div className="text-xs text-blue-300 mb-2 font-serif">
+                              Tags
+                            </div>
                             <div className="flex items-center gap-2 flex-wrap">
-                              {(ch.tags || []).map(tag => (
-                                <span key={tag} className="inline-flex items-center gap-1 px-3 py-1 rounded-lg text-xs bg-indigo-900/40 text-indigo-200 border border-indigo-700/50 backdrop-blur-sm font-serif">
+                              {(ch.tags || []).map((tag) => (
+                                <span
+                                  key={tag}
+                                  className="inline-flex items-center gap-1 px-3 py-1 rounded-lg text-xs bg-indigo-900/40 text-indigo-200 border border-indigo-700/50 backdrop-blur-sm font-serif"
+                                >
                                   {tag}
                                   <button
-                                    onClick={() => removeTagFromChapter(ch.id, tag)}
+                                    onClick={() =>
+                                      removeTagFromChapter(ch.id, tag)
+                                    }
                                     className="hover:text-red-400 transition-colors"
                                   >
                                     <X size={12} />
@@ -959,8 +1210,12 @@ export default function TOCPage2() {
                                 className="text-xs rounded-lg bg-blue-900/30 border border-blue-700/50 px-3 py-2 text-white backdrop-blur-sm outline-none font-serif"
                               >
                                 <option value="">Add tag...</option>
-                                {PREDEFINED_TAGS.filter(tag => !(ch.tags || []).includes(tag)).map(tag => (
-                                  <option key={tag} value={tag}>{tag}</option>
+                                {PREDEFINED_TAGS.filter(
+                                  (tag) => !(ch.tags || []).includes(tag)
+                                ).map((tag) => (
+                                  <option key={tag} value={tag}>
+                                    {tag}
+                                  </option>
                                 ))}
                               </select>
                             </div>
@@ -968,20 +1223,35 @@ export default function TOCPage2() {
 
                           {/* Synopsis */}
                           <div className="mb-6">
-                            <div className="font-bold mb-3 text-white font-serif text-lg">AI Synopsis</div>
+                            <div className="font-bold mb-3 text-white font-serif text-lg">
+                              AI Synopsis
+                            </div>
                             <div className="rounded-2xl bg-blue-900/40 border border-blue-700/30 p-4 backdrop-blur-sm">
-                              {ch.synopsis ? <p className="font-serif leading-relaxed">{ch.synopsis}</p> : <span className="opacity-60 font-serif">No synopsis yet. Click "AI Synopsis" to generate.</span>}
+                              {ch.synopsis ? (
+                                <p className="font-serif leading-relaxed">
+                                  {ch.synopsis}
+                                </p>
+                              ) : (
+                                <span className="opacity-60 font-serif">
+                                  No synopsis yet. Click "AI Synopsis" to
+                                  generate.
+                                </span>
+                              )}
                             </div>
                           </div>
 
                           {/* Content */}
                           <div>
-                            <div className="text-xs text-blue-300 mb-2 font-serif">Chapter content</div>
+                            <div className="text-xs text-blue-300 mb-2 font-serif">
+                              Chapter content
+                            </div>
                             <textarea
                               value={ch.content}
-                              onChange={(e) => updateChapter(ch.id, { content: e.target.value })}
+                              onChange={(e) =>
+                                updateChapter(ch.id, { content: e.target.value })
+                              }
                               placeholder="Draft your chapter content here…"
-                              className="w-full min-h-[200px] rounded-2xl bg-blue-900/30 border border-blue-700/50 px-4 py-4 text-white placeholder-blue-300 backdrop-blur-sm focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-all duration-300 font-serif outline-none resize-vertical"
+                              className="w-full min-h-[200px] rounded-2xl bg-blue-900/30 border border-blue-700/50 px-4 py-4 text-white placeholder-blue-300 backdrop-blur-sm focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-all duration-300 font-serif outline-none resize-y"
                             />
                           </div>
                         </div>
@@ -1000,20 +1270,24 @@ export default function TOCPage2() {
             <div className="bg-blue-950/90 backdrop-blur-xl rounded-3xl p-8 max-w-md w-full border border-blue-800/40 shadow-2xl">
               <div className="flex items-center gap-3 mb-6">
                 <AlertCircle className="text-red-400" size={24} />
-                <div className="text-xl font-bold text-white font-serif">Delete Chapter</div>
+                <div className="text-xl font-bold text-white font-serif">
+                  Delete Chapter
+                </div>
               </div>
               <div className="text-blue-200 font-serif mb-8 leading-relaxed">
-                Are you sure you want to delete "{chapters.find(c => c.id === confirmDeleteId)?.title}"? This action cannot be undone.
+                Are you sure you want to delete "
+                {chapters.find((c) => c.id === confirmDeleteId)?.title}"? This
+                action cannot be undone.
               </div>
               <div className="flex gap-4">
-                <button 
-                  onClick={() => setConfirmDeleteId(null)} 
+                <button
+                  onClick={() => setConfirmDeleteId(null)}
                   className="flex-1 px-6 py-3 rounded-xl bg-blue-900/40 hover:bg-blue-900/60 text-white font-serif backdrop-blur-sm transition-all duration-300 hover:scale-105"
                 >
                   Cancel
                 </button>
-                <button 
-                  onClick={() => deleteChapter(confirmDeleteId)} 
+                <button
+                  onClick={() => deleteChapter(confirmDeleteId)}
                   className="flex-1 px-6 py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white font-serif shadow-xl transition-all duration-300 hover:scale-105 hover:shadow-2xl"
                 >
                   Delete
@@ -1022,7 +1296,6 @@ export default function TOCPage2() {
             </div>
           </div>
         )}
-
       </div>
     </div>
   );
