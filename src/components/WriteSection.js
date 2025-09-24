@@ -4,7 +4,7 @@ import {
   Plus, Save, Eye, FileText, Edit3, Trash2,
   Menu, X, Target, Clock, RotateCcw, Download,
   CheckCircle, AlertCircle, Lightbulb, Zap, Brain, MessageSquare,
-  RefreshCw, Wand2, Users, BookOpen, MapPin, ArrowLeft
+  RefreshCw, Wand2, Users, BookOpen, MapPin, ArrowLeft, Maximize, Minimize, Moon, Sun
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
@@ -430,7 +430,7 @@ const MetaSidebar = ({ book, chapterWordCount, totalWords }) => {
           <div className="flex items-center gap-2 text-slate-800 font-semibold mb-2">
             <Lightbulb size={16} className="text-amber-500" /> Theme
           </div>
-          <div className="text-sm text-slate-700">The underlying idea you’re exploring.</div>
+          <div className="text-sm text-slate-700">The underlying idea you're exploring.</div>
         </div>
 
         {/* Description */}
@@ -448,14 +448,17 @@ const MetaSidebar = ({ book, chapterWordCount, totalWords }) => {
 };
 
 /* ──────────────────────────────────────────────────────────────
-   Writing Editor (white canvas)
+   Writing Editor (white canvas) WITH FULLSCREEN MODE
 ──────────────────────────────────────────────────────────────── */
 const WritingEditor = ({ chapter, onSave, onUpdate, onCreateNew }) => {
   const [title, setTitle] = useState(chapter?.title || "");
   const [content, setContent] = useState(chapter?.content || "");
   const [count, setCount] = useState(0);
   const [preview, setPreview] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [fullscreenTheme, setFullscreenTheme] = useState("light"); // light, dark, sepia
 
+  // Only update when switching between different chapters
   useEffect(() => {
     if (chapter) {
       setTitle(chapter.title || "");
@@ -464,12 +467,31 @@ const WritingEditor = ({ chapter, onSave, onUpdate, onCreateNew }) => {
       setTitle("");
       setContent("");
     }
-  }, [chapter]);
+  }, [chapter?.id]);
 
   useEffect(() => {
     const words = content.trim().split(/\s+/).filter(Boolean).length;
     setCount(words);
   }, [content]);
+
+  // Handle escape key to exit fullscreen
+  useEffect(() => {
+    const handleEscape = (e) => {
+      if (e.key === 'Escape' && isFullscreen) {
+        setIsFullscreen(false);
+      }
+    };
+    
+    if (isFullscreen) {
+      document.addEventListener('keydown', handleEscape);
+      document.body.style.overflow = 'hidden';
+    }
+    
+    return () => {
+      document.removeEventListener('keydown', handleEscape);
+      document.body.style.overflow = 'unset';
+    };
+  }, [isFullscreen]);
 
   const handleSave = () => {
     if (!chapter) return;
@@ -482,6 +504,116 @@ const WritingEditor = ({ chapter, onSave, onUpdate, onCreateNew }) => {
     });
     onSave?.();
   };
+
+  const toggleFullscreen = () => {
+    setIsFullscreen(!isFullscreen);
+  };
+
+  const getFullscreenTheme = () => {
+    switch (fullscreenTheme) {
+      case 'dark':
+        return 'bg-slate-900 text-slate-100';
+      case 'sepia':
+        return 'bg-amber-50 text-amber-900';
+      default:
+        return 'bg-white text-slate-900';
+    }
+  };
+
+  const getTextareaTheme = () => {
+    switch (fullscreenTheme) {
+      case 'dark':
+        return 'bg-slate-900 text-slate-100 placeholder-slate-400';
+      case 'sepia':
+        return 'bg-amber-50 text-amber-900 placeholder-amber-600';
+      default:
+        return 'bg-white text-slate-900 placeholder-slate-400';
+    }
+  };
+
+  // Fullscreen Mode Component
+  const FullscreenEditor = () => (
+    <div className={`fixed inset-0 z-[9999] ${getFullscreenTheme()} transition-colors duration-200`}>
+      {/* Fullscreen Header */}
+      <div className="absolute top-0 left-0 right-0 p-4 flex items-center justify-between border-b border-current border-opacity-10 bg-opacity-90 backdrop-blur-sm">
+        <div className="flex items-center gap-4">
+          <input
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            className="text-xl font-semibold bg-transparent outline-none border-b border-transparent hover:border-current focus:border-current transition-colors"
+            placeholder="Chapter title"
+          />
+          <div className="text-sm opacity-70">
+            {count} words
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-2">
+          {/* Theme Switcher */}
+          <div className="flex rounded-lg border border-current border-opacity-20 overflow-hidden">
+            {[
+              { key: 'light', icon: Sun, label: 'Light' },
+              { key: 'sepia', icon: '📄', label: 'Sepia' }, 
+              { key: 'dark', icon: Moon, label: 'Dark' }
+            ].map(({ key, icon: Icon, label }) => (
+              <button
+                key={key}
+                onClick={() => setFullscreenTheme(key)}
+                className={`px-3 py-2 text-sm transition-colors ${
+                  fullscreenTheme === key 
+                    ? 'bg-current bg-opacity-10' 
+                    : 'hover:bg-current hover:bg-opacity-5'
+                }`}
+                title={label}
+              >
+                {typeof Icon === 'string' ? Icon : <Icon size={16} />}
+              </button>
+            ))}
+          </div>
+          
+          <button
+            onClick={handleSave}
+            className="px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-500 transition-colors"
+          >
+            <Save size={16} />
+          </button>
+          
+          <button
+            onClick={toggleFullscreen}
+            className="p-2 rounded-lg hover:bg-current hover:bg-opacity-10 transition-colors"
+            title="Exit Fullscreen (Esc)"
+          >
+            <Minimize size={20} />
+          </button>
+        </div>
+      </div>
+
+      {/* Fullscreen Content */}
+      <div className="pt-20 pb-8 px-8 h-full flex items-center justify-center">
+        <div className="w-full max-w-4xl h-full flex flex-col">
+          <textarea
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            className={`w-full flex-1 resize-none outline-none text-lg leading-relaxed ${getTextareaTheme()}`}
+            placeholder="Start writing your story here... Press Esc to exit fullscreen."
+            autoFocus
+          />
+        </div>
+      </div>
+
+      {/* Fullscreen Footer */}
+      <div className="absolute bottom-0 left-0 right-0 p-4 text-center text-sm opacity-50">
+        <div className="flex items-center justify-center gap-4">
+          <span>Last saved: {chapter?.lastEdited || 'Never'}</span>
+          <span>•</span>
+          <span>Auto-save enabled</span>
+          <span>•</span>
+          <span>Press Esc to exit</span>
+        </div>
+      </div>
+    </div>
+  );
 
   if (!chapter) {
     return (
@@ -505,92 +637,105 @@ const WritingEditor = ({ chapter, onSave, onUpdate, onCreateNew }) => {
   }
 
   return (
-    <div className="flex-1 flex flex-col gap-4">
-      {/* raised AI assistant */}
-      <AIAssistant
-        chapter={chapter}
-        onApply={(s) => setContent((c) => c + (c.endsWith("\n") ? "" : "\n\n") + s)}
-      />
+    <>
+      <div className="flex-1 flex flex-col gap-4">
+        {/* raised AI assistant */}
+        <AIAssistant
+          chapter={chapter}
+          onApply={(s) => setContent((c) => c + (c.endsWith("\n") ? "" : "\n\n") + s)}
+        />
 
-      {/* white canvas */}
-      <div className="rounded-3xl bg-white shadow-2xl border border-slate-200 overflow-hidden flex-1 flex flex-col">
-        <div className="px-5 py-3 border-b border-slate-200 bg-white/70 backdrop-blur flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <input
-              type="text"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              className="text-lg font-semibold bg-transparent text-slate-900 outline-none"
-              placeholder="Chapter title"
-            />
-            <div className="hidden sm:flex items-center gap-2 text-sm text-slate-600">
-              <Target size={14} />
-              <span>{count} words</span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setPreview(!preview)}
-              className={[
-                "px-3 py-2 rounded-md text-sm border",
-                preview
-                  ? "bg-indigo-50 text-indigo-700 border-indigo-200"
-                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50",
-              ].join(" ")}
-              title="Preview"
-            >
-              <Eye size={16} />
-            </button>
-            <button
-              type="button"
-              onClick={handleSave}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-emerald-600 text-white hover:bg-emerald-500"
-            >
-              <Save size={16} />
-              Save
-            </button>
-          </div>
-        </div>
-
-        <div className="flex-1 p-6 overflow-auto">
-          {preview ? (
-            <div className="max-w-3xl">
-              <h1 className="text-3xl font-bold text-slate-900 mb-6">{title}</h1>
-              <div className="prose max-w-none">
-                {content.split("\n").map((p, i) => (
-                  <p key={i}>{p}</p>
-                ))}
+        {/* white canvas */}
+        <div className="rounded-3xl bg-white shadow-2xl border border-slate-200 overflow-hidden flex-1 flex flex-col">
+          <div className="px-5 py-3 border-b border-slate-200 bg-white/70 backdrop-blur flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                className="text-lg font-semibold bg-transparent text-slate-900 outline-none"
+                placeholder="Chapter title"
+              />
+              <div className="hidden sm:flex items-center gap-2 text-sm text-slate-600">
+                <Target size={14} />
+                <span>{count} words</span>
               </div>
             </div>
-          ) : (
-            <textarea
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              className="w-full h-[60vh] min-h-[420px] resize-none outline-none text-lg leading-7 text-slate-900"
-              placeholder="Start writing your story here..."
-            />
-          )}
-        </div>
 
-        <div className="px-5 py-3 border-t border-slate-200 bg-white/70 text-sm text-slate-600 flex items-center justify-between">
-          <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
-              <Clock size={14} />
-              <span>Last saved: {chapter.lastEdited}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <RotateCcw size={14} />
-              <span>Auto-save enabled</span>
+              <button
+                type="button"
+                onClick={toggleFullscreen}
+                className="px-3 py-2 rounded-md text-sm border bg-white text-slate-700 border-slate-200 hover:bg-slate-50 transition-colors"
+                title="Fullscreen Writing Mode"
+              >
+                <Maximize size={16} />
+              </button>
+              <button
+                type="button"
+                onClick={() => setPreview(!preview)}
+                className={[
+                  "px-3 py-2 rounded-md text-sm border",
+                  preview
+                    ? "bg-indigo-50 text-indigo-700 border-indigo-200"
+                    : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50",
+                ].join(" ")}
+                title="Preview"
+              >
+                <Eye size={16} />
+              </button>
+              <button
+                type="button"
+                onClick={handleSave}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-emerald-600 text-white hover:bg-emerald-500"
+              >
+                <Save size={16} />
+                Save
+              </button>
             </div>
           </div>
-          <button className="hover:text-slate-800" title="Download">
-            <Download size={14} />
-          </button>
+
+          <div className="flex-1 p-6 overflow-auto">
+            {preview ? (
+              <div className="max-w-3xl">
+                <h1 className="text-3xl font-bold text-slate-900 mb-6">{title}</h1>
+                <div className="prose max-w-none">
+                  {content.split("\n").map((p, i) => (
+                    <p key={i}>{p}</p>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <textarea
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                className="w-full h-[60vh] min-h-[420px] resize-none outline-none text-lg leading-7 text-slate-900"
+                placeholder="Start writing your story here..."
+              />
+            )}
+          </div>
+
+          <div className="px-5 py-3 border-t border-slate-200 bg-white/70 text-sm text-slate-600 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <Clock size={14} />
+                <span>Last saved: {chapter.lastEdited}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <RotateCcw size={14} />
+                <span>Auto-save enabled</span>
+              </div>
+            </div>
+            <button className="hover:text-slate-800" title="Download">
+              <Download size={14} />
+            </button>
+          </div>
         </div>
       </div>
-    </div>
+
+      {/* Render Fullscreen Mode */}
+      {isFullscreen && <FullscreenEditor />}
+    </>
   );
 };
 
