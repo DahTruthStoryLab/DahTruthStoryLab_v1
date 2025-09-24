@@ -12,7 +12,7 @@ import TOCPage2 from "./components/TOCPage2";
 import ProjectPage from "./components/ProjectPage";
 import WhoAmI from "./components/WhoAmI";
 import WriteSection from "./components/WriteSection";
-import Calendar from "./components/Calendar"; // <-- make sure filename & export match
+import Calendar from "./components/Calendar";
 
 // Simple placeholder
 const Placeholder = ({ title = "Coming soon" }) => (
@@ -29,11 +29,7 @@ function ProtectedRoute({ children }) {
   return children;
 }
 
-/**
- * Single /toc route that can render either version.
- * Use /toc?v=1 for TOCPage, /toc?v=2 (or default) for TOCPage2.
- * We remember the last choice in localStorage.
- */
+/** Selector for TOC v1/v2. Use /toc?v=1 or /toc?v=2; falls back to last choice in localStorage. */
 function TableOfContentsRouter() {
   const [params] = useSearchParams();
   const chosen = params.get("v") || localStorage.getItem("tocVersion") || "2";
@@ -62,7 +58,7 @@ export default function App() {
           }
         />
 
-        {/* Writer – support both /writer and /write */}
+        {/* Writer */}
         <Route
           path="/writer"
           element={
@@ -80,12 +76,28 @@ export default function App() {
           }
         />
 
-        {/* Table of Contents */}
+        {/* Table of Contents (selector + direct routes for testing) */}
         <Route
           path="/toc"
           element={
             <ProtectedRoute>
+              <TableOfContentsRouter />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/toc/v1"
+          element={
+            <ProtectedRoute>
               <TOCPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/toc/v2"
+          element={
+            <ProtectedRoute>
+              <TOCPage2 />
             </ProtectedRoute>
           }
         />
