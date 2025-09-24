@@ -1,5 +1,5 @@
 // src/components/Calendar.js
-import React, { useState, useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import {
   ChevronLeft,
   ChevronRight,
@@ -7,33 +7,16 @@ import {
   Target,
   Flame,
   TrendingUp,
+  ArrowLeft,
 } from "lucide-react";
-
-const STORAGE_KEY = "dahtruth-story-lab-toc-v3";
-const getDailyGoal = () => {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return null;
-    const data = JSON.parse(raw);
-    return data?.daily?.goal || null;
-  } catch {
-    return null;
-  }
-};
+import { NavLink } from "react-router-dom";
 
 export default function Calendar() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [hoveredDate, setHoveredDate] = useState(null);
 
-  const dailyGoal = getDailyGoal();
-  const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-  const monthNames = [
-    "January","February","March","April","May","June",
-    "July","August","September","October","November","December",
-  ];
-
-  // Sample writing data (replace with real data later)
+  // sample data
   const writingData = useMemo(
     () => ({
       "2025-09-15": { wordCount: 1500, projectId: 1, hasDeadline: false },
@@ -66,27 +49,11 @@ export default function Calendar() {
   );
 
   const formatDateKey = (date) =>
-    `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(
-      2,
-      "0"
-    )}-${String(date.getDate()).padStart(2, "0")}`;
+    `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
+      date.getDate()
+    ).padStart(2, "0")}`;
 
-  const isToday = (date) =>
-    new Date().toDateString() === date.toDateString();
-
-  const navigateMonth = (direction) => {
-    setCurrentMonth((prev) => {
-      const d = new Date(prev);
-      d.setMonth(prev.getMonth() + direction);
-      return d;
-    });
-  };
-
-  const jumpToToday = () => {
-    const d = new Date();
-    setCurrentMonth(new Date(d.getFullYear(), d.getMonth(), 1));
-    setSelectedDate(d);
-  };
+  const isToday = (date) => date.toDateString() === new Date().toDateString();
 
   const getDaysInMonth = (date) => {
     const year = date.getFullYear();
@@ -97,19 +64,16 @@ export default function Calendar() {
     const startDow = first.getDay();
 
     const days = [];
-    // prev month fillers
+    // prev
     const prevMonthLast = new Date(year, month, 0).getDate();
     for (let i = startDow - 1; i >= 0; i--) {
-      days.push({
-        date: new Date(year, month - 1, prevMonthLast - i),
-        isCurrentMonth: false,
-      });
+      days.push({ date: new Date(year, month - 1, prevMonthLast - i), isCurrentMonth: false });
     }
-    // this month
+    // current
     for (let i = 1; i <= daysInMonth; i++) {
       days.push({ date: new Date(year, month, i), isCurrentMonth: true });
     }
-    // next month fillers
+    // next
     const remaining = 42 - days.length;
     for (let i = 1; i <= remaining; i++) {
       days.push({ date: new Date(year, month + 1, i), isCurrentMonth: false });
@@ -117,17 +81,24 @@ export default function Calendar() {
     return days;
   };
 
+  const navigateMonth = (dir) => {
+    setCurrentMonth((prev) => {
+      const d = new Date(prev);
+      d.setMonth(prev.getMonth() + dir);
+      return d;
+    });
+  };
+
   const calculateStreak = () => {
     let streak = 0;
-    const cursor = new Date();
+    const cur = new Date();
+    const check = new Date(cur);
     while (true) {
-      const key = formatDateKey(cursor);
-      if ((writingData[key]?.wordCount || 0) > 0) {
+      const k = formatDateKey(check);
+      if ((writingData[k]?.wordCount || 0) > 0) {
         streak++;
-        cursor.setDate(cursor.getDate() - 1);
-      } else {
-        break;
-      }
+        check.setDate(check.getDate() - 1);
+      } else break;
     }
     return streak;
   };
@@ -135,259 +106,184 @@ export default function Calendar() {
   const getMonthStats = () => {
     const y = currentMonth.getFullYear();
     const m = currentMonth.getMonth();
-    let totalWords = 0,
-      writingDays = 0,
-      deadlines = 0,
-      maxWords = 0;
+    let totalWords = 0;
+    let writingDays = 0;
+    let deadlines = 0;
 
-    Object.entries(writingData).forEach(([key, data]) => {
-      const d = new Date(key);
+    Object.entries(writingData).forEach(([k, v]) => {
+      const d = new Date(k);
       if (d.getFullYear() === y && d.getMonth() === m) {
-        const wc = data.wordCount || 0;
+        const wc = v.wordCount || 0;
         totalWords += wc;
         if (wc > 0) writingDays++;
-        if (data.hasDeadline) deadlines++;
-        maxWords = Math.max(maxWords, wc);
+        if (v.hasDeadline) deadlines++;
       }
     });
 
-    return { totalWords, writingDays, deadlines, maxWords };
+    return { totalWords, writingDays, deadlines };
   };
 
   const stats = getMonthStats();
   const currentStreak = calculateStreak();
   const days = getDaysInMonth(currentMonth);
 
-  // heat amount (0..1) for a given date key
-  const heat = (key) => {
-    const wc = writingData[key]?.wordCount || 0;
-    if (!stats.maxWords) return 0;
-    return Math.min(1, wc / stats.maxWords);
-  };
-
-  // Mini progress (0..1) vs daily goal
-  const dayProgress = (wc) => {
-    if (!dailyGoal || !wc) return 0;
-    return Math.min(1, wc / dailyGoal);
-  };
+  const weekDays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const monthNames = [
+    "January","February","March","April","May","June",
+    "July","August","September","October","November","December"
+  ];
 
   return (
-    <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-slate-950 via-slate-950 to-slate-900 p-8">
-      {/* ambient blobs */}
-      <div className="pointer-events-none absolute inset-0 opacity-20">
-        <div className="absolute -top-10 -left-10 w-72 h-72 bg-sky-400/30 blur-3xl rounded-full" />
-        <div className="absolute bottom-0 right-0 w-96 h-96 bg-indigo-400/25 blur-3xl rounded-full" />
-      </div>
+    <div className="min-h-screen bg-gradient-to-br from-blue-950 via-indigo-950 to-blue-900 p-6 sm:p-8">
+      <div className="max-w-6xl mx-auto">
+        {/* Back to Dashboard */}
+        <div className="mb-6">
+          <NavLink
+            to="/dashboard"
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-white/10 text-white border border-white/20 hover:bg-white/15 backdrop-blur"
+          >
+            <ArrowLeft size={16} />
+            Back to Dashboard
+          </NavLink>
+        </div>
 
-      <div className="relative max-w-5xl mx-auto">
-        {/* Header */}
+        {/* header */}
         <div className="mb-8 text-center">
-          <h1 className="text-4xl font-bold text-white font-serif mb-2">
-            Writing Calendar
-          </h1>
-          <p className="text-sky-200">Track your writing journey</p>
+          <h1 className="text-4xl font-bold text-white font-serif mb-2">Writing Calendar</h1>
+          <p className="text-slate-300">Track your writing journey</p>
         </div>
 
-        {/* Stats Row (lighter glass) */}
+        {/* stats — lighter glass */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          {[
-            {
-              label: "Current Streak",
-              value: `${currentStreak} days`,
-              Icon: Flame,
-              iconClass: "text-orange-300",
-            },
-            {
-              label: "Words This Month",
-              value: stats.totalWords.toLocaleString(),
-              Icon: PenTool,
-              iconClass: "text-sky-300",
-            },
-            {
-              label: "Writing Days",
-              value: stats.writingDays,
-              Icon: TrendingUp,
-              iconClass: "text-emerald-300",
-            },
-            {
-              label: "Deadlines",
-              value: stats.deadlines,
-              Icon: Target,
-              iconClass: "text-rose-300",
-            },
-          ].map(({ label, value, Icon, iconClass }) => (
-            <div
-              key={label}
-              className="relative bg-white/15 backdrop-blur-xl rounded-2xl p-4 border border-white/20 shadow-xl overflow-hidden"
-            >
-              <div className="absolute inset-0 bg-gradient-to-tr from-white/10 to-transparent opacity-70" />
-              <div className="flex items-center justify-between relative">
-                <div>
-                  <p className="text-sky-200 text-xs font-serif">{label}</p>
-                  <p className="text-2xl font-bold text-white">{value}</p>
-                </div>
-                <Icon className={`h-8 w-8 ${iconClass}`} />
+          <div className="bg-white/70 text-slate-900 backdrop-blur-xl rounded-2xl p-4 border border-slate-200 shadow-xl">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-slate-700">Current Streak</p>
+                <p className="text-2xl font-bold">{currentStreak} days</p>
               </div>
+              <Flame className="h-8 w-8 text-orange-500" />
             </div>
-          ))}
+          </div>
+          <div className="bg-white/70 text-slate-900 backdrop-blur-xl rounded-2xl p-4 border border-slate-200 shadow-xl">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-slate-700">Words This Month</p>
+                <p className="text-2xl font-bold">{stats.totalWords.toLocaleString()}</p>
+              </div>
+              <PenTool className="h-8 w-8 text-sky-600" />
+            </div>
+          </div>
+          <div className="bg-white/70 text-slate-900 backdrop-blur-xl rounded-2xl p-4 border border-slate-200 shadow-xl">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-slate-700">Writing Days</p>
+                <p className="text-2xl font-bold">{stats.writingDays}</p>
+              </div>
+              <TrendingUp className="h-8 w-8 text-emerald-600" />
+            </div>
+          </div>
+          <div className="bg-white/70 text-slate-900 backdrop-blur-xl rounded-2xl p-4 border border-slate-200 shadow-xl">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-slate-700">Deadlines</p>
+                <p className="text-2xl font-bold">{stats.deadlines}</p>
+              </div>
+              <Target className="h-8 w-8 text-rose-600" />
+            </div>
+          </div>
         </div>
 
-        {/* Calendar Card (lighter glass) */}
-        <div className="relative bg-white/15 backdrop-blur-2xl rounded-3xl shadow-2xl p-6 md:p-8 border border-white/20 overflow-hidden">
-          {/* sheen */}
-          <div className="pointer-events-none absolute -top-24 left-1/2 -translate-x-1/2 w-[120%] h-48 bg-gradient-to-b from-white/20 to-transparent rounded-full blur-2xl" />
-
-          {/* Calendar Header */}
+        {/* calendar card — light sky-ish */}
+        <div className="bg-white/80 text-slate-900 backdrop-blur-2xl rounded-3xl shadow-2xl p-6 md:p-8 border border-slate-200">
+          {/* header */}
           <div className="flex items-center justify-between mb-6">
             <button
               onClick={() => navigateMonth(-1)}
-              className="p-2 rounded-xl bg-white/15 hover:bg-white/25 text-sky-100 hover:text-white transition-all duration-300 border border-white/20"
+              className="p-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-50"
               aria-label="Previous month"
             >
               <ChevronLeft className="h-5 w-5" />
             </button>
-
-            <div className="flex items-center gap-3">
-              <h2 className="text-2xl font-bold text-white font-serif">
-                {monthNames[currentMonth.getMonth()]}{" "}
-                {currentMonth.getFullYear()}
-              </h2>
-              <button
-                onClick={jumpToToday}
-                className="px-3 py-1.5 rounded-full text-xs bg-white/20 hover:bg-white/30 text-white/90 border border-white/30 transition-all"
-              >
-                Today
-              </button>
-            </div>
-
+            <h2 className="text-2xl font-bold font-serif">
+              {monthNames[currentMonth.getMonth()]} {currentMonth.getFullYear()}
+            </h2>
             <button
               onClick={() => navigateMonth(1)}
-              className="p-2 rounded-xl bg-white/15 hover:bg-white/25 text-sky-100 hover:text-white transition-all duration-300 border border-white/20"
+              className="p-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-50"
               aria-label="Next month"
             >
               <ChevronRight className="h-5 w-5" />
             </button>
           </div>
 
-          {/* Week Days */}
+          {/* weekdays */}
           <div className="grid grid-cols-7 gap-2 mb-3">
             {weekDays.map((d) => (
-              <div
-                key={d}
-                className="text-center text-sky-200/90 font-semibold text-xs tracking-wide"
-              >
+              <div key={d} className="text-center text-slate-600 font-semibold text-xs tracking-wide">
                 {d}
               </div>
             ))}
           </div>
 
-          {/* Days */}
+          {/* days */}
           <div className="grid grid-cols-7 gap-2">
-            {days.map((day, idx) => {
-              const dateKey = formatDateKey(day.date);
-              const dayData = writingData[dateKey];
-              const hasWriting = (dayData?.wordCount || 0) > 0;
-              const hasDeadline = !!dayData?.hasDeadline;
-              const selected =
-                selectedDate?.toDateString() === day.date.toDateString();
-              const heatAmt = heat(dateKey); // 0..1
-              const prog = dayProgress(dayData?.wordCount || 0); // 0..1
+            {getDaysInMonth(currentMonth).map((day, idx) => {
+              const key = formatDateKey(day.date);
+              const data = writingData[key];
+              const hasWriting = (data?.wordCount || 0) > 0;
+              const hasDeadline = !!data?.hasDeadline;
+              const selected = selectedDate?.toDateString() === day.date.toDateString();
 
               return (
                 <div
                   key={idx}
-                  onMouseEnter={() => setHoveredDate(dateKey)}
+                  onMouseEnter={() => setHoveredDate(key)}
                   onMouseLeave={() => setHoveredDate(null)}
                   onClick={() => setSelectedDate(day.date)}
                   className={[
-                    "relative h-20 p-2 rounded-2xl transition-all duration-300 cursor-pointer group overflow-hidden border",
-                    day.isCurrentMonth
-                      ? "bg-white/18"
-                      : "bg-white/10 opacity-70",
-                    isToday(day.date) ? "ring-2 ring-sky-300" : "",
-                    selected ? "outline outline-2 outline-teal-300/70" : "",
-                    "hover:scale-[1.03] hover:shadow-xl border-white/20",
+                    "relative h-20 p-2 rounded-2xl transition-all duration-200 cursor-pointer",
+                    day.isCurrentMonth ? "bg-sky-50" : "bg-slate-100/60",
+                    "border border-slate-200",
+                    "hover:shadow-md hover:bg-sky-100",
+                    isToday(day.date) ? "ring-2 ring-sky-400" : "",
+                    selected ? "outline outline-2 outline-teal-500/70" : "",
                   ].join(" ")}
                 >
-                  {/* heat overlay */}
-                  <div
-                    className="absolute inset-0 pointer-events-none"
-                    style={{
-                      background: `linear-gradient(180deg, rgba(16,185,129,${
-                        0.14 + 0.28 * heatAmt
-                      }) 0%, rgba(16,185,129,${0.08 * heatAmt}) 100%)`,
-                      opacity: hasWriting ? 1 : 0,
-                    }}
-                  />
-
-                  {/* glow border on hover */}
-                  <div
-                    className="absolute -inset-px rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity"
-                    style={{
-                      background:
-                        "linear-gradient(135deg, rgba(56,189,248,0.35), rgba(99,102,241,0.3))",
-                      WebkitMask:
-                        "linear-gradient(#000, #000) content-box, linear-gradient(#000, #000)",
-                      WebkitMaskComposite: "xor",
-                      maskComposite: "exclude",
-                      padding: 1,
-                    }}
-                  />
-
-                  <div className="relative flex flex-col h-full justify-between">
+                  <div className="flex flex-col h-full justify-between">
                     <div className="flex items-start justify-between">
                       <span
                         className={`text-sm font-medium ${
-                          day.isCurrentMonth
-                            ? "text-white"
-                            : "text-sky-100/70"
+                          day.isCurrentMonth ? "text-slate-800" : "text-slate-500"
                         }`}
                       >
                         {day.date.getDate()}
                       </span>
                       {hasDeadline && (
-                        <span className="px-1.5 py-0.5 rounded-md text-[10px] bg-rose-500/25 text-rose-100 border border-rose-300/40">
+                        <span className="px-1.5 py-0.5 rounded-md text-[10px] bg-rose-100 text-rose-700 border border-rose-200">
                           Due
                         </span>
                       )}
                     </div>
 
-                    {/* mini progress bar vs daily goal */}
-                    {day.isCurrentMonth && dailyGoal && (
-                      <div className="w-full h-1.5 bg-white/20 rounded-full overflow-hidden mt-1">
-                        <div
-                          className="h-full rounded-full bg-gradient-to-r from-teal-300 to-emerald-300 transition-all"
-                          style={{ width: `${prog * 100}%` }}
-                        />
+                    {hasWriting && (
+                      <div className="text-[11px] text-emerald-700 font-semibold">
+                        {data.wordCount.toLocaleString()} w
                       </div>
                     )}
 
-                    <div className="flex items-center justify-between">
-                      {hasWriting ? (
-                        <div className="text-[11px] text-teal-100 font-semibold">
-                          {dayData.wordCount.toLocaleString()} w
-                        </div>
-                      ) : (
-                        <span />
-                      )}
-                      {day.isCurrentMonth && (
-                        <div className="flex gap-1">
-                          {hasWriting && (
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-200" />
-                          )}
-                          {hasDeadline && (
-                            <span className="w-1.5 h-1.5 rounded-full bg-rose-200" />
-                          )}
-                        </div>
-                      )}
-                    </div>
+                    {day.isCurrentMonth && (
+                      <div className="flex gap-1 justify-end">
+                        {hasWriting && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />}
+                        {hasDeadline && <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />}
+                      </div>
+                    )}
                   </div>
 
-                  {/* Tooltip */}
-                  {hoveredDate === dateKey && (hasWriting || hasDeadline) && (
+                  {/* tooltip */}
+                  {hoveredDate === key && (hasWriting || hasDeadline) && (
                     <div className="absolute z-20 bottom-full mb-2 left-1/2 -translate-x-1/2 w-56">
-                      <div className="bg-white/20 backdrop-blur-xl border border-white/30 rounded-xl p-3 shadow-2xl">
-                        <div className="text-white text-sm font-semibold">
+                      <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-2xl">
+                        <div className="text-slate-900 text-sm font-semibold">
                           {day.date.toLocaleDateString("en-US", {
                             weekday: "short",
                             month: "short",
@@ -395,22 +291,12 @@ export default function Calendar() {
                           })}
                         </div>
                         {hasWriting && (
-                          <div className="text-teal-50 text-xs mt-1">
-                            <span className="font-semibold">
-                              {dayData.wordCount.toLocaleString()}
-                            </span>{" "}
-                            words written
-                            {dailyGoal
-                              ? ` • ${Math.round(
-                                  (dayData.wordCount / dailyGoal) * 100
-                                )}% of goal`
-                              : ""}
+                          <div className="text-slate-700 text-xs mt-1">
+                            <span className="font-semibold">{data.wordCount.toLocaleString()}</span> words written
                           </div>
                         )}
                         {hasDeadline && (
-                          <div className="text-rose-50 text-xs mt-1">
-                            📅 {dayData.deadlineTitle}
-                          </div>
+                          <div className="text-rose-700 text-xs mt-1">📅 {data.deadlineTitle}</div>
                         )}
                       </div>
                     </div>
@@ -420,19 +306,19 @@ export default function Calendar() {
             })}
           </div>
 
-          {/* Legend */}
+          {/* legend */}
           <div className="mt-6 flex flex-wrap gap-6 justify-center text-sm">
             <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-emerald-300" />
-              <span className="text-sky-50/90">Writing Session</span>
+              <div className="w-2 h-2 rounded-full bg-emerald-500" />
+              <span className="text-slate-700">Writing Session</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="w-2 h-2 rounded-full bg-rose-300" />
-              <span className="text-sky-50/90">Deadline</span>
+              <div className="w-2 h-2 rounded-full bg-rose-500" />
+              <span className="text-slate-700">Deadline</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="ring-2 ring-sky-300 w-4 h-4 rounded" />
-              <span className="text-sky-50/90">Today</span>
+              <div className="ring-2 ring-sky-400 w-4 h-4 rounded" />
+              <span className="text-slate-700">Today</span>
             </div>
           </div>
         </div>
