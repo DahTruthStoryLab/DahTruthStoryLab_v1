@@ -66,17 +66,17 @@ const TopBanner = ({ bookTitle }) => {
     <div className="sticky top-0 z-50 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <div className="h-16 flex items-center justify-between">
+          <div className="font-extrabold tracking-wide">Story Lab</div>
+
+          <div className="text-center">
+            <div className="text-sm opacity-90">Creative Workshop</div>
+            <div className="text-lg font-semibold">DahTruth Platform</div>
+          </div>
+
           <button className="inline-flex items-center gap-2 rounded-xl bg-white/15 hover:bg-white/25 px-3 py-2 text-sm font-medium border border-white/20">
             <ArrowLeft size={16} />
             Back to Dashboard
           </button>
-
-          <div className="text-center">
-            <div className="text-sm opacity-90">Story Lab</div>
-            <div className="text-lg font-semibold">Creative Workshop</div>
-          </div>
-
-          <div className="w-[120px]"></div>
         </div>
       </div>
     </div>
@@ -88,33 +88,33 @@ const TopBanner = ({ bookTitle }) => {
 ========================================================= */
 const FeatureCard = ({ icon: Icon, title, status, description, onClick }) => {
   const statusColors = {
-    'Ready': 'bg-green-100 text-green-800 border-green-200',
-    'Beta': 'bg-blue-100 text-blue-800 border-blue-200',
-    'Coming Soon': 'bg-gray-100 text-gray-700 border-gray-200'
+    'Ready': 'bg-green-500/20 text-green-300 border-green-400/30',
+    'Beta': 'bg-blue-500/20 text-blue-300 border-blue-400/30',
+    'Coming Soon': 'bg-gray-500/20 text-gray-300 border-gray-400/30'
   };
 
   return (
     <div 
       onClick={onClick}
-      className="bg-white/90 backdrop-blur-sm rounded-2xl p-6 border border-slate-200 hover:border-indigo-300 hover:shadow-lg transition-all cursor-pointer group"
+      className="bg-white/10 backdrop-blur-xl rounded-2xl p-6 border border-cyan-500/20 hover:border-cyan-400/40 transition-all cursor-pointer group hover:shadow-lg hover:shadow-cyan-500/10"
     >
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-start gap-4">
-          <div className="p-3 bg-indigo-50 rounded-xl group-hover:bg-indigo-100 transition-all border border-indigo-100">
-            <Icon className="w-6 h-6 text-indigo-600" />
+          <div className="p-3 bg-cyan-500/10 rounded-xl group-hover:bg-cyan-500/20 transition-all backdrop-blur-sm border border-cyan-400/20">
+            <Icon className="w-6 h-6 text-cyan-300" />
           </div>
           <div className="flex-1">
-            <h3 className="text-lg font-semibold text-slate-800 mb-2">{title}</h3>
+            <h3 className="text-lg font-semibold text-white mb-2">{title}</h3>
             {status && (
-              <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium border ${statusColors[status]}`}>
+              <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium border backdrop-blur-sm ${statusColors[status]}`}>
                 {status}
               </span>
             )}
           </div>
         </div>
-        <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-indigo-500 transition-colors mt-1" />
+        <ChevronRight className="w-5 h-5 text-cyan-400/60 group-hover:text-cyan-300 transition-colors mt-1" />
       </div>
-      <p className="text-slate-600 text-sm leading-relaxed">{description}</p>
+      <p className="text-cyan-100/70 text-sm leading-relaxed">{description}</p>
     </div>
   );
 };
@@ -122,14 +122,14 @@ const FeatureCard = ({ icon: Icon, title, status, description, onClick }) => {
 const SectionHeader = ({ icon, title, subtitle }) => {
   return (
     <div className="flex items-start gap-3 mb-8">
-      <div className="p-3 bg-indigo-50 rounded-xl border border-indigo-100">
+      <div className="p-3 bg-gradient-to-br from-cyan-500/20 to-blue-500/20 rounded-xl backdrop-blur-sm border border-cyan-400/20">
         <span className="text-2xl">{icon}</span>
       </div>
       <div>
-        <h2 className="text-3xl font-bold text-slate-800 mb-2">
+        <h2 className="text-3xl font-bold bg-gradient-to-r from-cyan-300 to-blue-400 bg-clip-text text-transparent mb-2">
           {title}
         </h2>
-        {subtitle && <p className="text-slate-600">{subtitle}</p>}
+        {subtitle && <p className="text-cyan-200/70">{subtitle}</p>}
       </div>
     </div>
   );
@@ -386,35 +386,35 @@ export default function StoryLab() {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-indigo-50">
+    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-slate-950">
       <TopBanner />
       
       <div className="max-w-7xl mx-auto px-6 py-12">
         {/* Hero Section */}
         <div className="text-center mb-16">
-          <h1 className="text-4xl md:text-5xl font-bold text-slate-800 mb-4">
+          <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-cyan-300 to-blue-400 bg-clip-text text-transparent mb-4">
             The All-in-One Writing Platform
           </h1>
-          <p className="text-xl text-slate-600 mb-8">
+          <p className="text-xl text-cyan-200/80 mb-8">
             Where creativity meets discipline. Blend AI assistance, community support,<br />
             character tracking and faith-based reflection in one seamless writing experience.
           </p>
           
           {/* Feature Pills */}
           <div className="flex flex-wrap justify-center gap-4 mb-12">
-            <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-yellow-100 border border-yellow-200 text-yellow-800">
+            <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-yellow-400/20 border border-yellow-400/50 text-yellow-400 backdrop-blur-sm">
               <Sparkles className="w-4 h-4" />
               <span className="text-sm font-medium">AI-Powered Assistance</span>
             </div>
-            <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-blue-100 border border-blue-200 text-blue-800">
+            <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-blue-500/20 border border-blue-400/50 text-blue-300 backdrop-blur-sm">
               <Users className="w-4 h-4" />
               <span className="text-sm font-medium">Writing Community</span>
             </div>
-            <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-green-100 border border-green-200 text-green-800">
+            <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-500/20 border border-emerald-400/50 text-emerald-300 backdrop-blur-sm">
               <Layers className="w-4 h-4" />
               <span className="text-sm font-medium">Organization Tools</span>
             </div>
-            <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-purple-100 border border-purple-200 text-purple-800">
+            <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-purple-500/20 border border-purple-400/50 text-purple-300 backdrop-blur-sm">
               <Heart className="w-4 h-4" />
               <span className="text-sm font-medium">Faith Integration</span>
             </div>
@@ -423,8 +423,8 @@ export default function StoryLab() {
 
         {/* Chapter Info Bar */}
         {chapters.length > 0 && (
-          <div className="mb-12 p-4 bg-indigo-50 rounded-xl border border-indigo-200">
-            <div className="flex items-center gap-3 text-indigo-700">
+          <div className="mb-12 p-4 bg-gradient-to-r from-cyan-500/10 to-blue-500/10 backdrop-blur-xl rounded-xl border border-cyan-500/20">
+            <div className="flex items-center gap-3 text-cyan-300">
               <BookOpen className="w-5 h-5" />
               <span>
                 {chapters.length} chapter{chapters.length > 1 ? 's' : ''} loaded from your story
@@ -445,36 +445,36 @@ export default function StoryLab() {
               onClick={() => setActiveSection('prompts')}
               className={`rounded-2xl p-5 border transition-all text-left ${
                 activeSection === 'prompts'
-                  ? 'bg-indigo-50 border-indigo-300 text-indigo-800'
-                  : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                  ? 'bg-cyan-500/20 border-cyan-400/50 text-cyan-100'
+                  : 'bg-white/5 border-white/10 text-white/80 hover:bg-white/10'
               }`}
             >
               <div className="text-lg font-semibold mb-1">Story Prompts Workshop</div>
-              <div className="text-sm opacity-80">Generates prompts from themes, conflicts, and your characters.</div>
+              <div className="text-sm text-cyan-200/80">Generates prompts from themes, conflicts, and your characters.</div>
             </button>
 
             <button
               onClick={() => setActiveSection('clothesline')}
               className={`rounded-2xl p-5 border transition-all text-left ${
                 activeSection === 'clothesline'
-                  ? 'bg-indigo-50 border-indigo-300 text-indigo-800'
-                  : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                  ? 'bg-cyan-500/20 border-cyan-400/50 text-cyan-100'
+                  : 'bg-white/5 border-white/10 text-white/80 hover:bg-white/10'
               }`}
             >
               <div className="text-lg font-semibold mb-1">Clothes Pin Workshop</div>
-              <div className="text-sm opacity-80">Visual cards to summarize characters and roles.</div>
+              <div className="text-sm text-cyan-200/80">Visual cards to summarize characters and roles.</div>
             </button>
 
             <button
               onClick={() => setActiveSection('hfl')}
               className={`rounded-2xl p-5 border transition-all text-left ${
                 activeSection === 'hfl'
-                  ? 'bg-indigo-50 border-indigo-300 text-indigo-800'
-                  : 'bg-white border-slate-200 text-slate-700 hover:bg-slate-50'
+                  ? 'bg-cyan-500/20 border-cyan-400/50 text-cyan-100'
+                  : 'bg-white/5 border-white/10 text-white/80 hover:bg-white/10'
               }`}
             >
               <div className="text-lg font-semibold mb-1">Hopes, Fears & Legacy</div>
-              <div className="text-sm opacity-80">Pulls sentences that reveal drives and long-term aims.</div>
+              <div className="text-sm text-cyan-200/80">Pulls sentences that reveal drives and long-term aims.</div>
             </button>
           </div>
 
