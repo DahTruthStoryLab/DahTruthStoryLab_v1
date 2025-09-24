@@ -17,7 +17,9 @@ const getProject = () => {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     return raw ? JSON.parse(raw) : null;
-  } catch { return null; }
+  } catch { 
+    return null; 
+  }
 };
 
 const setProject = (project) => {
@@ -67,7 +69,9 @@ function guessCharacters(text) {
   const names = new Set();
   const tokens = (text || '').match(/\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2}\b/g) || [];
   tokens.forEach(t => {
-    if (!['I', 'The', 'A', 'And', 'But', 'Then', 'Now', 'When', 'Where'].includes(t)) names.add(t.trim());
+    if (!['I', 'The', 'A', 'And', 'But', 'Then', 'Now', 'When', 'Where'].includes(t)) {
+      names.add(t.trim());
+    }
   });
   return Array.from(names).slice(0, 50);
 }
@@ -77,7 +81,9 @@ function extractConflicts(text) {
   const needles = ['conflict', 'tension', 'argument', 'fight', 'feud', 'rivalry', 'obstacle', 'problem', 'challenge', 'struggle', 'battle'];
   const sentences = splitSentences(text);
   sentences.forEach(s => {
-    if (needles.some(n => s.toLowerCase().includes(n))) hits.push(s.trim());
+    if (needles.some(n => s.toLowerCase().includes(n))) {
+      hits.push(s.trim());
+    }
   });
   return hits;
 }
@@ -103,7 +109,7 @@ function analyzeStoryStructure(chapters) {
   const total = chapters.length;
   if (total === 0) return { act: 'setup', phase: 'beginning' };
   
-  const currentIndex = 0; // Could be dynamic based on selected chapter
+  const currentIndex = 0;
   const progress = currentIndex / total;
   
   if (progress < 0.25) return { act: 'setup', phase: 'beginning' };
@@ -114,7 +120,7 @@ function analyzeStoryStructure(chapters) {
 /* =========================================================
    TOP BANNER
 ========================================================= */
-const TopBanner = ({ bookTitle }) => {
+const TopBanner = () => {
   return (
     <div className="sticky top-0 z-50 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
@@ -185,7 +191,7 @@ function generateEnhancedPrompts(chapters, characters, selectedChapter) {
   
   const prompts = [];
 
-  // Sprint prompts (5-15 min)
+  // Sprint prompts
   prompts.push(
     { category: 'sprint', text: 'Write a 100-word scene showing (don\'t tell) your protagonist\'s biggest fear.', difficulty: 1 },
     { category: 'sprint', text: 'Describe your setting through the five senses in exactly 50 words.', difficulty: 1 },
@@ -246,7 +252,7 @@ function generateEnhancedPrompts(chapters, characters, selectedChapter) {
   });
 
   conflicts.forEach((conflict, i) => {
-    if (i < 2) { // Limit to avoid too many
+    if (i < 2) {
       prompts.push({
         category: 'plot',
         text: `Escalate this conflict: "${conflict.substring(0, 60)}..." What's the next step?`,
@@ -420,7 +426,6 @@ const StoryPromptsWorkshop = ({
         if (prompt.difficulty !== difficulty) return false;
       }
       if (!showContextual && prompt.contextual) return false;
-      // Hide prompts that are marked as 'skip'
       if (promptStatuses[prompt.id] === 'skip') return false;
       return true;
     });
@@ -557,7 +562,7 @@ const StoryPromptsWorkshop = ({
 };
 
 /* =========================================================
-   OTHER WORKSHOP COMPONENTS (simplified for space)
+   OTHER WORKSHOP COMPONENTS
 ========================================================= */
 const ClotheslineWorkshop = ({ characters }) => {
   return (
