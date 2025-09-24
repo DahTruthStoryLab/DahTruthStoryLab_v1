@@ -85,7 +85,7 @@ export default function App() {
           path="/toc"
           element={
             <ProtectedRoute>
-              <TableOfContentsRouter />
+              <TOCPage />
             </ProtectedRoute>
           }
         />
