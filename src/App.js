@@ -2,9 +2,7 @@
 import React from "react";
 import { BrowserRouter as Router, Routes, Route, useSearchParams } from "react-router-dom";
 
-// ⚠️ Do NOT configure Amplify here (it’s already in src/index.js)
-
-// PAGES (using your current components folder)
+// PAGES
 import LandingPage from "./components/LandingPage";
 import RegistrationPage from "./components/RegistrationPage";
 import SignInPage from "./components/SignInPage";
@@ -13,12 +11,10 @@ import TOCPage from "./components/TOCPage";
 import TOCPage2 from "./components/TOCPage2";
 import ProjectPage from "./components/ProjectPage";
 import WhoAmI from "./components/WhoAmI";
-import Calendar from "./components/Calendar";
-
-// ✅ Writer is in /components per your file
 import WriteSection from "./components/WriteSection";
+import Calendar from "./components/Calendar"; // <-- make sure filename & export match
 
-// Tiny inline placeholder for pages you’ll build later
+// Simple placeholder
 const Placeholder = ({ title = "Coming soon" }) => (
   <div className="min-h-[60vh] flex items-center justify-center text-slate-200">
     <div className="text-center">
@@ -28,25 +24,22 @@ const Placeholder = ({ title = "Coming soon" }) => (
   </div>
 );
 
-// For now: bypass auth while you wire pages. Later you can enforce Auth here.
+// (Auth temporarily bypassed)
 function ProtectedRoute({ children }) {
   return children;
 }
 
-/** ── Wrapper: single /toc route that can render TOCPage or TOCPage2 ──
- *  Use /toc?v=1 for TOCPage  (classic)
- *  Use /toc?v=2 for TOCPage2 (default)
- *  /toc (no query) will remember your last choice in localStorage.
+/**
+ * Single /toc route that can render either version.
+ * Use /toc?v=1 for TOCPage, /toc?v=2 (or default) for TOCPage2.
+ * We remember the last choice in localStorage.
  */
 function TableOfContentsRouter() {
   const [params] = useSearchParams();
-  const saved = typeof window !== "undefined" ? localStorage.getItem("tocVersion") : null;
-  const chosen = params.get("v") || saved || "2";
-
-  if (typeof window !== "undefined" && chosen !== saved) {
+  const chosen = params.get("v") || localStorage.getItem("tocVersion") || "2";
+  if (chosen !== localStorage.getItem("tocVersion")) {
     localStorage.setItem("tocVersion", chosen);
   }
-
   return chosen === "1" ? <TOCPage /> : <TOCPage2 />;
 }
 
@@ -59,7 +52,7 @@ export default function App() {
         <Route path="/signin" element={<SignInPage />} />
         <Route path="/auth/register" element={<RegistrationPage />} />
 
-        {/* Protected (temporarily open via ProtectedRoute) */}
+        {/* Protected */}
         <Route
           path="/dashboard"
           element={
@@ -69,7 +62,7 @@ export default function App() {
           }
         />
 
-        {/* Writer – support both /writer and /write just in case */}
+        {/* Writer – support both /writer and /write */}
         <Route
           path="/writer"
           element={
@@ -87,7 +80,7 @@ export default function App() {
           }
         />
 
-        {/* Table of Contents (single route + wrapper) */}
+        {/* Table of Contents */}
         <Route
           path="/toc"
           element={
@@ -105,17 +98,20 @@ export default function App() {
               <ProjectPage />
             </ProtectedRoute>
           }
-          />
-            
-     <Route
-      path="/calendar"
-      element={
-        <ProtectedRoute>
-          <Calendar />
-        </ProtectedRoute>
-      }
-      />
+        />
 
+        {/* Calendar */}
+        <Route
+          path="/calendar"
+          element={
+            <ProtectedRoute>
+              <Calendar />
+            </ProtectedRoute>
+          }
+        />
+
+        {/* Misc */}
+        <Route path="/whoami" element={<WhoAmI />} />
         <Route
           path="/story-lab"
           element={
