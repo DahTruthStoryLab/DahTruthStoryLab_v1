@@ -19,7 +19,7 @@ const Placeholder = ({ title = "Coming soon" }) => (
   <div className="min-h-[60vh] flex items-center justify-center text-slate-200">
     <div className="text-center">
       <h1 className="text-2xl font-semibold mb-1">{title}</h1>
-      <p className="text-slate-400">This page hasn’t been built yet.</p>
+      <p className="text-slate-400">This page hasn't been built yet.</p>
     </div>
   </div>
 );
@@ -58,7 +58,7 @@ export default function App() {
           }
         />
 
-        {/* Writer */}
+        {/* Writer - Multiple paths for the same component */}
         <Route
           path="/writer"
           element={
@@ -69,6 +69,14 @@ export default function App() {
         />
         <Route
           path="/write"
+          element={
+            <ProtectedRoute>
+              <WriteSection />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/story-lab"
           element={
             <ProtectedRoute>
               <WriteSection />
@@ -124,14 +132,6 @@ export default function App() {
 
         {/* Misc */}
         <Route path="/whoami" element={<WhoAmI />} />
-        <Route
-          path="/story-lab"
-          element={
-            <ProtectedRoute>
-              <Placeholder title="Story Lab" />
-            </ProtectedRoute>
-          }
-        />
         <Route
           path="/publishing"
           element={
