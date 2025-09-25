@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Copy, Check, Filter, Timer, User, TrendingUp, Feather, Globe, Star, X, Pin, Edit3,
-  Lightbulb, ArrowLeft, Save, Download, Trash2, Send
+  Lightbulb, ArrowLeft, Save, Download, Trash2, Send, FileText
 } from 'lucide-react';
 
 /* =========================================================
@@ -127,25 +127,28 @@ const PROMPT_CATEGORIES = {
 
 function generateEnhancedPrompts(chapters, characters, selectedChapter) {
   const fullText = chapters.map((c) => c.text).join('\n\n');
+  const selectedText = selectedChapter?.text || fullText;
   const structure = analyzeStoryStructure(chapters, selectedChapter);
-  const emotions = extractEmotions(fullText);
-  const conflicts = extractConflicts(fullText);
+  const emotions = extractEmotions(selectedText);
+  const conflicts = extractConflicts(selectedText);
 
   const prompts = [];
 
-  // Sprint
+  // Sprint prompts
   prompts.push(
     { category: 'sprint', text: "Write a 100-word scene showing (don't tell) your protagonist's biggest fear.", difficulty: 1 },
-    { category: 'sprint', text: 'Describe your setting through the five senses in exactly 50 words.', difficulty: 1 },
+    { category: 'sprint', text: 'Describe your current setting through the five senses in exactly 50 words.', difficulty: 1 },
     { category: 'sprint', text: 'Write dialogue that reveals a secret without stating it directly.', difficulty: 2 }
   );
 
-  // Character
-  characters.forEach((char) => {
+  // Character prompts from current story
+  const storyCharacters = guessCharacters(selectedText);
+  const charPool = storyCharacters.length ? storyCharacters : characters;
+  charPool.slice(0, 5).forEach((char) => {
     prompts.push(
-      { category: 'character', text: `Write ${char}'s origin story in 200 words. What shaped them?`, difficulty: 2 },
-      { category: 'character', text: `What does ${char} want most? Write a scene where they almost get it.`, difficulty: 3 },
-      { category: 'character', text: `Give ${char} a quirky habit that reveals their personality.`, difficulty: 1 }
+      { category: 'character', text: `Write ${char}'s origin story in 200 words. What shaped them?`, difficulty: 2, contextual: true },
+      { category: 'character', text: `What does ${char} want most in this scene? Write a moment where they almost get it.`, difficulty: 3, contextual: true },
+      { category: 'character', text: `Give ${char} a quirky habit that reveals their inner state. Show it in action.`, difficulty: 1, contextual: true }
     );
   });
 
@@ -181,7 +184,7 @@ function generateEnhancedPrompts(chapters, characters, selectedChapter) {
     { category: 'worldbuilding', text: 'Design a place where your characters go to feel safe. What makes it special?', difficulty: 2 }
   );
 
-  // Contextual: emotions/conflicts
+  // Contextual: emotions from your story
   emotions.forEach(({ sentences }) => {
     if (sentences[0]) {
       prompts.push({
@@ -193,6 +196,7 @@ function generateEnhancedPrompts(chapters, characters, selectedChapter) {
     }
   });
 
+  // Contextual: conflicts from your story
   conflicts.slice(0, 2).forEach((conflict) => {
     prompts.push({
       category: 'plot',
@@ -203,6 +207,126 @@ function generateEnhancedPrompts(chapters, characters, selectedChapter) {
   });
 
   return prompts.map((p, i) => ({ ...p, id: i }));
+}
+
+/* =========================================================
+   SCRATCHPAD COMPONENT
+========================================================= */
+function Scratchpad({ isOpen, onClose, content, onChange, onSave, onSendToChapter, onClear }) {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-blue-50 rounded-2xl w-full max-w-2xl max-h-[80vh] flex flex-col border border-blue-300 shadow-xl">
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b border-blue-200">
+          <h3 className="text-lg font-semibold text-slate-800">Writing Scratchpad</h3>
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-blue-100 rounded-lg transition-colors"
+          >
+            <X size={20} className="text-slate-600" />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 p-4">
+          <textarea
+            value={content}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder="Start writing from the prompt..."
+            className="w-full h-64 p-3 border border-blue-200 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-blue-400 text-slate-800"
+          />
+        </div>
+
+        {/* Actions */}
+        <div className="flex items-center justify-between p-4 border-t border-blue-200">
+          <div className="flex gap-2">
+            <button
+              onClick={onSave}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              <Save size={16} />
+              Save Work
+            </button>
+            <button
+              onClick={onSendToChapter}
+              className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors"
+            >
+              <Send size={16} />
+              Send to Chapter
+            </button>
+          </div>
+          <button
+            onClick={onClear}
+            className="flex items-center gap-2 px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors"
+          >
+            <Trash2 size={16} />
+            Clear
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* =========================================================
+   SAVED PROMPTS MENU
+========================================================= */
+function SavedPromptsMenu({ savedPrompts, isOpen, onClose, onLoadPrompt }) {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+      <div className="bg-blue-50 rounded-2xl w-full max-w-3xl max-h-[80vh] flex flex-col border border-blue-300 shadow-xl">
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b border-blue-200">
+          <h3 className="text-lg font-semibold text-slate-800">Saved Prompt Work</h3>
+          <button
+            onClick={onClose}
+            className="p-2 hover:bg-blue-100 rounded-lg transition-colors"
+          >
+            <X size={20} className="text-slate-600" />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 p-4 overflow-y-auto">
+          {savedPrompts.length === 0 ? (
+            <div className="text-center py-8 text-slate-600">
+              <FileText size={48} className="mx-auto mb-4 text-blue-400" />
+              <p>No saved prompt work yet</p>
+              <p className="text-sm">Work on prompts and save them to see them here</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {savedPrompts.map((item) => (
+                <div key={item.id} className="bg-white rounded-lg p-4 border border-blue-200">
+                  <div className="flex items-start justify-between mb-2">
+                    <h4 className="font-medium text-slate-800 text-sm">
+                      {item.prompt.slice(0, 80)}...
+                    </h4>
+                    <span className="text-xs text-slate-500">
+                      {new Date(item.timestamp).toLocaleDateString()}
+                    </span>
+                  </div>
+                  <p className="text-slate-700 text-sm mb-3">
+                    {item.content.slice(0, 150)}...
+                  </p>
+                  <button
+                    onClick={() => onLoadPrompt(item)}
+                    className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+                  >
+                    Load & Edit
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }
 
 /* =========================================================
@@ -274,7 +398,7 @@ function PromptCard({ prompt, onPin, onUnpin, onUse, onMarkTried, isPinned, stat
           <button
             onClick={() => onUse(prompt.text)}
             className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-blue-600 text-white text-xs hover:bg-blue-500 transition-all"
-            title="Insert into selected chapter"
+            title="Open scratchpad with this prompt"
           >
             <Edit3 size={12} />
             Use
@@ -350,6 +474,11 @@ export default function StoryPromptsWorkshop() {
   const [pinned, setPinned] = useState([]);
   const [promptStatuses, setPromptStatuses] = useState({});
   const [toast, setToast] = useState('');
+  const [scratchpadOpen, setScratchpadOpen] = useState(false);
+  const [scratchpadContent, setScratchpadContent] = useState('');
+  const [currentPrompt, setCurrentPrompt] = useState('');
+  const [savedPrompts, setSavedPrompts] = useState([]);
+  const [savedPromptsMenuOpen, setSavedPromptsMenuOpen] = useState(false);
 
   useEffect(() => {
     const loadedChapters = loadChaptersFromLocalStorage();
@@ -370,24 +499,24 @@ export default function StoryPromptsWorkshop() {
     const lab = ch?.storyLab || {};
     setPinned(Array.isArray(lab.pinned) ? lab.pinned : []);
     setPromptStatuses(lab.promptStatuses || {});
+    setScratchpadContent(lab.scratchpad || '');
+    setSavedPrompts(lab.savedPrompts || []);
   }, [selectedChapter]);
 
-  // Persist pinned & statuses
+  // Persist pinned & statuses & scratchpad
   useEffect(() => {
     if (!selectedChapter) return;
     updateChapterById(selectedChapter.id, (c) => ({
       ...c,
-      storyLab: { ...(c.storyLab || {}), pinned },
+      storyLab: { 
+        ...(c.storyLab || {}), 
+        pinned, 
+        promptStatuses, 
+        scratchpad: scratchpadContent,
+        savedPrompts 
+      },
     }));
-  }, [pinned, selectedChapter]);
-
-  useEffect(() => {
-    if (!selectedChapter) return;
-    updateChapterById(selectedChapter.id, (c) => ({
-      ...c,
-      storyLab: { ...(c.storyLab || {}), promptStatuses },
-    }));
-  }, [promptStatuses, selectedChapter]);
+  }, [pinned, promptStatuses, scratchpadContent, savedPrompts, selectedChapter]);
 
   // Actions
   const pinPrompt = (text) => setPinned((p) => (p.includes(text) ? p : [...p, text]));
@@ -395,19 +524,62 @@ export default function StoryPromptsWorkshop() {
   const updatePromptStatus = (id, status) =>
     setPromptStatuses((prev) => ({ ...prev, [id]: status }));
 
-  // Insert prompt into chapter content
+  // Open scratchpad with prompt
   const usePrompt = (text) => {
-    if (!selectedChapter) return;
+    setCurrentPrompt(text);
+    setScratchpadContent(prev => {
+      const prefix = prev && !prev.endsWith('\n') ? '\n\n' : '';
+      return `${prev}${prefix}> Prompt: ${text}\n\n`;
+    });
+    setScratchpadOpen(true);
+    setToast('Prompt added to scratchpad');
+    setTimeout(() => setToast(''), 1200);
+  };
+
+  // Save current prompt work
+  const savePromptWork = () => {
+    if (!currentPrompt || !scratchpadContent) return;
+    const promptWork = {
+      id: Date.now(),
+      prompt: currentPrompt,
+      content: scratchpadContent,
+      timestamp: new Date().toISOString(),
+      chapterId: selectedChapter?.id
+    };
+    setSavedPrompts(prev => [promptWork, ...prev]);
+    setToast('Prompt work saved');
+    setTimeout(() => setToast(''), 1200);
+  };
+
+  // Send scratchpad to chapter
+  const sendToChapter = () => {
+    if (!selectedChapter || !scratchpadContent.trim()) return;
     updateChapterById(selectedChapter.id, (c) => {
       const existing = c.content ?? c.text ?? c.body ?? '';
-      const spacer = existing && !/\n$/.test(existing) ? '\n' : '';
+      const separator = existing && !/\n$/.test(existing) ? '\n\n' : '';
       return {
         ...c,
-        content: `${existing}${spacer}\n> Prompt: ${text}\n`,
+        content: `${existing}${separator}${scratchpadContent}\n\n`,
         lastEdited: 'Just now',
       };
     });
-    setToast('Added to selected chapter');
+    setToast('Sent to chapter');
+    setTimeout(() => setToast(''), 1200);
+  };
+
+  // Clear scratchpad
+  const clearScratchpad = () => {
+    setScratchpadContent('');
+    setCurrentPrompt('');
+  };
+
+  // Load saved prompt work
+  const loadSavedPrompt = (item) => {
+    setCurrentPrompt(item.prompt);
+    setScratchpadContent(item.content);
+    setScratchpadOpen(true);
+    setSavedPromptsMenuOpen(false);
+    setToast('Loaded saved work');
     setTimeout(() => setToast(''), 1200);
   };
 
@@ -438,7 +610,7 @@ export default function StoryPromptsWorkshop() {
   }, [allPrompts, promptStatuses]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-blue-25 to-white">
+    <div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-slate-900">
       {/* Top Banner */}
       <div className="sticky top-0 z-50 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
@@ -448,16 +620,32 @@ export default function StoryPromptsWorkshop() {
               <div className="text-sm opacity-90">Enhanced Prompts</div>
               <div className="text-lg font-semibold">DahTruth Story Lab</div>
             </div>
-            <button
-              onClick={() => navigate('/story-lab')}
-              className="inline-flex items-center gap-2 rounded-xl bg-white/15 hover:bg-white/25 px-3 py-2 text-sm font-medium border border-white/20"
-            >
-              <ArrowLeft size={16} />
-              Back to Story Lab
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setSavedPromptsMenuOpen(true)}
+                className="inline-flex items-center gap-2 rounded-lg bg-white/15 hover:bg-white/25 px-3 py-2 text-sm font-medium border border-white/20"
+              >
+                <FileText size={16} />
+                Saved Work
+              </button>
+              <button
+                onClick={() => navigate('/story-lab')}
+                className="inline-flex items-center gap-2 rounded-lg bg-white/15 hover:bg-white/25 px-3 py-2 text-sm font-medium border border-white/20"
+              >
+                <ArrowLeft size={16} />
+                Back to Story Lab
+              </button>
+            </div>
           </div>
         </div>
       </div>
+
+      {/* Toast */}
+      {toast && (
+        <div className="fixed right-4 top-20 z-50 px-3 py-1.5 text-xs rounded-md bg-emerald-600 text-white shadow">
+          {toast}
+        </div>
+      )}
 
       <div className="max-w-7xl mx-auto px-6 py-12">
         {/* Chapter Selection */}
@@ -485,13 +673,6 @@ export default function StoryPromptsWorkshop() {
 
         {/* Enhanced Prompts Interface */}
         <div className="bg-white/90 backdrop-blur-xl rounded-2xl p-6 border border-blue-200 relative shadow-sm">
-          {/* Tiny toast */}
-          {toast && (
-            <div className="absolute right-4 top-4 px-3 py-1.5 text-xs rounded-md bg-emerald-600 text-white">
-              {toast}
-            </div>
-          )}
-
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
             <div>
@@ -615,6 +796,25 @@ export default function StoryPromptsWorkshop() {
           )}
         </div>
       </div>
+
+      {/* Scratchpad Modal */}
+      <Scratchpad
+        isOpen={scratchpadOpen}
+        onClose={() => setScratchpadOpen(false)}
+        content={scratchpadContent}
+        onChange={setScratchpadContent}
+        onSave={savePromptWork}
+        onSendToChapter={sendToChapter}
+        onClear={clearScratchpad}
+      />
+
+      {/* Saved Prompts Menu */}
+      <SavedPromptsMenu
+        savedPrompts={savedPrompts}
+        isOpen={savedPromptsMenuOpen}
+        onClose={() => setSavedPromptsMenuOpen(false)}
+        onLoadPrompt={loadSavedPrompt}
+      />
     </div>
   );
 }
