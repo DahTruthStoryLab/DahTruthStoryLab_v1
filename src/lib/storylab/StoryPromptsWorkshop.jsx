@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  Copy, Check, Filter, Timer, User, TrendingUp,
-  Feather, Globe, Star, X, Pin, Edit3, Lightbulb, ArrowLeft
+  Copy, Check, Filter, Timer, User, TrendingUp, Feather, Globe, Star, X, Pin, Edit3,
+  Lightbulb, ArrowLeft, Save, Download, Trash2, Send
 } from 'lucide-react';
 
 /* =========================================================
@@ -213,26 +213,26 @@ function PromptCard({ prompt, onPin, onUnpin, onUse, onMarkTried, isPinned, stat
   const CatIcon = cat?.icon;
 
   const colorClasses = {
-    emerald: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300',
-    blue: 'border-blue-500/30 bg-blue-500/10 text-blue-300',
-    purple: 'border-purple-500/30 bg-purple-500/10 text-purple-300',
-    orange: 'border-orange-500/30 bg-orange-500/10 text-orange-300',
-    teal: 'border-teal-500/30 bg-teal-500/10 text-teal-300',
+    emerald: 'border-emerald-300 bg-emerald-50 text-emerald-800',
+    blue: 'border-blue-300 bg-blue-50 text-blue-800',
+    purple: 'border-purple-300 bg-purple-50 text-purple-800',
+    orange: 'border-orange-300 bg-orange-50 text-orange-800',
+    teal: 'border-teal-300 bg-teal-50 text-teal-800',
   };
 
   const statusIcons = {
-    tried: { icon: Check, color: 'text-green-400', label: 'Tried' },
-    helpful: { icon: Star, color: 'text-yellow-400', label: 'Helpful' },
-    skip: { icon: X, color: 'text-gray-400', label: 'Skip' },
+    tried: { icon: Check, color: 'text-emerald-600', label: 'Tried' },
+    helpful: { icon: Star, color: 'text-amber-500', label: 'Helpful' },
+    skip: { icon: X, color: 'text-slate-400', label: 'Skip' },
   };
   const StatusIcon = status ? statusIcons[status]?.icon : null;
 
   return (
-    <div className="bg-white/10 backdrop-blur-xl rounded-xl p-4 border border-cyan-500/20 hover:border-cyan-400/40 transition-all group">
+    <div className="bg-white rounded-xl p-4 border border-blue-200 hover:border-blue-300 transition-all shadow-sm">
       {/* Header */}
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-2">
-          <div className={`px-2 py-1 rounded-md text-xs border backdrop-blur-sm ${cat ? colorClasses[cat.color] : ''}`}>
+          <div className={`px-2 py-1 rounded-md text-xs border ${cat ? colorClasses[cat.color] : 'border-slate-200 bg-slate-50 text-slate-700'}`}>
             {CatIcon ? <CatIcon size={12} className="inline mr-1" /> : null}
             {cat?.label || 'Prompt'}
           </div>
@@ -241,12 +241,12 @@ function PromptCard({ prompt, onPin, onUnpin, onUse, onMarkTried, isPinned, stat
               {Array.from({ length: 4 }, (_, i) => (
                 <div
                   key={i}
-                  className={`w-1.5 h-1.5 rounded-full ${i < prompt.difficulty ? 'bg-cyan-400' : 'bg-gray-600'}`}
+                  className={`w-1.5 h-1.5 rounded-full ${i < prompt.difficulty ? 'bg-blue-500' : 'bg-slate-300'}`}
                 />
               ))}
             </div>
           ) : null}
-          {cat?.time ? <span className="text-xs text-cyan-300/70">{cat.time}</span> : null}
+          {cat?.time ? <span className="text-xs text-slate-500">{cat.time}</span> : null}
         </div>
         {status && StatusIcon ? (
           <div className={`flex items-center gap-1 text-xs ${statusIcons[status].color}`}>
@@ -257,14 +257,14 @@ function PromptCard({ prompt, onPin, onUnpin, onUse, onMarkTried, isPinned, stat
       </div>
 
       {/* Prompt text */}
-      <div className="text-cyan-100/90 text-sm leading-relaxed mb-4">{prompt.text}</div>
+      <div className="text-slate-800 text-sm leading-relaxed mb-4">{prompt.text}</div>
 
       {/* Actions */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <button
             onClick={() => navigator.clipboard && navigator.clipboard.writeText(prompt.text)}
-            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-white/10 border border-white/20 hover:bg-white/15 text-xs transition-all"
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-blue-50 border border-blue-200 hover:bg-blue-100 text-xs text-slate-700 transition-all"
             title="Copy to clipboard"
           >
             <Copy size={12} />
@@ -273,7 +273,7 @@ function PromptCard({ prompt, onPin, onUnpin, onUse, onMarkTried, isPinned, stat
 
           <button
             onClick={() => onUse(prompt.text)}
-            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-indigo-600/30 border border-indigo-400/30 hover:bg-indigo-600/40 text-indigo-100 text-xs transition-all"
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-blue-600 text-white text-xs hover:bg-blue-500 transition-all"
             title="Insert into selected chapter"
           >
             <Edit3 size={12} />
@@ -283,7 +283,7 @@ function PromptCard({ prompt, onPin, onUnpin, onUse, onMarkTried, isPinned, stat
           {isPinned ? (
             <button
               onClick={() => onUnpin(prompt.text)}
-              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-yellow-600/30 border border-yellow-400/30 hover:bg-yellow-600/40 text-yellow-100 text-xs transition-all"
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-amber-100 border border-amber-200 hover:bg-amber-200 text-amber-800 text-xs transition-all"
               title="Unpin prompt"
             >
               <Check size={12} />
@@ -292,7 +292,7 @@ function PromptCard({ prompt, onPin, onUnpin, onUse, onMarkTried, isPinned, stat
           ) : (
             <button
               onClick={() => onPin(prompt.text)}
-              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-white/10 border border-white/20 hover:bg-white/15 text-xs transition-all"
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-blue-50 border border-blue-200 hover:bg-blue-100 text-xs text-slate-700 transition-all"
               title="Pin prompt"
             >
               <Pin size={12} />
@@ -307,21 +307,21 @@ function PromptCard({ prompt, onPin, onUnpin, onUse, onMarkTried, isPinned, stat
             <>
               <button
                 onClick={() => onMarkTried(prompt.id, 'tried')}
-                className="p-1.5 rounded hover:bg-green-500/20 text-green-400 transition-all"
+                className="p-1.5 rounded hover:bg-emerald-50 text-emerald-600 transition-all"
                 title="Mark as tried"
               >
                 <Check size={14} />
               </button>
               <button
                 onClick={() => onMarkTried(prompt.id, 'helpful')}
-                className="p-1.5 rounded hover:bg-yellow-500/20 text-yellow-400 transition-all"
+                className="p-1.5 rounded hover:bg-amber-50 text-amber-500 transition-all"
                 title="Mark as helpful"
               >
                 <Star size={14} />
               </button>
               <button
                 onClick={() => onMarkTried(prompt.id, 'skip')}
-                className="p-1.5 rounded hover:bg-gray-500/20 text-gray-400 transition-all"
+                className="p-1.5 rounded hover:bg-slate-50 text-slate-400 transition-all"
                 title="Skip this prompt"
               >
                 <X size={14} />
@@ -438,7 +438,7 @@ export default function StoryPromptsWorkshop() {
   }, [allPrompts, promptStatuses]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-slate-950">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-blue-25 to-white">
       {/* Top Banner */}
       <div className="sticky top-0 z-50 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
@@ -462,16 +462,16 @@ export default function StoryPromptsWorkshop() {
       <div className="max-w-7xl mx-auto px-6 py-12">
         {/* Chapter Selection */}
         {chapters.length > 1 && (
-          <div className="mb-8 p-4 bg-gradient-to-r from-cyan-500/10 to-blue-500/10 backdrop-blur-xl rounded-xl border border-cyan-500/20">
+          <div className="mb-8 p-4 bg-blue-50 backdrop-blur-xl rounded-xl border border-blue-200">
             <div className="flex items-center justify-between">
-              <span className="text-cyan-300">Working with chapter:</span>
+              <span className="text-slate-700">Working with chapter:</span>
               <select
                 value={selectedChapter?.id || ''}
                 onChange={(e) => {
                   const ch = chapters.find((c) => c.id === parseInt(e.target.value, 10));
                   setSelectedChapter(ch || null);
                 }}
-                className="px-3 py-2 bg-slate-900/40 border border-cyan-500/20 rounded-lg text-white text-sm"
+                className="px-3 py-2 bg-white border border-blue-200 rounded-lg text-slate-800 text-sm"
               >
                 {chapters.map((ch) => (
                   <option key={ch.id} value={ch.id}>
@@ -484,10 +484,10 @@ export default function StoryPromptsWorkshop() {
         )}
 
         {/* Enhanced Prompts Interface */}
-        <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-6 border border-cyan-500/20 relative">
+        <div className="bg-white/90 backdrop-blur-xl rounded-2xl p-6 border border-blue-200 relative shadow-sm">
           {/* Tiny toast */}
           {toast && (
-            <div className="absolute right-4 top-4 px-3 py-1.5 text-xs rounded-md bg-emerald-600/80 text-white">
+            <div className="absolute right-4 top-4 px-3 py-1.5 text-xs rounded-md bg-emerald-600 text-white">
               {toast}
             </div>
           )}
@@ -495,44 +495,44 @@ export default function StoryPromptsWorkshop() {
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
             <div>
-              <h1 className="text-2xl font-bold text-cyan-300 mb-2">Interactive Story Prompts</h1>
-              <p className="text-cyan-200/80 text-sm">
+              <h1 className="text-2xl font-bold text-slate-800 mb-2">Interactive Story Prompts</h1>
+              <p className="text-slate-600 text-sm">
                 Smart prompts that adapt to your story structure, characters, and writing style
               </p>
             </div>
             <div className="text-right">
-              <div className="text-2xl font-bold text-white">{filteredPrompts.length}</div>
-              <div className="text-xs text-cyan-300">Available prompts</div>
+              <div className="text-2xl font-bold text-slate-800">{filteredPrompts.length}</div>
+              <div className="text-xs text-blue-600">Available prompts</div>
             </div>
           </div>
 
           {/* Stats */}
           <div className="grid grid-cols-4 gap-4 mb-6">
-            <div className="text-center p-3 rounded-lg bg-slate-900/30 border border-slate-700/40">
-              <div className="text-lg font-bold text-white">{stats.tried}</div>
-              <div className="text-xs text-green-400">Tried</div>
+            <div className="text-center p-3 rounded-lg bg-blue-50 border border-blue-200">
+              <div className="text-lg font-bold text-slate-800">{stats.tried}</div>
+              <div className="text-xs text-green-600">Tried</div>
             </div>
-            <div className="text-center p-3 rounded-lg bg-slate-900/30 border border-slate-700/40">
-              <div className="text-lg font-bold text-white">{stats.helpful}</div>
-              <div className="text-xs text-yellow-400">Helpful</div>
+            <div className="text-center p-3 rounded-lg bg-blue-50 border border-blue-200">
+              <div className="text-lg font-bold text-slate-800">{stats.helpful}</div>
+              <div className="text-xs text-amber-600">Helpful</div>
             </div>
-            <div className="text-center p-3 rounded-lg bg-slate-900/30 border border-slate-700/40">
-              <div className="text-lg font-bold text-white">{pinned.length}</div>
-              <div className="text-xs text-cyan-400">Pinned</div>
+            <div className="text-center p-3 rounded-lg bg-blue-50 border border-blue-200">
+              <div className="text-lg font-bold text-slate-800">{pinned.length}</div>
+              <div className="text-xs text-blue-600">Pinned</div>
             </div>
-            <div className="text-center p-3 rounded-lg bg-slate-900/30 border border-slate-700/40">
-              <div className="text-lg font-bold text-white">
+            <div className="text-center p-3 rounded-lg bg-blue-50 border border-blue-200">
+              <div className="text-lg font-bold text-slate-800">
                 {stats.total - stats.tried - stats.helpful - stats.skipped}
               </div>
-              <div className="text-xs text-cyan-300">New</div>
+              <div className="text-xs text-slate-600">New</div>
             </div>
           </div>
 
           {/* Filters */}
           <div className="flex flex-wrap items-center gap-4 mb-6">
             <div className="flex items-center gap-2">
-              <Filter size={16} className="text-cyan-400" />
-              <span className="text-sm text-cyan-300">Filters:</span>
+              <Filter size={16} className="text-blue-600" />
+              <span className="text-sm text-slate-700">Filters:</span>
             </div>
 
             <div className="flex gap-2">
@@ -540,8 +540,8 @@ export default function StoryPromptsWorkshop() {
                 onClick={() => setActiveCategory('all')}
                 className={`px-3 py-1.5 rounded-lg text-xs border transition-all ${
                   activeCategory === 'all'
-                    ? 'bg-cyan-500/20 border-cyan-400/50 text-cyan-300'
-                    : 'bg-white/5 border-white/20 text-white/70 hover:bg-white/10'
+                    ? 'bg-blue-100 border-blue-300 text-blue-800'
+                    : 'bg-blue-50 border-blue-200 text-slate-600 hover:bg-blue-100'
                 }`}
               >
                 All Categories
@@ -554,8 +554,8 @@ export default function StoryPromptsWorkshop() {
                     onClick={() => setActiveCategory(key)}
                     className={`px-3 py-1.5 rounded-lg text-xs border transition-all ${
                       activeCategory === key
-                        ? 'bg-cyan-500/20 border-cyan-400/50 text-cyan-300'
-                        : 'bg-white/5 border-white/20 text-white/70 hover:bg-white/10'
+                        ? 'bg-blue-100 border-blue-300 text-blue-800'
+                        : 'bg-blue-50 border-blue-200 text-slate-600 hover:bg-blue-100'
                     }`}
                   >
                     {Icon ? <Icon size={12} className="inline mr-1" /> : null}
@@ -568,7 +568,7 @@ export default function StoryPromptsWorkshop() {
             <select
               value={difficultyFilter}
               onChange={(e) => setDifficultyFilter(e.target.value)}
-              className="px-3 py-1.5 rounded-lg text-xs bg-slate-900/40 border border-slate-600/40 text-white"
+              className="px-3 py-1.5 rounded-lg text-xs bg-blue-50 border border-blue-200 text-slate-700"
             >
               <option value="all">All Difficulties</option>
               <option value="1">Easy (●○○○)</option>
@@ -577,12 +577,12 @@ export default function StoryPromptsWorkshop() {
               <option value="4">Expert (●●●●)</option>
             </select>
 
-            <label className="flex items-center gap-2 text-xs text-cyan-300">
+            <label className="flex items-center gap-2 text-xs text-slate-700">
               <input
                 type="checkbox"
                 checked={showContextual}
                 onChange={(e) => setShowContextual(e.target.checked)}
-                className="accent-cyan-500"
+                className="accent-blue-600"
               />
               Show story-specific prompts
             </label>
@@ -591,9 +591,9 @@ export default function StoryPromptsWorkshop() {
           {/* Prompts Grid */}
           {filteredPrompts.length === 0 ? (
             <div className="text-center py-12">
-              <Lightbulb size={48} className="mx-auto mb-4 text-cyan-400/50" />
-              <div className="text-lg font-semibold text-white mb-2">No prompts match your filters</div>
-              <div className="text-cyan-200/70">
+              <Lightbulb size={48} className="mx-auto mb-4 text-blue-400" />
+              <div className="text-lg font-semibold text-slate-800 mb-2">No prompts match your filters</div>
+              <div className="text-slate-600">
                 Try adjusting your filters or add more chapters to generate personalized prompts
               </div>
             </div>
