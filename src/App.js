@@ -12,7 +12,9 @@ import TOCPage2 from "./components/TOCPage2";
 import ProjectPage from "./components/ProjectPage";
 import WhoAmI from "./components/WhoAmI";
 import WriteSection from "./components/WriteSection";
-import StoryLab from "./components/StoryLab"; // Add this import
+// UPDATE: Change StoryLab import to new lib location
+import StoryLab from "./lib/storylab/StoryLab";
+import StoryPromptsWorkshop from "./lib/storylab/StoryPromptsWorkshop"; // NEW: Add this import
 import Calendar from "./components/Calendar";
 
 // Simple placeholder
@@ -77,12 +79,21 @@ export default function App() {
           }
         />
 
-        {/* Story Lab - The workshop/lab component */}
+        {/* Story Lab Routes */}
         <Route
           path="/story-lab"
           element={
             <ProtectedRoute>
               <StoryLab />
+            </ProtectedRoute>
+          }
+        />
+        {/* NEW: Add enhanced prompts route */}
+        <Route
+          path="/story-lab/prompts"
+          element={
+            <ProtectedRoute>
+              <StoryPromptsWorkshop />
             </ProtectedRoute>
           }
         />
