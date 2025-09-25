@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom'; // ADD THIS IMPORT
 import { 
   Brain, Target, Zap, ArrowLeft, BookOpen, Users, Quote, Pin,
   Sparkles, Calendar, Clock, ChevronRight, X, Plus, Shuffle,
@@ -59,9 +60,9 @@ function extractKeywordSentences(text, keyword) {
 }
 
 /* =========================================================
-   TOP BANNER
+   TOP BANNER - UPDATED WITH NAVIGATION
 ========================================================= */
-const TopBanner = () => {
+const TopBanner = ({ navigate }) => {
   return (
     <div className="sticky top-0 z-50 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
@@ -73,7 +74,10 @@ const TopBanner = () => {
             <div className="text-lg font-semibold">DahTruth Platform</div>
           </div>
 
-          <button className="inline-flex items-center gap-2 rounded-xl bg-white/15 hover:bg-white/25 px-3 py-2 text-sm font-medium border border-white/20">
+          <button 
+            onClick={() => navigate('/dashboard')}
+            className="inline-flex items-center gap-2 rounded-xl bg-white/15 hover:bg-white/25 px-3 py-2 text-sm font-medium border border-white/20"
+          >
             <ArrowLeft size={16} />
             Back to Dashboard
           </button>
@@ -349,9 +353,10 @@ const HopesFearsLegacyWorkshop = ({ chapters, characters }) => {
 };
 
 /* =========================================================
-   MAIN COMPONENT
+   MAIN COMPONENT - UPDATED WITH NAVIGATION
 ========================================================= */
 export default function StoryLab() {
+  const navigate = useNavigate(); // ADD THIS LINE
   const [activeSection, setActiveSection] = useState('overview');
   const [chapters, setChapters] = useState([]);
   const [workshopCharacters, setWorkshopCharacters] = useState([]);
@@ -387,7 +392,7 @@ export default function StoryLab() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-slate-950">
-      <TopBanner />
+      <TopBanner navigate={navigate} />
       
       <div className="max-w-7xl mx-auto px-6 py-12">
         {/* Hero Section */}
@@ -433,7 +438,7 @@ export default function StoryLab() {
           </div>
         )}
 
-        {/* Lab Sessions */}
+        {/* Lab Sessions - UPDATED WITH NAVIGATION */}
         <section className="mb-16">
           <SectionHeader 
             icon="🧪"
@@ -442,15 +447,11 @@ export default function StoryLab() {
           />
           <div className="grid gap-6 md:grid-cols-3 mb-8">
             <button
-              onClick={() => setActiveSection('prompts')}
-              className={`rounded-2xl p-5 border transition-all text-left ${
-                activeSection === 'prompts'
-                  ? 'bg-cyan-500/20 border-cyan-400/50 text-cyan-100'
-                  : 'bg-white/5 border-white/10 text-white/80 hover:bg-white/10'
-              }`}
+              onClick={() => navigate('/story-lab/prompts')}
+              className="rounded-2xl p-5 border transition-all text-left bg-white/5 border-white/10 text-white/80 hover:bg-white/10"
             >
               <div className="text-lg font-semibold mb-1">Story Prompts Workshop</div>
-              <div className="text-sm text-cyan-200/80">Generates prompts from themes, conflicts, and your characters.</div>
+              <div className="text-sm text-cyan-200/80">Smart prompts based on your story structure and content.</div>
             </button>
 
             <button
@@ -478,10 +479,7 @@ export default function StoryLab() {
             </button>
           </div>
 
-          {/* Active workshop panel */}
-          {activeSection === 'prompts' && (
-            <StoryPromptsWorkshop chapters={chapters} characters={workshopCharacters} />
-          )}
+          {/* Active workshop panel - Remove prompts since it now navigates to separate page */}
           {activeSection === 'clothesline' && (
             <ClotheslineWorkshop characters={workshopCharacters} />
           )}
