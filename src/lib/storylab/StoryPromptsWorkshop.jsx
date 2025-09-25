@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Copy, Check, Filter, Timer, User, TrendingUp,
   Feather, Globe, Star, X, Pin, Edit3, Lightbulb, ArrowLeft
@@ -185,7 +186,7 @@ function generateEnhancedPrompts(chapters, characters, selectedChapter) {
     if (sentences[0]) {
       prompts.push({
         category: 'character',
-        text: `Expand on this emotion: “${sentences[0].slice(0, 140)}${sentences[0].length > 140 ? '…' : ''}”`,
+        text: `Expand on this emotion: "${sentences[0].slice(0, 140)}${sentences[0].length > 140 ? '…' : ''}"`,
         difficulty: 2,
         contextual: true,
       });
@@ -195,7 +196,7 @@ function generateEnhancedPrompts(chapters, characters, selectedChapter) {
   conflicts.slice(0, 2).forEach((conflict) => {
     prompts.push({
       category: 'plot',
-      text: `Escalate this conflict: “${conflict.slice(0, 140)}${conflict.length > 140 ? '…' : ''}”. What's the next step?`,
+      text: `Escalate this conflict: "${conflict.slice(0, 140)}${conflict.length > 140 ? '…' : ''}". What's the next step?`,
       difficulty: 3,
       contextual: true,
     });
@@ -337,6 +338,7 @@ function PromptCard({ prompt, onPin, onUnpin, onUse, onMarkTried, isPinned, stat
    MAIN STORY PROMPTS COMPONENT
 ========================================================= */
 export default function StoryPromptsWorkshop() {
+  const navigate = useNavigate();
   const [chapters, setChapters] = useState([]);
   const [selectedChapter, setSelectedChapter] = useState(null);
   const [characters, setCharacters] = useState([]);
@@ -447,7 +449,7 @@ export default function StoryPromptsWorkshop() {
               <div className="text-lg font-semibold">DahTruth Story Lab</div>
             </div>
             <button
-              onClick={() => window.history.back()}
+              onClick={() => navigate('/story-lab')}
               className="inline-flex items-center gap-2 rounded-xl bg-white/15 hover:bg-white/25 px-3 py-2 text-sm font-medium border border-white/20"
             >
               <ArrowLeft size={16} />
