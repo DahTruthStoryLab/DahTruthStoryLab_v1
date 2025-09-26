@@ -1,4 +1,3 @@
-// src/lib/storylab/StoryLab.jsx
 import React, { useState, useEffect, useMemo } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
@@ -6,6 +5,7 @@ import {
   Layers, Edit3, Trash2, Globe, Shield, Heart, Star, CheckCircle, FileText,
   MessageSquare, User
 } from "lucide-react";
+import BrandLogo from "../../components/BrandLogo"; // ✅ added
 
 /* -----------------------------
    Helpers: load chapters safely
