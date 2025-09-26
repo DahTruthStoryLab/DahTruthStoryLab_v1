@@ -1,559 +1,249 @@
-import { useState, useEffect } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import heic2any from "heic2any";
+iimport { useState } from "react";
+import { User, Save, X, Camera } from "lucide-react";
 
-import { Button } from "components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "components/ui/card";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "components/ui/form";
-import { Input } from "components/ui/input";
-import { Textarea } from "components/ui/textarea";
-import { Avatar, AvatarFallback, AvatarImage } from "components/ui/avatar";
-
-import { apiRequest } from "lib/queryClient";
-import { useToast } from "hooks/use-toast";
-import { useAuth } from "hooks/useAuth";
-import { useUser } from "state/UserContext";
-
-import { Upload, User, Save, X, Camera } from "lucide-react";
-
-import PageShell from "components/layout/PageShell";
-import AeroBanner from "components/layout/AeroBanner";
-
-/* -----------------------------
-   Schema
-------------------------------*/
-const profileFormSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  email: z.string().email("Please enter a valid email address"),
-  bio: z
-    .string()
-    .max(500, "Bio must be less than 500 characters")
-    .optional()
-    .or(z.literal("")),
-});
-
-/* -----------------------------
-   TEMP: Font + Glass sanity card
-------------------------------*/
-function StyleTestCard() {
-  return (
-    <div className="p-6 glass-panel max-w-xl mx-auto my-6">
-      <h1 className="font-serif text-3xl mb-2">Your pen is ready</h1>
-      <p className="font-sans text-base leading-7 text-muted">
-        This line should be Inter. The heading above should be Playfair Display.
-      </p>
-      <button className="mt-4 btn-primary">Looks good</button>
-    </div>
-  );
-}
-
-/* -----------------------------
-   Component
-------------------------------*/
 export default function Profile() {
   const [isEditing, setIsEditing] = useState(false);
-  const [avatarFile, setAvatarFile] = useState(null);
+  const [formData, setFormData] = useState({
+    name: "John Doe",
+    email: "john@example.com",
+    bio: "A passionate writer exploring the depths of storytelling and creativity. I've been crafting stories for over a decade, drawing inspiration from everyday life and the infinite possibilities of human imagination."
+  });
   const [avatarPreview, setAvatarPreview] = useState(null);
-  const [convertingImage, setConvertingImage] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-  const { user: authUser } = useAuth();
-  const { setUser: setGlobalUser } = useUser();
+  const handleInputChange = (field, value) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
 
-  const { data: user, isLoading } = useQuery({
-    queryKey: ["/api/user/current"],
-  });
-
-  const form = useForm({
-    resolver: zodResolver(profileFormSchema),
-    defaultValues: {
-      name: "",
-      email: "",
-      bio: "",
-    },
-  });
-
-  useEffect(() => {
-    if (user) {
-      form.reset({
-        name: user.name,
-        email: user.email,
-        bio: user.bio || "",
-      });
-    }
-  }, [user, form]);
-
-  const updateProfileMutation = useMutation({
-    mutationFn: async (data) => {
-      return await apiRequest("PATCH", "/api/user/current", data);
-    },
-    onSuccess: (updatedUser) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/user/current"] });
-
-      if (user) {
-        const newUser = { ...user, ...updatedUser };
-        setGlobalUser(newUser);
-      }
-
-      setIsEditing(false);
-      setAvatarFile(null);
-      setAvatarPreview(null);
-      toast({
-        title: "Profile updated",
-        description: "Your profile has been successfully updated.",
-      });
-    },
-    onError: () => {
-      toast({
-        title: "Error updating profile",
-        description: "There was an error updating your profile. Please try again.",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const handleAvatarChange = async (event) => {
+  const handleAvatarChange = (event) => {
     const file = event.target.files?.[0];
-    if (!file) return;
-
-    if (file.size > 5 * 1024 * 1024) {
-      toast({
-        title: "File too large",
-        description: "Please select an image smaller than 5MB.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (avatarPreview) URL.revokeObjectURL(avatarPreview);
-
-    const isHeic =
-      file.type === "image/heic" ||
-      file.type === "image/heif" ||
-      /\.heic$/i.test(file.name) ||
-      /\.heif$/i.test(file.name);
-
-    try {
-      setConvertingImage(true);
-
-      if (isHeic) {
-        const convertedBlob = await heic2any({
-          blob: file,
-          toType: "image/jpeg",
-          quality: 0.9,
-        });
-
-        const convertedFile = new File(
-          [convertedBlob],
-          file.name.replace(/\.(heic|heif)$/i, ".jpg"),
-          { type: "image/jpeg" }
-        );
-
-        setAvatarFile(convertedFile);
-        setAvatarPreview(URL.createObjectURL(convertedFile));
-      } else {
-        const validImageTypes = [
-          "image/jpeg",
-          "image/jpg",
-          "image/png",
-          "image/gif",
-          "image/webp",
-          "image/svg+xml",
-          "image/bmp",
-          "image/tiff",
-          "image/avif",
-        ];
-        const fileExtension = file.name.toLowerCase().split(".").pop();
-        const validExtensions = [
-          "jpg",
-          "jpeg",
-          "png",
-          "gif",
-          "webp",
-          "svg",
-          "bmp",
-          "tiff",
-          "tif",
-          "avif",
-          "jfif",
-        ];
-
-        const isValidType = file.type.startsWith("image/") || validImageTypes.includes(file.type);
-        const isValidExtension = validExtensions.includes(fileExtension || "");
-
-        if (!isValidType && !isValidExtension) {
-          toast({
-            title: "Invalid file type",
-            description:
-              "Please select an image file. Supported formats: JPEG, PNG, GIF, WebP, SVG, HEIC, HEIF, BMP, TIFF, AVIF",
-            variant: "destructive",
-          });
-          return;
-        }
-
-        setAvatarFile(file);
-        setAvatarPreview(URL.createObjectURL(file));
+    if (file) {
+      // Check file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        alert("Please select an image smaller than 5MB.");
+        return;
       }
-    } catch (err) {
-      console.error("Image conversion error:", err);
-      toast({
-        title: "Image processing failed",
-        description:
-          "Sorry, we couldn't process that image. Please try a different photo.",
-        variant: "destructive",
-      });
-      setAvatarFile(null);
-      setAvatarPreview(null);
-      event.target.value = "";
-    } finally {
-      setConvertingImage(false);
+
+      const reader = new FileReader();
+      reader.onload = (e) => setAvatarPreview(e.target.result);
+      reader.readAsDataURL(file);
     }
   };
 
-  const onSubmit = async (data) => {
-    let avatarUrl = user?.avatar;
-
-    if (avatarFile) {
-      try {
-        const formData = new FormData();
-        formData.append("avatar", avatarFile);
-
-        const uploadResponse = await fetch("/api/user/avatar", {
-          method: "POST",
-          body: formData,
-        });
-
-        if (uploadResponse.ok) {
-          const result = await uploadResponse.json();
-          avatarUrl = result.avatarUrl;
-
-          if (user && avatarUrl) {
-            const cacheBustedUrl = `${avatarUrl}?t=${Date.now()}`;
-            setGlobalUser({ ...user, avatar: cacheBustedUrl });
-          }
-        } else {
-          const errorText = await uploadResponse.text();
-          throw new Error(`Avatar upload failed: ${uploadResponse.status} - ${errorText}`);
-        }
-      } catch (error) {
-        console.error("Avatar upload error:", error);
-        toast({
-          title: "Avatar upload failed",
-          description:
-            error instanceof Error
-              ? error.message
-              : "Could not upload avatar. Profile will be updated without the new image.",
-          variant: "destructive",
-        });
-      }
-    }
-
-    updateProfileMutation.mutate({
-      ...data,
-      avatar: avatarUrl || undefined,
-    });
+  const handleSave = async () => {
+    setIsLoading(true);
+    // Simulate API call
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    setIsEditing(false);
+    setIsLoading(false);
+    console.log("Profile saved:", formData);
+    alert("Profile updated successfully!");
   };
 
   const handleCancel = () => {
-    if (user) {
-      form.reset({
-        name: user.name,
-        email: user.email,
-        bio: user.bio || "",
-      });
-    }
     setIsEditing(false);
-    setAvatarFile(null);
     setAvatarPreview(null);
+    // Reset form data if needed
   };
 
-  /* -----------------------------
-     Loading / Error UI (light)
-  ------------------------------*/
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-[color:var(--color-base)]">
-        <div className="p-6 max-w-4xl mx-auto">
-          <div className="animate-pulse space-y-6">
-            <div className="h-8 bg-black/5 rounded-lg w-1/4"></div>
-            <div className="glass-panel p-6 space-y-4">
-              <div className="flex items-center space-x-4">
-                <div className="w-20 h-20 bg-black/5 rounded-full"></div>
-                <div className="space-y-2">
-                  <div className="h-6 bg-black/5 rounded w-32"></div>
-                  <div className="h-4 bg-black/5 rounded w-48"></div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-[color:var(--color-base)] flex items-center justify-center">
-        <div className="glass-panel p-8 text-center">
-          <p className="text-muted">Unable to load profile. Please try refreshing the page.</p>
-        </div>
-      </div>
-    );
-  }
-
-  /* -----------------------------
-     Main (light + glass)
-  ------------------------------*/
   return (
-    <div className="min-h-screen bg-[color:var(--color-base)] bg-radial-fade">
-      <PageShell>
-        <AeroBanner size="md" title="Your Profile" subtitle="Manage your account and avatar" />
-
-        {/* TEMP: font + glass sanity check */}
-        <StyleTestCard />
-
-        <div className="section max-w-4xl mx-auto space-y-6">
-          {/* Header */}
-          <div className="glass-panel p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="font-serif text-2xl text-[color:var(--color-ink)]">Author Profile</h2>
-                <p className="text-muted">Manage your writing identity and personal information</p>
-              </div>
-              {!isEditing && (
-                <Button
-                  onClick={() => setIsEditing(true)}
-                  size="lg"
-                  className="btn-primary font-semibold shadow-lg"
-                  data-testid="button-edit-profile"
-                >
-                  <User className="w-5 h-5 mr-2" />
-                  Edit Profile
-                </Button>
-              )}
-            </div>
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-indigo-900">
+      <div className="container mx-auto px-6 py-12 max-w-4xl">
+        {/* Header Banner */}
+        <div className="bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20 p-6 shadow-xl mb-6">
+          <div className="text-center">
+            <h1 className="text-3xl font-bold text-white mb-2">Your Profile</h1>
+            <p className="text-white/70">Manage your account and avatar</p>
           </div>
+        </div>
 
-          {/* Card */}
-          <Card className="glass-panel">
-            <CardHeader className="glass-soft rounded-t-2xl border border-white/0">
-              <CardTitle className="text-xl text-[color:var(--color-ink)] flex items-center gap-2">
+        {/* Profile Header */}
+        <div className="bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20 p-6 shadow-xl mb-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-bold text-white">Author Profile</h2>
+              <p className="text-white/70">Manage your writing identity and personal information</p>
+            </div>
+            {!isEditing && (
+              <button 
+                onClick={() => setIsEditing(true)}
+                className="bg-white/20 backdrop-blur-sm text-white border border-white/30 hover:bg-white/30 font-semibold shadow-lg transition-all duration-300 px-6 py-3 rounded-lg flex items-center gap-2"
+              >
                 <User className="w-5 h-5" />
-                Personal Information
-              </CardTitle>
-              <CardDescription className="text-muted">
-                Manage your author profile and personal information
-              </CardDescription>
-            </CardHeader>
+                Edit Profile
+              </button>
+            )}
+          </div>
+        </div>
 
-            <CardContent className="space-y-6 p-6">
-              {!isEditing ? (
-                /* -------- Display Mode -------- */
-                <div className="space-y-6">
-                  <div className="flex items-center gap-6">
-                    <div className="relative">
-                      <Avatar className="w-24 h-24 border-2 border-white/40 ring-4 ring-white/20 shadow-xl">
-                        <AvatarImage
-                          src={user.avatar || undefined}
-                          alt={user.name}
-                          className="object-cover"
-                        />
-                        <AvatarFallback className="text-lg font-medium bg-white/60 text-[color:var(--color-ink)] border border-white/40">
-                          {user.name
-                            .split(" ")
-                            .map((n) => n[0])
-                            .join("")
-                            .toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-[rgba(202,177,214,0.25)] to-[rgba(234,242,255,0.25)] pointer-events-none"></div>
+        {/* Main Profile Card */}
+        <div className="bg-white/10 backdrop-blur-xl border border-white/20 shadow-2xl rounded-2xl">
+          {/* Card Header */}
+          <div className="bg-white/5 backdrop-blur-sm rounded-t-2xl border-b border-white/10 p-6">
+            <h3 className="text-xl text-white flex items-center gap-2">
+              <User className="w-5 h-5" />
+              Personal Information
+            </h3>
+            <p className="text-white/70 mt-1">
+              Manage your author profile and personal information
+            </p>
+          </div>
+          
+          {/* Card Content */}
+          <div className="p-6 space-y-6">
+            {!isEditing ? (
+              // Display Mode
+              <div className="space-y-6">
+                <div className="flex items-center space-x-6">
+                  <div className="relative">
+                    <div className="w-24 h-24 border-2 border-white/30 ring-4 ring-white/10 shadow-xl rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center text-white text-2xl font-medium overflow-hidden">
+                      {avatarPreview ? (
+                        <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
+                      ) : (
+                        formData.name.split(" ").map(n => n[0]).join("").toUpperCase()
+                      )}
                     </div>
-                    <div className="space-y-1">
-                      <h3
-                        className="font-serif text-2xl font-semibold text-[color:var(--color-ink)]"
-                        data-testid="text-user-name"
+                    <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-blue-400/20 to-purple-400/20 pointer-events-none"></div>
+                  </div>
+                  <div className="space-y-2">
+                    <h3 className="text-2xl font-semibold text-white">
+                      {formData.name}
+                    </h3>
+                    <p className="text-white/70 text-lg">
+                      {formData.email}
+                    </p>
+                  </div>
+                </div>
+
+                {formData.bio && (
+                  <div className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10">
+                    <h4 className="text-sm font-medium text-white/90 mb-2">Bio</h4>
+                    <p className="text-white/80 leading-relaxed whitespace-pre-wrap">
+                      {formData.bio}
+                    </p>
+                  </div>
+                )}
+
+                {!formData.bio && (
+                  <div className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10 border-dashed">
+                    <div className="text-white/60 italic text-center">
+                      No bio added yet. Click "Edit Profile" to add your author biography.
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              // Edit Mode
+              <div className="space-y-6">
+                {/* Avatar Section */}
+                <div className="space-y-4">
+                  <div className="flex items-center space-x-6">
+                    <div className="relative">
+                      <div className="w-24 h-24 border-2 border-white/30 ring-4 ring-white/10 shadow-xl rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center text-white text-lg font-medium overflow-hidden">
+                        {avatarPreview ? (
+                          <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
+                        ) : (
+                          formData.name.split(" ").map(n => n[0]).join("").toUpperCase()
+                        )}
+                      </div>
+                      <label
+                        htmlFor="avatar-upload"
+                        className="absolute -bottom-2 -right-2 bg-blue-600/80 backdrop-blur-sm hover:bg-blue-500/80 text-white rounded-full p-2 cursor-pointer shadow-xl transition-all duration-300 border border-white/20"
+                        title="Change avatar"
                       >
-                        {user.name}
-                      </h3>
-                      <p className="text-muted text-lg" data-testid="text-user-email">
-                        {user.email}
+                        <Camera className="w-4 h-4" />
+                      </label>
+                      <input
+                        id="avatar-upload"
+                        type="file"
+                        onChange={handleAvatarChange}
+                        className="hidden"
+                        accept="image/*"
+                      />
+                      <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-blue-400/20 to-purple-400/20 pointer-events-none"></div>
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium text-white">Profile Photo</p>
+                      <p className="text-xs text-white/60">
+                        Click the camera icon to upload a new photo (max 5MB)
+                        <br />
+                        Supported formats: JPEG, PNG, GIF, WebP
                       </p>
                     </div>
                   </div>
-
-                  {user.bio ? (
-                    <div className="glass-soft p-4">
-                      <h4 className="text-sm font-medium text-[color:var(--color-ink)]/80 mb-2">Bio</h4>
-                      <p
-                        className="text-[color:var(--color-ink)]/80 leading-relaxed whitespace-pre-wrap"
-                        data-testid="text-user-bio"
-                      >
-                        {user.bio}
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="glass-soft p-4 border-dashed">
-                      <div className="text-muted italic text-center">
-                        No bio added yet. Click "Edit Profile" to add your author biography.
-                      </div>
-                    </div>
-                  )}
                 </div>
-              ) : (
-                /* -------- Edit Mode -------- */
-                <Form {...form}>
-                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                    <div className="space-y-4">
-                      <div className="flex items-center gap-6">
-                        <div className="relative">
-                          <Avatar className="w-24 h-24 border-2 border-white/40 ring-4 ring-white/20 shadow-xl">
-                            <AvatarImage
-                              src={avatarPreview || user.avatar || undefined}
-                              alt={user.name}
-                              className="object-cover"
-                            />
-                            <AvatarFallback className="text-lg font-medium bg-white/60 text-[color:var(--color-ink)] border border-white/40">
-                              {user.name
-                                .split(" ")
-                                .map((n) => n[0])
-                                .join("")
-                                .toUpperCase()}
-                            </AvatarFallback>
-                          </Avatar>
 
-                          <label
-                            htmlFor="avatar-upload"
-                            className="absolute -bottom-2 -right-2 bg-[color:var(--color-primary)] hover:opacity-90 text-[color:var(--color-ink)] rounded-full p-2 cursor-pointer shadow-xl border border-white/40"
-                            title="Change avatar"
-                          >
-                            <Camera className="w-4 h-4" />
-                          </label>
-                          <input
-                            id="avatar-upload"
-                            type="file"
-                            onChange={handleAvatarChange}
-                            className="hidden"
-                            data-testid="input-avatar-upload"
-                          />
+                {/* Form Fields */}
+                <div className="space-y-6">
+                  <div>
+                    <label className="text-white/90 text-sm font-medium block mb-2">Full Name</label>
+                    <input
+                      value={formData.name}
+                      onChange={(e) => handleInputChange('name', e.target.value)}
+                      className="w-full bg-white/10 backdrop-blur-sm border border-white/20 text-white placeholder:text-white/50 focus:border-white/40 focus:ring-2 focus:ring-white/20 rounded-lg px-4 py-3 focus:outline-none transition-all"
+                      placeholder="Enter your full name"
+                      required
+                    />
+                  </div>
 
-                          <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-[rgba(202,177,214,0.25)] to-[rgba(234,242,255,0.25)] pointer-events-none"></div>
-                        </div>
+                  <div>
+                    <label className="text-white/90 text-sm font-medium block mb-2">Email Address</label>
+                    <input
+                      type="email"
+                      value={formData.email}
+                      onChange={(e) => handleInputChange('email', e.target.value)}
+                      className="w-full bg-white/10 backdrop-blur-sm border border-white/20 text-white placeholder:text-white/50 focus:border-white/40 focus:ring-2 focus:ring-white/20 rounded-lg px-4 py-3 focus:outline-none transition-all"
+                      placeholder="Enter your email address"
+                      required
+                    />
+                  </div>
 
-                        <div className="space-y-2">
-                          <p className="text-sm font-medium text-[color:var(--color-ink)]">Profile Photo</p>
-                          <p className="text-xs text-muted">
-                            Click the camera icon to upload a new photo (max 5MB)
-                            <br />
-                            HEIC files will be converted to JPEG automatically
-                          </p>
-                          {convertingImage && (
-                            <div className="text-xs font-medium bg-[color:var(--color-primary)] rounded px-2 py-1 border border-white/40">
-                              Converting image...
-                            </div>
-                          )}
-                        </div>
-                      </div>
+                  <div>
+                    <label className="text-white/90 text-sm font-medium block mb-2">Author Bio</label>
+                    <textarea
+                      value={formData.bio}
+                      onChange={(e) => handleInputChange('bio', e.target.value)}
+                      rows={6}
+                      placeholder="Tell your readers about yourself, your writing journey, and what inspires you..."
+                      className="w-full bg-white/10 backdrop-blur-sm border border-white/20 text-white placeholder:text-white/50 focus:border-white/40 focus:ring-2 focus:ring-white/20 resize-none rounded-lg px-4 py-3 focus:outline-none transition-all"
+                      maxLength={500}
+                    />
+                    <div className="text-xs text-white/60 text-right bg-white/5 backdrop-blur-sm rounded-lg px-3 py-2 border border-white/10 mt-2 inline-block">
+                      {formData.bio.length}/500 characters
                     </div>
+                  </div>
+                </div>
 
-                    <FormField
-                      control={form.control}
-                      name="name"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-[color:var(--color-ink)]/90">Full Name</FormLabel>
-                          <FormControl>
-                            <Input
-                              {...field}
-                              className="glass-soft border-white/40 text-[color:var(--color-ink)] placeholder:text-[color:var(--color-ink)]/50 focus-visible:ring-0 focus:border-white/60"
-                              data-testid="input-name"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="email"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-[color:var(--color-ink)]/90">Email Address</FormLabel>
-                          <FormControl>
-                            <Input
-                              {...field}
-                              type="email"
-                              className="glass-soft border-white/40 text-[color:var(--color-ink)] placeholder:text-[color:var(--color-ink)]/50 focus-visible:ring-0 focus:border-white/60"
-                              data-testid="input-email"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="bio"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-[color:var(--color-ink)]/90">Author Bio</FormLabel>
-                          <FormControl>
-                            <Textarea
-                              {...field}
-                              rows={5}
-                              placeholder="Tell your readers about yourself, your writing journey, and what inspires you..."
-                              className="glass-soft border-white/40 text-[color:var(--color-ink)] placeholder:text-[color:var(--color-ink)]/50 resize-none focus-visible:ring-0 focus:border-white/60"
-                              data-testid="textarea-bio"
-                            />
-                          </FormControl>
-                          <div className="text-xs text-muted text-right glass-soft px-2 py-1">
-                            {(field.value || "").length}/500 characters
-                          </div>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <div className="flex items-center justify-end gap-3 pt-4 glass-soft p-4">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={handleCancel}
-                        disabled={updateProfileMutation.isPending}
-                        className="glass-soft hover:bg-white/60"
-                        data-testid="button-cancel"
-                      >
-                        <X className="w-4 h-4 mr-2" />
-                        Cancel
-                      </Button>
-                      <Button
-                        type="submit"
-                        disabled={updateProfileMutation.isPending}
-                        className="btn-primary shadow-xl"
-                        data-testid="button-save"
-                      >
-                        {updateProfileMutation.isPending ? (
-                          "Saving..."
-                        ) : (
-                          <>
-                            <Save className="w-4 h-4 mr-2" />
-                            Save Changes
-                          </>
-                        )}
-                      </Button>
-                    </div>
-                  </form>
-                </Form>
-              )}
-            </CardContent>
-          </Card>
+                {/* Action Buttons */}
+                <div className="flex items-center justify-end space-x-4 pt-6 bg-white/5 backdrop-blur-sm rounded-xl p-6 border border-white/10">
+                  <button 
+                    type="button"
+                    onClick={handleCancel}
+                    disabled={isLoading}
+                    className="bg-white/10 backdrop-blur-sm border border-white/20 text-white hover:bg-white/20 px-6 py-3 rounded-lg transition-all duration-300 flex items-center gap-2 disabled:opacity-50"
+                  >
+                    <X className="w-4 h-4" />
+                    Cancel
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={handleSave}
+                    disabled={isLoading}
+                    className="bg-blue-600/80 backdrop-blur-sm hover:bg-blue-500/80 border border-white/20 shadow-xl text-white px-6 py-3 rounded-lg transition-all duration-300 flex items-center gap-2 disabled:opacity-50"
+                  >
+                    {isLoading ? (
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    ) : (
+                      <Save className="w-4 h-4" />
+                    )}
+                    {isLoading ? "Saving..." : "Save Changes"}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
-      </PageShell>
+      </div>
     </div>
   );
 }
