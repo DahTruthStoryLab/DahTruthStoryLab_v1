@@ -4,19 +4,24 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import heic2any from "heic2any";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { apiRequest } from "@/lib/queryClient";
-import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/hooks/useAuth";
-import { useUser } from "@/state/UserContext";
+
+import { Button } from "components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "components/ui/card";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "components/ui/form";
+import { Input } from "components/ui/input";
+import { Textarea } from "components/ui/textarea";
+import { Avatar, AvatarFallback, AvatarImage } from "components/ui/avatar";
+
+import { apiRequest } from "lib/queryClient";
+import { useToast } from "hooks/use-toast";
+import { useAuth } from "hooks/useAuth";
+import { useUser } from "state/UserContext";
+
 import { Upload, User, Save, X, Camera } from "lucide-react";
-import PageShell from "@/components/layout/PageShell";
-import AeroBanner from "@/components/layout/AeroBanner";
+
+import PageShell from "components/layout/PageShell";
+import AeroBanner from "components/layout/AeroBanner";
+
 
 const profileFormSchema = z.object({
   name: z.string().min(1, "Name is required"),
