@@ -1,3 +1,4 @@
+// src/lib/storylab/StoryLab.jsx
 import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -17,10 +18,10 @@ function loadChaptersFromLocalStorage() {
   try {
     const parsed = JSON.parse(raw);
     const list = parsed?.chapters ?? [];
-    return list.map((c: any, idx: number) => ({
-      id: c.id ?? idx,
-      title: c.title ?? `Chapter ${idx + 1}`,
-      text: c.text ?? c.content ?? c.body ?? "",
+    return list.map((c, idx) => ({
+      id: c?.id ?? idx,
+      title: c?.title ?? `Chapter ${idx + 1}`,
+      text: c?.text ?? c?.content ?? c?.body ?? "",
     }));
   } catch {
     return [];
@@ -30,13 +31,13 @@ function loadChaptersFromLocalStorage() {
 /* -----------------------------
    Tiny, client-only "NLP-lite"
 --------------------------------*/
-const splitSentences = (txt: string) =>
+const splitSentences = (txt) =>
   (txt || "")
     .replace(/\s+/g, " ")
     .match(/[^.!?]+[.!?]?/g) || [];
 
-function guessCharacters(text: string) {
-  const names = new Set<string>();
+function guessCharacters(text) {
+  const names = new Set();
   const tokens = (text || "").match(/\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2}\b/g) || [];
   tokens.forEach((t) => {
     if (!["I", "The", "A", "And", "But"].includes(t)) names.add(t.trim());
@@ -44,8 +45,8 @@ function guessCharacters(text: string) {
   return Array.from(names).slice(0, 50);
 }
 
-function extractConflicts(text: string) {
-  const hits: string[] = [];
+function extractConflicts(text) {
+  const hits = [];
   const needles = ["conflict", "tension", "argument", "fight", "feud", "rivalry", "obstacle", "problem", "challenge"];
   const sentences = splitSentences(text);
   sentences.forEach((s) => {
@@ -54,7 +55,7 @@ function extractConflicts(text: string) {
   return hits;
 }
 
-function extractKeywordSentences(text: string, keyword: string) {
+function extractKeywordSentences(text, keyword) {
   const k = keyword.toLowerCase();
   return splitSentences(text).filter((s) => s.toLowerCase().includes(k));
 }
@@ -62,7 +63,7 @@ function extractKeywordSentences(text: string, keyword: string) {
 /* =========================================================
    TOP BANNER - UPDATED WITH NAVIGATION
 ========================================================= */
-const TopBanner = ({ navigate }: { navigate: (p: string) => void }) => {
+const TopBanner = ({ navigate }) => {
   return (
     <div className="sticky top-0 z-50 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white">
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
@@ -90,20 +91,8 @@ const TopBanner = ({ navigate }: { navigate: (p: string) => void }) => {
 /* =========================================================
    FEATURE CARDS  (lightened aesthetic)
 ========================================================= */
-const FeatureCard = ({
-  icon: Icon,
-  title,
-  status,
-  description,
-  onClick,
-}: {
-  icon: any;
-  title: string;
-  status?: "Ready" | "Beta" | "Coming Soon";
-  description: string;
-  onClick?: () => void;
-}) => {
-  const statusColors: Record<string, string> = {
+const FeatureCard = ({ icon: Icon, title, status, description, onClick }) => {
+  const statusColors = {
     Ready: "bg-green-100 text-green-700 border-green-200",
     Beta: "bg-blue-100 text-blue-700 border-blue-200",
     "Coming Soon": "bg-gray-100 text-gray-700 border-gray-200",
@@ -137,15 +126,7 @@ const FeatureCard = ({
   );
 };
 
-const SectionHeader = ({
-  icon,
-  title,
-  subtitle,
-}: {
-  icon: string;
-  title: string;
-  subtitle?: string;
-}) => {
+const SectionHeader = ({ icon, title, subtitle }) => {
   return (
     <div className="flex items-start gap-3 mb-8">
       <div className="p-3 bg-gradient-to-br from-sky-100 to-blue-100 rounded-xl border border-sky-200">
@@ -162,19 +143,13 @@ const SectionHeader = ({
 /* =========================================================
    CHARACTER MANAGER
 ========================================================= */
-const CharacterManager = ({
-  seedText = "",
-  onChange,
-}: {
-  seedText?: string;
-  onChange?: (names: string[]) => void;
-}) => {
+const CharacterManager = ({ seedText = "", onChange }) => {
   const [characters, setCharacters] = useState(() => {
     const fromText = guessCharacters(seedText);
     return fromText.length ? fromText.map((n, i) => ({ id: i + 1, name: n })) : [];
   });
   const [newCharacter, setNewCharacter] = useState("");
-  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingId, setEditingId] = useState(null);
 
   useEffect(() => {
     onChange?.(characters.map((c) => c.name));
@@ -187,11 +162,11 @@ const CharacterManager = ({
     setNewCharacter("");
   };
 
-  const deleteCharacter = (id: number) => {
+  const deleteCharacter = (id) => {
     setCharacters((prev) => prev.filter((c) => c.id !== id));
   };
 
-  const updateCharacter = (id: number, name: string) => {
+  const updateCharacter = (id, name) => {
     setCharacters((prev) => prev.map((c) => (c.id === id ? { ...c, name: name.trim() } : c)));
     setEditingId(null);
   };
@@ -214,9 +189,7 @@ const CharacterManager = ({
                 type="text"
                 defaultValue={character.name}
                 onBlur={(e) => updateCharacter(character.id, e.target.value)}
-                onKeyDown={(e) =>
-                  e.key === "Enter" && updateCharacter(character.id, (e.currentTarget as HTMLInputElement).value)
-                }
+                onKeyDown={(e) => e.key === "Enter" && updateCharacter(character.id, e.currentTarget.value)}
                 className="flex-1 bg-transparent border-b border-sky-400 text-slate-800 outline-none"
                 autoFocus
               />
@@ -263,17 +236,11 @@ const CharacterManager = ({
 /* =========================================================
    WORKSHOP COMPONENTS
 ========================================================= */
-const StoryPromptsWorkshop = ({
-  chapters,
-  characters,
-}: {
-  chapters: any[];
-  characters: string[];
-}) => {
+const StoryPromptsWorkshop = ({ chapters, characters }) => {
   const fullText = useMemo(() => chapters.map((c) => c.text).join("\n\n"), [chapters]);
 
   const prompts = useMemo(() => {
-    const out: string[] = [];
+    const out = [];
     (characters || []).slice(0, 8).forEach((ch) => {
       out.push(`Explore the backstory of ${ch}.`);
       out.push(`What does ${ch} fear the most? Write a scene that reveals it implicitly.`);
@@ -319,7 +286,7 @@ const StoryPromptsWorkshop = ({
   );
 };
 
-const ClotheslineWorkshop = ({ characters }: { characters: string[] }) => {
+const ClotheslineWorkshop = ({ characters }) => {
   return (
     <div className="bg-sky-50/80 backdrop-blur-xl rounded-2xl p-6 border border-sky-200">
       <h3 className="text-xl font-semibold text-slate-800 mb-2">Clothes Pin Workshop</h3>
@@ -341,17 +308,11 @@ const ClotheslineWorkshop = ({ characters }: { characters: string[] }) => {
   );
 };
 
-const HopesFearsLegacyWorkshop = ({
-  chapters,
-  characters,
-}: {
-  chapters: any[];
-  characters: string[];
-}) => {
+const HopesFearsLegacyWorkshop = ({ chapters, characters }) => {
   const text = useMemo(() => chapters.map((c) => c.text).join("\n\n"), [chapters]);
 
   const insights = useMemo(() => {
-    const result: Record<string, { Hopes: string[]; Fears: string[]; Legacy: string[] }> = {};
+    const result = {};
     (characters || []).forEach((ch) => {
       result[ch] = {
         Hopes: extractKeywordSentences(text, "hope").slice(0, 3),
@@ -376,9 +337,9 @@ const HopesFearsLegacyWorkshop = ({
               {["Hopes", "Fears", "Legacy"].map((key) => (
                 <div key={key} className="rounded-lg bg-slate-50 p-3 border border-slate-200">
                   <div className="text-slate-800 text-sm font-medium mb-2">{key}</div>
-                  {(data as any)[key] && (data as any)[key].length ? (
+                  {data[key] && data[key].length ? (
                     <ul className="space-y-2 text-slate-700 text-sm">
-                      {(data as any)[key].map((s: string, i: number) => <li key={i}>• {s}</li>)}
+                      {data[key].map((s, i) => <li key={i}>• {s}</li>)}
                     </ul>
                   ) : (
                     <div className="text-slate-500 text-sm">No {key.toLowerCase()} found yet.</div>
@@ -398,9 +359,9 @@ const HopesFearsLegacyWorkshop = ({
 ========================================================= */
 export default function StoryLab() {
   const navigate = useNavigate();
-  const [activeSection, setActiveSection] = useState<"overview" | "clothesline" | "hfl">("overview");
-  const [chapters, setChapters] = useState<any[]>([]);
-  const [workshopCharacters, setWorkshopCharacters] = useState<string[]>([]);
+  const [activeSection, setActiveSection] = useState("overview"); // "overview" | "clothesline" | "hfl"
+  const [chapters, setChapters] = useState([]);
+  const [workshopCharacters, setWorkshopCharacters] = useState([]);
 
   useEffect(() => {
     setChapters(loadChaptersFromLocalStorage());
@@ -410,25 +371,25 @@ export default function StoryLab() {
     {
       icon: Sparkles,
       title: "Story Prompts",
-      status: "Ready" as const,
+      status: "Ready",
       description: "Get creative AI-generated prompts tailored to your story's theme and chapter.",
     },
     {
       icon: CheckCircle,
       title: "Character Consistency",
-      status: "Coming Soon" as const,
+      status: "Coming Soon",
       description: "AI checks for character inconsistencies like changing eye color or contradictions.",
     },
     {
       icon: Edit3,
       title: "Grammar Polish",
-      status: "Coming Soon" as const,
+      status: "Coming Soon",
       description: "Smart grammar and clarity suggestions that preserve your unique voice.",
     },
     {
       icon: FileText,
       title: "Scene Summaries",
-      status: "Ready" as const,
+      status: "Ready",
       description: "Auto-generate chapter summaries and track plot threads.",
     },
   ];
@@ -437,47 +398,47 @@ export default function StoryLab() {
     {
       icon: User,
       title: "Character Profiles",
-      status: "Beta" as const,
+      status: "Beta",
       description: "Create detailed character sheets and track relationships.",
     },
     {
       icon: Pin,
       title: "Character Clothesline",
-      status: "Ready" as const,
+      status: "Ready",
       description: "Pin and track traits, obstacles, and changes.",
     },
     {
       icon: Globe,
       title: "World Bible",
-      status: "Beta" as const,
+      status: "Beta",
       description: "Locations, cultures, and timelines that grow as you write.",
     },
     {
       icon: Shield,
       title: "Continuity Alerts",
-      status: "Coming Soon" as const,
+      status: "Coming Soon",
       description: "Get notified when you break continuity rules mid-story.",
     },
   ];
 
-  // 🔁 UPDATED: replace Quote Flash Writing → Critique Circle
+  // 🔁 UPDATED: Quote Flash Writing → Critique Circle
   const workshopFeatures = [
     {
       icon: Calendar,
       title: "Session Schedule",
-      status: "Ready" as const,
+      status: "Ready",
       description: "Six-session collaborative writing structure with goals.",
     },
     {
       icon: Users,
       title: "Breakout Pairings",
-      status: "Ready" as const,
+      status: "Ready",
       description: "Randomly pair writers for collaborative exercises and peer review.",
     },
     {
       icon: MessageSquare,
       title: "Critique Circle",
-      status: "Ready" as const,
+      status: "Ready",
       description: "Share drafts with your cohort, add inline comments, and track revisions securely.",
     },
   ];
@@ -486,13 +447,13 @@ export default function StoryLab() {
     {
       icon: Heart,
       title: "Reflection Prompts",
-      status: "Beta" as const,
+      status: "Beta",
       description: "Daily questions to ground your writing in purpose and meaning.",
     },
     {
       icon: Star,
       title: "Legacy Writing",
-      status: "Coming Soon" as const,
+      status: "Coming Soon",
       description: "Tools for writing with future generations in mind.",
     },
   ];
@@ -512,7 +473,7 @@ export default function StoryLab() {
             and faith-based reflection in one seamless writing experience.
           </p>
 
-        {/* Feature Pills */}
+          {/* Feature Pills */}
           <div className="flex flex-wrap justify-center gap-4 mb-12">
             <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-yellow-100 border border-yellow-200 text-yellow-800">
               <Sparkles className="w-4 h-4" />
@@ -588,7 +549,7 @@ export default function StoryLab() {
             </button>
           </div>
 
-          {/* NEW: Critique Circle button that routes to the workshop module */}
+          {/* Critique Circle CTA (route should exist later) */}
           <div className="mb-8">
             <button
               onClick={() => navigate("/story-lab/critique")}
