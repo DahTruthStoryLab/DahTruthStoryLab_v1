@@ -1,48 +1,15 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1, viewport-fit=cover"
-    />
-    <title>DahTruth Story Lab</title>
-
-    <!-- SEO basics -->
-    <meta
-      name="description"
-      content="DahTruth Story Lab — write, organize, and develop your stories with prompts, TOC, and project tools."
-    />
-    <meta name="theme-color" content="#0b1220" />
-    <meta name="color-scheme" content="light dark" />
-
-    <!-- Open Graph / social -->
-    <meta property="og:title" content="DahTruth Story Lab" />
-    <meta
-      property="og:description"
-      content="Write, organize, and develop your stories with DahTruth Story Lab."
-    />
-    <meta property="og:type" content="website" />
-    <meta property="og:url" content="/" />
-    <!-- If you don’t have this file in /public, remove this line or add the image -->
-    <meta property="og:image" content="/og-image.png" />
-
-    <!-- Favicon / PWA bits -->
-    <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
-    <link rel="apple-touch-icon" href="%PUBLIC_URL%/apple-touch-icon.png" />
-    <link rel="manifest" href="%PUBLIC_URL%/manifest.json" />
-
-    <!-- Fonts -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Playfair+Display:wght@600;700&display=swap"
-      rel="stylesheet"
-    />
-  </head>
-  <body>
-    <noscript>You need to enable JavaScript to run this app.</noscript>
-    <div id="root"></div>
-    <!-- CRA injects your JS bundle; do not add script tags here -->
-  </body>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DahTruth Story Lab</title>
+  <!-- Ensures asset paths resolve correctly in Amplify -->
+  <base href="/" />
+</head>
+<body style="margin:0;">
+  <!-- If you see THIS text in production, index.html is served but JS didn't run yet -->
+  <div id="root">STATIC: index.html loaded (JS not yet running)</div>
+  <noscript>Enable JavaScript to run this app.</noscript>
+</body>
 </html>
