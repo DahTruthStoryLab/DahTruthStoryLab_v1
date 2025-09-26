@@ -17,6 +17,7 @@ const WriteSection         = lazy(() => import("./components/WriteSection"));
 const StoryLab             = lazy(() => import("./lib/storylab/StoryLab"));
 const StoryPromptsWorkshop = lazy(() => import("./lib/storylab/StoryPromptsWorkshop"));
 const Calendar             = lazy(() => import("./components/Calendar"));
+const Profile              = lazy(() => import("./components/Profile")); // Add this line
 
 /* =========================
    Global UI helpers
@@ -36,7 +37,7 @@ const Placeholder = ({ title = "Coming soon" }) => (
   <div className="min-h-[60vh] flex items-center justify-center text-slate-200">
     <div className="text-center">
       <h1 className="text-2xl font-semibold mb-1">{title}</h1>
-      <p className="text-slate-400">This page hasn’t been built yet.</p>
+      <p className="text-slate-400">This page hasn't been built yet.</p>
     </div>
   </div>
 );
@@ -56,7 +57,7 @@ function ScrollToTop() {
 // Set to true while Auth is WIP; set to false when ready to enforce auth.
 const BYPASS_AUTH = true;
 
-// Very light “session” check that you can swap later for real Amplify/Cognito state.
+// Very light "session" check that you can swap later for real Amplify/Cognito state.
 // If BYPASS_AUTH is false, this checks a localStorage key.
 function ProtectedRoute({ children }) {
   if (BYPASS_AUTH) return children;
@@ -186,6 +187,16 @@ export default function App() {
             }
           />
 
+          {/* Profile - Updated to use the actual Profile component */}
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute>
+                <Profile />
+              </ProtectedRoute>
+            }
+          />
+
           {/* Misc */}
           <Route path="/whoami" element={<WhoAmI />} />
           <Route
@@ -201,14 +212,6 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <Placeholder title="Store" />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/profile"
-            element={
-              <ProtectedRoute>
-                <Placeholder title="Profile" />
               </ProtectedRoute>
             }
           />
