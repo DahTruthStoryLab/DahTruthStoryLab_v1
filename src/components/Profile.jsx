@@ -1,4 +1,4 @@
-iimport { useState } from "react";
+import { useState } from "react";
 import { User, Save, X, Camera } from "lucide-react";
 
 export default function Profile() {
