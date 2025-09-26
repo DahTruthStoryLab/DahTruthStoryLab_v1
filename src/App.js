@@ -1,67 +1,38 @@
 // src/App.jsx
-import React, { useEffect } from "react";
-import { Routes, Route, useSearchParams, useLocation, Navigate } from "react-router-dom";
+import React, { Suspense, lazy, useEffect } from "react";
+import { BrowserRouter as Router, Routes, Route, useSearchParams, useLocation, Navigate } from "react-router-dom";
 
 /* =========================
-   TEMP: direct (non-lazy) imports to avoid chunk-loading issues
+   Lazy-loaded pages (faster)
    ========================= */
-import LandingPage          from "./components/LandingPage";
-import RegistrationPage     from "./components/RegistrationPage";
-import SignInPage           from "./components/SignInPage";
-import Dashboard            from "./components/Dashboard";
-import TOCPage              from "./components/TOCPage";
-import TOCPage2             from "./components/TOCPage2";
-import ProjectPage          from "./components/ProjectPage";
-import WhoAmI               from "./components/WhoAmI";
-import WriteSection         from "./components/WriteSection";
-import StoryLab             from "./lib/storylab/StoryLab";
-import StoryPromptsWorkshop from "./lib/storylab/StoryPromptsWorkshop";
-import Calendar             from "./components/Calendar";
-import Profile              from "./components/Profile";
+const LandingPage          = lazy(() => import("./components/LandingPage"));
+const RegistrationPage     = lazy(() => import("./components/RegistrationPage"));
+const SignInPage           = lazy(() => import("./components/SignInPage"));
+const Dashboard            = lazy(() => import("./components/Dashboard"));
+const TOCPage              = lazy(() => import("./components/TOCPage"));
+const TOCPage2             = lazy(() => import("./components/TOCPage2"));
+const ProjectPage          = lazy(() => import("./components/ProjectPage"));
+const WhoAmI               = lazy(() => import("./components/WhoAmI"));
+const WriteSection         = lazy(() => import("./components/WriteSection"));
+const StoryLab             = lazy(() => import("./lib/storylab/StoryLab"));
+const StoryPromptsWorkshop = lazy(() => import("./lib/storylab/StoryPromptsWorkshop"));
+const Calendar             = lazy(() => import("./components/Calendar"));
+const Profile              = lazy(() => import("./components/Profile"));
 
 /* =========================
-   Error Boundary – shows runtime errors on screen
+   Global UI helpers
    ========================= */
-class ErrorBoundary extends React.Component {
-  constructor(props) {
-    super(props);
-    this.state = { err: null };
-  }
-  static getDerivedStateFromError(error) {
-    return { err: error };
-  }
-  componentDidCatch(error, info) {
-    console.error("[App ErrorBoundary]", error, info);
-  }
-  render() {
-    if (this.state.err) {
-      return (
-        <div style={{ padding: 24, color: "#fff", background: "#0b1220", minHeight: "100vh" }}>
-          <h1 style={{ fontSize: 22, marginBottom: 8 }}>Something went wrong</h1>
-          <pre
-            style={{
-              whiteSpace: "pre-wrap",
-              background: "#111827",
-              padding: 16,
-              borderRadius: 8,
-              border: "1px solid #1f2937",
-            }}
-          >
-            {String(this.state.err?.message || this.state.err)}
-          </pre>
-          <p style={{ opacity: 0.8, marginTop: 12 }}>
-            Check the browser console for details.
-          </p>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
+// Minimal loading UI for lazy routes
+const Fallback = () => (
+  <div className="min-h-[60vh] grid place-items-center text-slate-200">
+    <div className="text-center">
+      <div className="animate-pulse text-lg">Loading…</div>
+      <p className="text-slate-400 mt-1">Please wait a moment.</p>
+    </div>
+  </div>
+);
 
-/* =========================
-   Global helpers
-   ========================= */
+// Simple placeholder
 const Placeholder = ({ title = "Coming soon" }) => (
   <div className="min-h-[60vh] flex items-center justify-center text-slate-200">
     <div className="text-center">
@@ -71,6 +42,7 @@ const Placeholder = ({ title = "Coming soon" }) => (
   </div>
 );
 
+// Auto-scroll to top on route change
 function ScrollToTop() {
   const { pathname, search, hash } = useLocation();
   useEffect(() => {
@@ -82,11 +54,14 @@ function ScrollToTop() {
 /* =========================
    Auth gate (toggleable)
    ========================= */
+// Set to true while Auth is WIP; set to false when ready to enforce auth.
 const BYPASS_AUTH = true;
 
+// Very light "session" check that you can swap later for real Amplify/Cognito state.
+// If BYPASS_AUTH is false, this checks a localStorage key.
 function ProtectedRoute({ children }) {
   if (BYPASS_AUTH) return children;
-  const user = localStorage.getItem("dt_auth_user");
+  const user = localStorage.getItem("dt_auth_user"); // e.g., set after sign-in
   return user ? children : <Navigate to="/signin" replace />;
 }
 
@@ -98,8 +73,11 @@ function TableOfContentsRouter() {
   const paramV = params.get("v");
   const key = "tocVersion";
   const stored = localStorage.getItem(key);
+
+  // Decide version (URL param wins, then stored, default "2")
   const chosen = paramV || stored || "2";
   if (chosen !== stored) localStorage.setItem(key, chosen);
+
   return chosen === "1" ? <TOCPage /> : <TOCPage2 />;
 }
 
@@ -107,153 +85,149 @@ function TableOfContentsRouter() {
    App
    ========================= */
 export default function App() {
-  useEffect(() => {
-    console.log("[App] mounted");
-  }, []);
-
   return (
-    <ErrorBoundary>
+    <Router>
       <ScrollToTop />
-      <Routes>
-        {/* Public */}
-        <Route path="/" element={<LandingPage />} />
-        <Route path="/signin" element={<SignInPage />} />
-        <Route path="/auth/register" element={<RegistrationPage />} />
+      <Suspense fallback={<Fallback />}>
+        <Routes>
+          {/* Public */}
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/signin" element={<SignInPage />} />
+          <Route path="/auth/register" element={<RegistrationPage />} />
 
-        {/* Protected */}
-        <Route
-          path="/dashboard"
-          element={
-            <ProtectedRoute>
-              <Dashboard />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/writer"
-          element={
-            <ProtectedRoute>
-              <WriteSection />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/write"
-          element={
-            <ProtectedRoute>
-              <WriteSection />
-            </ProtectedRoute>
-          }
-        />
+          {/* Protected */}
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <Dashboard />
+              </ProtectedRoute>
+            }
+          />
 
-        {/* Story Lab */}
-        <Route
-          path="/story-lab"
-          element={
-            <ProtectedRoute>
-              <StoryLab />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/story-lab/prompts"
-          element={
-            <ProtectedRoute>
-              <StoryPromptsWorkshop />
-            </ProtectedRoute>
-          }
-        />
+          {/* Writer - WriteSection for actual writing */}
+          <Route
+            path="/writer"
+            element={
+              <ProtectedRoute>
+                <WriteSection />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/write"
+            element={
+              <ProtectedRoute>
+                <WriteSection />
+              </ProtectedRoute>
+            }
+          />
 
-        {/* TOC */}
-        <Route
-          path="/toc"
-          element={
-            <ProtectedRoute>
-              <TableOfContentsRouter />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/toc/v1"
-          element={
-            <ProtectedRoute>
-              <TOCPage />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/toc/v2"
-          element={
-            <ProtectedRoute>
-              <TOCPage2 />
-            </ProtectedRoute>
-          }
-        />
+          {/* Story Lab */}
+          <Route
+            path="/story-lab"
+            element={
+              <ProtectedRoute>
+                <StoryLab />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/story-lab/prompts"
+            element={
+              <ProtectedRoute>
+                <StoryPromptsWorkshop />
+              </ProtectedRoute>
+            }
+          />
 
-        {/* Project */}
-        <Route
-          path="/project"
-          element={
-            <ProtectedRoute>
-              <ProjectPage />
-            </ProtectedRoute>
-          }
-        />
+          {/* Table of Contents (selector + direct) */}
+          <Route
+            path="/toc"
+            element={
+              <ProtectedRoute>
+                <TableOfContentsRouter />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/toc/v1"
+            element={
+              <ProtectedRoute>
+                <TOCPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/toc/v2"
+            element={
+              <ProtectedRoute>
+                <TOCPage2 />
+              </ProtectedRoute>
+            }
+          />
 
-        {/* Calendar */}
-        <Route
-          path="/calendar"
-          element={
-            <ProtectedRoute>
-              <Calendar />
-            </ProtectedRoute>
-          }
-        />
+          {/* Project */}
+          <Route
+            path="/project"
+            element={
+              <ProtectedRoute>
+                <ProjectPage />
+              </ProtectedRoute>
+            }
+          />
 
-        {/* Profile */}
-        <Route
-          path="/profile"
-          element={
-            <ProtectedRoute>
-              <Profile />
-            </ProtectedRoute>
-          }
-        />
+          {/* Calendar */}
+          <Route
+            path="/calendar"
+            element={
+              <ProtectedRoute>
+                <Calendar />
+              </ProtectedRoute>
+            }
+          />
 
-        {/* Misc */}
-        <Route path="/whoami" element={<WhoAmI />} />
-        <Route
-          path="/publishing"
-          element={
-            <ProtectedRoute>
-              <Placeholder title="Publishing" />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/store"
-          element={
-            <ProtectedRoute>
-              <Placeholder title="Store" />
-            </ProtectedRoute>
-          }
-        />
-        <Route
-          path="/about"
-          element={
-            <ProtectedRoute>
-              <Placeholder title="About" />
-            </ProtectedRoute>
-          }
-        />
+          {/* Profile - Updated to use the actual Profile component */}
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute>
+                <Profile />
+              </ProtectedRoute>
+            }
+          />
 
-        {/* Health check route (easy sanity check) */}
-        <Route path="/__health" element={<div style={{ padding: 24, color: "#fff" }}>OK</div>} />
+          {/* Misc */}
+          <Route path="/whoami" element={<WhoAmI />} />
+          <Route
+            path="/publishing"
+            element={
+              <ProtectedRoute>
+                <Placeholder title="Publishing" />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/store"
+            element={
+              <ProtectedRoute>
+                <Placeholder title="Store" />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/about"
+            element={
+              <ProtectedRoute>
+                <Placeholder title="About" />
+              </ProtectedRoute>
+            }
+          />
 
-        {/* Fallback */}
-        <Route path="*" element={<Placeholder title="Not Found" />} />
-      </Routes>
-    </ErrorBoundary>
+          {/* Fallback */}
+          <Route path="*" element={<Placeholder title="Not Found" />} />
+        </Routes>
+      </Suspense>
+    </Router>
   );
 }
-Error
