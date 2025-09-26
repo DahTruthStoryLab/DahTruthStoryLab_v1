@@ -1,6 +1,6 @@
 // src/App.jsx
 import React, { Suspense, lazy, useEffect } from "react";
-import { BrowserRouter as Router, Routes, Route, useSearchParams, useLocation, Navigate } from "react-router-dom";
+import { Routes, Route, useSearchParams, useLocation, Navigate } from "react-router-dom";
 
 /* =========================
    Lazy-loaded pages (faster)
@@ -17,12 +17,11 @@ const WriteSection         = lazy(() => import("./components/WriteSection"));
 const StoryLab             = lazy(() => import("./lib/storylab/StoryLab"));
 const StoryPromptsWorkshop = lazy(() => import("./lib/storylab/StoryPromptsWorkshop"));
 const Calendar             = lazy(() => import("./components/Calendar"));
-const Profile              = lazy(() => import("./components/Profile")); // Add this line
+const Profile              = lazy(() => import("./components/Profile"));
 
 /* =========================
    Global UI helpers
    ========================= */
-// Minimal loading UI for lazy routes
 const Fallback = () => (
   <div className="min-h-[60vh] grid place-items-center text-slate-200">
     <div className="text-center">
@@ -32,7 +31,6 @@ const Fallback = () => (
   </div>
 );
 
-// Simple placeholder
 const Placeholder = ({ title = "Coming soon" }) => (
   <div className="min-h-[60vh] flex items-center justify-center text-slate-200">
     <div className="text-center">
@@ -54,14 +52,11 @@ function ScrollToTop() {
 /* =========================
    Auth gate (toggleable)
    ========================= */
-// Set to true while Auth is WIP; set to false when ready to enforce auth.
 const BYPASS_AUTH = true;
 
-// Very light "session" check that you can swap later for real Amplify/Cognito state.
-// If BYPASS_AUTH is false, this checks a localStorage key.
 function ProtectedRoute({ children }) {
   if (BYPASS_AUTH) return children;
-  const user = localStorage.getItem("dt_auth_user"); // e.g., set after sign-in
+  const user = localStorage.getItem("dt_auth_user");
   return user ? children : <Navigate to="/signin" replace />;
 }
 
@@ -74,7 +69,6 @@ function TableOfContentsRouter() {
   const key = "tocVersion";
   const stored = localStorage.getItem(key);
 
-  // Decide version (URL param wins, then stored, default "2")
   const chosen = paramV || stored || "2";
   if (chosen !== stored) localStorage.setItem(key, chosen);
 
@@ -86,7 +80,7 @@ function TableOfContentsRouter() {
    ========================= */
 export default function App() {
   return (
-    <Router>
+    <>
       <ScrollToTop />
       <Suspense fallback={<Fallback />}>
         <Routes>
@@ -105,7 +99,7 @@ export default function App() {
             }
           />
 
-          {/* Writer - WriteSection for actual writing */}
+          {/* Writer */}
           <Route
             path="/writer"
             element={
@@ -141,7 +135,7 @@ export default function App() {
             }
           />
 
-          {/* Table of Contents (selector + direct) */}
+          {/* Table of Contents */}
           <Route
             path="/toc"
             element={
@@ -187,7 +181,7 @@ export default function App() {
             }
           />
 
-          {/* Profile - Updated to use the actual Profile component */}
+          {/* Profile */}
           <Route
             path="/profile"
             element={
@@ -228,6 +222,6 @@ export default function App() {
           <Route path="*" element={<Placeholder title="Not Found" />} />
         </Routes>
       </Suspense>
-    </Router>
+    </>
   );
 }
