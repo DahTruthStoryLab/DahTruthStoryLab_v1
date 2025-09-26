@@ -15,7 +15,6 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { useUser } from "@/state/UserContext";
 import { Upload, User, Save, X, Camera } from "lucide-react";
-import type { User as UserType } from "@shared/schema";
 import PageShell from "@/components/layout/PageShell";
 import AeroBanner from "@/components/layout/AeroBanner";
 
@@ -25,23 +24,21 @@ const profileFormSchema = z.object({
   bio: z.string().max(500, "Bio must be less than 500 characters").optional().or(z.literal("")),
 });
 
-type ProfileFormValues = z.infer<typeof profileFormSchema>;
-
 export default function Profile() {
   const [isEditing, setIsEditing] = useState(false);
-  const [avatarFile, setAvatarFile] = useState<File | null>(null);
-  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [avatarFile, setAvatarFile] = useState(null);
+  const [avatarPreview, setAvatarPreview] = useState(null);
   const [convertingImage, setConvertingImage] = useState(false);
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const { user: authUser } = useAuth();
   const { setUser: setGlobalUser } = useUser();
 
-  const { data: user, isLoading } = useQuery<UserType>({
+  const { data: user, isLoading } = useQuery({
     queryKey: ["/api/user/current"],
   });
 
-  const form = useForm<ProfileFormValues>({
+  const form = useForm({
     resolver: zodResolver(profileFormSchema),
     defaultValues: {
       name: "",
@@ -62,7 +59,7 @@ export default function Profile() {
   }, [user, form]);
 
   const updateProfileMutation = useMutation({
-    mutationFn: async (data: ProfileFormValues & { avatar?: string }) => {
+    mutationFn: async (data) => {
       return await apiRequest("PATCH", "/api/user/current", data);
     },
     onSuccess: (updatedUser) => {
@@ -91,7 +88,7 @@ export default function Profile() {
     },
   });
 
-  const handleAvatarChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAvatarChange = async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -124,7 +121,7 @@ export default function Profile() {
           blob: file,
           toType: "image/jpeg",
           quality: 0.9,
-        })) as Blob;
+        }));
 
         // Create a File from the Blob
         const convertedFile = new File(
@@ -153,7 +150,7 @@ export default function Profile() {
         if (!isValidType && !isValidExtension) {
           toast({
             title: "Invalid file type",
-            description: `Please select an image file. Supported formats: JPEG, PNG, GIF, WebP, SVG, HEIC, HEIF, BMP, TIFF, AVIF`,
+            description: "Please select an image file. Supported formats: JPEG, PNG, GIF, WebP, SVG, HEIC, HEIF, BMP, TIFF, AVIF",
             variant: "destructive",
           });
           return;
@@ -179,7 +176,7 @@ export default function Profile() {
     }
   };
 
-  const onSubmit = async (data: ProfileFormValues) => {
+  const onSubmit = async (data) => {
     let avatarUrl = user?.avatar;
 
     // Upload avatar if changed
