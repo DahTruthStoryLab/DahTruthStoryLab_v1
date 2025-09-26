@@ -1,13 +1,25 @@
+/* Tailwind layers MUST be first */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ---- Brand + global base ---- */
+:root {
+  --brand-navy: #0b1220;
+  color-scheme: dark; /* improves control defaults on dark bg */
+}
+
+html, body, #root {
+  height: 100%;
+}
 
 body {
   margin: 0;
   font-family: 'Roboto', sans-serif;
   font-size: 16px;
   line-height: 1.6;
-  color: #333;
+  color: #e5e7eb;              /* slate-200: readable on navy */
+  background-color: var(--brand-navy);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -16,10 +28,55 @@ h1, h2, h3, h4, h5, h6 {
   font-family: 'Merriweather', serif;
   font-weight: 700;
   line-height: 1.3;
-  color: #111;
+  color: #f8fafc;              /* slate-50 on dark bg */
 }
 
 code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
+}
+
+img {
+  image-rendering: -webkit-optimize-contrast;
+}
+
+/* ---- shadcn/ui tokens (optional but useful) ---- */
+@layer base {
+  :root {
+    --background: 222 61% 7%;      /* ~#0b1220 */
+    --foreground: 210 40% 98%;
+
+    --muted: 215 20% 17%;
+    --muted-foreground: 215 20% 65%;
+
+    --card: 222 61% 9%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 222 61% 9%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 199 89% 48%;        /* sky-600-ish */
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 215 20% 17%;
+    --secondary-foreground: 210 40% 98%;
+
+    --accent: 199 89% 48%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 215 20% 20%;
+    --input: 215 20% 20%;
+    --ring: 199 89% 48%;
+
+    --radius: 0.75rem;
+  }
+}
+
+/* ---- optional helpers you can reuse ---- */
+@layer components {
+  .glass-panel { @apply bg-white/10 backdrop-blur-xl border border-white/20 rounded-2xl; }
+  .glass-soft  { @apply bg-white/5  backdrop-blur-md border border-white/10 rounded-xl; }
+  .btn-sky     { @apply bg-sky-600 text-white hover:bg-sky-500; }
 }
