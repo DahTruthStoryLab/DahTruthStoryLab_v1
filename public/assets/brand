@@ -1,0 +1,4 @@
+// src/components/BrandLogo.jsx
+export default function BrandLogo({ className = "h-8 w-auto", alt = "DahTruth" }) {
+  return <img src="/assets/brand/logo-light.svg" alt={alt} className={className} draggable={false} />;
+}
