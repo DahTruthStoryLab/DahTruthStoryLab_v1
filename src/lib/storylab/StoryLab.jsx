@@ -1,6 +1,6 @@
 // src/lib/storylab/StoryLab.jsx
 import React, { useState, useEffect, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   Brain, Target, Zap, ArrowLeft, BookOpen, Users, /* Quote, */ Pin,
   Sparkles, Calendar, Clock, ChevronRight, X, Plus, Shuffle,
@@ -61,23 +61,23 @@ function extractKeywordSentences(text, keyword) {
 }
 
 /* =========================================================
-   TOP BANNER - UPDATED WITH NAVIGATION
+   TOP BANNER - NAVY
 ========================================================= */
 const TopBanner = ({ navigate }) => {
   return (
-    <div className="sticky top-0 z-50 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white">
+    <div className="sticky top-0 z-50 bg-[#0b1220] border-b border-slate-800 text-slate-100">
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <div className="h-16 flex items-center justify-between">
           <div className="font-extrabold tracking-wide">Story Lab</div>
 
           <div className="text-center">
-            <div className="text-sm opacity-90">Creative Workshop</div>
-            <div className="text-lg font-semibold">DahTruth Platform</div>
+            <div className="text-sm text-slate-300">Creative Workshop</div>
+            <div className="text-lg font-semibold text-slate-100">DahTruth Platform</div>
           </div>
 
           <button
             onClick={() => navigate("/dashboard")}
-            className="inline-flex items-center gap-2 rounded-xl bg-white/15 hover:bg-white/25 px-3 py-2 text-sm font-medium border border-white/20"
+            className="inline-flex items-center gap-2 rounded-xl bg-sky-600 hover:bg-sky-500 px-3 py-2 text-sm font-medium text-white"
           >
             <ArrowLeft size={16} />
             Back to Dashboard
@@ -89,27 +89,27 @@ const TopBanner = ({ navigate }) => {
 };
 
 /* =========================================================
-   FEATURE CARDS  (lightened aesthetic)
+   FEATURE CARDS (dark theme)
 ========================================================= */
 const FeatureCard = ({ icon: Icon, title, status, description, onClick }) => {
   const statusColors = {
-    Ready: "bg-green-100 text-green-700 border-green-200",
-    Beta: "bg-blue-100 text-blue-700 border-blue-200",
-    "Coming Soon": "bg-gray-100 text-gray-700 border-gray-200",
+    Ready: "bg-emerald-500/20 text-emerald-200 border-emerald-400/30",
+    Beta: "bg-sky-500/20 text-sky-200 border-sky-400/30",
+    "Coming Soon": "bg-slate-600/30 text-slate-300 border-slate-500/40",
   };
 
   return (
     <div
       onClick={onClick}
-      className="bg-sky-50/80 backdrop-blur-xl rounded-2xl p-6 border border-sky-200 hover:border-sky-300 transition-all cursor-pointer group hover:shadow-md"
+      className="bg-white/5 backdrop-blur-xl rounded-2xl p-6 border border-slate-800 hover:border-slate-700 transition-all cursor-pointer group"
     >
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-start gap-4">
-          <div className="p-3 bg-sky-100 rounded-xl group-hover:bg-sky-200 transition-all border border-sky-200">
-            <Icon className="w-6 h-6 text-sky-700" />
+          <div className="p-3 bg-white/10 rounded-xl border border-slate-700">
+            <Icon className="w-6 h-6 text-sky-300" />
           </div>
           <div className="flex-1">
-            <h3 className="text-lg font-semibold text-slate-800 mb-2">{title}</h3>
+            <h3 className="text-lg font-semibold text-slate-100 mb-2">{title}</h3>
             {status && (
               <span
                 className={`inline-block px-3 py-1 rounded-full text-xs font-medium border ${statusColors[status]}`}
@@ -119,9 +119,9 @@ const FeatureCard = ({ icon: Icon, title, status, description, onClick }) => {
             )}
           </div>
         </div>
-        <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-slate-600 transition-colors mt-1" />
+        <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-slate-200 transition-colors mt-1" />
       </div>
-      <p className="text-slate-700 text-sm leading-relaxed">{description}</p>
+      <p className="text-slate-300 text-sm leading-relaxed">{description}</p>
     </div>
   );
 };
@@ -129,19 +129,19 @@ const FeatureCard = ({ icon: Icon, title, status, description, onClick }) => {
 const SectionHeader = ({ icon, title, subtitle }) => {
   return (
     <div className="flex items-start gap-3 mb-8">
-      <div className="p-3 bg-gradient-to-br from-sky-100 to-blue-100 rounded-xl border border-sky-200">
+      <div className="p-3 bg-sky-600/20 rounded-xl border border-sky-700">
         <span className="text-2xl">{icon}</span>
       </div>
       <div>
-        <h2 className="text-3xl font-bold text-slate-800 mb-2">{title}</h2>
-        {subtitle && <p className="text-slate-600">{subtitle}</p>}
+        <h2 className="text-3xl font-bold text-slate-100 mb-2">{title}</h2>
+        {subtitle && <p className="text-slate-300">{subtitle}</p>}
       </div>
     </div>
   );
 };
 
 /* =========================================================
-   CHARACTER MANAGER
+   CHARACTER MANAGER (dark theme)
 ========================================================= */
 const CharacterManager = ({ seedText = "", onChange }) => {
   const [characters, setCharacters] = useState(() => {
@@ -172,17 +172,17 @@ const CharacterManager = ({ seedText = "", onChange }) => {
   };
 
   return (
-    <div className="bg-sky-50/80 backdrop-blur-xl rounded-2xl p-6 border border-sky-200">
-      <h3 className="text-lg font-semibold text-slate-800 mb-4">Character Manager</h3>
+    <div className="bg-white/5 backdrop-blur-xl rounded-2xl p-6 border border-slate-800">
+      <h3 className="text-lg font-semibold text-slate-100 mb-4">Character Manager</h3>
 
       <div className="space-y-3 mb-4">
         {characters.length === 0 && (
-          <div className="text-slate-600 text-sm">No characters found yet. Add them below.</div>
+          <div className="text-slate-400 text-sm">No characters found yet. Add them below.</div>
         )}
         {characters.map((character) => (
           <div
             key={character.id}
-            className="flex items-center gap-3 bg-white rounded-lg p-3 border border-slate-200"
+            className="flex items-center gap-3 bg-slate-900/60 rounded-lg p-3 border border-slate-700"
           >
             {editingId === character.id ? (
               <input
@@ -190,13 +190,13 @@ const CharacterManager = ({ seedText = "", onChange }) => {
                 defaultValue={character.name}
                 onBlur={(e) => updateCharacter(character.id, e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && updateCharacter(character.id, e.currentTarget.value)}
-                className="flex-1 bg-transparent border-b border-sky-400 text-slate-800 outline-none"
+                className="flex-1 bg-transparent border-b border-sky-500 text-slate-100 outline-none"
                 autoFocus
               />
             ) : (
               <span
                 onClick={() => setEditingId(character.id)}
-                className="flex-1 text-slate-800 cursor-pointer hover:text-sky-700"
+                className="flex-1 text-slate-100 cursor-pointer hover:text-sky-300"
                 title="Click to edit"
               >
                 {character.name}
@@ -204,7 +204,7 @@ const CharacterManager = ({ seedText = "", onChange }) => {
             )}
             <button
               onClick={() => deleteCharacter(character.id)}
-              className="text-rose-600 hover:text-rose-700 transition-colors"
+              className="text-rose-400/80 hover:text-rose-300 transition-colors"
               title="Delete character"
             >
               <Trash2 className="w-4 h-4" />
@@ -220,11 +220,11 @@ const CharacterManager = ({ seedText = "", onChange }) => {
           value={newCharacter}
           onChange={(e) => setNewCharacter(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && addCharacter()}
-          className="flex-1 px-4 py-2 bg-white border border-slate-200 rounded-lg text-slate-800 placeholder-slate-400 focus:border-sky-400 focus:outline-none"
+          className="flex-1 px-4 py-2 bg-slate-900/60 border border-slate-700 rounded-lg text-slate-100 placeholder-slate-400 focus:border-sky-500 focus:outline-none"
         />
         <button
           onClick={addCharacter}
-          className="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg transition-all"
+          className="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-lg transition-all"
         >
           <Plus className="w-5 h-5" />
         </button>
@@ -234,7 +234,7 @@ const CharacterManager = ({ seedText = "", onChange }) => {
 };
 
 /* =========================================================
-   WORKSHOP COMPONENTS
+   WORKSHOP COMPONENTS (dark theme)
 ========================================================= */
 const StoryPromptsWorkshop = ({ chapters, characters }) => {
   const fullText = useMemo(() => chapters.map((c) => c.text).join("\n\n"), [chapters]);
@@ -268,15 +268,15 @@ const StoryPromptsWorkshop = ({ chapters, characters }) => {
   }, [chapters, characters, fullText]);
 
   return (
-    <div className="bg-sky-50/80 backdrop-blur-xl rounded-2xl p-6 border border-sky-200">
-      <h3 className="text-xl font-semibold text-slate-800 mb-2">Story Prompts Workshop</h3>
-      <p className="text-slate-600 mb-4">Prompts generated from your story chapters and characters.</p>
+    <div className="bg-white/5 backdrop-blur-xl rounded-2xl p-6 border border-slate-800">
+      <h3 className="text-xl font-semibold text-slate-100 mb-2">Story Prompts Workshop</h3>
+      <p className="text-slate-400 mb-4">Prompts generated from your story chapters and characters.</p>
       {prompts.length === 0 ? (
-        <div className="text-slate-600">No prompts yet. Add chapters first.</div>
+        <div className="text-slate-400">No prompts yet. Add chapters first.</div>
       ) : (
         <ul className="grid md:grid-cols-2 gap-3">
           {prompts.map((p, i) => (
-            <li key={i} className="p-3 rounded-lg bg-white border border-slate-200 text-slate-800">
+            <li key={i} className="p-3 rounded-lg bg-slate-900/60 border border-slate-700 text-slate-100">
               • {p}
             </li>
           ))}
@@ -288,17 +288,17 @@ const StoryPromptsWorkshop = ({ chapters, characters }) => {
 
 const ClotheslineWorkshop = ({ characters }) => {
   return (
-    <div className="bg-sky-50/80 backdrop-blur-xl rounded-2xl p-6 border border-sky-200">
-      <h3 className="text-xl font-semibold text-slate-800 mb-2">Clothes Pin Workshop</h3>
-      <p className="text-slate-600 mb-4">Pin quick synopses for each character.</p>
+    <div className="bg-white/5 backdrop-blur-xl rounded-2xl p-6 border border-slate-800">
+      <h3 className="text-xl font-semibold text-slate-100 mb-2">Clothes Pin Workshop</h3>
+      <p className="text-slate-400 mb-4">Pin quick synopses for each character.</p>
       <div className="flex items-center gap-4 overflow-x-auto pb-2">
         {(characters?.length ? characters : ["Protagonist", "Antagonist"]).map((name, idx) => (
-          <div key={idx} className="min-w-[220px] bg-white border border-slate-200 rounded-xl p-4">
+          <div key={idx} className="min-w-[220px] bg-slate-900/60 border border-slate-700 rounded-xl p-4">
             <div className="flex items-center gap-2 mb-2">
-              <Pin className="w-4 h-4 text-sky-700" />
-              <div className="font-semibold text-slate-800">{name}</div>
+              <Pin className="w-4 h-4 text-sky-300" />
+              <div className="font-semibold text-slate-100">{name}</div>
             </div>
-            <p className="text-sm text-slate-700">
+            <p className="text-sm text-slate-200/90">
               {name} plays a key role in the story. Summarize traits, goals, and obstacles here.
             </p>
           </div>
@@ -324,25 +324,25 @@ const HopesFearsLegacyWorkshop = ({ chapters, characters }) => {
   }, [text, characters]);
 
   return (
-    <div className="bg-sky-50/80 backdrop-blur-xl rounded-2xl p-6 border border-sky-200">
-      <h3 className="text-xl font-semibold text-slate-800 mb-4">Hopes, Fears & Legacy Workshop</h3>
+    <div className="bg-white/5 backdrop-blur-xl rounded-2xl p-6 border border-slate-800">
+      <h3 className="text-xl font-semibold text-slate-100 mb-4">Hopes, Fears & Legacy Workshop</h3>
       {(!characters || characters.length === 0) && (
-        <div className="text-slate-600 mb-3">Add characters above to see targeted insights.</div>
+        <div className="text-slate-400 mb-3">Add characters above to see targeted insights.</div>
       )}
       <div className="space-y-4">
         {Object.entries(insights).map(([name, data]) => (
-          <div key={name} className="rounded-xl border border-slate-200 bg-white p-4">
-            <div className="font-semibold text-slate-800 mb-2">{name}</div>
+          <div key={name} className="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+            <div className="font-semibold text-slate-100 mb-2">{name}</div>
             <div className="grid md:grid-cols-3 gap-3">
               {["Hopes", "Fears", "Legacy"].map((key) => (
-                <div key={key} className="rounded-lg bg-slate-50 p-3 border border-slate-200">
-                  <div className="text-slate-800 text-sm font-medium mb-2">{key}</div>
+                <div key={key} className="rounded-lg bg-black/30 p-3 border border-slate-800">
+                  <div className="text-slate-100 text-sm font-medium mb-2">{key}</div>
                   {data[key] && data[key].length ? (
-                    <ul className="space-y-2 text-slate-700 text-sm">
+                    <ul className="space-y-2 text-slate-200 text-sm">
                       {data[key].map((s, i) => <li key={i}>• {s}</li>)}
                     </ul>
                   ) : (
-                    <div className="text-slate-500 text-sm">No {key.toLowerCase()} found yet.</div>
+                    <div className="text-slate-400 text-sm">No {key.toLowerCase()} found yet.</div>
                   )}
                 </div>
               ))}
@@ -355,7 +355,7 @@ const HopesFearsLegacyWorkshop = ({ chapters, characters }) => {
 };
 
 /* =========================================================
-   MAIN COMPONENT - UPDATED WITH NAVIGATION
+   MAIN COMPONENT - NAVY + LIGHT-BLUE MENUS
 ========================================================= */
 export default function StoryLab() {
   const navigate = useNavigate();
@@ -459,35 +459,35 @@ export default function StoryLab() {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-sky-50 to-white">
+    <div className="min-h-screen bg-[#0b1220] text-slate-100">
       <TopBanner navigate={navigate} />
 
       <div className="max-w-7xl mx-auto px-6 py-12">
         {/* Hero Section */}
         <div className="text-center mb-16">
-          <h1 className="text-4xl md:text-5xl font-bold text-slate-900 mb-4">
+          <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
             The All-in-One Writing Platform
           </h1>
-          <p className="text-lg text-slate-600 mb-8">
+          <p className="text-lg text-slate-300 mb-8">
             Where creativity meets discipline. Blend AI, community support, character tracking,
             and faith-based reflection in one seamless writing experience.
           </p>
 
-          {/* Feature Pills */}
+          {/* Feature Pills (light-blue) */}
           <div className="flex flex-wrap justify-center gap-4 mb-12">
-            <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-yellow-100 border border-yellow-200 text-yellow-800">
+            <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-sky-600 text-white">
               <Sparkles className="w-4 h-4" />
               <span className="text-sm font-medium">AI-Powered Assistance</span>
             </div>
-            <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-blue-100 border border-blue-200 text-blue-800">
+            <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-sky-600 text-white">
               <Users className="w-4 h-4" />
               <span className="text-sm font-medium">Writing Community</span>
             </div>
-            <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-emerald-100 border border-emerald-200 text-emerald-800">
+            <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-sky-600 text-white">
               <Layers className="w-4 h-4" />
               <span className="text-sm font-medium">Organization Tools</span>
             </div>
-            <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-purple-100 border border-purple-200 text-purple-800">
+            <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-sky-600 text-white">
               <Heart className="w-4 h-4" />
               <span className="text-sm font-medium">Faith Integration</span>
             </div>
@@ -496,8 +496,8 @@ export default function StoryLab() {
 
         {/* Chapter Info Bar */}
         {chapters.length > 0 && (
-          <div className="mb-12 p-4 bg-white rounded-xl border border-slate-200">
-            <div className="flex items-center gap-3 text-slate-800">
+          <div className="mb-12 p-4 bg-white/5 rounded-xl border border-slate-800">
+            <div className="flex items-center gap-3 text-slate-200">
               <BookOpen className="w-5 h-5" />
               <span>
                 {chapters.length} chapter{chapters.length > 1 ? "s" : ""} loaded from your story
@@ -514,55 +514,60 @@ export default function StoryLab() {
             subtitle="Interactive workshops that analyze your story and support collaboration."
           />
           <div className="grid gap-6 md:grid-cols-3 mb-8">
-            <button
-              onClick={() => navigate("/story-lab/prompts")}
-              className="rounded-2xl p-5 border transition-all text-left bg-white border-slate-200 text-slate-800 hover:bg-slate-50"
+            {/* Story Prompts Workshop (Link + light-blue) */}
+            <Link
+              to="/story-lab/prompts"
+              className="rounded-2xl p-5 border text-left bg-sky-600 text-white hover:bg-sky-500 border-sky-500 transition-all block"
             >
               <div className="text-lg font-semibold mb-1">Story Prompts Workshop</div>
-              <div className="text-sm text-slate-600">
+              <div className="text-sm opacity-90">
                 Smart prompts based on your story structure and content.
               </div>
-            </button>
+            </Link>
 
+            {/* Clothesline */}
             <button
               onClick={() => setActiveSection("clothesline")}
-              className={`rounded-2xl p-5 border transition-all text-left ${
+              className={`rounded-2xl p-5 border text-left transition-all ${
                 activeSection === "clothesline"
-                  ? "bg-sky-100 border-sky-300 text-slate-800"
-                  : "bg-white border-slate-200 text-slate-800 hover:bg-slate-50"
+                  ? "bg-sky-600 text-white border-sky-500"
+                  : "bg-white/5 text-slate-100 border-slate-800 hover:bg-white/10"
               }`}
             >
               <div className="text-lg font-semibold mb-1">Clothes Pin Workshop</div>
-              <div className="text-sm text-slate-600">Visual cards to summarize characters and roles.</div>
+              <div className="text-sm text-slate-300">Visual cards to summarize characters and roles.</div>
             </button>
 
+            {/* Hopes, Fears & Legacy */}
             <button
               onClick={() => setActiveSection("hfl")}
-              className={`rounded-2xl p-5 border transition-all text-left ${
+              className={`rounded-2xl p-5 border text-left transition-all ${
                 activeSection === "hfl"
-                  ? "bg-sky-100 border-sky-300 text-slate-800"
-                  : "bg-white border-slate-200 text-slate-800 hover:bg-slate-50"
+                  ? "bg-sky-600 text-white border-sky-500"
+                  : "bg-white/5 text-slate-100 border-slate-800 hover:bg-white/10"
               }`}
             >
               <div className="text-lg font-semibold mb-1">Hopes, Fears & Legacy</div>
-              <div className="text-sm text-slate-600">Pulls sentences that reveal drives and long-term aims.</div>
+              <div className="text-sm text-slate-300">Pulls sentences that reveal drives and long-term aims.</div>
             </button>
           </div>
 
-          {/* Critique Circle CTA (route should exist later) */}
+          {/* Critique Circle CTA (Link + light-blue) */}
           <div className="mb-8">
-            <button
-              onClick={() => navigate("/story-lab/critique")}
-              className="w-full rounded-2xl p-5 border transition-all text-left bg-white border-slate-200 text-slate-800 hover:bg-slate-50 flex items-center gap-3"
+            <Link
+              to="/story-lab/critique"
+              className="block rounded-2xl p-5 border bg-sky-600 text-white hover:bg-sky-500 border-sky-500 transition-all"
             >
-              <MessageSquare className="w-5 h-5 text-sky-700" />
-              <div>
-                <div className="text-lg font-semibold mb-1">Critique Circle</div>
-                <div className="text-sm text-slate-600">
-                  Secure peer review with inline comments, reactions, copy-controls, and an audit log.
+              <div className="flex items-start gap-3">
+                <MessageSquare className="w-5 h-5 mt-1" />
+                <div>
+                  <div className="text-lg font-semibold mb-1">Critique Circle</div>
+                  <div className="text-sm opacity-90">
+                    Secure peer review with inline comments, reactions, copy-controls, and an audit log.
+                  </div>
                 </div>
               </div>
-            </button>
+            </Link>
           </div>
 
           {/* Active workshop panels */}
@@ -636,18 +641,24 @@ export default function StoryLab() {
           </div>
         </section>
 
-        {/* Quick Actions Bar */}
-        <div className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-xl border-t border-slate-200 p-4">
+        {/* Quick Actions Bar (dark) */}
+        <div className="fixed bottom-0 left-0 right-0 bg-[#0b1220]/95 backdrop-blur-xl border-t border-slate-800 p-4">
           <div className="max-w-7xl mx-auto flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <button className="px-6 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white rounded-lg font-medium transition-all shadow-lg">
-                Start Writing Session
-              </button>
-              <button className="px-4 py-2 bg-white hover:bg-slate-50 text-slate-800 rounded-lg font-medium transition-all border border-slate-200">
-                View Schedule
-              </button>
+              <Link
+                to="/story-lab/critique"
+                className="px-6 py-3 bg-sky-600 hover:bg-sky-500 text-white rounded-lg font-medium transition-all shadow-lg"
+              >
+                Open Critique Circle
+              </Link>
+              <Link
+                to="/story-lab/prompts"
+                className="px-4 py-2 bg-white/5 hover:bg-white/10 text-slate-100 rounded-lg font-medium transition-all border border-slate-800"
+              >
+                View Prompts
+              </Link>
             </div>
-            <div className="flex items-center gap-2 text-slate-600">
+            <div className="flex items-center gap-2 text-slate-300">
               <Clock className="w-4 h-4" />
               <span className="text-sm">Next session in 2 days</span>
             </div>
