@@ -1,22 +1,27 @@
 // src/index.js
 import React from "react";
 import { createRoot } from "react-dom/client";
-import { BrowserRouter } from "react-router-dom";
+import { HashRouter } from "react-router-dom"; // ← use HashRouter for now
 import App from "./App";
 
-// ✅ Global styles (Tailwind + navy theme)
+// Global styles
 import "./index.css";
 
-// ✅ Amplify
-import { Amplify } from "aws-amplify";
-import awsconfig from "./aws-exports";
-Amplify.configure(awsconfig);
+// Optional Amplify config (safe if aws-exports is missing)
+try {
+  const { Amplify } = require("aws-amplify");
+  const awsconfig = require("./aws-exports");
+  Amplify.configure(awsconfig.default || awsconfig);
+} catch {
+  console.log("AWS Amplify not configured - running without backend");
+}
 
 const root = createRoot(document.getElementById("root"));
 root.render(
   <React.StrictMode>
-    <BrowserRouter>
+    <HashRouter>
       <App />
-    </BrowserRouter>
+    </HashRouter>
   </React.StrictMode>
 );
+
