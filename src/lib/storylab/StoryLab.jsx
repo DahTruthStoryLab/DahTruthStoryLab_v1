@@ -1,3 +1,4 @@
+// src/lib/storylab/StoryLab.jsx
 import React, { useState, useEffect, useMemo } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
@@ -5,7 +6,7 @@ import {
   Layers, Edit3, Trash2, Globe, Shield, Heart, Star, CheckCircle, FileText,
   MessageSquare, User
 } from "lucide-react";
-import BrandLogo from "../../components/BrandLogo"; // ✅ added
+import BrandLogo from "../../components/BrandLogo"; // ✅ logo component
 
 /* -----------------------------
    Helpers: load chapters safely
@@ -59,28 +60,33 @@ function extractKeywordSentences(text, keyword) {
 }
 
 /* =========================================================
-   TOP BANNER (navy)
+   TOP BANNER (navy) — now with BrandLogo in the left block
 ========================================================= */
 const TopBanner = ({ navigate, toggleMobileSidebar }) => {
   return (
     <div className="sticky top-0 z-50 bg-[#0b1220] border-b border-slate-800 text-slate-100">
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <div className="h-16 flex items-center justify-between">
-          <button
-            onClick={toggleMobileSidebar}
-            className="md:hidden inline-flex items-center justify-center w-9 h-9 rounded-lg bg-white/10 hover:bg-white/15 border border-white/10"
-            aria-label="Toggle menu"
-          >
-            <span className="i">☰</span>
-          </button>
+          {/* LEFT: mobile menu + logo + title */}
+          <div className="flex items-center gap-3">
+            <button
+              onClick={toggleMobileSidebar}
+              className="md:hidden inline-flex items-center justify-center w-9 h-9 rounded-lg bg-white/10 hover:bg-white/15 border border-white/10"
+              aria-label="Toggle menu"
+            >
+              <span>☰</span>
+            </button>
+            <BrandLogo className="h-7 w-auto" />
+            <div className="font-extrabold tracking-wide">Story Lab</div>
+          </div>
 
-          <div className="font-extrabold tracking-wide">Story Lab</div>
-
+          {/* CENTER: subtitle (hidden on small) */}
           <div className="text-center hidden md:block">
             <div className="text-sm text-slate-300">Creative Workshop</div>
             <div className="text-lg font-semibold text-slate-100">DahTruth Platform</div>
           </div>
 
+          {/* RIGHT: back button */}
           <button
             onClick={() => navigate("/dashboard")}
             className="inline-flex items-center gap-2 rounded-xl bg-sky-600 hover:bg-sky-500 px-3 py-2 text-sm font-medium text-white"
@@ -99,6 +105,7 @@ const TopBanner = ({ navigate, toggleMobileSidebar }) => {
    - fixed under the TopBanner (top: 4rem)
    - collapsible (stores preference in localStorage)
    - highlights active item
+   - now shows small logo row at the top
 ========================================================= */
 function AeroSidebar({
   collapsed,
@@ -148,6 +155,12 @@ function AeroSidebar({
         ].join(" ")}
         aria-label="Aero menu sidebar"
       >
+        {/* Small brand row */}
+        <div className="flex items-center gap-2 px-3 pt-3">
+          <BrandLogo className={`${collapsed ? "h-6" : "h-7"} w-auto`} />
+          {!collapsed && <span className="text-sm font-semibold text-white/90">DahTruth</span>}
+        </div>
+
         {/* Collapse/expand trigger (desktop) */}
         <div className="hidden md:flex items-center justify-end p-2">
           <button
@@ -252,7 +265,8 @@ const FeatureCard = ({ icon: Icon, title, status, description, onClick }) => {
             )}
           </div>
         </div>
-        <ChevronRight className="w-5 h-5 text-slate-400 group-hover:text-slate-2 00 transition-colors mt-1" />
+        {/* fixed typo: text-slate-200 */}
+        <ChevronRight className="w-5 h-5 text-slate-200 group-hover:text-slate-100 transition-colors mt-1" />
       </div>
       <p className="text-slate-300 text-sm leading-relaxed">{description}</p>
     </div>
@@ -504,6 +518,7 @@ export default function StoryLab() {
   });
   const [mobileSidebarHidden, setMobileSidebarHidden] = useState(true);
 
+  // Proper mobile toggle (opens/closes overlay sidebar)
   const toggleMobileSidebar = () => setMobileSidebarHidden((v) => !v);
 
   useEffect(() => {
@@ -537,15 +552,17 @@ export default function StoryLab() {
 
   return (
     <div className="min-h-screen bg-[#0b1220] text-slate-100">
-      <TopBanner navigate={navigate} toggleMobileSidebar={() => setSidebarCollapsed((v) => !v)} />
+      {/* Top banner with working mobile toggle + logo */}
+      <TopBanner navigate={navigate} toggleMobileSidebar={toggleMobileSidebar} />
 
       {/* Aero Sidebar */}
       <div className="md:block">
         <AeroSidebar
+          // If mobile overlay is visible, treat as expanded even if desktop preference is "collapsed"
           collapsed={sidebarCollapsed && mobileSidebarHidden}
           setCollapsed={(v) => {
             setSidebarCollapsed(v);
-            setMobileSidebarHidden(true);
+            setMobileSidebarHidden(true); // closing also hides the mobile overlay
           }}
           activeSection={activeSection}
           setActiveSection={setActiveSection}
