@@ -4,15 +4,17 @@ import { createRoot } from "react-dom/client";
 import App from "./App";
 import "./index.css";
 
-// Safe Amplify init (won’t crash if aws-exports.js is missing)
+// (Optional) Amplify – safe configure
 try {
   const { Amplify } = require("aws-amplify");
   const awsconfig = require("./aws-exports");
   Amplify.configure(awsconfig.default || awsconfig);
 } catch (e) {
-  console.log("Amplify not configured - continuing without backend");
+  console.log("Amplify not configured (ok for now)");
 }
 
-const rootEl = document.getElementById("root");
-const root = createRoot(rootEl);
-root.render(<App />);
+createRoot(document.getElementById("root")).render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
+);
