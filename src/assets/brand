@@ -1,7 +1,0 @@
-src/
-  assets/
-    brand/
-      logo-light.svg   // or .png — raw image assets
-      logo-dark.svg
-  components/
-    BrandLogo.jsx      // React component that renders the logo (optional but recommended)
