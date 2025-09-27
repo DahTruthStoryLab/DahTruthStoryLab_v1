@@ -1,186 +1,109 @@
+// src/components/Profile.jsx
 import { useState, useEffect } from "react";
-import { User, Save, X, Camera } from "lucide-react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
+import heic2any from "heic2any";
 
-// Simple form validation schema (replacing Zod)
-const validateProfile = (data) => {
-  const errors = {};
-  if (!data.name || data.name.trim().length === 0) {
-    errors.name = "Name is required";
-  }
-  if (!data.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
-    errors.email = "Please enter a valid email address";
-  }
-  if (data.bio && data.bio.length > 500) {
-    errors.bio = "Bio must be less than 500 characters";
-  }
-  return { errors, isValid: Object.keys(errors).length === 0 };
-};
+import { Button } from "components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "components/ui/card";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "components/ui/form";
+import { Input } from "components/ui/input";
+import { Textarea } from "components/ui/textarea";
+import { Avatar, AvatarFallback, AvatarImage } from "components/ui/avatar";
 
-// Simple toast notification (replacing useToast)
-const showToast = (title, description, variant = "default") => {
-  const toast = document.createElement('div');
-  toast.className = `fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg text-white max-w-sm ${
-    variant === 'destructive' ? 'bg-red-600' : 'bg-green-600'
-  }`;
-  toast.innerHTML = `
-    <div class="font-semibold">${title}</div>
-    <div class="text-sm opacity-90">${description}</div>
-  `;
-  document.body.appendChild(toast);
-  setTimeout(() => document.body.removeChild(toast), 3000);
-};
+import { apiRequest } from "lib/queryClient";
+import { useToast } from "hooks/use-toast";
+import { useAuth } from "hooks/useAuth";
+import { useUser } from "state/UserContext";
 
-// Mock user data (replacing useQuery)
-const mockUser = {
-  name: "Jacqueline Session",
-  email: "jacqueline@dahtruth.com",
-  bio: "Founder of DahTruth.com and creator of DahTruth StoryLab. Passionate about empowering writers to discover and share their authentic stories through faith-based community and modern technology.",
-  avatar: null
-};
+import { Upload, User, Save, X, Camera } from "lucide-react";
 
-// Simple UI Components (replacing external UI library)
-const Button = ({ children, onClick, disabled, variant = "default", size = "default", className = "", ...props }) => {
-  const baseClasses = "inline-flex items-center justify-center rounded-lg font-medium transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-white/20";
-  const variants = {
-    default: "bg-blue-600/80 backdrop-blur-sm hover:bg-blue-500/80 border border-white/20 shadow-xl text-white",
-    outline: "bg-white/10 backdrop-blur-sm border border-white/20 text-white hover:bg-white/20"
-  };
-  const sizes = {
-    default: "px-4 py-2",
-    lg: "px-6 py-3"
-  };
-  
-  return (
-    <button
-      onClick={onClick}
-      disabled={disabled}
-      className={`${baseClasses} ${variants[variant]} ${sizes[size]} ${className} ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-      {...props}
-    >
-      {children}
-    </button>
-  );
-};
+import PageShell from "components/layout/PageShell";
+import AeroBanner from "components/layout/AeroBanner";
 
-const Card = ({ children, className = "" }) => (
-  <div className={`bg-white/10 backdrop-blur-xl border border-white/20 shadow-2xl rounded-2xl ${className}`}>
-    {children}
-  </div>
-);
-
-const CardHeader = ({ children, className = "" }) => (
-  <div className={`bg-white/5 backdrop-blur-sm rounded-t-2xl border-b border-white/10 p-6 ${className}`}>
-    {children}
-  </div>
-);
-
-const CardTitle = ({ children, className = "" }) => (
-  <h3 className={`text-xl text-white flex items-center gap-2 ${className}`}>
-    {children}
-  </h3>
-);
-
-const CardDescription = ({ children, className = "" }) => (
-  <p className={`text-white/70 mt-1 ${className}`}>
-    {children}
-  </p>
-);
-
-const CardContent = ({ children, className = "" }) => (
-  <div className={`p-6 ${className}`}>
-    {children}
-  </div>
-);
-
-const Avatar = ({ children, className = "" }) => (
-  <div className={`relative ${className}`}>
-    {children}
-  </div>
-);
-
-const AvatarImage = ({ src, alt, className = "" }) => 
-  src ? <img src={src} alt={alt} className={`object-cover ${className}`} /> : null;
-
-const AvatarFallback = ({ children, className = "" }) => (
-  <div className={`w-full h-full flex items-center justify-center ${className}`}>
-    {children}
-  </div>
-);
-
-const Input = ({ className = "", ...props }) => (
-  <input
-    className={`w-full bg-white/10 backdrop-blur-sm border border-white/20 text-white placeholder:text-white/50 focus:border-white/40 focus:ring-2 focus:ring-white/20 rounded-lg px-4 py-3 focus:outline-none transition-all ${className}`}
-    {...props}
-  />
-);
-
-const Textarea = ({ className = "", ...props }) => (
-  <textarea
-    className={`w-full bg-white/10 backdrop-blur-sm border border-white/20 text-white placeholder:text-white/50 focus:border-white/40 focus:ring-2 focus:ring-white/20 resize-none rounded-lg px-4 py-3 focus:outline-none transition-all ${className}`}
-    {...props}
-  />
-);
-
-// Form components
-const FormField = ({ name, render }) => render({ field: { name } });
-const FormItem = ({ children }) => <div className="space-y-2">{children}</div>;
-const FormLabel = ({ children, className = "" }) => <label className={`text-white/90 text-sm font-medium block ${className}`}>{children}</label>;
-const FormControl = ({ children }) => <div>{children}</div>;
-const FormMessage = ({ children }) => children ? <div className="text-red-400 text-sm">{children}</div> : null;
+const profileFormSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  email: z.string().email("Please enter a valid email address"),
+  bio: z.string().max(500, "Bio must be less than 500 characters").optional().or(z.literal("")),
+});
 
 export default function Profile() {
   const [isEditing, setIsEditing] = useState(false);
   const [avatarFile, setAvatarFile] = useState(null);
   const [avatarPreview, setAvatarPreview] = useState(null);
   const [convertingImage, setConvertingImage] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  const [user, setUser] = useState(null);
-  const [formData, setFormData] = useState({
-    name: "",
-    email: "",
-    bio: ""
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const { user: authUser } = useAuth();
+  const { setUser: setGlobalUser } = useUser();
+
+  const { data: user, isLoading } = useQuery({
+    queryKey: ["/api/user/current"],
   });
-  const [formErrors, setFormErrors] = useState({});
 
-  // Load mock user data
+  const form = useForm({
+    resolver: zodResolver(profileFormSchema),
+    defaultValues: {
+      name: "",
+      email: "",
+      bio: "",
+    },
+  });
+
   useEffect(() => {
-    // Simulate loading
-    setTimeout(() => {
-      setUser(mockUser);
-      setFormData({
-        name: mockUser.name,
-        email: mockUser.email,
-        bio: mockUser.bio || ""
+    if (user) {
+      form.reset({
+        name: user.name,
+        email: user.email,
+        bio: user.bio || "",
       });
-    }, 500);
-  }, []);
-
-  const handleInputChange = (field, value) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-    // Clear error when user starts typing
-    if (formErrors[field]) {
-      setFormErrors(prev => ({ ...prev, [field]: "" }));
     }
-  };
+  }, [user, form]);
+
+  const updateProfileMutation = useMutation({
+    mutationFn: async (data) => {
+      return await apiRequest("PATCH", "/api/user/current", data);
+    },
+    onSuccess: (updatedUser) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/user/current"] });
+      if (user) {
+        const newUser = { ...user, ...updatedUser };
+        setGlobalUser(newUser);
+      }
+      setIsEditing(false);
+      setAvatarFile(null);
+      setAvatarPreview(null);
+      toast({
+        title: "Profile updated",
+        description: "Your profile has been successfully updated.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Error updating profile",
+        description: "There was an error updating your profile. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
 
   const handleAvatarChange = async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    // Check file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
-      showToast(
-        "File too large",
-        "Please select an image smaller than 5MB.",
-        "destructive"
-      );
+      toast({
+        title: "File too large",
+        description: "Please select an image smaller than 5MB.",
+        variant: "destructive",
+      });
       return;
     }
 
-    // Clean up previous preview
     if (avatarPreview) URL.revokeObjectURL(avatarPreview);
 
-    // Check if file is HEIC/HEIF (basic check without conversion)
     const isHeic =
       file.type === "image/heic" ||
       file.type === "image/heif" ||
@@ -191,28 +114,40 @@ export default function Profile() {
       setConvertingImage(true);
 
       if (isHeic) {
-        showToast(
-          "HEIC files not supported",
-          "Please convert to JPEG or PNG first.",
-          "destructive"
+        const convertedBlob = await heic2any({
+          blob: file,
+          toType: "image/jpeg",
+          quality: 0.9,
+        });
+
+        const convertedFile = new File(
+          [convertedBlob],
+          file.name.replace(/\.(heic|heif)$/i, ".jpg"),
+          { type: "image/jpeg" }
         );
-        return;
+
+        setAvatarFile(convertedFile);
+        setAvatarPreview(URL.createObjectURL(convertedFile));
       } else {
         const validImageTypes = [
-          'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'
+          'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml',
+          'image/bmp', 'image/tiff', 'image/avif'
         ];
         const fileExtension = file.name.toLowerCase().split('.').pop();
-        const validExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+        const validExtensions = [
+          'jpg', 'jpeg', 'png', 'gif', 'webp', 'svg',
+          'bmp', 'tiff', 'tif', 'avif', 'jfif'
+        ];
 
         const isValidType = file.type.startsWith("image/") || validImageTypes.includes(file.type);
         const isValidExtension = validExtensions.includes(fileExtension || '');
 
         if (!isValidType && !isValidExtension) {
-          showToast(
-            "Invalid file type",
-            "Please select an image file. Supported formats: JPEG, PNG, GIF, WebP",
-            "destructive"
-          );
+          toast({
+            title: "Invalid file type",
+            description: "Please select an image file. Supported formats: JPEG, PNG, GIF, WebP, SVG, HEIC, HEIF, BMP, TIFF, AVIF",
+            variant: "destructive",
+          });
           return;
         }
 
@@ -220,12 +155,12 @@ export default function Profile() {
         setAvatarPreview(URL.createObjectURL(file));
       }
     } catch (err) {
-      console.error("Image processing error:", err);
-      showToast(
-        "Image processing failed",
-        "Sorry, we couldn't process that image. Please try a different photo.",
-        "destructive"
-      );
+      console.error("Image conversion error:", err);
+      toast({
+        title: "Image processing failed",
+        description: "Sorry, we couldn't process that image. Please try a different photo.",
+        variant: "destructive",
+      });
       setAvatarFile(null);
       setAvatarPreview(null);
       event.target.value = "";
@@ -234,84 +169,75 @@ export default function Profile() {
     }
   };
 
-  const handleSave = async () => {
-    // Validate form
-    const { errors, isValid } = validateProfile(formData);
-    setFormErrors(errors);
+  const onSubmit = async (data) => {
+    let avatarUrl = user?.avatar;
 
-    if (!isValid) {
-      showToast(
-        "Validation Error",
-        "Please fix the errors below.",
-        "destructive"
-      );
-      return;
-    }
+    if (avatarFile) {
+      try {
+        const formData = new FormData();
+        formData.append("avatar", avatarFile);
 
-    setIsLoading(true);
+        const uploadResponse = await fetch("/api/user/avatar", {
+          method: "POST",
+          body: formData,
+        });
 
-    try {
-      let avatarUrl = user?.avatar;
+        if (uploadResponse.ok) {
+          const result = await uploadResponse.json();
+          avatarUrl = result.avatarUrl;
 
-      // Simulate avatar upload if changed
-      if (avatarFile) {
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        avatarUrl = URL.createObjectURL(avatarFile);
+          if (user && avatarUrl) {
+            const cacheBustedUrl = `${avatarUrl}?t=${Date.now()}`;
+            setGlobalUser({ ...user, avatar: cacheBustedUrl });
+          }
+        } else {
+          const errorText = await uploadResponse.text();
+          throw new Error(`Avatar upload failed: ${uploadResponse.status} - ${errorText}`);
+        }
+      } catch (error) {
+        console.error("Avatar upload error:", error);
+        toast({
+          title: "Avatar upload failed",
+          description: error instanceof Error ? error.message : "Could not upload avatar. Profile will be updated without the new image.",
+          variant: "destructive",
+        });
       }
-
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // Update user data
-      const updatedUser = { ...user, ...formData, avatar: avatarUrl };
-      setUser(updatedUser);
-
-      setIsEditing(false);
-      setAvatarFile(null);
-      setAvatarPreview(null);
-      
-      showToast(
-        "Profile updated",
-        "Your profile has been successfully updated."
-      );
-    } catch (error) {
-      console.error("Profile update error:", error);
-      showToast(
-        "Error updating profile",
-        "There was an error updating your profile. Please try again.",
-        "destructive"
-      );
-    } finally {
-      setIsLoading(false);
     }
+
+    updateProfileMutation.mutate({
+      ...data,
+      avatar: avatarUrl || undefined,
+    });
   };
 
   const handleCancel = () => {
     if (user) {
-      setFormData({
+      form.reset({
         name: user.name,
         email: user.email,
-        bio: user.bio || ""
+        bio: user.bio || "",
       });
     }
     setIsEditing(false);
     setAvatarFile(null);
     setAvatarPreview(null);
-    setFormErrors({});
   };
 
-  if (!user) {
+  /* =========================
+     Loading (palette only)
+  ========================= */
+  if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-indigo-900">
+      <div className="min-h-screen bg-base">
         <div className="p-6 max-w-4xl mx-auto">
           <div className="animate-pulse space-y-6">
-            <div className="h-8 bg-white/20 backdrop-blur-xl rounded-lg border border-white/10 w-1/4"></div>
-            <div className="bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20 p-6 space-y-4">
+            <div className="h-8 bg-black/5 rounded-lg w-1/4"></div>
+            <div className="glass-panel p-6 space-y-4">
               <div className="flex items-center space-x-4">
-                <div className="w-20 h-20 bg-white/20 rounded-full"></div>
+                <div className="w-20 h-20 bg-black/5 rounded-full"></div>
                 <div className="space-y-2">
-                  <div className="h-6 bg-white/20 rounded w-32"></div>
-                  <div className="h-4 bg-white/20 rounded w-48"></div>
+                  <div className="h-6 bg-black/5 rounded w-32"></div>
+                  <div className="h-4 bg-black/5 rounded w-48"></div>
                 </div>
               </div>
             </div>
@@ -321,30 +247,40 @@ export default function Profile() {
     );
   }
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-indigo-900">
-      {/* Page Shell equivalent */}
-      <div className="max-w-7xl mx-auto px-6 py-12">
-        
-        {/* Aero Banner equivalent */}
-        <div className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white rounded-2xl p-8 mb-8 text-center">
-          <h1 className="text-3xl font-bold mb-2">Your Profile</h1>
-          <p className="text-xl opacity-90">Manage your account and avatar</p>
+  /* =========================
+     Not found (palette only)
+  ========================= */
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-base flex items-center justify-center">
+        <div className="glass-panel p-8 text-center">
+          <p className="text-muted">Unable to load profile. Please try refreshing the page.</p>
         </div>
+      </div>
+    );
+  }
 
-        <div className="max-w-4xl mx-auto space-y-6">
-          {/* Header Section */}
-          <div className="bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20 p-6 shadow-xl">
+  /* =========================
+     Main (palette only)
+  ========================= */
+  return (
+    <div className="min-h-screen bg-base bg-radial-fade">
+      <PageShell>
+        <AeroBanner size="md" title="Your Profile" subtitle="Manage your account and avatar" />
+
+        <div className="section max-w-4xl mx-auto space-y-6">
+          {/* Header */}
+          <div className="glass-panel p-6">
             <div className="flex items-center justify-between">
               <div>
-                <h2 className="text-2xl font-bold text-white">Author Profile</h2>
-                <p className="text-white/70">Manage your writing identity and personal information</p>
+                <h2 className="text-2xl font-bold text-ink font-serif">Author Profile</h2>
+                <p className="text-muted">Manage your writing identity and personal information</p>
               </div>
               {!isEditing && (
-                <Button 
+                <Button
                   onClick={() => setIsEditing(true)}
                   size="lg"
-                  className="font-semibold shadow-lg"
+                  className="btn-primary font-semibold shadow-lg"
                   data-testid="button-edit-profile"
                 >
                   <User className="w-5 h-5 mr-2" />
@@ -354,192 +290,205 @@ export default function Profile() {
             </div>
           </div>
 
-          {/* Main Profile Card */}
-          <Card>
-            <CardHeader>
-              <CardTitle>
+          {/* Card */}
+          <Card className="glass-panel">
+            <CardHeader className="glass-soft rounded-t-2xl border-0">
+              <CardTitle className="text-xl text-ink flex items-center gap-2">
                 <User className="w-5 h-5" />
                 Personal Information
               </CardTitle>
-              <CardDescription>
+              <CardDescription className="text-muted">
                 Manage your author profile and personal information
               </CardDescription>
             </CardHeader>
-            <CardContent className="space-y-6">
+
+            <CardContent className="space-y-6 p-6">
               {!isEditing ? (
-                // Display Mode
+                /* -------- Display Mode -------- */
                 <div className="space-y-6">
                   <div className="flex items-center space-x-6">
-                    <Avatar className="w-24 h-24 border-2 border-white/30 ring-4 ring-white/10 shadow-xl rounded-full bg-white/20 backdrop-blur-sm overflow-hidden">
-                      <AvatarImage 
-                        src={user.avatar || undefined} 
-                        alt={user.name}
-                        className="w-full h-full"
-                      />
-                      <AvatarFallback className="text-lg font-medium text-white border border-white/30">
-                        {user.name.split(" ").map(n => n[0]).join("").toUpperCase()}
-                      </AvatarFallback>
-                      <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-blue-400/20 to-purple-400/20 pointer-events-none"></div>
-                    </Avatar>
+                    <div className="relative">
+                      <Avatar className="w-24 h-24 border-2 border-white/40 ring-4 ring-white/20 shadow-xl">
+                        <AvatarImage
+                          src={user.avatar || undefined}
+                          alt={user.name}
+                          className="object-cover"
+                        />
+                        <AvatarFallback className="text-lg font-medium bg-white/60 text-ink border border-white/40">
+                          {user.name.split(" ").map(n => n[0]).join("").toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-accent/30 to-primary/30 pointer-events-none"></div>
+                    </div>
                     <div className="space-y-2">
-                      <h3 className="text-2xl font-semibold text-white" data-testid="text-user-name">
+                      <h3 className="text-2xl font-semibold text-ink font-serif" data-testid="text-user-name">
                         {user.name}
                       </h3>
-                      <p className="text-white/70 text-lg" data-testid="text-user-email">
+                      <p className="text-muted text-lg" data-testid="text-user-email">
                         {user.email}
                       </p>
                     </div>
                   </div>
 
-                  {user.bio && (
-                    <div className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10">
-                      <h4 className="text-sm font-medium text-white/90 mb-2">Bio</h4>
-                      <p className="text-white/80 leading-relaxed whitespace-pre-wrap" data-testid="text-user-bio">
+                  {user.bio ? (
+                    <div className="glass-soft p-4">
+                      <h4 className="text-sm font-medium text-ink/80 mb-2">Bio</h4>
+                      <p className="text-ink/80 leading-relaxed whitespace-pre-wrap" data-testid="text-user-bio">
                         {user.bio}
                       </p>
                     </div>
-                  )}
-
-                  {!user.bio && (
-                    <div className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10 border-dashed">
-                      <div className="text-white/60 italic text-center">
+                  ) : (
+                    <div className="glass-soft p-4 border-dashed">
+                      <div className="text-muted italic text-center">
                         No bio added yet. Click "Edit Profile" to add your author biography.
                       </div>
                     </div>
                   )}
                 </div>
               ) : (
-                // Edit Mode
-                <div className="space-y-6">
-                  <div className="space-y-4">
-                    <div className="flex items-center space-x-6">
-                      <Avatar className="w-24 h-24 border-2 border-white/30 ring-4 ring-white/10 shadow-xl rounded-full bg-white/20 backdrop-blur-sm overflow-hidden">
-                        <AvatarImage 
-                          src={avatarPreview || user.avatar || undefined}
-                          alt={user.name}
-                          className="w-full h-full"
-                        />
-                        <AvatarFallback className="text-lg font-medium text-white border border-white/30">
-                          {user.name.split(" ").map(n => n[0]).join("").toUpperCase()}
-                        </AvatarFallback>
-                        <label
-                          htmlFor="avatar-upload"
-                          className="absolute -bottom-2 -right-2 bg-blue-600/80 backdrop-blur-sm hover:bg-blue-500/80 text-white rounded-full p-2 cursor-pointer shadow-xl transition-all duration-300 border border-white/20"
-                          title="Change avatar"
-                        >
-                          <Camera className="w-4 h-4" />
-                        </label>
-                        <input
-                          id="avatar-upload"
-                          type="file"
-                          onChange={handleAvatarChange}
-                          className="hidden"
-                          data-testid="input-avatar-upload"
-                        />
-                        <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-blue-400/20 to-purple-400/20 pointer-events-none"></div>
-                      </Avatar>
-                      <div className="space-y-2">
-                        <p className="text-sm font-medium text-white">Profile Photo</p>
-                        <p className="text-xs text-white/60">
-                          Click the camera icon to upload a new photo (max 5MB)
-                          <br />
-                          Supported formats: JPEG, PNG, GIF, WebP
-                        </p>
-                        {convertingImage && (
-                          <div className="text-xs text-blue-300 font-medium bg-blue-500/20 backdrop-blur-sm rounded px-2 py-1 border border-blue-400/20">
-                            Processing image...
-                          </div>
-                        )}
+                /* -------- Edit Mode -------- */
+                <Form {...form}>
+                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                    <div className="space-y-4">
+                      <div className="flex items-center space-x-6">
+                        <div className="relative">
+                          <Avatar className="w-24 h-24 border-2 border-white/40 ring-4 ring-white/20 shadow-xl">
+                            <AvatarImage
+                              src={avatarPreview || user.avatar || undefined}
+                              alt={user.name}
+                              className="object-cover"
+                            />
+                            <AvatarFallback className="text-lg font-medium bg-white/60 text-ink border border-white/40">
+                              {user.name.split(" ").map(n => n[0]).join("").toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                          <label
+                            htmlFor="avatar-upload"
+                            className="absolute -bottom-2 -right-2 bg-primary hover:opacity-90 text-ink rounded-full p-2 cursor-pointer shadow-xl border border-white/40"
+                            title="Change avatar"
+                          >
+                            <Camera className="w-4 h-4" />
+                          </label>
+                          <input
+                            id="avatar-upload"
+                            type="file"
+                            onChange={handleAvatarChange}
+                            className="hidden"
+                            data-testid="input-avatar-upload"
+                          />
+                          <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-accent/30 to-primary/30 pointer-events-none"></div>
+                        </div>
+                        <div className="space-y-2">
+                          <p className="text-sm font-medium text-ink">Profile Photo</p>
+                          <p className="text-xs text-muted">
+                            Click the camera icon to upload a new photo (max 5MB)
+                            <br />
+                            HEIC files will be converted to JPEG automatically
+                          </p>
+                          {convertingImage && (
+                            <div className="text-xs font-medium bg-primary rounded px-2 py-1 border border-white/40">
+                              Converting image...
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  <FormField
-                    name="name"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Full Name</FormLabel>
-                        <FormControl>
-                          <Input
-                            value={formData.name}
-                            onChange={(e) => handleInputChange('name', e.target.value)}
-                            data-testid="input-name"
-                          />
-                        </FormControl>
-                        <FormMessage>{formErrors.name}</FormMessage>
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    name="email"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Email Address</FormLabel>
-                        <FormControl>
-                          <Input
-                            type="email"
-                            value={formData.email}
-                            onChange={(e) => handleInputChange('email', e.target.value)}
-                            data-testid="input-email"
-                          />
-                        </FormControl>
-                        <FormMessage>{formErrors.email}</FormMessage>
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    name="bio"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Author Bio</FormLabel>
-                        <FormControl>
-                          <Textarea
-                            rows={5}
-                            placeholder="Tell your readers about yourself, your writing journey, and what inspires you..."
-                            value={formData.bio}
-                            onChange={(e) => handleInputChange('bio', e.target.value)}
-                            data-testid="textarea-bio"
-                          />
-                        </FormControl>
-                        <div className="text-xs text-white/60 text-right bg-white/5 backdrop-blur-sm rounded px-2 py-1 border border-white/10">
-                          {(formData.bio || "").length}/500 characters
-                        </div>
-                        <FormMessage>{formErrors.bio}</FormMessage>
-                      </FormItem>
-                    )}
-                  />
-
-                  <div className="flex items-center justify-end space-x-3 pt-4 bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10">
-                    <Button 
-                      variant="outline"
-                      onClick={handleCancel}
-                      disabled={isLoading}
-                      data-testid="button-cancel"
-                    >
-                      <X className="w-4 h-4 mr-2" />
-                      Cancel
-                    </Button>
-                    <Button 
-                      onClick={handleSave}
-                      disabled={isLoading}
-                      data-testid="button-save"
-                    >
-                      {isLoading ? (
-                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mr-2"></div>
-                      ) : (
-                        <Save className="w-4 h-4 mr-2" />
+                    <FormField
+                      control={form.control}
+                      name="name"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-ink/90">Full Name</FormLabel>
+                          <FormControl>
+                            <Input
+                              {...field}
+                              className="glass-soft border-white/40 text-ink placeholder:text-ink/50 focus-visible:ring-0 focus:border-white/60"
+                              data-testid="input-name"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
                       )}
-                      {isLoading ? "Saving..." : "Save Changes"}
-                    </Button>
-                  </div>
-                </div>
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="email"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-ink/90">Email Address</FormLabel>
+                          <FormControl>
+                            <Input
+                              {...field}
+                              type="email"
+                              className="glass-soft border-white/40 text-ink placeholder:text-ink/50 focus-visible:ring-0 focus:border-white/60"
+                              data-testid="input-email"
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="bio"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-ink/90">Author Bio</FormLabel>
+                          <FormControl>
+                            <Textarea
+                              {...field}
+                              rows={5}
+                              placeholder="Tell your readers about yourself, your writing journey, and what inspires you..."
+                              className="glass-soft border-white/40 text-ink placeholder:text-ink/50 resize-none focus-visible:ring-0 focus:border-white/60"
+                              data-testid="textarea-bio"
+                            />
+                          </FormControl>
+                          <div className="text-xs text-muted text-right glass-soft px-2 py-1">
+                            {(field.value || "").length}/500 characters
+                          </div>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <div className="flex items-center justify-end space-x-3 pt-4 glass-soft p-4">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleCancel}
+                        disabled={updateProfileMutation.isPending}
+                        className="glass-soft hover:bg-white/60"
+                        data-testid="button-cancel"
+                      >
+                        <X className="w-4 h-4 mr-2" />
+                        Cancel
+                      </Button>
+                      <Button
+                        type="submit"
+                        disabled={updateProfileMutation.isPending}
+                        className="btn-primary shadow-xl"
+                        data-testid="button-save"
+                      >
+                        {updateProfileMutation.isPending ? (
+                          "Saving..."
+                        ) : (
+                          <>
+                            <Save className="w-4 h-4 mr-2" />
+                            Save Changes
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </form>
+                </Form>
               )}
             </CardContent>
           </Card>
         </div>
-      </div>
+      </PageShell>
     </div>
   );
 }
