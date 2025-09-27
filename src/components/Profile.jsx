@@ -14,7 +14,7 @@ import { Textarea } from "components/ui/textarea";
 import { Avatar, AvatarFallback, AvatarImage } from "components/ui/avatar";
 
 import { apiRequest } from "lib/queryClient";
-import { useToast } from "hooks/use-toast";
+// import { useToast } from "hooks/use-toast"; // REMOVED: file not found
 import { useAuth } from "hooks/useAuth";
 import { useUser } from "state/UserContext";
 
@@ -23,10 +23,38 @@ import { Upload, User, Save, X, Camera } from "lucide-react";
 import PageShell from "components/layout/PageShell";
 import AeroBanner from "components/layout/AeroBanner";
 
+/* ========= Temporary toast shim =========
+   This replaces the missing hooks/use-toast.
+   It logs to console and emits a CustomEvent you can listen to.
+   When you add a real toast system, delete this block and restore the import.
+*/
+function useToast() {
+  return {
+    toast({ title, description, variant } = {}) {
+      try {
+        window.dispatchEvent(
+          new CustomEvent("app:toast", { detail: { title, description, variant } })
+        );
+      } catch {}
+      const tag = variant ? `[toast:${variant}]` : `[toast]`;
+      if (title || description) {
+        console.log(`${tag} ${title || ""}${description ? " — " + description : ""}`);
+      }
+      // Optional visual fallback:
+      // if (title || description) alert(`${title || ""}\n${description || ""}`);
+    },
+  };
+}
+/* ====================================== */
+
 const profileFormSchema = z.object({
   name: z.string().min(1, "Name is required"),
   email: z.string().email("Please enter a valid email address"),
-  bio: z.string().max(500, "Bio must be less than 500 characters").optional().or(z.literal("")),
+  bio: z
+    .string()
+    .max(500, "Bio must be less than 500 characters")
+    .optional()
+    .or(z.literal("")),
 });
 
 export default function Profile() {
@@ -45,11 +73,7 @@ export default function Profile() {
 
   const form = useForm({
     resolver: zodResolver(profileFormSchema),
-    defaultValues: {
-      name: "",
-      email: "",
-      bio: "",
-    },
+    defaultValues: { name: "", email: "", bio: "" },
   });
 
   useEffect(() => {
@@ -63,9 +87,7 @@ export default function Profile() {
   }, [user, form]);
 
   const updateProfileMutation = useMutation({
-    mutationFn: async (data) => {
-      return await apiRequest("PATCH", "/api/user/current", data);
-    },
+    mutationFn: async (data) => await apiRequest("PATCH", "/api/user/current", data),
     onSuccess: (updatedUser) => {
       queryClient.invalidateQueries({ queryKey: ["/api/user/current"] });
       if (user) {
@@ -80,7 +102,7 @@ export default function Profile() {
         description: "Your profile has been successfully updated.",
       });
     },
-    onError: (error) => {
+    onError: () => {
       toast({
         title: "Error updating profile",
         description: "There was an error updating your profile. Please try again.",
@@ -130,22 +152,40 @@ export default function Profile() {
         setAvatarPreview(URL.createObjectURL(convertedFile));
       } else {
         const validImageTypes = [
-          'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml',
-          'image/bmp', 'image/tiff', 'image/avif'
+          "image/jpeg",
+          "image/jpg",
+          "image/png",
+          "image/gif",
+          "image/webp",
+          "image/svg+xml",
+          "image/bmp",
+          "image/tiff",
+          "image/avif",
         ];
-        const fileExtension = file.name.toLowerCase().split('.').pop();
+        const fileExtension = file.name.toLowerCase().split(".").pop();
         const validExtensions = [
-          'jpg', 'jpeg', 'png', 'gif', 'webp', 'svg',
-          'bmp', 'tiff', 'tif', 'avif', 'jfif'
+          "jpg",
+          "jpeg",
+          "png",
+          "gif",
+          "webp",
+          "svg",
+          "bmp",
+          "tiff",
+          "tif",
+          "avif",
+          "jfif",
         ];
 
-        const isValidType = file.type.startsWith("image/") || validImageTypes.includes(file.type);
-        const isValidExtension = validExtensions.includes(fileExtension || '');
+        const isValidType =
+          file.type.startsWith("image/") || validImageTypes.includes(file.type);
+        const isValidExtension = validExtensions.includes(fileExtension || "");
 
         if (!isValidType && !isValidExtension) {
           toast({
             title: "Invalid file type",
-            description: "Please select an image file. Supported formats: JPEG, PNG, GIF, WebP, SVG, HEIC, HEIF, BMP, TIFF, AVIF",
+            description:
+              "Please select an image file. Supported formats: JPEG, PNG, GIF, WebP, SVG, HEIC, HEIF, BMP, TIFF, AVIF",
             variant: "destructive",
           });
           return;
@@ -158,7 +198,8 @@ export default function Profile() {
       console.error("Image conversion error:", err);
       toast({
         title: "Image processing failed",
-        description: "Sorry, we couldn't process that image. Please try a different photo.",
+        description:
+          "Sorry, we couldn't process that image. Please try a different photo.",
         variant: "destructive",
       });
       setAvatarFile(null);
@@ -198,7 +239,10 @@ export default function Profile() {
         console.error("Avatar upload error:", error);
         toast({
           title: "Avatar upload failed",
-          description: error instanceof Error ? error.message : "Could not upload avatar. Profile will be updated without the new image.",
+          description:
+            error instanceof Error
+              ? error.message
+              : "Could not upload avatar. Profile will be updated without the new image.",
           variant: "destructive",
         });
       }
@@ -315,7 +359,7 @@ export default function Profile() {
                           className="object-cover"
                         />
                         <AvatarFallback className="text-lg font-medium bg-white/60 text-ink border border-white/40">
-                          {user.name.split(" ").map(n => n[0]).join("").toUpperCase()}
+                          {user.name.split(" ").map((n) => n[0]).join("").toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
                       <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-accent/30 to-primary/30 pointer-events-none"></div>
@@ -359,7 +403,7 @@ export default function Profile() {
                               className="object-cover"
                             />
                             <AvatarFallback className="text-lg font-medium bg-white/60 text-ink border border-white/40">
-                              {user.name.split(" ").map(n => n[0]).join("").toUpperCase()}
+                              {user.name.split(" ").map((n) => n[0]).join("").toUpperCase()}
                             </AvatarFallback>
                           </Avatar>
                           <label
