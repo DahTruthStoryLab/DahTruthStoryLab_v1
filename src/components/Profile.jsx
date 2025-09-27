@@ -1,29 +1,56 @@
 // src/components/Profile.jsx
 import React, { useEffect, useState } from "react";
 
-/** Simple toast notification - replaces API toasts temporarily */
+/** Read frontend env vars (defined in .env.development / Amplify env) */
+const API_BASE = process.env.REACT_APP_API_BASE || "";                // e.g. https://xxx.lambda-url.us-east-1.on.aws
+const PUBLIC_BUCKET = process.env.REACT_APP_PUBLIC_BUCKET_URL || "";  // e.g. https://your-public-bucket.s3.amazonaws.com
+
+/** Minimal helper: tiny toasts via alert+console (no external deps) */
 function toast({ title, description } = {}) {
   if (title || description) {
     console.log(`[toast] ${title || ""}${description ? " — " + description : ""}`);
-    // Simple browser notification
-    const toastEl = document.createElement('div');
-    toastEl.className = 'fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg text-white max-w-sm bg-green-600';
-    toastEl.innerHTML = `
-      <div class="font-semibold">${title || ""}</div>
-      <div class="text-sm opacity-90">${description || ""}</div>
-    `;
-    document.body.appendChild(toastEl);
-    setTimeout(() => document.body.removeChild(toastEl), 3000);
+    // alert(`${title || ""}\n${description || ""}`); // enable if you want dialogs
   }
 }
 
-// Mock user data - replace with real API later
-const mockUser = {
-  name: "Jacqueline Session",
-  email: "jacqueline@dahtruth.com",
-  bio: "Founder of DahTruth.com and creator of DahTruth StoryLab. Passionate about empowering writers to discover and share their authentic stories through faith-based community and modern technology.",
-  avatar: null
-};
+/** Helper: upload to S3 with a presigned POST */
+async function uploadViaPresignedPost({ presignEndpoint, userId, file }) {
+  // 1) ask Lambda for presigned form data
+  const presignRes = await fetch(`${presignEndpoint}/uploads/presign`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      userId: userId || "dev-user-1",
+      fileName: file.name,
+      contentType: file.type || "application/octet-stream",
+    }),
+  });
+  if (!presignRes.ok) {
+    const errText = await presignRes.text();
+    throw new Error(`Presign failed: ${presignRes.status} ${errText}`);
+  }
+  const { url, fields, key } = await presignRes.json();
+  if (!url || !fields || !key) throw new Error("Malformed presign response");
+
+  // 2) POST the file to S3 with the returned form
+  const formData = new FormData();
+  Object.entries(fields).forEach(([k, v]) => formData.append(k, v));
+  formData.append("file", file);
+
+  const s3Res = await fetch(url, { method: "POST", body: formData });
+  if (!s3Res.ok) {
+    const errText = await s3Res.text();
+    throw new Error(`S3 upload failed: ${s3Res.status} ${errText}`);
+  }
+
+  // 3) Return the public URL if provided, else construct from PUBLIC_BUCKET
+  // If your raw bucket isn't public, you might copy/process to a public bucket later.
+  if (PUBLIC_BUCKET) {
+    return `${PUBLIC_BUCKET}/${key}`;
+  }
+  // Fallback: return key only; caller can decide how to display/resolve it.
+  return key;
+}
 
 export default function Profile() {
   const [loading, setLoading] = useState(true);
@@ -40,109 +67,107 @@ export default function Profile() {
   const [avatarFile, setAvatarFile] = useState(null);
   const [avatarPreview, setAvatarPreview] = useState(null);
 
-  // Load mock user data - replace with real API call later
+  // Load current user
   useEffect(() => {
     let isMounted = true;
-    
-    // Simulate API loading
-    setTimeout(() => {
-      if (!isMounted) return;
-      
+    (async () => {
       try {
-        setUser(mockUser);
-        setName(mockUser.name || "");
-        setEmail(mockUser.email || "");
-        setBio(mockUser.bio || "");
+        const res = await fetch("/api/user/current");
+        if (!res.ok) throw new Error(`GET /api/user/current ${res.status}`);
+        const data = await res.json();
+        if (!isMounted) return;
+        setUser(data);
+        setName(data?.name || "");
+        setEmail(data?.email || "");
+        setBio(data?.bio || "");
       } catch (e) {
         console.error(e);
         toast({ title: "Unable to load profile", description: "Please try refreshing the page." });
       } finally {
         if (isMounted) setLoading(false);
       }
-    }, 500); // Simulate loading delay
-
+    })();
     return () => (isMounted = false);
   }, []);
 
-  // Handle avatar change (validation + preview) - HEIC conversion removed for now
-  const onAvatarChange = async (e) => {
+  // Handle avatar change (basic validation + preview)
+  const onAvatarChange = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // size check: 5MB
     if (file.size > 5 * 1024 * 1024) {
       toast({ title: "File too large", description: "Choose an image smaller than 5MB." });
       return;
     }
-
-    const lowerName = file.name.toLowerCase();
-    const isHeic = /\.(heic|heif)$/i.test(lowerName);
-
-    if (isHeic) {
-      toast({ title: "HEIC files not supported yet", description: "Please convert to JPEG or PNG first." });
-      return;
-    }
-
     if (!file.type.startsWith("image/")) {
       toast({ title: "Invalid file type", description: "Please pick an image file." });
       return;
     }
 
-    try {
-      // cleanup old preview url
-      if (avatarPreview) URL.revokeObjectURL(avatarPreview);
-
-      setAvatarFile(file);
-      setAvatarPreview(URL.createObjectURL(file));
-    } catch (err) {
-      console.error("Image processing error:", err);
-      toast({ title: "Image processing failed", description: "Try a different photo." });
-    }
+    if (avatarPreview) URL.revokeObjectURL(avatarPreview);
+    setAvatarFile(file);
+    setAvatarPreview(URL.createObjectURL(file));
   };
 
-  // Save profile - mock version, replace with real API later
+  // Save profile
   const onSubmit = async (e) => {
     e.preventDefault();
     if (!user) return;
 
     setSaving(true);
-    
     try {
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      // Mock avatar upload
       let avatarUrl = user.avatar;
+
       if (avatarFile) {
-        // In real implementation, this would upload to server
-        avatarUrl = URL.createObjectURL(avatarFile);
+        if (API_BASE) {
+          // Preferred path: presign + upload to S3 via Lambda Function URL
+          avatarUrl = await uploadViaPresignedPost({
+            presignEndpoint: API_BASE,
+            userId: user?.id || "dev-user-1",
+            file: avatarFile,
+          });
+        } else {
+          // Fallback path: existing backend endpoint
+          const formData = new FormData();
+          formData.append("avatar", avatarFile);
+          const up = await fetch("/api/user/avatar", { method: "POST", body: formData });
+          if (!up.ok) {
+            const errText = await up.text();
+            throw new Error(`Avatar upload failed: ${up.status} ${errText}`);
+          }
+          const resJson = await up.json();
+          avatarUrl = resJson.avatarUrl || avatarUrl;
+        }
       }
 
-      // Mock profile update
-      const updatedUser = {
-        ...user,
-        name: name.trim(),
-        email: email.trim(),
-        bio: bio,
-        avatar: avatarUrl
-      };
+      // Update profile
+      const patchRes = await fetch("/api/user/current", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: name.trim(),
+          email: email.trim(),
+          bio: bio,
+          avatar: avatarUrl || undefined,
+        }),
+      });
+      if (!patchRes.ok) {
+        const errText = await patchRes.text();
+        throw new Error(`Update failed: ${patchRes.status} ${errText}`);
+      }
+      const updated = await patchRes.json();
 
       // Update local state
-      setUser(updatedUser);
-      
-      if (avatarUrl && avatarFile) {
+      setUser((prev) => ({ ...prev, ...updated }));
+      if (avatarUrl) {
+        const busted = `${avatarUrl}?t=${Date.now()}`; // cache-bust
+        setUser((prev) => ({ ...prev, avatar: busted }));
         setAvatarPreview(null);
         setAvatarFile(null);
       }
 
-      // Notify rest of app that user changed (if needed)
-      try {
-        window.dispatchEvent(new CustomEvent("app:user-updated", { detail: updatedUser }));
-      } catch {}
-
       setIsEditing(false);
       toast({ title: "Profile updated", description: "Your profile has been saved." });
-      
     } catch (err) {
       console.error(err);
       toast({
@@ -166,7 +191,7 @@ export default function Profile() {
     setAvatarFile(null);
   };
 
-  /* ----------------- UI with your new color scheme ----------------- */
+  /* ----------------- UI ----------------- */
 
   if (loading) {
     return (
@@ -299,7 +324,7 @@ export default function Profile() {
                   </div>
 
                   <div className="text-xs text-muted">
-                    Max 5MB. JPG/PNG/WebP recommended. HEIC support coming with backend APIs.
+                    Max 5MB. JPG/PNG/WebP recommended.
                   </div>
                 </div>
 
@@ -310,7 +335,6 @@ export default function Profile() {
                     onChange={(e) => setName(e.target.value)}
                     className="w-full glass-soft border-white/40 text-ink placeholder:text-ink/50 px-3 py-2 rounded-lg focus:outline-none focus:border-white/60"
                     placeholder="Your full name"
-                    required
                   />
                 </div>
 
@@ -322,7 +346,6 @@ export default function Profile() {
                     onChange={(e) => setEmail(e.target.value)}
                     className="w-full glass-soft border-white/40 text-ink placeholder:text-ink/50 px-3 py-2 rounded-lg focus:outline-none focus:border-white/60"
                     placeholder="you@example.com"
-                    required
                   />
                 </div>
 
@@ -334,7 +357,6 @@ export default function Profile() {
                     onChange={(e) => setBio(e.target.value)}
                     className="w-full glass-soft border-white/40 text-ink placeholder:text-ink/50 px-3 py-2 rounded-lg resize-none focus:outline-none focus:border-white/60"
                     placeholder="Tell your readers about yourself, your writing journey, and what inspires you..."
-                    maxLength={500}
                   />
                   <div className="text-xs text-muted text-right glass-soft px-2 py-1 rounded-lg">
                     {(bio || "").length}/500 characters
@@ -346,14 +368,14 @@ export default function Profile() {
                     type="button"
                     onClick={onCancel}
                     disabled={saving}
-                    className="glass-soft hover:bg-white/60 px-4 py-2 rounded-lg disabled:opacity-50"
+                    className="glass-soft hover:bg-white/60 px-4 py-2 rounded-lg"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={saving}
-                    className="btn-primary shadow-xl px-4 py-2 rounded-lg disabled:opacity-50"
+                    className="btn-primary shadow-xl px-4 py-2 rounded-lg"
                   >
                     {saving ? "Saving..." : "Save Changes"}
                   </button>
