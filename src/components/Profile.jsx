@@ -1,14 +1,29 @@
 // src/components/Profile.jsx
 import React, { useEffect, useState } from "react";
-import heic2any from "heic2any"; // <-- add HEIC→JPEG conversion
 
-/** Minimal helper: tiny toasts via alert+console (no external deps) */
+/** Simple toast notification - replaces API toasts temporarily */
 function toast({ title, description } = {}) {
   if (title || description) {
     console.log(`[toast] ${title || ""}${description ? " — " + description : ""}`);
-    // alert(`${title || ""}\n${description || ""}`);
+    // Simple browser notification
+    const toastEl = document.createElement('div');
+    toastEl.className = 'fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg text-white max-w-sm bg-green-600';
+    toastEl.innerHTML = `
+      <div class="font-semibold">${title || ""}</div>
+      <div class="text-sm opacity-90">${description || ""}</div>
+    `;
+    document.body.appendChild(toastEl);
+    setTimeout(() => document.body.removeChild(toastEl), 3000);
   }
 }
+
+// Mock user data - replace with real API later
+const mockUser = {
+  name: "Jacqueline Session",
+  email: "jacqueline@dahtruth.com",
+  bio: "Founder of DahTruth.com and creator of DahTruth StoryLab. Passionate about empowering writers to discover and share their authentic stories through faith-based community and modern technology.",
+  avatar: null
+};
 
 export default function Profile() {
   const [loading, setLoading] = useState(true);
@@ -25,37 +40,31 @@ export default function Profile() {
   const [avatarFile, setAvatarFile] = useState(null);
   const [avatarPreview, setAvatarPreview] = useState(null);
 
-  // Load current user
+  // Load mock user data - replace with real API call later
   useEffect(() => {
     let isMounted = true;
-    (async () => {
+    
+    // Simulate API loading
+    setTimeout(() => {
+      if (!isMounted) return;
+      
       try {
-        const res = await fetch("/api/user/current", { credentials: "include" }); // <-- send cookies
-        if (!res.ok) {
-          if (res.status === 401) {
-            // Not signed in: go to sign-in
-            window.location.assign("/signin");
-            return;
-          }
-          throw new Error(`GET /api/user/current ${res.status}`);
-        }
-        const data = await res.json();
-        if (!isMounted) return;
-        setUser(data);
-        setName(data?.name || "");
-        setEmail(data?.email || "");
-        setBio(data?.bio || "");
+        setUser(mockUser);
+        setName(mockUser.name || "");
+        setEmail(mockUser.email || "");
+        setBio(mockUser.bio || "");
       } catch (e) {
         console.error(e);
         toast({ title: "Unable to load profile", description: "Please try refreshing the page." });
       } finally {
         if (isMounted) setLoading(false);
       }
-    })();
+    }, 500); // Simulate loading delay
+
     return () => (isMounted = false);
   }, []);
 
-  // Handle avatar change (validation + HEIC conversion + preview)
+  // Handle avatar change (validation + preview) - HEIC conversion removed for now
   const onAvatarChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -67,106 +76,73 @@ export default function Profile() {
     }
 
     const lowerName = file.name.toLowerCase();
-    const isHeic =
-      file.type === "image/heic" ||
-      file.type === "image/heif" ||
-      /\.heic$/i.test(lowerName) ||
-      /\.heif$/i.test(lowerName);
+    const isHeic = /\.(heic|heif)$/i.test(lowerName);
+
+    if (isHeic) {
+      toast({ title: "HEIC files not supported yet", description: "Please convert to JPEG or PNG first." });
+      return;
+    }
+
+    if (!file.type.startsWith("image/")) {
+      toast({ title: "Invalid file type", description: "Please pick an image file." });
+      return;
+    }
 
     try {
-      let finalFile = file;
-
-      if (isHeic) {
-        const outBlob = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.9 });
-        finalFile = new File(
-          [outBlob],
-          lowerName.replace(/\.(heic|heif)$/i, ".jpg"),
-          { type: "image/jpeg" }
-        );
-      } else if (!file.type.startsWith("image/")) {
-        toast({ title: "Invalid file type", description: "Please pick an image file." });
-        return;
-      }
-
       // cleanup old preview url
       if (avatarPreview) URL.revokeObjectURL(avatarPreview);
 
-      setAvatarFile(finalFile);
-      setAvatarPreview(URL.createObjectURL(finalFile));
+      setAvatarFile(file);
+      setAvatarPreview(URL.createObjectURL(file));
     } catch (err) {
-      console.error("Image conversion error:", err);
+      console.error("Image processing error:", err);
       toast({ title: "Image processing failed", description: "Try a different photo." });
     }
   };
 
-  // Save profile
+  // Save profile - mock version, replace with real API later
   const onSubmit = async (e) => {
     e.preventDefault();
     if (!user) return;
 
     setSaving(true);
+    
     try {
-      // 1) Upload avatar if changed
+      // Simulate API delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // Mock avatar upload
       let avatarUrl = user.avatar;
       if (avatarFile) {
-        const formData = new FormData();
-        formData.append("avatar", avatarFile);
-        const up = await fetch("/api/user/avatar", {
-          method: "POST",
-          body: formData,
-          credentials: "include", // <-- send cookies
-        });
-        if (!up.ok) {
-          const errText = await up.text();
-          if (up.status === 401) {
-            window.location.assign("/signin");
-            return;
-          }
-          throw new Error(`Avatar upload failed: ${up.status} ${errText}`);
-        }
-        const resJson = await up.json();
-        avatarUrl = resJson.avatarUrl || avatarUrl;
+        // In real implementation, this would upload to server
+        avatarUrl = URL.createObjectURL(avatarFile);
       }
 
-      // 2) Update profile
-      const patchRes = await fetch("/api/user/current", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: name.trim(),
-          email: email.trim(),
-          bio: bio,
-          avatar: avatarUrl || undefined,
-        }),
-        credentials: "include", // <-- send cookies
-      });
-      if (!patchRes.ok) {
-        const errText = await patchRes.text();
-        if (patchRes.status === 401) {
-          window.location.assign("/signin");
-          return;
-        }
-        throw new Error(`Update failed: ${patchRes.status} ${errText}`);
-      }
-      const updated = await patchRes.json();
+      // Mock profile update
+      const updatedUser = {
+        ...user,
+        name: name.trim(),
+        email: email.trim(),
+        bio: bio,
+        avatar: avatarUrl
+      };
 
       // Update local state
-      setUser((prev) => ({ ...prev, ...updated }));
-      if (avatarUrl) {
-        // cache-bust preview
-        const busted = `${avatarUrl}?t=${Date.now()}`;
-        setUser((prev) => ({ ...prev, avatar: busted }));
+      setUser(updatedUser);
+      
+      if (avatarUrl && avatarFile) {
         setAvatarPreview(null);
         setAvatarFile(null);
       }
 
-      // Notify rest of app (e.g., sidebar/header) that user changed
+      // Notify rest of app that user changed (if needed)
       try {
-        window.dispatchEvent(new CustomEvent("app:user-updated", { detail: updated }));
+        window.dispatchEvent(new CustomEvent("app:user-updated", { detail: updatedUser }));
       } catch {}
 
       setIsEditing(false);
       toast({ title: "Profile updated", description: "Your profile has been saved." });
+      
     } catch (err) {
       console.error(err);
       toast({
@@ -190,7 +166,7 @@ export default function Profile() {
     setAvatarFile(null);
   };
 
-  /* ----------------- UI ----------------- */
+  /* ----------------- UI with your new color scheme ----------------- */
 
   if (loading) {
     return (
@@ -323,7 +299,7 @@ export default function Profile() {
                   </div>
 
                   <div className="text-xs text-muted">
-                    Max 5MB. JPG/PNG/WebP recommended. HEIC will be converted automatically.
+                    Max 5MB. JPG/PNG/WebP recommended. HEIC support coming with backend APIs.
                   </div>
                 </div>
 
@@ -334,6 +310,7 @@ export default function Profile() {
                     onChange={(e) => setName(e.target.value)}
                     className="w-full glass-soft border-white/40 text-ink placeholder:text-ink/50 px-3 py-2 rounded-lg focus:outline-none focus:border-white/60"
                     placeholder="Your full name"
+                    required
                   />
                 </div>
 
@@ -345,6 +322,7 @@ export default function Profile() {
                     onChange={(e) => setEmail(e.target.value)}
                     className="w-full glass-soft border-white/40 text-ink placeholder:text-ink/50 px-3 py-2 rounded-lg focus:outline-none focus:border-white/60"
                     placeholder="you@example.com"
+                    required
                   />
                 </div>
 
@@ -356,6 +334,7 @@ export default function Profile() {
                     onChange={(e) => setBio(e.target.value)}
                     className="w-full glass-soft border-white/40 text-ink placeholder:text-ink/50 px-3 py-2 rounded-lg resize-none focus:outline-none focus:border-white/60"
                     placeholder="Tell your readers about yourself, your writing journey, and what inspires you..."
+                    maxLength={500}
                   />
                   <div className="text-xs text-muted text-right glass-soft px-2 py-1 rounded-lg">
                     {(bio || "").length}/500 characters
@@ -367,14 +346,14 @@ export default function Profile() {
                     type="button"
                     onClick={onCancel}
                     disabled={saving}
-                    className="glass-soft hover:bg-white/60 px-4 py-2 rounded-lg"
+                    className="glass-soft hover:bg-white/60 px-4 py-2 rounded-lg disabled:opacity-50"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={saving}
-                    className="btn-primary shadow-xl px-4 py-2 rounded-lg"
+                    className="btn-primary shadow-xl px-4 py-2 rounded-lg disabled:opacity-50"
                   >
                     {saving ? "Saving..." : "Save Changes"}
                   </button>
