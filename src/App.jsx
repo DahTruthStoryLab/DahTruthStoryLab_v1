@@ -17,7 +17,9 @@ const WriteSection         = lazy(() => import("./components/WriteSection"));
 const StoryLab             = lazy(() => import("./lib/storylab/StoryLab"));
 const StoryPromptsWorkshop = lazy(() => import("./lib/storylab/StoryPromptsWorkshop"));
 const Calendar             = lazy(() => import("./components/Calendar"));
-const Profile              = lazy(() => import("./components/Profile.jsx")); // <-- explicit extension
+- const Profile              = lazy(() => import("./components/Profile.jsx")); // <-- explicit extension
++ import Profile from "./components/Profile.jsx";
+
 
 /* =========================
    Global UI helpers
