@@ -9,6 +9,9 @@ import {
   Navigate,
 } from "react-router-dom";
 
+// ✅ Place this with the other imports
+import Profile from "./components/Profile.jsx";
+
 /* =========================
    Lazy-loaded pages (faster)
    ========================= */
@@ -24,8 +27,6 @@ const WriteSection         = lazy(() => import("./components/WriteSection"));
 const StoryLab             = lazy(() => import("./lib/storylab/StoryLab"));
 const StoryPromptsWorkshop = lazy(() => import("./lib/storylab/StoryPromptsWorkshop"));
 const Calendar             = lazy(() => import("./components/Calendar"));
-// IMPORTANT: direct import to avoid lazy chunk issues for Profile
-import Profile from "./components/Profile.jsx";
 
 /* =========================
    Global UI helpers
