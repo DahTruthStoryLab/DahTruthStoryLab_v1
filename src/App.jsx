@@ -17,7 +17,7 @@ const WriteSection         = lazy(() => import("./components/WriteSection"));
 const StoryLab             = lazy(() => import("./lib/storylab/StoryLab"));
 const StoryPromptsWorkshop = lazy(() => import("./lib/storylab/StoryPromptsWorkshop"));
 const Calendar             = lazy(() => import("./components/Calendar"));
-const Profile              = lazy(() => import("./components/Profile"));
+const Profile              = lazy(() => import("./components/Profile.jsx")); // <-- explicit extension
 
 /* =========================
    Global UI helpers
@@ -85,6 +85,11 @@ function TableOfContentsRouter() {
    App
    ========================= */
 export default function App() {
+  // Ensure light theme tokens are active (remove any lingering dark class on <html>)
+  useEffect(() => {
+    document.documentElement.classList.remove("theme-dark");
+  }, []);
+
   return (
     <Router>
       <ScrollToTop />
@@ -187,7 +192,7 @@ export default function App() {
             }
           />
 
-          {/* Profile - Updated to use the actual Profile component */}
+          {/* Profile */}
           <Route
             path="/profile"
             element={
