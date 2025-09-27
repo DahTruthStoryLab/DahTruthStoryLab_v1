@@ -1,11 +1,11 @@
 // src/components/Profile.jsx
 import React, { useEffect, useState } from "react";
+import heic2any from "heic2any"; // <-- add HEIC→JPEG conversion
 
 /** Minimal helper: tiny toasts via alert+console (no external deps) */
 function toast({ title, description } = {}) {
   if (title || description) {
     console.log(`[toast] ${title || ""}${description ? " — " + description : ""}`);
-    // Comment out if you don't want dialogs in prod:
     // alert(`${title || ""}\n${description || ""}`);
   }
 }
@@ -30,8 +30,15 @@ export default function Profile() {
     let isMounted = true;
     (async () => {
       try {
-        const res = await fetch("/api/user/current");
-        if (!res.ok) throw new Error(`GET /api/user/current ${res.status}`);
+        const res = await fetch("/api/user/current", { credentials: "include" }); // <-- send cookies
+        if (!res.ok) {
+          if (res.status === 401) {
+            // Not signed in: go to sign-in
+            window.location.assign("/signin");
+            return;
+          }
+          throw new Error(`GET /api/user/current ${res.status}`);
+        }
         const data = await res.json();
         if (!isMounted) return;
         setUser(data);
@@ -48,8 +55,8 @@ export default function Profile() {
     return () => (isMounted = false);
   }, []);
 
-  // Handle avatar change (basic validation + preview)
-  const onAvatarChange = (e) => {
+  // Handle avatar change (validation + HEIC conversion + preview)
+  const onAvatarChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -59,17 +66,37 @@ export default function Profile() {
       return;
     }
 
-    // type check (basic)
-    if (!file.type.startsWith("image/")) {
-      toast({ title: "Invalid file type", description: "Please pick an image file." });
-      return;
+    const lowerName = file.name.toLowerCase();
+    const isHeic =
+      file.type === "image/heic" ||
+      file.type === "image/heif" ||
+      /\.heic$/i.test(lowerName) ||
+      /\.heif$/i.test(lowerName);
+
+    try {
+      let finalFile = file;
+
+      if (isHeic) {
+        const outBlob = await heic2any({ blob: file, toType: "image/jpeg", quality: 0.9 });
+        finalFile = new File(
+          [outBlob],
+          lowerName.replace(/\.(heic|heif)$/i, ".jpg"),
+          { type: "image/jpeg" }
+        );
+      } else if (!file.type.startsWith("image/")) {
+        toast({ title: "Invalid file type", description: "Please pick an image file." });
+        return;
+      }
+
+      // cleanup old preview url
+      if (avatarPreview) URL.revokeObjectURL(avatarPreview);
+
+      setAvatarFile(finalFile);
+      setAvatarPreview(URL.createObjectURL(finalFile));
+    } catch (err) {
+      console.error("Image conversion error:", err);
+      toast({ title: "Image processing failed", description: "Try a different photo." });
     }
-
-    // cleanup old preview url
-    if (avatarPreview) URL.revokeObjectURL(avatarPreview);
-
-    setAvatarFile(file);
-    setAvatarPreview(URL.createObjectURL(file));
   };
 
   // Save profile
@@ -84,9 +111,17 @@ export default function Profile() {
       if (avatarFile) {
         const formData = new FormData();
         formData.append("avatar", avatarFile);
-        const up = await fetch("/api/user/avatar", { method: "POST", body: formData });
+        const up = await fetch("/api/user/avatar", {
+          method: "POST",
+          body: formData,
+          credentials: "include", // <-- send cookies
+        });
         if (!up.ok) {
           const errText = await up.text();
+          if (up.status === 401) {
+            window.location.assign("/signin");
+            return;
+          }
           throw new Error(`Avatar upload failed: ${up.status} ${errText}`);
         }
         const resJson = await up.json();
@@ -103,9 +138,14 @@ export default function Profile() {
           bio: bio,
           avatar: avatarUrl || undefined,
         }),
+        credentials: "include", // <-- send cookies
       });
       if (!patchRes.ok) {
         const errText = await patchRes.text();
+        if (patchRes.status === 401) {
+          window.location.assign("/signin");
+          return;
+        }
         throw new Error(`Update failed: ${patchRes.status} ${errText}`);
       }
       const updated = await patchRes.json();
@@ -119,6 +159,11 @@ export default function Profile() {
         setAvatarPreview(null);
         setAvatarFile(null);
       }
+
+      // Notify rest of app (e.g., sidebar/header) that user changed
+      try {
+        window.dispatchEvent(new CustomEvent("app:user-updated", { detail: updated }));
+      } catch {}
 
       setIsEditing(false);
       toast({ title: "Profile updated", description: "Your profile has been saved." });
@@ -278,7 +323,7 @@ export default function Profile() {
                   </div>
 
                   <div className="text-xs text-muted">
-                    Max 5MB. JPG/PNG/WebP recommended.
+                    Max 5MB. JPG/PNG/WebP recommended. HEIC will be converted automatically.
                   </div>
                 </div>
 
