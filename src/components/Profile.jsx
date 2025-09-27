@@ -1,276 +1,153 @@
 // src/components/Profile.jsx
-import { useState, useEffect } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import heic2any from "heic2any";
+import React, { useEffect, useState } from "react";
 
-import { Button } from "components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "components/ui/card";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "components/ui/form";
-import { Input } from "components/ui/input";
-import { Textarea } from "components/ui/textarea";
-import { Avatar, AvatarFallback, AvatarImage } from "components/ui/avatar";
-
-import { apiRequest } from "lib/queryClient";
-// import { useToast } from "hooks/use-toast"; // REMOVED: file not found
-import { useAuth } from "hooks/useAuth";
-import { useUser } from "state/UserContext";
-
-import { Upload, User, Save, X, Camera } from "lucide-react";
-
-import PageShell from "components/layout/PageShell";
-import AeroBanner from "components/layout/AeroBanner";
-
-/* ========= Temporary toast shim =========
-   This replaces the missing hooks/use-toast.
-   It logs to console and emits a CustomEvent you can listen to.
-   When you add a real toast system, delete this block and restore the import.
-*/
-function useToast() {
-  return {
-    toast({ title, description, variant } = {}) {
-      try {
-        window.dispatchEvent(
-          new CustomEvent("app:toast", { detail: { title, description, variant } })
-        );
-      } catch {}
-      const tag = variant ? `[toast:${variant}]` : `[toast]`;
-      if (title || description) {
-        console.log(`${tag} ${title || ""}${description ? " — " + description : ""}`);
-      }
-      // Optional visual fallback:
-      // if (title || description) alert(`${title || ""}\n${description || ""}`);
-    },
-  };
+/** Minimal helper: tiny toasts via alert+console (no external deps) */
+function toast({ title, description } = {}) {
+  if (title || description) {
+    console.log(`[toast] ${title || ""}${description ? " — " + description : ""}`);
+    // Comment out if you don't want dialogs in prod:
+    // alert(`${title || ""}\n${description || ""}`);
+  }
 }
-/* ====================================== */
-
-const profileFormSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  email: z.string().email("Please enter a valid email address"),
-  bio: z
-    .string()
-    .max(500, "Bio must be less than 500 characters")
-    .optional()
-    .or(z.literal("")),
-});
 
 export default function Profile() {
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [user, setUser] = useState(null);
+
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [bio, setBio] = useState("");
+
   const [isEditing, setIsEditing] = useState(false);
+
+  // Avatar state
   const [avatarFile, setAvatarFile] = useState(null);
   const [avatarPreview, setAvatarPreview] = useState(null);
-  const [convertingImage, setConvertingImage] = useState(false);
-  const queryClient = useQueryClient();
-  const { toast } = useToast();
-  const { user: authUser } = useAuth();
-  const { setUser: setGlobalUser } = useUser();
 
-  const { data: user, isLoading } = useQuery({
-    queryKey: ["/api/user/current"],
-  });
-
-  const form = useForm({
-    resolver: zodResolver(profileFormSchema),
-    defaultValues: { name: "", email: "", bio: "" },
-  });
-
+  // Load current user
   useEffect(() => {
-    if (user) {
-      form.reset({
-        name: user.name,
-        email: user.email,
-        bio: user.bio || "",
-      });
-    }
-  }, [user, form]);
-
-  const updateProfileMutation = useMutation({
-    mutationFn: async (data) => await apiRequest("PATCH", "/api/user/current", data),
-    onSuccess: (updatedUser) => {
-      queryClient.invalidateQueries({ queryKey: ["/api/user/current"] });
-      if (user) {
-        const newUser = { ...user, ...updatedUser };
-        setGlobalUser(newUser);
+    let isMounted = true;
+    (async () => {
+      try {
+        const res = await fetch("/api/user/current");
+        if (!res.ok) throw new Error(`GET /api/user/current ${res.status}`);
+        const data = await res.json();
+        if (!isMounted) return;
+        setUser(data);
+        setName(data?.name || "");
+        setEmail(data?.email || "");
+        setBio(data?.bio || "");
+      } catch (e) {
+        console.error(e);
+        toast({ title: "Unable to load profile", description: "Please try refreshing the page." });
+      } finally {
+        if (isMounted) setLoading(false);
       }
-      setIsEditing(false);
-      setAvatarFile(null);
-      setAvatarPreview(null);
-      toast({
-        title: "Profile updated",
-        description: "Your profile has been successfully updated.",
-      });
-    },
-    onError: () => {
-      toast({
-        title: "Error updating profile",
-        description: "There was an error updating your profile. Please try again.",
-        variant: "destructive",
-      });
-    },
-  });
+    })();
+    return () => (isMounted = false);
+  }, []);
 
-  const handleAvatarChange = async (event) => {
-    const file = event.target.files?.[0];
+  // Handle avatar change (basic validation + preview)
+  const onAvatarChange = (e) => {
+    const file = e.target.files?.[0];
     if (!file) return;
 
+    // size check: 5MB
     if (file.size > 5 * 1024 * 1024) {
-      toast({
-        title: "File too large",
-        description: "Please select an image smaller than 5MB.",
-        variant: "destructive",
-      });
+      toast({ title: "File too large", description: "Choose an image smaller than 5MB." });
       return;
     }
 
+    // type check (basic)
+    if (!file.type.startsWith("image/")) {
+      toast({ title: "Invalid file type", description: "Please pick an image file." });
+      return;
+    }
+
+    // cleanup old preview url
     if (avatarPreview) URL.revokeObjectURL(avatarPreview);
 
-    const isHeic =
-      file.type === "image/heic" ||
-      file.type === "image/heif" ||
-      /\.heic$/i.test(file.name) ||
-      /\.heif$/i.test(file.name);
-
-    try {
-      setConvertingImage(true);
-
-      if (isHeic) {
-        const convertedBlob = await heic2any({
-          blob: file,
-          toType: "image/jpeg",
-          quality: 0.9,
-        });
-
-        const convertedFile = new File(
-          [convertedBlob],
-          file.name.replace(/\.(heic|heif)$/i, ".jpg"),
-          { type: "image/jpeg" }
-        );
-
-        setAvatarFile(convertedFile);
-        setAvatarPreview(URL.createObjectURL(convertedFile));
-      } else {
-        const validImageTypes = [
-          "image/jpeg",
-          "image/jpg",
-          "image/png",
-          "image/gif",
-          "image/webp",
-          "image/svg+xml",
-          "image/bmp",
-          "image/tiff",
-          "image/avif",
-        ];
-        const fileExtension = file.name.toLowerCase().split(".").pop();
-        const validExtensions = [
-          "jpg",
-          "jpeg",
-          "png",
-          "gif",
-          "webp",
-          "svg",
-          "bmp",
-          "tiff",
-          "tif",
-          "avif",
-          "jfif",
-        ];
-
-        const isValidType =
-          file.type.startsWith("image/") || validImageTypes.includes(file.type);
-        const isValidExtension = validExtensions.includes(fileExtension || "");
-
-        if (!isValidType && !isValidExtension) {
-          toast({
-            title: "Invalid file type",
-            description:
-              "Please select an image file. Supported formats: JPEG, PNG, GIF, WebP, SVG, HEIC, HEIF, BMP, TIFF, AVIF",
-            variant: "destructive",
-          });
-          return;
-        }
-
-        setAvatarFile(file);
-        setAvatarPreview(URL.createObjectURL(file));
-      }
-    } catch (err) {
-      console.error("Image conversion error:", err);
-      toast({
-        title: "Image processing failed",
-        description:
-          "Sorry, we couldn't process that image. Please try a different photo.",
-        variant: "destructive",
-      });
-      setAvatarFile(null);
-      setAvatarPreview(null);
-      event.target.value = "";
-    } finally {
-      setConvertingImage(false);
-    }
+    setAvatarFile(file);
+    setAvatarPreview(URL.createObjectURL(file));
   };
 
-  const onSubmit = async (data) => {
-    let avatarUrl = user?.avatar;
+  // Save profile
+  const onSubmit = async (e) => {
+    e.preventDefault();
+    if (!user) return;
 
-    if (avatarFile) {
-      try {
+    setSaving(true);
+    try {
+      // 1) Upload avatar if changed
+      let avatarUrl = user.avatar;
+      if (avatarFile) {
         const formData = new FormData();
         formData.append("avatar", avatarFile);
-
-        const uploadResponse = await fetch("/api/user/avatar", {
-          method: "POST",
-          body: formData,
-        });
-
-        if (uploadResponse.ok) {
-          const result = await uploadResponse.json();
-          avatarUrl = result.avatarUrl;
-
-          if (user && avatarUrl) {
-            const cacheBustedUrl = `${avatarUrl}?t=${Date.now()}`;
-            setGlobalUser({ ...user, avatar: cacheBustedUrl });
-          }
-        } else {
-          const errorText = await uploadResponse.text();
-          throw new Error(`Avatar upload failed: ${uploadResponse.status} - ${errorText}`);
+        const up = await fetch("/api/user/avatar", { method: "POST", body: formData });
+        if (!up.ok) {
+          const errText = await up.text();
+          throw new Error(`Avatar upload failed: ${up.status} ${errText}`);
         }
-      } catch (error) {
-        console.error("Avatar upload error:", error);
-        toast({
-          title: "Avatar upload failed",
-          description:
-            error instanceof Error
-              ? error.message
-              : "Could not upload avatar. Profile will be updated without the new image.",
-          variant: "destructive",
-        });
+        const resJson = await up.json();
+        avatarUrl = resJson.avatarUrl || avatarUrl;
       }
-    }
 
-    updateProfileMutation.mutate({
-      ...data,
-      avatar: avatarUrl || undefined,
-    });
+      // 2) Update profile
+      const patchRes = await fetch("/api/user/current", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: name.trim(),
+          email: email.trim(),
+          bio: bio,
+          avatar: avatarUrl || undefined,
+        }),
+      });
+      if (!patchRes.ok) {
+        const errText = await patchRes.text();
+        throw new Error(`Update failed: ${patchRes.status} ${errText}`);
+      }
+      const updated = await patchRes.json();
+
+      // Update local state
+      setUser((prev) => ({ ...prev, ...updated }));
+      if (avatarUrl) {
+        // cache-bust preview
+        const busted = `${avatarUrl}?t=${Date.now()}`;
+        setUser((prev) => ({ ...prev, avatar: busted }));
+        setAvatarPreview(null);
+        setAvatarFile(null);
+      }
+
+      setIsEditing(false);
+      toast({ title: "Profile updated", description: "Your profile has been saved." });
+    } catch (err) {
+      console.error(err);
+      toast({
+        title: "Error updating profile",
+        description: err instanceof Error ? err.message : "Please try again.",
+      });
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleCancel = () => {
+  const onCancel = () => {
     if (user) {
-      form.reset({
-        name: user.name,
-        email: user.email,
-        bio: user.bio || "",
-      });
+      setName(user.name || "");
+      setEmail(user.email || "");
+      setBio(user.bio || "");
     }
     setIsEditing(false);
-    setAvatarFile(null);
+    if (avatarPreview) URL.revokeObjectURL(avatarPreview);
     setAvatarPreview(null);
+    setAvatarFile(null);
   };
 
-  /* =========================
-     Loading (palette only)
-  ========================= */
-  if (isLoading) {
+  /* ----------------- UI ----------------- */
+
+  if (loading) {
     return (
       <div className="min-h-screen bg-base">
         <div className="p-6 max-w-4xl mx-auto">
@@ -291,9 +168,6 @@ export default function Profile() {
     );
   }
 
-  /* =========================
-     Not found (palette only)
-  ========================= */
   if (!user) {
     return (
       <div className="min-h-screen bg-base flex items-center justify-center">
@@ -304,235 +178,167 @@ export default function Profile() {
     );
   }
 
-  /* =========================
-     Main (palette only)
-  ========================= */
   return (
     <div className="min-h-screen bg-base bg-radial-fade">
-      <PageShell>
-        <AeroBanner size="md" title="Your Profile" subtitle="Manage your account and avatar" />
-
-        <div className="section max-w-4xl mx-auto space-y-6">
-          {/* Header */}
-          <div className="glass-panel p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <h2 className="text-2xl font-bold text-ink font-serif">Author Profile</h2>
-                <p className="text-muted">Manage your writing identity and personal information</p>
-              </div>
-              {!isEditing && (
-                <Button
-                  onClick={() => setIsEditing(true)}
-                  size="lg"
-                  className="btn-primary font-semibold shadow-lg"
-                  data-testid="button-edit-profile"
-                >
-                  <User className="w-5 h-5 mr-2" />
-                  Edit Profile
-                </Button>
-              )}
+      <div className="max-w-4xl mx-auto px-6 py-10 space-y-6">
+        {/* Header */}
+        <div className="glass-panel p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-2xl font-bold text-ink font-serif">Author Profile</h2>
+              <p className="text-muted">Manage your writing identity and personal information</p>
             </div>
+            {!isEditing && (
+              <button
+                onClick={() => setIsEditing(true)}
+                className="btn-primary font-semibold shadow-lg px-4 py-2 rounded-lg"
+              >
+                Edit Profile
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Card */}
+        <div className="glass-panel rounded-2xl">
+          <div className="glass-soft rounded-t-2xl p-6 border-0">
+            <div className="text-xl text-ink font-semibold">Personal Information</div>
+            <div className="text-muted">Manage your author profile and personal information</div>
           </div>
 
-          {/* Card */}
-          <Card className="glass-panel">
-            <CardHeader className="glass-soft rounded-t-2xl border-0">
-              <CardTitle className="text-xl text-ink flex items-center gap-2">
-                <User className="w-5 h-5" />
-                Personal Information
-              </CardTitle>
-              <CardDescription className="text-muted">
-                Manage your author profile and personal information
-              </CardDescription>
-            </CardHeader>
-
-            <CardContent className="space-y-6 p-6">
-              {!isEditing ? (
-                /* -------- Display Mode -------- */
-                <div className="space-y-6">
-                  <div className="flex items-center space-x-6">
-                    <div className="relative">
-                      <Avatar className="w-24 h-24 border-2 border-white/40 ring-4 ring-white/20 shadow-xl">
-                        <AvatarImage
-                          src={user.avatar || undefined}
-                          alt={user.name}
-                          className="object-cover"
-                        />
-                        <AvatarFallback className="text-lg font-medium bg-white/60 text-ink border border-white/40">
-                          {user.name.split(" ").map((n) => n[0]).join("").toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-accent/30 to-primary/30 pointer-events-none"></div>
+          <div className="p-6 space-y-6">
+            {!isEditing ? (
+              /* -------- Display Mode -------- */
+              <div className="space-y-6">
+                <div className="flex items-center space-x-6">
+                  <div className="relative">
+                    <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-white/40 ring-4 ring-white/20 shadow-xl bg-white/60">
+                      {user.avatar ? (
+                        <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full grid place-items-center text-ink/70 font-semibold">
+                          {user.name?.split(" ").map(n => n[0]).join("").toUpperCase()}
+                        </div>
+                      )}
                     </div>
-                    <div className="space-y-2">
-                      <h3 className="text-2xl font-semibold text-ink font-serif" data-testid="text-user-name">
-                        {user.name}
-                      </h3>
-                      <p className="text-muted text-lg" data-testid="text-user-email">
-                        {user.email}
-                      </p>
+                    <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-accent/30 to-primary/30 pointer-events-none"></div>
+                  </div>
+                  <div className="space-y-2">
+                    <h3 className="text-2xl font-semibold text-ink font-serif">{user.name}</h3>
+                    <p className="text-muted text-lg">{user.email}</p>
+                  </div>
+                </div>
+
+                {user.bio ? (
+                  <div className="glass-soft p-4">
+                    <h4 className="text-sm font-medium text-ink/80 mb-2">Bio</h4>
+                    <p className="text-ink/80 leading-relaxed whitespace-pre-wrap">{user.bio}</p>
+                  </div>
+                ) : (
+                  <div className="glass-soft p-4 border-dashed">
+                    <div className="text-muted italic text-center">
+                      No bio added yet. Click "Edit Profile" to add your author biography.
                     </div>
                   </div>
+                )}
+              </div>
+            ) : (
+              /* -------- Edit Mode -------- */
+              <form onSubmit={onSubmit} className="space-y-6">
+                <div className="flex items-center space-x-6">
+                  <div className="relative">
+                    <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-white/40 ring-4 ring-white/20 shadow-xl bg-white/60">
+                      {avatarPreview || user.avatar ? (
+                        <img
+                          src={avatarPreview || user.avatar}
+                          alt={user.name}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full grid place-items-center text-ink/70 font-semibold">
+                          {user.name?.split(" ").map(n => n[0]).join("").toUpperCase()}
+                        </div>
+                      )}
+                    </div>
+                    <label
+                      htmlFor="avatar-upload"
+                      className="absolute -bottom-2 -right-2 bg-primary hover:opacity-90 text-ink rounded-full px-3 py-2 cursor-pointer shadow-xl border border-white/40 text-sm"
+                      title="Change avatar"
+                    >
+                      Change
+                    </label>
+                    <input
+                      id="avatar-upload"
+                      type="file"
+                      accept="image/*"
+                      onChange={onAvatarChange}
+                      className="hidden"
+                    />
+                    <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-accent/30 to-primary/30 pointer-events-none"></div>
+                  </div>
 
-                  {user.bio ? (
-                    <div className="glass-soft p-4">
-                      <h4 className="text-sm font-medium text-ink/80 mb-2">Bio</h4>
-                      <p className="text-ink/80 leading-relaxed whitespace-pre-wrap" data-testid="text-user-bio">
-                        {user.bio}
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="glass-soft p-4 border-dashed">
-                      <div className="text-muted italic text-center">
-                        No bio added yet. Click "Edit Profile" to add your author biography.
-                      </div>
-                    </div>
-                  )}
+                  <div className="text-xs text-muted">
+                    Max 5MB. JPG/PNG/WebP recommended.
+                  </div>
                 </div>
-              ) : (
-                /* -------- Edit Mode -------- */
-                <Form {...form}>
-                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                    <div className="space-y-4">
-                      <div className="flex items-center space-x-6">
-                        <div className="relative">
-                          <Avatar className="w-24 h-24 border-2 border-white/40 ring-4 ring-white/20 shadow-xl">
-                            <AvatarImage
-                              src={avatarPreview || user.avatar || undefined}
-                              alt={user.name}
-                              className="object-cover"
-                            />
-                            <AvatarFallback className="text-lg font-medium bg-white/60 text-ink border border-white/40">
-                              {user.name.split(" ").map((n) => n[0]).join("").toUpperCase()}
-                            </AvatarFallback>
-                          </Avatar>
-                          <label
-                            htmlFor="avatar-upload"
-                            className="absolute -bottom-2 -right-2 bg-primary hover:opacity-90 text-ink rounded-full p-2 cursor-pointer shadow-xl border border-white/40"
-                            title="Change avatar"
-                          >
-                            <Camera className="w-4 h-4" />
-                          </label>
-                          <input
-                            id="avatar-upload"
-                            type="file"
-                            onChange={handleAvatarChange}
-                            className="hidden"
-                            data-testid="input-avatar-upload"
-                          />
-                          <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-accent/30 to-primary/30 pointer-events-none"></div>
-                        </div>
-                        <div className="space-y-2">
-                          <p className="text-sm font-medium text-ink">Profile Photo</p>
-                          <p className="text-xs text-muted">
-                            Click the camera icon to upload a new photo (max 5MB)
-                            <br />
-                            HEIC files will be converted to JPEG automatically
-                          </p>
-                          {convertingImage && (
-                            <div className="text-xs font-medium bg-primary rounded px-2 py-1 border border-white/40">
-                              Converting image...
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
 
-                    <FormField
-                      control={form.control}
-                      name="name"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-ink/90">Full Name</FormLabel>
-                          <FormControl>
-                            <Input
-                              {...field}
-                              className="glass-soft border-white/40 text-ink placeholder:text-ink/50 focus-visible:ring-0 focus:border-white/60"
-                              data-testid="input-name"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                <div className="space-y-1">
+                  <label className="text-ink/90 text-sm">Full Name</label>
+                  <input
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="w-full glass-soft border-white/40 text-ink placeholder:text-ink/50 px-3 py-2 rounded-lg focus:outline-none focus:border-white/60"
+                    placeholder="Your full name"
+                  />
+                </div>
 
-                    <FormField
-                      control={form.control}
-                      name="email"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-ink/90">Email Address</FormLabel>
-                          <FormControl>
-                            <Input
-                              {...field}
-                              type="email"
-                              className="glass-soft border-white/40 text-ink placeholder:text-ink/50 focus-visible:ring-0 focus:border-white/60"
-                              data-testid="input-email"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                <div className="space-y-1">
+                  <label className="text-ink/90 text-sm">Email Address</label>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className="w-full glass-soft border-white/40 text-ink placeholder:text-ink/50 px-3 py-2 rounded-lg focus:outline-none focus:border-white/60"
+                    placeholder="you@example.com"
+                  />
+                </div>
 
-                    <FormField
-                      control={form.control}
-                      name="bio"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-ink/90">Author Bio</FormLabel>
-                          <FormControl>
-                            <Textarea
-                              {...field}
-                              rows={5}
-                              placeholder="Tell your readers about yourself, your writing journey, and what inspires you..."
-                              className="glass-soft border-white/40 text-ink placeholder:text-ink/50 resize-none focus-visible:ring-0 focus:border-white/60"
-                              data-testid="textarea-bio"
-                            />
-                          </FormControl>
-                          <div className="text-xs text-muted text-right glass-soft px-2 py-1">
-                            {(field.value || "").length}/500 characters
-                          </div>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                <div className="space-y-1">
+                  <label className="text-ink/90 text-sm">Author Bio</label>
+                  <textarea
+                    rows={5}
+                    value={bio}
+                    onChange={(e) => setBio(e.target.value)}
+                    className="w-full glass-soft border-white/40 text-ink placeholder:text-ink/50 px-3 py-2 rounded-lg resize-none focus:outline-none focus:border-white/60"
+                    placeholder="Tell your readers about yourself, your writing journey, and what inspires you..."
+                  />
+                  <div className="text-xs text-muted text-right glass-soft px-2 py-1 rounded-lg">
+                    {(bio || "").length}/500 characters
+                  </div>
+                </div>
 
-                    <div className="flex items-center justify-end space-x-3 pt-4 glass-soft p-4">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={handleCancel}
-                        disabled={updateProfileMutation.isPending}
-                        className="glass-soft hover:bg-white/60"
-                        data-testid="button-cancel"
-                      >
-                        <X className="w-4 h-4 mr-2" />
-                        Cancel
-                      </Button>
-                      <Button
-                        type="submit"
-                        disabled={updateProfileMutation.isPending}
-                        className="btn-primary shadow-xl"
-                        data-testid="button-save"
-                      >
-                        {updateProfileMutation.isPending ? (
-                          "Saving..."
-                        ) : (
-                          <>
-                            <Save className="w-4 h-4 mr-2" />
-                            Save Changes
-                          </>
-                        )}
-                      </Button>
-                    </div>
-                  </form>
-                </Form>
-              )}
-            </CardContent>
-          </Card>
+                <div className="flex items-center justify-end gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={onCancel}
+                    disabled={saving}
+                    className="glass-soft hover:bg-white/60 px-4 py-2 rounded-lg"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={saving}
+                    className="btn-primary shadow-xl px-4 py-2 rounded-lg"
+                  >
+                    {saving ? "Saving..." : "Save Changes"}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
         </div>
-      </PageShell>
+      </div>
     </div>
   );
 }
