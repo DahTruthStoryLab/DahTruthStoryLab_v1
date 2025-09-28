@@ -102,41 +102,29 @@ const TopBanner = () => (
   <div className="bg-white/70 backdrop-blur-xl border-b border-white/60 text-ink sticky top-0 z-50">
     <div className="px-6 py-3">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <div className="hidden md:block text-sm text-muted">
+        <div className="flex-1"></div>
+        
+        {/* Centered Logo and Title */}
+        <div className="flex flex-col items-center">
+          <div className="flex items-center gap-3 mb-1">
+            <img 
+              src="/DahTruthLogo.png" 
+              alt="DahTruth Logo" 
+              className="w-8 h-8 rounded-full shadow-md"
+            />
+            <div className="flex flex-col">
+              <span className="font-bold text-xl text-ink" style={{ fontFamily: 'Georgia, serif' }}>
+                DahTruth
+              </span>
+              <span className="text-xs text-muted -mt-1">StoryLab</span>
+            </div>
+          </div>
+          <div className="text-sm text-muted text-center">
             Transform your ideas into compelling stories
           </div>
         </div>
         
-        {/* Centered Logo */}
-        <div className="absolute left-1/2 transform -translate-x-1/2 flex items-center gap-3">
-          <div style={{
-            width: '32px',
-            height: '32px',
-            borderRadius: '50%',
-            background: 'linear-gradient(135deg, #8b5cf6, #3b82f6, #eab308)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
-            border: '1px solid rgba(255,255,255,0.3)'
-          }}>
-            <span style={{
-              color: 'white',
-              fontWeight: 'bold',
-              fontSize: '14px',
-              fontFamily: 'Arial, sans-serif'
-            }}>
-              DT
-            </span>
-          </div>
-          <div className="flex flex-col">
-            <span className="font-bold text-lg text-ink">DahTruth</span>
-            <span className="text-xs text-muted -mt-1">StoryLab</span>
-          </div>
-        </div>
-        
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 flex-1 justify-end">
           <button className="p-2 rounded-lg hover:bg-white/70 hover:text-ink transition-colors">
             <Search size={16} />
           </button>
@@ -155,17 +143,24 @@ const TopBanner = () => (
 
 // --------- Sidebar Component ---------
 const Sidebar = ({ isOpen, onClose, authorName, navigate, userNovels = [] }) => {
+  const [activeItem, setActiveItem] = useState('/dashboard');
+  
   const menuItems = [
-    { icon: Home, label: "Dashboard", active: true, path: "/dashboard" },
-    { icon: PencilLine, label: "Write", active: false, path: "/writer" },
-    { icon: BookOpen, label: "Table of Contents", active: false, path: "/toc" },
-    { icon: Calendar, label: "Calendar", active: false, path: "/calendar" },
-    { icon: Layers, label: "Story Lab", active: false, path: "/story-lab" },
-    { icon: UploadCloud, label: "Publishing", active: false, path: "/publishing" },
-    { icon: Store, label: "Store", active: false, path: "/store" },
-    { icon: User, label: "Profile", active: false, path: "/profile" },
-    { icon: Info, label: "About", active: false, path: "/about" },
+    { icon: Home, label: "Dashboard", path: "/dashboard" },
+    { icon: PencilLine, label: "Write", path: "/writer" },
+    { icon: BookOpen, label: "Table of Contents", path: "/toc" },
+    { icon: Calendar, label: "Calendar", path: "/calendar" },
+    { icon: Layers, label: "Story Lab", path: "/story-lab" },
+    { icon: UploadCloud, label: "Publishing", path: "/publishing" },
+    { icon: Store, label: "Store", path: "/store" },
+    { icon: User, label: "Profile", path: "/profile" },
+    { icon: Info, label: "About", path: "/about" },
   ];
+
+  const handleNavigation = (path) => {
+    setActiveItem(path);
+    navigate(path);
+  };
 
   return (
     <>
@@ -183,40 +178,25 @@ const Sidebar = ({ isOpen, onClose, authorName, navigate, userNovels = [] }) => 
         transform transition-transform duration-300 ease-in-out
         ${isOpen ? 'translate-x-0' : '-translate-x-full'}
         lg:translate-x-0 lg:static lg:z-auto lg:h-[calc(100vh-4rem)]
-        flex flex-col
+        flex flex-col overflow-hidden
       `}>
         {/* Sidebar Header with Logo */}
         <div className="p-6 border-b border-white/60 flex-shrink-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              {/* Logo Component - Simple and visible */}
-              <div style={{
-                width: '40px',
-                height: '40px',
-                borderRadius: '50%',
-                background: 'linear-gradient(135deg, #8b5cf6, #3b82f6, #eab308)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                border: '2px solid rgba(255,255,255,0.3)'
-              }}>
-                <span style={{
-                  color: 'white',
-                  fontWeight: 'bold',
-                  fontSize: '16px',
-                  fontFamily: 'Arial, sans-serif'
-                }}>
-                  DT
-                </span>
-              </div>
+              {/* Your actual logo */}
+              <img 
+                src="/DahTruthLogo.png" 
+                alt="DahTruth Logo" 
+                className="w-12 h-12 rounded-full shadow-lg border-2 border-white/20"
+              />
               
-              {/* Logo Text */}
-              <div className="flex flex-col">
-                <span className="font-bold text-lg text-ink">
+              {/* Logo Text - Raised up */}
+              <div className="flex flex-col -mt-1">
+                <span className="font-bold text-xl text-ink" style={{ fontFamily: 'Georgia, serif' }}>
                   DahTruth
                 </span>
-                <span className="text-xs text-muted -mt-1">StoryLab</span>
+                <span className="text-xs text-muted -mt-2">StoryLab</span>
               </div>
             </div>
             
@@ -230,25 +210,45 @@ const Sidebar = ({ isOpen, onClose, authorName, navigate, userNovels = [] }) => 
           <p className="text-xs text-muted mt-2">Where your story comes to life</p>
         </div>
 
-        {/* Menu Items */}
-        <nav className="p-4 space-y-2 flex-1 overflow-y-auto">
+        {/* Menu Items - Main Navigation with proper scrolling */}
+        <nav className="p-4 space-y-2 flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-primary/20 scrollbar-track-transparent">
           {menuItems.map((item, index) => (
             <button
               key={index}
-              onClick={() => navigate(item.path)}
+              onClick={() => handleNavigation(item.path)}
               className={`
                 w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left 
-                transition-all duration-200
-                ${item.active 
-                  ? 'bg-primary text-ink border border-white/60 shadow'
-                  : 'text-ink hover:bg-white/80'
+                transition-all duration-200 transform hover:scale-102 hover:shadow-md
+                ${activeItem === item.path
+                  ? 'bg-primary text-ink border border-white/60 shadow-lg scale-102' 
+                  : 'text-ink hover:bg-white/80 hover:shadow-sm'
                 }
                 group relative overflow-hidden
               `}
             >
-              <item.icon size={18} className="relative z-10" />
-              <span className="font-medium relative z-10">{item.label}</span>
-              <div className="absolute right-2 w-2 h-2 bg-gold rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200" />
+              {/* Background animation */}
+              <div className={`
+                absolute inset-0 bg-gradient-to-r from-primary/10 to-accent/10 
+                opacity-0 group-hover:opacity-100 transition-opacity duration-200
+                ${activeItem === item.path ? 'opacity-20' : ''}
+              `} />
+              
+              <item.icon size={18} className={`
+                relative z-10 transition-all duration-200
+                ${activeItem === item.path ? 'text-ink scale-110' : 'group-hover:scale-110'}
+              `} />
+              <span className={`
+                font-medium relative z-10 transition-all duration-200
+                ${activeItem === item.path ? 'font-semibold' : ''}
+              `}>
+                {item.label}
+              </span>
+              
+              {/* Active indicator */}
+              <div className={`
+                absolute right-2 w-2 h-2 bg-gold rounded-full transition-all duration-200
+                ${activeItem === item.path ? 'opacity-100 scale-125' : 'opacity-0 group-hover:opacity-100'}
+              `} />
             </button>
           ))}
         </nav>
@@ -267,7 +267,7 @@ const Sidebar = ({ isOpen, onClose, authorName, navigate, userNovels = [] }) => 
             </button>
           </div>
           
-          <div className="space-y-2 max-h-32 overflow-y-auto">
+          <div className="space-y-2 max-h-32 overflow-y-auto scrollbar-thin scrollbar-thumb-primary/20 scrollbar-track-transparent">
             {userNovels.length === 0 ? (
               <div className="p-3 rounded-lg glass-soft border border-white/30 text-center">
                 <p className="text-xs text-muted">No novels yet</p>
@@ -277,7 +277,7 @@ const Sidebar = ({ isOpen, onClose, authorName, navigate, userNovels = [] }) => 
               userNovels.map((novel, index) => (
                 <div 
                   key={novel.id || index} 
-                  className="p-3 rounded-lg glass-soft border border-white/30 transition-all duration-200 cursor-pointer"
+                  className="p-3 rounded-lg glass-soft border border-white/30 transition-all duration-200 cursor-pointer hover:scale-102 hover:shadow-md"
                   onClick={() => navigate('/writer')}
                 >
                   <h4 className="text-sm font-medium text-ink truncate">
@@ -299,7 +299,7 @@ const Sidebar = ({ isOpen, onClose, authorName, navigate, userNovels = [] }) => 
 
         {/* Author Info - Fixed at bottom */}
         <div className="p-4 border-t border-white/60 flex-shrink-0">
-          <div className="p-4 glass-soft rounded-xl border border-white/30">
+          <div className="p-4 glass-soft rounded-xl border border-white/30 hover:shadow-md transition-all duration-200">
             <div className="flex items-center gap-3 mb-3">
               <div className="w-8 h-8 rounded-full bg-gradient-to-br from-accent via-primary to-gold flex items-center justify-center shadow-md">
                 <span className="text-ink font-bold text-xs">
@@ -567,7 +567,7 @@ export default function Dashboard() {
                 onClick={() => navigate('/toc')}
               >
                 <CardBody className="text-center">
-                  <BookOpen size={24} className="mx-auto mb-2 text-primary" />
+                  <BookOpen size={24} className="mx-auto mb-2 text-ink" />
                   <p className="font-semibold">Table of Contents</p>
                   <p className="text-xs text-muted mt-1">Organize chapters</p>
                 </CardBody>
@@ -578,7 +578,7 @@ export default function Dashboard() {
                 onClick={() => navigate('/writer')}
               >
                 <CardBody className="text-center">
-                  <PencilLine size={24} className="mx-auto mb-2 text-primary" />
+                  <PencilLine size={24} className="mx-auto mb-2 text-ink" />
                   <p className="font-semibold">Writer</p>
                   <p className="text-xs text-muted mt-1">Start writing</p>
                 </CardBody>
@@ -589,7 +589,7 @@ export default function Dashboard() {
                 onClick={() => navigate('/project')}
               >
                 <CardBody className="text-center">
-                  <Layers size={24} className="mx-auto mb-2 text-primary" />
+                  <Layers size={24} className="mx-auto mb-2 text-ink" />
                   <p className="font-semibold">Project</p>
                   <p className="text-xs text-muted mt-1">Manage project</p>
                 </CardBody>
@@ -600,7 +600,7 @@ export default function Dashboard() {
                 onClick={() => navigate('/calendar')}
               >
                 <CardBody className="text-center">
-                  <Calendar size={24} className="mx-auto mb-2 text-primary" />
+                  <Calendar size={24} className="mx-auto mb-2 text-ink" />
                   <p className="font-semibold">Calendar</p>
                   <p className="text-xs text-muted mt-1">Track progress</p>
                 </CardBody>
