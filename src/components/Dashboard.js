@@ -161,7 +161,23 @@ const Sidebar = ({ isOpen, onClose, authorName, navigate, userNovels = [] }) => 
         {/* Sidebar Header with Logo */}
         <div className="p-6 border-b border-white/60 flex-shrink-0">
           <div className="flex items-center justify-between">
-            <Logo size="lg" showText={true} />
+            <div className="flex items-center gap-3">
+              {/* Logo Component - Fixed visibility */}
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-400 via-blue-500 to-yellow-500 flex items-center justify-center shadow-lg border-2 border-white/20">
+                <div className="text-white font-bold text-lg">
+                  DT
+                </div>
+              </div>
+              
+              {/* Logo Text - Only show once */}
+              <div className="flex flex-col">
+                <span className="font-bold text-lg text-ink">
+                  DahTruth
+                </span>
+                <span className="text-xs text-muted -mt-1">StoryLab</span>
+              </div>
+            </div>
+            
             <button 
               onClick={onClose}
               className="lg:hidden text-muted hover:text-ink transition-colors p-1 rounded-lg hover:bg-white/70"
@@ -379,14 +395,12 @@ export default function Dashboard() {
                     <Menu size={24} />
                   </button>
                   <div>
-                    <h1 className="text-2xl md:text-3xl font-extrabold">
-                      <span className="bg-gradient-to-r from-accent via-primary to-gold bg-clip-text text-transparent">
-                        {greeting}, Ready to Write?
-                      </span>
+                    <h1 className="text-2xl md:text-3xl font-extrabold text-ink">
+                      {greeting}, Ready to Write?
                     </h1>
-                    <div className="mt-1 text-muted">
-                      <p className="font-medium text-sm">Start your writing journey today</p>
-                      <p className="text-xs">Create your first novel and begin tracking your progress</p>
+                    <div className="mt-1">
+                      <p className="font-medium text-sm text-ink/80">Start your writing journey today</p>
+                      <p className="text-xs text-muted">Create your first novel and begin tracking your progress</p>
                     </div>
                   </div>
                 </div>
