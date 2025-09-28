@@ -1,5 +1,3 @@
-
-
 // src/components/Calendar.js
 import React, { useMemo, useState } from "react";
 import {
@@ -136,13 +134,13 @@ export default function Calendar() {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-950 via-indigo-950 to-blue-900 p-6 sm:p-8">
+    <div className="min-h-screen bg-base bg-radial-fade p-6 sm:p-8">
       <div className="max-w-6xl mx-auto">
         {/* Back to Dashboard */}
         <div className="mb-6">
           <NavLink
             to="/dashboard"
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-white/10 text-white border border-white/20 hover:bg-white/15 backdrop-blur"
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-xl glass-soft text-ink border border-white/20 hover:bg-white/20 backdrop-blur"
           >
             <ArrowLeft size={16} />
             Back to Dashboard
@@ -151,77 +149,77 @@ export default function Calendar() {
 
         {/* header */}
         <div className="mb-8 text-center">
-          <h1 className="text-4xl font-bold text-white font-serif mb-2">Writing Calendar</h1>
-          <p className="text-slate-300">Track your writing journey</p>
+          <h1 className="text-4xl font-bold text-ink font-serif mb-2">Writing Calendar</h1>
+          <p className="text-muted">Track your writing journey</p>
         </div>
 
-        {/* stats — lighter glass */}
+        {/* stats — using new color scheme */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          <div className="bg-white/70 text-slate-900 backdrop-blur-xl rounded-2xl p-4 border border-slate-200 shadow-xl">
+          <div className="glass-panel p-4 shadow-xl">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-700">Current Streak</p>
-                <p className="text-2xl font-bold">{currentStreak} days</p>
+                <p className="text-sm text-muted">Current Streak</p>
+                <p className="text-2xl font-bold text-ink">{currentStreak} days</p>
               </div>
               <Flame className="h-8 w-8 text-orange-500" />
             </div>
           </div>
-          <div className="bg-white/70 text-slate-900 backdrop-blur-xl rounded-2xl p-4 border border-slate-200 shadow-xl">
+          <div className="glass-panel p-4 shadow-xl">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-700">Words This Month</p>
-                <p className="text-2xl font-bold">{stats.totalWords.toLocaleString()}</p>
+                <p className="text-sm text-muted">Words This Month</p>
+                <p className="text-2xl font-bold text-ink">{stats.totalWords.toLocaleString()}</p>
               </div>
               <PenTool className="h-8 w-8 text-sky-600" />
             </div>
           </div>
-          <div className="bg-white/70 text-slate-900 backdrop-blur-xl rounded-2xl p-4 border border-slate-200 shadow-xl">
+          <div className="glass-panel p-4 shadow-xl">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-700">Writing Days</p>
-                <p className="text-2xl font-bold">{stats.writingDays}</p>
+                <p className="text-sm text-muted">Writing Days</p>
+                <p className="text-2xl font-bold text-ink">{stats.writingDays}</p>
               </div>
               <TrendingUp className="h-8 w-8 text-emerald-600" />
             </div>
           </div>
-          <div className="bg-white/70 text-slate-900 backdrop-blur-xl rounded-2xl p-4 border border-slate-200 shadow-xl">
+          <div className="glass-panel p-4 shadow-xl">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-slate-700">Deadlines</p>
-                <p className="text-2xl font-bold">{stats.deadlines}</p>
+                <p className="text-sm text-muted">Deadlines</p>
+                <p className="text-2xl font-bold text-ink">{stats.deadlines}</p>
               </div>
               <Target className="h-8 w-8 text-rose-600" />
             </div>
           </div>
         </div>
 
-        {/* calendar card — light sky-ish */}
-        <div className="bg-white/80 text-slate-900 backdrop-blur-2xl rounded-3xl shadow-2xl p-6 md:p-8 border border-slate-200">
+        {/* calendar card — using glass-panel */}
+        <div className="glass-panel p-6 md:p-8 shadow-2xl">
           {/* header */}
           <div className="flex items-center justify-between mb-6">
             <button
               onClick={() => navigateMonth(-1)}
-              className="p-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-50"
+              className="p-2 rounded-xl glass-soft border border-white/20 hover:bg-white/20"
               aria-label="Previous month"
             >
-              <ChevronLeft className="h-5 w-5" />
+              <ChevronLeft className="h-5 w-5 text-ink" />
             </button>
-            <h2 className="text-2xl font-bold font-serif">
+            <h2 className="text-2xl font-bold font-serif text-ink">
               {monthNames[currentMonth.getMonth()]} {currentMonth.getFullYear()}
             </h2>
             <button
               onClick={() => navigateMonth(1)}
-              className="p-2 rounded-xl bg-white border border-slate-200 hover:bg-slate-50"
+              className="p-2 rounded-xl glass-soft border border-white/20 hover:bg-white/20"
               aria-label="Next month"
             >
-              <ChevronRight className="h-5 w-5" />
+              <ChevronRight className="h-5 w-5 text-ink" />
             </button>
           </div>
 
           {/* weekdays */}
           <div className="grid grid-cols-7 gap-2 mb-3">
             {weekDays.map((d) => (
-              <div key={d} className="text-center text-slate-600 font-semibold text-xs tracking-wide">
+              <div key={d} className="text-center text-muted font-semibold text-xs tracking-wide">
                 {d}
               </div>
             ))}
@@ -244,18 +242,18 @@ export default function Calendar() {
                   onClick={() => setSelectedDate(day.date)}
                   className={[
                     "relative h-20 p-2 rounded-2xl transition-all duration-200 cursor-pointer",
-                    day.isCurrentMonth ? "bg-sky-50" : "bg-slate-100/60",
-                    "border border-slate-200",
-                    "hover:shadow-md hover:bg-sky-100",
-                    isToday(day.date) ? "ring-2 ring-sky-400" : "",
-                    selected ? "outline outline-2 outline-teal-500/70" : "",
+                    day.isCurrentMonth ? "glass-soft" : "glass-soft opacity-60",
+                    "border border-white/20",
+                    "hover:shadow-md hover:bg-white/20",
+                    isToday(day.date) ? "ring-2 ring-primary" : "",
+                    selected ? "outline outline-2 outline-accent" : "",
                   ].join(" ")}
                 >
                   <div className="flex flex-col h-full justify-between">
                     <div className="flex items-start justify-between">
                       <span
                         className={`text-sm font-medium ${
-                          day.isCurrentMonth ? "text-slate-800" : "text-slate-500"
+                          day.isCurrentMonth ? "text-ink" : "text-muted"
                         }`}
                       >
                         {day.date.getDate()}
@@ -284,8 +282,8 @@ export default function Calendar() {
                   {/* tooltip */}
                   {hoveredDate === key && (hasWriting || hasDeadline) && (
                     <div className="absolute z-20 bottom-full mb-2 left-1/2 -translate-x-1/2 w-56">
-                      <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-2xl">
-                        <div className="text-slate-900 text-sm font-semibold">
+                      <div className="glass-panel p-3 shadow-2xl">
+                        <div className="text-ink text-sm font-semibold">
                           {day.date.toLocaleDateString("en-US", {
                             weekday: "short",
                             month: "short",
@@ -293,7 +291,7 @@ export default function Calendar() {
                           })}
                         </div>
                         {hasWriting && (
-                          <div className="text-slate-700 text-xs mt-1">
+                          <div className="text-muted text-xs mt-1">
                             <span className="font-semibold">{data.wordCount.toLocaleString()}</span> words written
                           </div>
                         )}
@@ -312,15 +310,15 @@ export default function Calendar() {
           <div className="mt-6 flex flex-wrap gap-6 justify-center text-sm">
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-emerald-500" />
-              <span className="text-slate-700">Writing Session</span>
+              <span className="text-muted">Writing Session</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-rose-500" />
-              <span className="text-slate-700">Deadline</span>
+              <span className="text-muted">Deadline</span>
             </div>
             <div className="flex items-center gap-2">
-              <div className="ring-2 ring-sky-400 w-4 h-4 rounded" />
-              <span className="text-slate-700">Today</span>
+              <div className="ring-2 ring-primary w-4 h-4 rounded" />
+              <span className="text-muted">Today</span>
             </div>
           </div>
         </div>
