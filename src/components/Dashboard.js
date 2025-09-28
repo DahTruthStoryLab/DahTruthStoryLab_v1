@@ -103,9 +103,36 @@ const TopBanner = () => (
     <div className="px-6 py-3">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <Logo size="md" showText={true} />
           <div className="hidden md:block text-sm text-muted">
             Transform your ideas into compelling stories
+          </div>
+        </div>
+        
+        {/* Centered Logo */}
+        <div className="absolute left-1/2 transform -translate-x-1/2 flex items-center gap-3">
+          <div style={{
+            width: '32px',
+            height: '32px',
+            borderRadius: '50%',
+            background: 'linear-gradient(135deg, #8b5cf6, #3b82f6, #eab308)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+            border: '1px solid rgba(255,255,255,0.3)'
+          }}>
+            <span style={{
+              color: 'white',
+              fontWeight: 'bold',
+              fontSize: '14px',
+              fontFamily: 'Arial, sans-serif'
+            }}>
+              DT
+            </span>
+          </div>
+          <div className="flex flex-col">
+            <span className="font-bold text-lg text-ink">DahTruth</span>
+            <span className="text-xs text-muted -mt-1">StoryLab</span>
           </div>
         </div>
         
@@ -162,14 +189,29 @@ const Sidebar = ({ isOpen, onClose, authorName, navigate, userNovels = [] }) => 
         <div className="p-6 border-b border-white/60 flex-shrink-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              {/* Logo Component - Fixed visibility */}
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-400 via-blue-500 to-yellow-500 flex items-center justify-center shadow-lg border-2 border-white/20">
-                <div className="text-white font-bold text-lg">
+              {/* Logo Component - Simple and visible */}
+              <div style={{
+                width: '40px',
+                height: '40px',
+                borderRadius: '50%',
+                background: 'linear-gradient(135deg, #8b5cf6, #3b82f6, #eab308)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                border: '2px solid rgba(255,255,255,0.3)'
+              }}>
+                <span style={{
+                  color: 'white',
+                  fontWeight: 'bold',
+                  fontSize: '16px',
+                  fontFamily: 'Arial, sans-serif'
+                }}>
                   DT
-                </div>
+                </span>
               </div>
               
-              {/* Logo Text - Only show once */}
+              {/* Logo Text */}
               <div className="flex flex-col">
                 <span className="font-bold text-lg text-ink">
                   DahTruth
@@ -454,7 +496,10 @@ export default function Dashboard() {
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
               <Card className="hover:scale-105 transition-transform duration-200">
                 <CardBody>
-                  <StatLabel>Overall Progress</StatLabel>
+                  <div className="flex items-center gap-2 mb-2">
+                    <PencilLine size={16} className="text-primary" />
+                    <StatLabel>Overall Progress</StatLabel>
+                  </div>
                   <StatValue>{goalPercent}%</StatValue>
                   <div className="mt-4 space-y-2">
                     <Progress value={goalPercent} />
@@ -468,7 +513,10 @@ export default function Dashboard() {
 
               <Card className="hover:scale-105 transition-transform duration-200">
                 <CardBody>
-                  <StatLabel>Writing Streak</StatLabel>
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-lg">🔥</span>
+                    <StatLabel>Writing Streak</StatLabel>
+                  </div>
                   <div className="flex items-center gap-2 mt-1">
                     <StatValue>0</StatValue>
                     <span className="text-2xl">✍️</span>
@@ -479,7 +527,10 @@ export default function Dashboard() {
 
               <Card className="hover:scale-105 transition-transform duration-200">
                 <CardBody>
-                  <StatLabel>Today's Goal</StatLabel>
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-lg">🎯</span>
+                    <StatLabel>Today's Goal</StatLabel>
+                  </div>
                   <StatValue>{todayPercent}%</StatValue>
                   <div className="mt-4 space-y-2">
                     <Progress value={todayPercent} />
@@ -494,6 +545,10 @@ export default function Dashboard() {
               <Card className="hover:scale-105 transition-transform duration-200">
                 <CardBody className="flex items-center justify-center">
                   <div className="text-center">
+                    <div className="flex items-center justify-center gap-2 mb-2">
+                      <Calendar size={16} className="text-primary" />
+                      <span className="text-xs text-muted uppercase tracking-wide">Today</span>
+                    </div>
                     <div className="text-5xl font-bold bg-gradient-to-r from-accent via-primary to-gold bg-clip-text text-transparent">
                       {new Date().getDate()}
                     </div>
