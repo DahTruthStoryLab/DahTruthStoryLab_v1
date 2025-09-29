@@ -315,14 +315,14 @@ export default function RegistrationPage() {
           </Button>
         </form>
 
-        <div className="text-center mt-8">
+       <div className="text-center mt-8">
           <p className="text-muted text-sm font-serif">
             Already have an account?{' '}
             <button
               type="button"
               onClick={() => navigate('/signin')}
-              className="text-primary hover:opacity-80 font-medium transition"
-            >
+              className="text-ink hover:text-primary font-semibold underline underline-offset-4 decoration-primary/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 rounded-sm transition"
+          >
               Sign in
             </button>
           </p>
@@ -331,7 +331,7 @@ export default function RegistrationPage() {
         <button
           type="button"
           onClick={() => navigate('/')}
-          className="w-full mt-4 text-muted hover:text-ink font-serif text-sm transition"
+          className="w-full mt-4 text-ink/80 hover:text-ink font-serif text-sm transition"
         >
           ← Back to Home
         </button>
