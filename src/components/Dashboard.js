@@ -1,9 +1,10 @@
+// src/components/Dashboard.js
 import React, { useState, useEffect } from "react";
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
-import { 
-  Play, Plus, Settings, PencilLine, BookOpen, Calendar, Layers, 
-  UploadCloud, Store, User, Info, Home, ChevronRight, Menu, X, Bell, Search 
+import {
+  Play, Plus, Settings, PencilLine, BookOpen, Calendar, Layers,
+  UploadCloud, Store, User, Info, Home, ChevronRight, Menu, X, Bell, Search, FileText
 } from "lucide-react";
 
 // --------- Empty/Default Data (to be populated by user) ---------
@@ -21,10 +22,7 @@ const recentChapters = [];
 
 // --------- Utility Components ---------
 const Card = ({ children, className = "", onClick }) => (
-  <div 
-    className={`rounded-2xl glass-panel ${className}`}
-    onClick={onClick}
-  >
+  <div className={`rounded-2xl glass-panel ${className}`} onClick={onClick}>
     {children}
   </div>
 );
@@ -42,7 +40,7 @@ const StatValue = ({ children }) => (
 );
 
 const Progress = ({ value }) => (
-  <div className="h-2 w-full rounded-full bg-primary/50">
+  <div className="h-2 w-full rounded-full bg-primary/20">
     <div
       className="h-2 rounded-full bg-gradient-to-r from-accent to-primary transition-all duration-300"
       style={{ width: `${value}%` }}
@@ -50,66 +48,19 @@ const Progress = ({ value }) => (
   </div>
 );
 
-// --------- Logo Component ---------
-const Logo = ({ size = "md", showText = true }) => {
-  const sizeClasses = {
-    sm: "w-6 h-6",
-    md: "w-8 h-8", 
-    lg: "w-10 h-10",
-    xl: "w-12 h-12"
-  };
-
-  const textSizeClasses = {
-    sm: "text-sm",
-    md: "text-lg",
-    lg: "text-xl",
-    xl: "text-2xl"
-  };
-
-  return (
-    <div className="flex items-center gap-2">
-      <div className={`${sizeClasses[size]} rounded-full bg-gradient-to-br from-accent via-primary to-gold flex items-center justify-center shadow-lg relative overflow-hidden`}>
-        <div className="absolute inset-0 bg-gradient-to-br from-white/30 to-transparent"></div>
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_30%,_rgba(255,255,255,0.35)_0%,_transparent_50%)]"></div>
-        <div className="relative z-10 flex items-center justify-center text-ink">
-          <svg 
-            viewBox="0 0 24 24" 
-            className={`${size === 'sm' ? 'w-3 h-3' : size === 'md' ? 'w-4 h-4' : size === 'lg' ? 'w-5 h-5' : 'w-6 h-6'}`}
-            fill="currentColor"
-          >
-            <path d="M3 5v14h5.5c3.5 0 6.5-2.5 6.5-6s-2-5-4.5-5.5V7c1.5 0 3 1 3 2.5S12 12 10.5 12H8V5H3z"/>
-            <path d="M16 5v2h3v12h2V5z"/>
-          </svg>
-        </div>
-      </div>
-      
-      {showText && (
-        <div className="flex flex-col">
-          <span className={`font-bold text-transparent bg-gradient-to-r from-accent via-primary to-gold bg-clip-text ${textSizeClasses[size]}`}>
-            DahTruth
-          </span>
-          {(size === 'md' || size === 'lg' || size === 'xl') && (
-            <span className="text-xs text-muted -mt-1">StoryLab</span>
-          )}
-        </div>
-      )}
-    </div>
-  );
-};
-
 // --------- Top Banner Component ---------
 const TopBanner = () => (
   <div className="bg-white/70 backdrop-blur-xl border-b border-white/60 text-ink sticky top-0 z-50">
     <div className="px-6 py-3">
       <div className="flex items-center justify-between">
-        <div className="flex-1"></div>
+        <div className="flex-1" />
         <div className="flex items-center gap-4">
           <button className="p-2 rounded-lg hover:bg-white/70 hover:text-ink transition-colors">
             <Search size={16} />
           </button>
           <button className="p-2 rounded-lg hover:bg-white/70 hover:text-ink transition-colors relative">
             <Bell size={16} />
-            <div className="absolute -top-1 -right-1 w-3 h-3 bg-gold rounded-full"></div>
+            <div className="absolute -top-1 -right-1 w-3 h-3 bg-gold rounded-full" />
           </button>
           <div className="text-sm">
             <span className="text-muted">Welcome back!</span>
@@ -122,64 +73,55 @@ const TopBanner = () => (
 
 // --------- Sidebar Component ---------
 const Sidebar = ({ isOpen, onClose, authorName, navigate, userNovels = [] }) => {
-  const [activeItem, setActiveItem] = useState('/dashboard');
-  
-  const menuItems = [
-    { icon: Home, label: "Dashboard", path: "/dashboard" },
-    { icon: PencilLine, label: "Write", path: "/writer" },
-    { icon: BookOpen, label: "Table of Contents", path: "/toc" },
-    { icon: Calendar, label: "Calendar", path: "/calendar" },
-    { icon: Layers, label: "Story Lab", path: "/story-lab" },
-    { icon: UploadCloud, label: "Publishing", path: "/publishing" },
-    { icon: Store, label: "Store", path: "/store" },
-    { icon: User, label: "Profile", path: "/profile" },
-    { icon: Info, label: "About", path: "/about" },
-  ];
+  const location = useLocation();
+  const activePath = location.pathname;
 
-  const handleNavigation = (path) => {
-    setActiveItem(path);
-    navigate(path);
-  };
+  const menuItems = [
+    { icon: Home,       label: "Dashboard",         path: "/dashboard" },
+    { icon: PencilLine, label: "Write",             path: "/writer" },
+    { icon: BookOpen,   label: "Table of Contents", path: "/toc" },
+    { icon: Calendar,   label: "Calendar",          path: "/calendar" },
+    { icon: Layers,     label: "Story Lab",         path: "/story-lab" },
+    { icon: UploadCloud,label: "Publishing",        path: "/publishing" },
+    { icon: Store,      label: "Store",             path: "/store" },
+    { icon: User,       label: "Profile",           path: "/profile" },
+    { icon: Info,       label: "About",             path: "/about" },
+  ];
 
   return (
     <>
       {/* Mobile Overlay */}
       {isOpen && (
-        <div 
-          className="fixed inset-0 bg-black/30 z-40 lg:hidden"
-          onClick={onClose}
-        />
+        <div className="fixed inset-0 bg-black/30 z-40 lg:hidden" onClick={onClose} />
       )}
-      
-      {/* Sidebar - Now positioned below banner */}
-      <div className={`
-        fixed top-16 left-0 h-[calc(100vh-4rem)] w-80 bg-white/70 backdrop-blur-xl border-r border-white/60 z-40
-        transform transition-transform duration-300 ease-in-out
-        ${isOpen ? 'translate-x-0' : '-translate-x-full'}
-        lg:translate-x-0 lg:static lg:z-auto lg:h-[calc(100vh-4rem)]
-        flex flex-col overflow-hidden
-      `}>
-        {/* Sidebar Header with Logo */}
-        <div className="p-6 border-b border-white/60 flex-shrink-0">
-          <div className="flex items-start justify-between">
-            <div className="flex items-start gap-3">
-              {/* Your actual logo - raised to top */}
-              <img 
-                src="/DahTruthLogo.png" 
-                alt="DahTruth Logo" 
-                className="w-12 h-12 rounded-full shadow-lg border-2 border-white/20 mt-0"
+
+      {/* Sidebar */}
+      <div
+        className={`
+          fixed top-16 left-0 h-[calc(100vh-4rem)] w-80 glass-panel z-40
+          transform transition-transform duration-300 ease-in-out
+          ${isOpen ? 'translate-x-0' : '-translate-x-full'}
+          lg:translate-x-0 lg:static lg:z-auto lg:h-[calc(100vh-4rem)]
+          flex flex-col overflow-hidden
+        `}
+      >
+        {/* Tight top header with logo pinned to top */}
+        <div className="px-5 py-4 border-b border-white/60 flex-shrink-0">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <img
+                src="/DahTruthLogo.png"
+                alt="DahTruth Logo"
+                className="w-12 h-12 rounded-full shadow-lg border-2 border-white/20"
               />
-              
-              {/* Logo Text - aligned to top */}
-              <div className="flex flex-col mt-0">
-                <span className="font-bold text-xl text-ink" style={{ fontFamily: 'Georgia, serif' }}>
+              <div className="leading-tight">
+                <span className="block font-bold text-lg text-ink" style={{ fontFamily: 'Georgia, serif' }}>
                   DahTruth
                 </span>
-                <span className="text-xs text-muted -mt-1">StoryLab</span>
+                <span className="block text-xs text-muted -mt-0.5">StoryLab</span>
               </div>
             </div>
-            
-            <button 
+            <button
               onClick={onClose}
               className="lg:hidden text-muted hover:text-ink transition-colors p-1 rounded-lg hover:bg-white/70"
             >
@@ -189,76 +131,64 @@ const Sidebar = ({ isOpen, onClose, authorName, navigate, userNovels = [] }) => 
           <p className="text-xs text-muted mt-2">Where your story comes to life</p>
         </div>
 
-        {/* Menu Items - Main Navigation with proper scrolling */}
-        <nav className="p-4 space-y-2 flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-primary/20 scrollbar-track-transparent">
-          {menuItems.map((item, index) => (
-            <button
-              key={index}
-              onClick={() => handleNavigation(item.path)}
-              onMouseEnter={null}
-              className={`
-                w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left 
-                transition-all duration-200 transform hover:scale-102 hover:shadow-md
-                ${activeItem === item.path
-                  ? 'bg-primary text-ink border border-white/60 shadow-lg scale-102' 
-                  : 'text-ink hover:bg-white/80 hover:shadow-sm'
-                }
-                group relative overflow-hidden
-              `}
-            >
-              {/* Background animation */}
-              <div className={`
-                absolute inset-0 bg-gradient-to-r from-primary/10 to-accent/10 
-                opacity-0 group-hover:opacity-100 transition-opacity duration-200
-                ${activeItem === item.path ? 'opacity-20' : ''}
-              `} />
-              
-              <item.icon size={18} className={`
-                relative z-10 transition-all duration-200
-                ${activeItem === item.path ? 'text-ink scale-110' : 'group-hover:scale-110'}
-              `} />
-              <span className={`
-                font-medium relative z-10 transition-all duration-200
-                ${activeItem === item.path ? 'font-semibold' : ''}
-              `}>
-                {item.label}
-              </span>
-              
-              {/* Active indicator */}
-              <div className={`
-                absolute right-2 w-2 h-2 bg-gold rounded-full transition-all duration-200
-                ${activeItem === item.path ? 'opacity-100 scale-125' : 'opacity-0 group-hover:opacity-100'}
-              `} />
-            </button>
-          ))}
+        {/* Aerodynamic Menu (no scale jump; left accent bar on hover/active) */}
+        <nav className="p-4 space-y-1.5 flex-1 overflow-y-auto">
+          {menuItems.map((item) => {
+            const isActive = activePath === item.path;
+            return (
+              <button
+                key={item.path}
+                type="button"
+                onClick={() => navigate(item.path)}
+                className={`
+                  relative w-full h-11 rounded-xl text-left flex items-center gap-3 px-4
+                  transition-colors duration-150
+                  ${isActive
+                    ? 'bg-white/80 border border-border'
+                    : 'hover:bg-white/70 border border-transparent'
+                  }
+                `}
+              >
+                {/* left accent rail */}
+                <span
+                  className={`
+                    absolute left-0 top-2 bottom-2 w-1 rounded-full
+                    transition-all ${isActive ? 'bg-primary' : 'bg-transparent group-hover:bg-primary/60'}
+                  `}
+                />
+                <item.icon size={18} className={`shrink-0 ${isActive ? 'text-ink' : 'text-ink/80'}`} />
+                <span className={`font-medium ${isActive ? 'text-ink' : 'text-ink/90'}`}>{item.label}</span>
+              </button>
+            );
+          })}
         </nav>
 
-        {/* Your Novels Section - Now using passed userNovels data */}
+        {/* Your Novels */}
         <div className="p-4 border-t border-white/60 flex-shrink-0">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-semibold text-muted uppercase tracking-wide">
               Your Novels ({userNovels.length})
             </h3>
-            <button 
+            <button
               onClick={() => navigate('/writer')}
-              className="text-ink hover:opacity-80 p-1 rounded-lg hover:bg-white/70 transition-all duration-200"
+              className="text-ink hover:opacity-80 p-1 rounded-lg hover:bg-white/70 transition-all duration-150"
             >
               <Plus size={16} />
             </button>
           </div>
-          
-          <div className="space-y-2 max-h-32 overflow-y-auto scrollbar-thin scrollbar-thumb-primary/20 scrollbar-track-transparent">
+
+          <div className="space-y-2 max-h-32 overflow-y-auto">
             {userNovels.length === 0 ? (
-              <div className="p-3 rounded-lg glass-soft border border-white/30 text-center">
+              <div className="p-3 rounded-lg glass-soft text-center">
                 <p className="text-xs text-muted">No novels yet</p>
                 <p className="text-xs text-muted mt-1">Click + to create your first story</p>
               </div>
             ) : (
               userNovels.map((novel, index) => (
-                <div 
-                  key={novel.id || index} 
-                  className="p-3 rounded-lg glass-soft border border-white/30 transition-all duration-200 cursor-pointer hover:scale-102 hover:shadow-md"
+                <button
+                  key={novel.id || index}
                   onClick={() => navigate('/writer')}
+                  className="w-full text-left p-3 rounded-lg glass-soft hover:bg-white/80 transition-colors"
                 >
                   <h4 className="text-sm font-medium text-ink truncate">
                     {novel.title || "Untitled Story"}
@@ -271,42 +201,40 @@ const Sidebar = ({ isOpen, onClose, authorName, navigate, userNovels = [] }) => 
                       </span>
                     )}
                   </p>
-                </div>
+                </button>
               ))
             )}
           </div>
         </div>
 
-        {/* Author Info - Fixed at bottom */}
+        {/* Author Info */}
         <div className="p-4 border-t border-white/60 flex-shrink-0">
-          <div className="p-4 glass-soft rounded-xl border border-white/30 hover:shadow-md transition-all duration-200">
+          <div className="p-4 glass-soft rounded-xl hover:bg-white/80 transition-colors">
             <div className="flex items-center gap-3 mb-3">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-accent via-primary to-gold flex items-center justify-center shadow-md">
-                <span className="text-ink font-bold text-xs">
-                  {authorName.charAt(0).toUpperCase()}
-                </span>
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-accent via-primary to-gold grid place-items-center shadow-md">
+                <span className="text-ink font-bold text-xs">{authorName.charAt(0).toUpperCase()}</span>
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-ink truncate">{authorName}</p>
                 <p className="text-xs text-muted">Author</p>
               </div>
-              <button 
+              <button
                 onClick={() => navigate('/profile')}
-                className="text-muted hover:text-ink p-1 rounded-lg hover:bg-white/70 transition-all duration-200"
+                className="text-muted hover:text-ink p-1 rounded-lg hover:bg-white/70 transition-colors"
               >
                 <Settings size={16} />
               </button>
             </div>
             <div className="space-y-2">
-              <button 
+              <button
                 onClick={() => navigate('/profile')}
-                className="w-full text-left px-3 py-2 text-xs text-muted hover:text-ink hover:bg-white/70 rounded-lg transition-all duration-200"
+                className="w-full text-left px-3 py-2 text-xs text-muted hover:text-ink hover:bg-white/70 rounded-lg transition-colors"
               >
                 Account Settings
               </button>
-              <button 
+              <button
                 onClick={() => navigate('/')}
-                className="w-full text-left px-3 py-2 text-xs text-muted hover:text-ink hover:bg-white/70 rounded-lg transition-all duration-200"
+                className="w-full text-left px-3 py-2 text-xs text-muted hover:text-ink hover:bg-white/70 rounded-lg transition-colors"
               >
                 Sign Out
               </button>
@@ -325,13 +253,12 @@ export default function Dashboard() {
   const [greeting, setGreeting] = useState("");
   const [authorName, setAuthorName] = useState("New Author");
   const [userNovels, setUserNovels] = useState([]);
-  
+
   // Get user data from localStorage and other sources
   useEffect(() => {
-    // Get user profile data
     const userData = localStorage.getItem('currentUser');
     const profileData = localStorage.getItem('userProfile');
-    
+
     if (profileData) {
       const profile = JSON.parse(profileData);
       if (profile.firstName && profile.lastName) {
@@ -343,23 +270,19 @@ export default function Dashboard() {
       const user = JSON.parse(userData);
       setAuthorName(`${user.firstName} ${user.lastName}`);
     } else {
-      // If no user data, they might need to sign in
       const mockUser = { firstName: "New", lastName: "Author" };
       setAuthorName(`${mockUser.firstName} ${mockUser.lastName}`);
     }
-    
-    // Get novel data from project page storage
+
+    // Projects / novels
     const projectData = localStorage.getItem('userProjects');
     const novelsData = localStorage.getItem('userNovels');
-    
+
     if (projectData) {
-      const projects = JSON.parse(projectData);
-      setUserNovels(projects);
+      setUserNovels(JSON.parse(projectData));
     } else if (novelsData) {
-      const novels = JSON.parse(novelsData);
-      setUserNovels(novels);
+      setUserNovels(JSON.parse(novelsData));
     } else {
-      // Check for any story data
       const storyData = localStorage.getItem('currentStory');
       if (storyData) {
         const story = JSON.parse(storyData);
@@ -372,8 +295,8 @@ export default function Dashboard() {
       }
     }
   }, []);
-  
-  // Set greeting based on time of day
+
+  // Greeting
   useEffect(() => {
     const hour = new Date().getHours();
     if (hour < 12) setGreeting("Good Morning");
@@ -392,11 +315,11 @@ export default function Dashboard() {
     <div className="min-h-screen bg-base bg-radial-fade text-ink">
       {/* Top Banner */}
       <TopBanner />
-      
+
       <div className="flex">
         {/* Sidebar */}
-        <Sidebar 
-          isOpen={sidebarOpen} 
+        <Sidebar
+          isOpen={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
           authorName={authorName}
           userNovels={userNovels}
@@ -412,12 +335,14 @@ export default function Dashboard() {
                 <div className="flex items-center gap-4">
                   <button
                     onClick={() => setSidebarOpen(true)}
-                    className="lg:hidden text-muted hover:text-ink p-2 rounded-lg hover:bg-white/70 transition-all duration-200"
+                    className="lg:hidden text-muted hover:text-ink p-2 rounded-lg hover:bg-white/70 transition-colors"
                   >
                     <Menu size={24} />
                   </button>
                   <div>
                     <h1 className="text-2xl md:text-3xl font-extrabold text-ink">
+                      {/* Replace star with writing-aligned icon */}
+                      <span className="mr-2">📝</span>
                       {greeting}, Ready to Write?
                     </h1>
                     <div className="mt-1 flex items-center gap-4">
@@ -428,15 +353,15 @@ export default function Dashboard() {
                     <p className="text-xs text-muted mt-1">Create your first novel and begin tracking your progress</p>
                   </div>
                 </div>
-                
+
                 <div className="flex gap-3">
-                  <button 
+                  <button
                     onClick={() => navigate('/writer')}
                     className="inline-flex items-center gap-2 rounded-2xl bg-accent hover:opacity-90 px-4 py-2 text-sm font-semibold shadow"
                   >
                     <Plus size={16} /> Create Novel
                   </button>
-                  <button 
+                  <button
                     onClick={() => navigate('/writer')}
                     className="inline-flex items-center gap-2 rounded-2xl glass-soft border border-white/40 px-4 py-2 text-sm font-semibold"
                   >
@@ -454,32 +379,25 @@ export default function Dashboard() {
               <CardBody>
                 <div className="text-center py-6">
                   <div className="flex items-center justify-center gap-3 mb-4">
-                    <img 
-                      src="/DahTruthLogo.png" 
-                      alt="DahTruth Logo" 
+                    <img
+                      src="/DahTruthLogo.png"
+                      alt="DahTruth Logo"
                       className="w-16 h-16 rounded-full shadow-lg border-2 border-white/20"
-                      onError={(e) => {
-                        console.log('Logo failed to load:', e);
-                        e.target.style.display = 'none';
-                      }}
+                      onError={(e) => { e.currentTarget.style.display = 'none'; }}
                     />
-                    <div className="flex gap-2">
-                      <PencilLine size={24} className="text-ink opacity-60" />
-                      <BookOpen size={24} className="text-ink opacity-60" />
-                      <span className="text-2xl opacity-60">📝</span>
-                    </div>
+                    {/* removed the pencil/book/paper icon trio here */}
                   </div>
                   <h2 className="text-xl font-bold text-ink mb-3 flex items-center justify-center gap-2" style={{ fontFamily: 'Georgia, serif' }}>
-                    <span className="text-xl">✨</span>
+                    {/* paper & pencil vibe (left only) */}
+                    <span className="text-xl">📝</span>
                     Welcome to DahTruth StoryLab!
-                    <span className="text-xl">📚</span>
                   </h2>
                   <p className="text-ink/80 mb-5 max-w-xl mx-auto text-sm">
-                    Ready to bring your stories to life? Start by creating your first novel and set your writing goals. 
+                    Ready to bring your stories to life? Start by creating your first novel and set your writing goals.
                     Track your progress, stay motivated, and turn your ideas into compelling narratives.
                   </p>
                   <div className="flex gap-3 justify-center">
-                    <button 
+                    <button
                       onClick={() => navigate('/writer')}
                       className="inline-flex items-center gap-2 rounded-2xl bg-accent hover:opacity-90 px-5 py-2.5 text-sm font-semibold shadow"
                     >
@@ -492,10 +410,10 @@ export default function Dashboard() {
                 </div>
               </CardBody>
             </Card>
-            
+
             {/* Stats */}
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-              <Card className="hover:scale-105 transition-transform duration-200">
+              <Card>
                 <CardBody>
                   <div className="flex items-center gap-2 mb-2">
                     <PencilLine size={16} className="text-primary" />
@@ -512,21 +430,21 @@ export default function Dashboard() {
                 </CardBody>
               </Card>
 
-              <Card className="hover:scale-105 transition-transform duration-200">
+              <Card>
                 <CardBody>
                   <div className="flex items-center gap-2 mb-2">
-                    <span className="text-lg">🔥</span>
+                    <span className="text-lg">✍️</span>
                     <StatLabel>Writing Streak</StatLabel>
                   </div>
                   <div className="flex items-center gap-2 mt-1">
                     <StatValue>0</StatValue>
-                    <span className="text-2xl">✍️</span>
+                    <span className="text-2xl">🗓️</span>
                   </div>
                   <p className="text-muted text-sm mt-2">Start your streak today!</p>
                 </CardBody>
               </Card>
 
-              <Card className="hover:scale-105 transition-transform duration-200">
+              <Card>
                 <CardBody>
                   <div className="flex items-center gap-2 mb-2">
                     <span className="text-lg">🎯</span>
@@ -543,7 +461,7 @@ export default function Dashboard() {
                 </CardBody>
               </Card>
 
-              <Card className="hover:scale-105 transition-transform duration-200">
+              <Card>
                 <CardBody className="flex items-center justify-center">
                   <div className="text-center">
                     <div className="flex items-center justify-center gap-2 mb-2">
@@ -561,45 +479,33 @@ export default function Dashboard() {
               </Card>
             </div>
 
-            {/* Quick Access to Writing Tools */}
+            {/* Quick Access */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <Card 
-                className="hover:scale-105 transition-all cursor-pointer hover:border-primary/50"
-                onClick={() => navigate('/toc')}
-              >
+              <Card className="cursor-pointer hover:border-primary/50" onClick={() => navigate('/toc')}>
                 <CardBody className="text-center">
                   <BookOpen size={24} className="mx-auto mb-2 text-ink" />
                   <p className="font-semibold">Table of Contents</p>
                   <p className="text-xs text-muted mt-1">Organize chapters</p>
                 </CardBody>
               </Card>
-              
-              <Card 
-                className="hover:scale-105 transition-all cursor-pointer hover:border-primary/50"
-                onClick={() => navigate('/writer')}
-              >
+
+              <Card className="cursor-pointer hover:border-primary/50" onClick={() => navigate('/writer')}>
                 <CardBody className="text-center">
                   <PencilLine size={24} className="mx-auto mb-2 text-ink" />
                   <p className="font-semibold">Writer</p>
                   <p className="text-xs text-muted mt-1">Start writing</p>
                 </CardBody>
               </Card>
-              
-              <Card 
-                className="hover:scale-105 transition-all cursor-pointer hover:border-primary/50"
-                onClick={() => navigate('/project')}
-              >
+
+              <Card className="cursor-pointer hover:border-primary/50" onClick={() => navigate('/project')}>
                 <CardBody className="text-center">
                   <Layers size={24} className="mx-auto mb-2 text-ink" />
                   <p className="font-semibold">Project</p>
                   <p className="text-xs text-muted mt-1">Manage project</p>
                 </CardBody>
               </Card>
-              
-              <Card 
-                className="hover:scale-105 transition-all cursor-pointer hover:border-primary/50"
-                onClick={() => navigate('/calendar')}
-              >
+
+              <Card className="cursor-pointer hover:border-primary/50" onClick={() => navigate('/calendar')}>
                 <CardBody className="text-center">
                   <Calendar size={24} className="mx-auto mb-2 text-ink" />
                   <p className="font-semibold">Calendar</p>
@@ -615,41 +521,38 @@ export default function Dashboard() {
                   <div className="flex justify-between items-center mb-6">
                     <h2 className="text-xl font-bold text-ink">Writing Activity</h2>
                     <div className="flex gap-2">
-                      <button className="px-3 py-1 rounded-lg bg-primary text-ink text-sm">7 days</button>
+                      <button className="px-3 py-1 rounded-lg bg-primary text-white text-sm">7 days</button>
                       <button className="px-3 py-1 rounded-lg text-ink/70 hover:bg-white/70 text-sm transition-colors">30 days</button>
                       <button className="px-3 py-1 rounded-lg text-ink/70 hover:bg-white/70 text-sm transition-colors">All time</button>
                     </div>
                   </div>
-                  
+
                   <div className="h-64">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={writingActivity}>
                         <XAxis dataKey="day" axisLine={false} tickLine={false} className="text-ink/70" />
                         <YAxis axisLine={false} tickLine={false} className="text-ink/70" />
-                        <Tooltip 
-                          contentStyle={{ 
-                            backgroundColor: 'rgba(255,255,255,0.9)',
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: 'rgba(255,255,255,0.95)',
                             border: '1px solid rgba(0,0,0,0.05)',
                             borderRadius: '12px',
                             boxShadow: '0 10px 25px rgba(0,0,0,0.08)',
                             color: '#0F172A'
                           }}
                         />
-                        <Bar 
-                          dataKey="words" 
-                          fill="url(#brandGradient)"
-                          radius={[4, 4, 0, 0]} 
-                        />
                         <defs>
+                          {/* Use your brand colors directly */}
                           <linearGradient id="brandGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                            <stop offset="0%" stopColor="hsl(var(--accent))" />
-                            <stop offset="100%" stopColor="hsl(var(--base))" />
+                            <stop offset="0%" stopColor="#CAB1D6" />
+                            <stop offset="100%" stopColor="#EAF2FF" />
                           </linearGradient>
                         </defs>
+                        <Bar dataKey="words" fill="url(#brandGradient)" radius={[4, 4, 0, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
-                  
+
                   <div className="flex justify-between text-center mt-6 pt-4 border-t border-white/60">
                     <div>
                       <p className="text-2xl font-bold text-ink">0</p>
@@ -673,22 +576,27 @@ export default function Dashboard() {
                     <h2 className="text-xl font-bold text-ink">Recent Activity</h2>
                     <ChevronRight size={20} className="text-ink/60 hover:text-ink transition-colors cursor-pointer" />
                   </div>
-                  
+
                   <div className="space-y-4">
                     {recentChapters.length === 0 ? (
                       <div className="text-center py-8">
                         <div className="w-12 h-12 glass-soft rounded-full flex items-center justify-center mx-auto mb-3">
-                          <BookOpen size={20} className="text-ink/70" />
+                          <FileText size={20} className="text-ink/70" />
                         </div>
                         <p className="text-sm text-muted mb-2">No activity yet</p>
                         <p className="text-xs text-ink/60">Start writing to see your progress here</p>
                       </div>
                     ) : (
                       recentChapters.map((chapter) => (
-                        <div key={chapter.id} className="flex items-start gap-3 p-3 rounded-lg hover:bg-white/70 transition-all duration-200 cursor-pointer group">
+                        <div
+                          key={chapter.id}
+                          className="flex items-start gap-3 p-3 rounded-lg hover:bg-white/70 transition-colors cursor-pointer group"
+                        >
                           <div className="w-2 h-2 rounded-full bg-gold mt-2 flex-shrink-0" />
                           <div className="flex-1 min-w-0">
-                            <h3 className="font-medium text-ink text-sm truncate group-hover:opacity-80 transition-colors">{chapter.title}</h3>
+                            <h3 className="font-medium text-ink text-sm truncate group-hover:opacity-80 transition-colors">
+                              {chapter.title}
+                            </h3>
                             <p className="text-xs text-muted mt-1">{chapter.words} words • {chapter.time}</p>
                           </div>
                         </div>
@@ -697,7 +605,6 @@ export default function Dashboard() {
                   </div>
                 </CardBody>
               </Card>
-              
             </div>
           </div>
         </div>
