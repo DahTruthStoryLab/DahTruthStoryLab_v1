@@ -1,4 +1,4 @@
-iimport React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { 
@@ -452,22 +452,41 @@ export default function Dashboard() {
             {/* Welcome */}
             <Card>
               <CardBody>
-                <div className="text-center py-8">
-                  <Logo size="xl" showText={false} />
-                  <h2 className="text-2xl font-bold text-ink mb-2 mt-4">Welcome to DahTruth StoryLab!</h2>
-                  <p className="text-ink/80 mb-6 max-w-2xl mx-auto">
+                <div className="text-center py-6">
+                  <div className="flex items-center justify-center gap-3 mb-4">
+                    <img 
+                      src="/DahTruthLogo.png" 
+                      alt="DahTruth Logo" 
+                      className="w-16 h-16 rounded-full shadow-lg border-2 border-white/20"
+                      onError={(e) => {
+                        console.log('Logo failed to load:', e);
+                        e.target.style.display = 'none';
+                      }}
+                    />
+                    <div className="flex gap-2">
+                      <PencilLine size={24} className="text-ink opacity-60" />
+                      <BookOpen size={24} className="text-ink opacity-60" />
+                      <span className="text-2xl opacity-60">📝</span>
+                    </div>
+                  </div>
+                  <h2 className="text-xl font-bold text-ink mb-3 flex items-center justify-center gap-2" style={{ fontFamily: 'Georgia, serif' }}>
+                    <span className="text-xl">✨</span>
+                    Welcome to DahTruth StoryLab!
+                    <span className="text-xl">📚</span>
+                  </h2>
+                  <p className="text-ink/80 mb-5 max-w-xl mx-auto text-sm">
                     Ready to bring your stories to life? Start by creating your first novel and set your writing goals. 
                     Track your progress, stay motivated, and turn your ideas into compelling narratives.
                   </p>
-                  <div className="flex gap-4 justify-center">
+                  <div className="flex gap-3 justify-center">
                     <button 
                       onClick={() => navigate('/writer')}
-                      className="inline-flex items-center gap-2 rounded-2xl bg-accent hover:opacity-90 px-6 py-3 font-semibold shadow"
+                      className="inline-flex items-center gap-2 rounded-2xl bg-accent hover:opacity-90 px-5 py-2.5 text-sm font-semibold shadow"
                     >
-                      <Plus size={18} /> Create Your First Novel
+                      <Plus size={16} /> Create Your First Novel
                     </button>
-                    <button className="inline-flex items-center gap-2 rounded-2xl glass-soft border border-white/40 px-6 py-3 font-semibold">
-                      <BookOpen size={18} /> Learn More
+                    <button className="inline-flex items-center gap-2 rounded-2xl glass-soft border border-white/40 px-5 py-2.5 text-sm font-semibold">
+                      <BookOpen size={16} /> Learn More
                     </button>
                   </div>
                 </div>
