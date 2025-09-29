@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+iimport React, { useState, useEffect } from "react";
 import { useNavigate } from 'react-router-dom';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { 
@@ -103,28 +103,7 @@ const TopBanner = () => (
     <div className="px-6 py-3">
       <div className="flex items-center justify-between">
         <div className="flex-1"></div>
-        
-        {/* Centered Logo and Title */}
-        <div className="flex flex-col items-center">
-          <div className="flex items-center gap-3 mb-1">
-            <img 
-              src="/DahTruthLogo.png" 
-              alt="DahTruth Logo" 
-              className="w-8 h-8 rounded-full shadow-md"
-            />
-            <div className="flex flex-col">
-              <span className="font-bold text-xl text-ink" style={{ fontFamily: 'Georgia, serif' }}>
-                DahTruth
-              </span>
-              <span className="text-xs text-muted -mt-1">StoryLab</span>
-            </div>
-          </div>
-          <div className="text-sm text-muted text-center">
-            Transform your ideas into compelling stories
-          </div>
-        </div>
-        
-        <div className="flex items-center gap-4 flex-1 justify-end">
+        <div className="flex items-center gap-4">
           <button className="p-2 rounded-lg hover:bg-white/70 hover:text-ink transition-colors">
             <Search size={16} />
           </button>
@@ -182,21 +161,21 @@ const Sidebar = ({ isOpen, onClose, authorName, navigate, userNovels = [] }) => 
       `}>
         {/* Sidebar Header with Logo */}
         <div className="p-6 border-b border-white/60 flex-shrink-0">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              {/* Your actual logo */}
+          <div className="flex items-start justify-between">
+            <div className="flex items-start gap-3">
+              {/* Your actual logo - raised to top */}
               <img 
                 src="/DahTruthLogo.png" 
                 alt="DahTruth Logo" 
-                className="w-12 h-12 rounded-full shadow-lg border-2 border-white/20"
+                className="w-12 h-12 rounded-full shadow-lg border-2 border-white/20 mt-0"
               />
               
-              {/* Logo Text - Raised up */}
-              <div className="flex flex-col -mt-1">
+              {/* Logo Text - aligned to top */}
+              <div className="flex flex-col mt-0">
                 <span className="font-bold text-xl text-ink" style={{ fontFamily: 'Georgia, serif' }}>
                   DahTruth
                 </span>
-                <span className="text-xs text-muted -mt-2">StoryLab</span>
+                <span className="text-xs text-muted -mt-1">StoryLab</span>
               </div>
             </div>
             
@@ -216,6 +195,7 @@ const Sidebar = ({ isOpen, onClose, authorName, navigate, userNovels = [] }) => 
             <button
               key={index}
               onClick={() => handleNavigation(item.path)}
+              onMouseEnter={null}
               className={`
                 w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left 
                 transition-all duration-200 transform hover:scale-102 hover:shadow-md
@@ -440,10 +420,12 @@ export default function Dashboard() {
                     <h1 className="text-2xl md:text-3xl font-extrabold text-ink">
                       {greeting}, Ready to Write?
                     </h1>
-                    <div className="mt-1">
+                    <div className="mt-1 flex items-center gap-4">
                       <p className="font-medium text-sm text-ink/80">Start your writing journey today</p>
-                      <p className="text-xs text-muted">Create your first novel and begin tracking your progress</p>
+                      <span className="text-muted">•</span>
+                      <p className="text-sm text-muted">Transform your ideas into compelling stories</p>
                     </div>
+                    <p className="text-xs text-muted mt-1">Create your first novel and begin tracking your progress</p>
                   </div>
                 </div>
                 
