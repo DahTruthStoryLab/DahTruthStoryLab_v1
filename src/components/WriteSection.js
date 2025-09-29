@@ -85,34 +85,32 @@ const getInitialState = () => {
 };
 
 /* ──────────────────────────────────────────────────────────────
-   Banner (simple): left title, center book name, right actions
+   Top banner (light glass, brand buttons)
 ──────────────────────────────────────────────────────────────── */
 const TopBanner = ({ bookTitle, onNewChapter, onExport }) => {
   return (
-    <div className="sticky top-0 z-50 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white">
+    <div className="sticky top-0 z-50 bg-white/70 backdrop-blur-xl border-b border-white/60 text-ink">
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <div className="h-16 flex items-center justify-between">
           <div className="font-extrabold tracking-wide">Write your story</div>
 
           <div className="hidden md:block text-center">
-            <div className="text-sm opacity-90">Current project</div>
-            <div className="text-lg font-semibold">
-              {bookTitle || "Untitled Book"}
-            </div>
+            <div className="text-xs text-muted">Current project</div>
+            <div className="text-lg font-semibold">{bookTitle || "Untitled Book"}</div>
           </div>
 
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={onNewChapter}
-              className="inline-flex items-center gap-2 rounded-xl bg-white/15 hover:bg-white/25 px-3 py-2 text-sm font-medium border border-white/20"
+              className="inline-flex items-center gap-2 rounded-xl glass-soft border border-white/40 px-3 py-2 text-sm font-medium hover:bg-white/80"
             >
               <Plus size={16} /> New Chapter
             </button>
             <button
               type="button"
               onClick={onExport}
-              className="inline-flex items-center gap-2 rounded-xl bg-white/15 hover:bg-white/25 px-3 py-2 text-sm font-medium border border-white/20"
+              className="inline-flex items-center gap-2 rounded-xl bg-primary text-white px-3 py-2 text-sm font-medium hover:opacity-90"
             >
               <FileText size={16} /> Export
             </button>
@@ -141,7 +139,7 @@ const ChapterRail = ({
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className={`xl:hidden fixed ${toggleBtnPos} top-20 z-40 p-2 rounded-lg bg-white/10 text-white border border-white/20 backdrop-blur-md`}
+        className={`xl:hidden fixed ${toggleBtnPos} top-20 z-40 p-2 rounded-lg bg-white/70 text-ink border border-white/60 backdrop-blur-md`}
         title="Toggle chapters"
       >
         {open ? <X size={18} /> : <Menu size={18} />}
@@ -151,8 +149,8 @@ const ChapterRail = ({
       <aside
         className={[
           "xl:hidden fixed top-16", fixedSide,
-          "h-[calc(100vh-4rem)] w-72 z-30",
-          "bg-white/10 backdrop-blur-xl", borderSide, "border-white/20",
+          "h:[calc(100vh-4rem)] w-72 z-30",
+          "bg-white/70 backdrop-blur-xl", borderSide, "border-white/60",
           "transition-transform duration-300",
           open ? "translate-x-0" : hiddenX,
           "overflow-hidden"
@@ -167,10 +165,10 @@ const ChapterRail = ({
         />
       </aside>
 
-      {/* Desktop/static column content (placed inside grid) */}
+      {/* Desktop/static column content */}
       <div className="hidden xl:block">
         <div className="sticky top-20">
-          <div className="rounded-2xl bg-white/10 backdrop-blur-xl border border-white/20 overflow-hidden">
+          <div className="rounded-2xl bg-white/70 backdrop-blur-xl border border-white/60 overflow-hidden">
             <RailInner
               chapters={chapters}
               selectedId={selectedId}
@@ -187,12 +185,12 @@ const ChapterRail = ({
 
 const RailInner = ({ chapters, selectedId, onSelect, onAdd, onDelete }) => (
   <div className="h-full flex flex-col">
-    <div className="px-4 py-3 flex items-center justify-between border-b border-white/10">
-      <h2 className="text-white font-semibold">Chapters</h2>
+    <div className="px-4 py-3 flex items-center justify-between border-b border-white/60">
+      <h2 className="text-ink font-semibold">Chapters</h2>
       <button
         type="button"
         onClick={onAdd}
-        className="p-2 rounded-md bg-white/10 hover:bg-white/20 text-white border border-white/20"
+        className="p-2 rounded-md glass-soft border border-white/40 text-ink hover:bg-white/80"
         title="New chapter"
       >
         <Plus size={16} />
@@ -206,9 +204,9 @@ const RailInner = ({ chapters, selectedId, onSelect, onAdd, onDelete }) => (
           className={[
             "group mb-2 rounded-xl border",
             selectedId === ch.id
-              ? "bg-indigo-500/20 border-indigo-400/40"
-              : "bg-white/5 border-white/10 hover:bg-white/10",
-            "text-white"
+              ? "bg-primary/15 border-primary/40"
+              : "bg-white/70 border-white/60 hover:bg-white/80",
+            "text-ink"
           ].join(" ")}
         >
           <button
@@ -217,18 +215,18 @@ const RailInner = ({ chapters, selectedId, onSelect, onAdd, onDelete }) => (
             className="w-full text-left px-3 py-2"
           >
             <div className="text-sm font-medium truncate">{ch.title}</div>
-            <div className="text-xs text-white/70">
+            <div className="text-xs text-muted">
               {ch.wordCount} words • {ch.lastEdited}
             </div>
           </button>
           <div className="px-3 pb-2 flex gap-2">
-            <span className="px-2 py-0.5 text-[10px] rounded bg-white/10 border border-white/20">
+            <span className="px-2 py-0.5 text-[10px] rounded bg-white/70 border border-white/60 text-muted">
               {ch.status}
             </span>
             <button
               type="button"
               onClick={() => onDelete(ch.id)}
-              className="ml-auto text-rose-200/90 hover:text-rose-100 p-1"
+              className="ml-auto text-rose-500 hover:text-rose-600 p-1"
               title="Delete"
             >
               <Trash2 size={14} />
@@ -256,10 +254,10 @@ const AIAssistant = ({ chapter, onApply }) => {
   };
 
   return (
-    <div className="rounded-2xl bg-white/80 backdrop-blur border border-slate-200 p-3 shadow-sm">
+    <div className="rounded-2xl bg-white/80 backdrop-blur border border-border p-3 shadow-sm">
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 font-semibold text-slate-800">
-          <Brain size={18} className="text-indigo-500" />
+        <div className="flex items-center gap-2 font-semibold text-ink">
+          <Brain size={18} className="text-primary" />
           AI Assistant
         </div>
         <div className="flex items-center gap-2">
@@ -270,8 +268,8 @@ const AIAssistant = ({ chapter, onApply }) => {
               className={[
                 "px-2 py-1 rounded-md text-xs border",
                 tab === t
-                  ? "bg-indigo-50 border-indigo-200 text-indigo-700"
-                  : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50",
+                  ? "bg-primary/10 border-primary/30 text-primary"
+                  : "bg-white border-border text-muted hover:bg-white/80",
               ].join(" ")}
             >
               {t === "suggestions" ? "Ideas" : t === "grammar" ? "Grammar" : "Prompts"}
@@ -280,7 +278,7 @@ const AIAssistant = ({ chapter, onApply }) => {
           <button
             onClick={generate}
             disabled={busy}
-            className="px-2 py-1 rounded-md text-xs bg-indigo-600 text-white hover:bg-indigo-500 disabled:opacity-50"
+            className="px-2 py-1 rounded-md text-xs bg-primary text-white hover:opacity-90 disabled:opacity-50"
           >
             {busy ? <RefreshCw size={14} className="animate-spin" /> : <Wand2 size={14} />}
           </button>
@@ -293,16 +291,16 @@ const AIAssistant = ({ chapter, onApply }) => {
             ideas.map((s, i) => (
               <div
                 key={i}
-                className="min-w-[16rem] p-3 rounded-xl border border-slate-200 bg-white"
+                className="min-w-[16rem] p-3 rounded-xl border border-border bg-white"
               >
                 <div className="flex items-start gap-2">
-                  <Lightbulb size={16} className="text-amber-500 mt-0.5" />
-                  <div className="text-sm text-slate-700">
+                  <Lightbulb size={16} className="text-gold mt-0.5" />
+                  <div className="text-sm text-ink">
                     {s}
                     <div>
                       <button
                         onClick={() => onApply(s)}
-                        className="text-indigo-600 text-xs mt-2"
+                        className="text-primary text-xs mt-2"
                       >
                         Apply
                       </button>
@@ -312,7 +310,7 @@ const AIAssistant = ({ chapter, onApply }) => {
               </div>
             ))
           ) : (
-            <div className="text-sm text-slate-600">No suggestions yet.</div>
+            <div className="text-sm text-muted">No suggestions yet.</div>
           ))}
 
         {tab === "grammar" &&
@@ -339,15 +337,15 @@ const AIAssistant = ({ chapter, onApply }) => {
 
         {tab === "prompts" && (
           <>
-            <div className="min-w-[16rem] p-3 rounded-xl border border-violet-200 bg-violet-50">
-              <div className="flex items-start gap-2 text-sm text-violet-900">
-                <MessageSquare size={16} className="text-violet-600 mt-0.5" />
+            <div className="min-w-[16rem] p-3 rounded-xl border border-accent/40 bg-accent/15">
+              <div className="flex items-start gap-2 text-sm text-ink">
+                <MessageSquare size={16} className="text-accent mt-0.5" />
                 Character: What secret is your protagonist hiding?
               </div>
             </div>
-            <div className="min-w-[16rem] p-3 rounded-xl border border-blue-200 bg-blue-50">
-              <div className="flex items-start gap-2 text-sm text-blue-900">
-                <Zap size={16} className="text-blue-600 mt-0.5" />
+            <div className="min-w-[16rem] p-3 rounded-xl border border-primary/30 bg-primary/10">
+              <div className="flex items-start gap-2 text-sm text-ink">
+                <Zap size={16} className="text-primary mt-0.5" />
                 Plot: Add a conflict that tests a friendship.
               </div>
             </div>
@@ -360,7 +358,7 @@ const AIAssistant = ({ chapter, onApply }) => {
 
 /* ──────────────────────────────────────────────────────────────
    LEFT: Story Meta sidebar (+ Quick Nav)
-──────────────────────────────────────────────────────────────── */
+───────────────────────────────────────────────────────────── */
 const MetaSidebar = ({ book, chapterWordCount, totalWords }) => {
   return (
     <aside className="hidden xl:block">
@@ -369,7 +367,7 @@ const MetaSidebar = ({ book, chapterWordCount, totalWords }) => {
         <div className="flex flex-col gap-2">
           <NavLink
             to="/dashboard"
-            className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-white/10 text-white border border-white/20 hover:bg-white/15"
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-xl glass-soft border border-white/40 text-ink hover:bg-white/80"
           >
             <ArrowLeft size={16} />
             Back to Dashboard
@@ -377,14 +375,14 @@ const MetaSidebar = ({ book, chapterWordCount, totalWords }) => {
           <div className="flex gap-2">
             <NavLink
               to="/toc"
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-white/10 text-white border border-white/20 hover:bg-white/15"
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-xl glass-soft border border-white/40 text-ink hover:bg-white/80"
             >
               <BookOpen size={16} />
               TOC
             </NavLink>
             <NavLink
               to="/project"
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-white/10 text-white border border-white/20 hover:bg-white/15"
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-xl glass-soft border border-white/40 text-ink hover:bg-white/80"
             >
               <FileText size={16} />
               Project
@@ -393,9 +391,9 @@ const MetaSidebar = ({ book, chapterWordCount, totalWords }) => {
         </div>
 
         {/* Stats */}
-        <div className="rounded-2xl bg-white/80 backdrop-blur border border-slate-200 p-4">
-          <div className="text-sm text-slate-600 mb-2 font-medium">Word Count</div>
-          <div className="text-slate-900">
+        <div className="rounded-2xl bg-white/80 backdrop-blur border border-border p-4">
+          <div className="text-sm text-muted mb-2 font-medium">Word Count</div>
+          <div className="text-ink">
             <div className="flex justify-between text-sm">
               <span>Current chapter</span>
               <span className="font-semibold">{chapterWordCount.toLocaleString()}</span>
@@ -408,39 +406,35 @@ const MetaSidebar = ({ book, chapterWordCount, totalWords }) => {
         </div>
 
         {/* Characters */}
-        <div className="rounded-2xl bg-white/80 backdrop-blur border border-slate-200 p-4">
-          <div className="flex items-center gap-2 text-slate-800 font-semibold mb-2">
-            <Users size={16} className="text-indigo-500" /> Characters
+        <div className="rounded-2xl bg-white/80 backdrop-blur border border-border p-4">
+          <div className="flex items-center gap-2 text-ink font-semibold mb-2">
+            <Users size={16} className="text-primary" /> Characters
           </div>
-          <div className="text-sm text-slate-700">
-            Add/track your key characters here.
-          </div>
+          <div className="text-sm text-muted">Add/track your key characters here.</div>
         </div>
 
         {/* Setting */}
-        <div className="rounded-2xl bg-white/80 backdrop-blur border border-slate-200 p-4">
-          <div className="flex items-center gap-2 text-slate-800 font-semibold mb-2">
+        <div className="rounded-2xl bg-white/80 backdrop-blur border border-border p-4">
+          <div className="flex items-center gap-2 text-ink font-semibold mb-2">
             <MapPin size={16} className="text-emerald-600" /> Setting
           </div>
-          <div className="text-sm text-slate-700">Where and when your story happens.</div>
+          <div className="text-sm text-muted">Where and when your story happens.</div>
         </div>
 
         {/* Theme */}
-        <div className="rounded-2xl bg-white/80 backdrop-blur border border-slate-200 p-4">
-          <div className="flex items-center gap-2 text-slate-800 font-semibold mb-2">
-            <Lightbulb size={16} className="text-amber-500" /> Theme
+        <div className="rounded-2xl bg-white/80 backdrop-blur border border-border p-4">
+          <div className="flex items-center gap-2 text-ink font-semibold mb-2">
+            <Lightbulb size={16} className="text-gold" /> Theme
           </div>
-          <div className="text-sm text-slate-700">The underlying idea you're exploring.</div>
+          <div className="text-sm text-muted">The underlying idea you're exploring.</div>
         </div>
 
         {/* Description */}
-        <div className="rounded-2xl bg-white/80 backdrop-blur border border-slate-200 p-4">
-          <div className="flex items-center gap-2 text-slate-800 font-semibold mb-2">
-            <BookOpen size={16} className="text-sky-600" /> Description
+        <div className="rounded-2xl bg-white/80 backdrop-blur border border-border p-4">
+          <div className="flex items-center gap-2 text-ink font-semibold mb-2">
+            <BookOpen size={16} className="text-primary" /> Description
           </div>
-          <div className="text-sm text-slate-700">
-            A quick summary of your book (synopsis/logline).
-          </div>
+          <div className="text-sm text-muted">A quick summary of your book (synopsis/logline).</div>
         </div>
       </div>
     </aside>
@@ -448,8 +442,8 @@ const MetaSidebar = ({ book, chapterWordCount, totalWords }) => {
 };
 
 /* ──────────────────────────────────────────────────────────────
-   Writing Editor (white canvas) WITH FULLSCREEN MODE
-──────────────────────────────────────────────────────────────── */
+   Writing Editor (light canvas) with fullscreen mode
+───────────────────────────────────────────────────────────── */
 const WritingEditor = ({ chapter, onSave, onUpdate, onCreateNew }) => {
   const [title, setTitle] = useState(chapter?.title || "");
   const [content, setContent] = useState(chapter?.content || "");
@@ -481,12 +475,12 @@ const WritingEditor = ({ chapter, onSave, onUpdate, onCreateNew }) => {
         setIsFullscreen(false);
       }
     };
-    
+
     if (isFullscreen) {
       document.addEventListener('keydown', handleEscape);
       document.body.style.overflow = 'hidden';
     }
-    
+
     return () => {
       document.removeEventListener('keydown', handleEscape);
       document.body.style.overflow = 'unset';
@@ -516,7 +510,7 @@ const WritingEditor = ({ chapter, onSave, onUpdate, onCreateNew }) => {
       case 'sepia':
         return 'bg-amber-50 text-amber-900';
       default:
-        return 'bg-white text-slate-900';
+        return 'bg-white text-ink';
     }
   };
 
@@ -527,7 +521,7 @@ const WritingEditor = ({ chapter, onSave, onUpdate, onCreateNew }) => {
       case 'sepia':
         return 'bg-amber-50 text-amber-900 placeholder-amber-600';
       default:
-        return 'bg-white text-slate-900 placeholder-slate-400';
+        return 'bg-white text-ink placeholder-slate-400';
     }
   };
 
@@ -548,21 +542,21 @@ const WritingEditor = ({ chapter, onSave, onUpdate, onCreateNew }) => {
             {count} words
           </div>
         </div>
-        
+
         <div className="flex items-center gap-2">
           {/* Theme Switcher */}
           <div className="flex rounded-lg border border-current border-opacity-20 overflow-hidden">
             {[
               { key: 'light', icon: Sun, label: 'Light' },
-              { key: 'sepia', icon: '📄', label: 'Sepia' }, 
+              { key: 'sepia', icon: '📄', label: 'Sepia' },
               { key: 'dark', icon: Moon, label: 'Dark' }
             ].map(({ key, icon: Icon, label }) => (
               <button
                 key={key}
                 onClick={() => setFullscreenTheme(key)}
                 className={`px-3 py-2 text-sm transition-colors ${
-                  fullscreenTheme === key 
-                    ? 'bg-current bg-opacity-10' 
+                  fullscreenTheme === key
+                    ? 'bg-current bg-opacity-10'
                     : 'hover:bg-current hover:bg-opacity-5'
                 }`}
                 title={label}
@@ -571,14 +565,14 @@ const WritingEditor = ({ chapter, onSave, onUpdate, onCreateNew }) => {
               </button>
             ))}
           </div>
-          
+
           <button
             onClick={handleSave}
-            className="px-4 py-2 rounded-lg bg-emerald-600 text-white hover:bg-emerald-500 transition-colors"
+            className="px-4 py-2 rounded-lg bg-primary text-white hover:opacity-90 transition-colors"
           >
             <Save size={16} />
           </button>
-          
+
           <button
             onClick={toggleFullscreen}
             className="p-2 rounded-lg hover:bg-current hover:bg-opacity-10 transition-colors"
@@ -619,14 +613,14 @@ const WritingEditor = ({ chapter, onSave, onUpdate, onCreateNew }) => {
     return (
       <div className="flex-1 grid place-items-center">
         <div className="text-center">
-          <div className="w-16 h-16 bg-white/70 rounded-full grid place-items-center mx-auto mb-4 border border-slate-200">
-            <Edit3 size={24} className="text-slate-600" />
+          <div className="w-16 h-16 bg-white/70 rounded-full grid place-items-center mx-auto mb-4 border border-border">
+            <Edit3 size={24} className="text-muted" />
           </div>
-          <h3 className="text-xl font-bold text-white mb-2">Start writing</h3>
-          <p className="text-slate-300 mb-4">Create your first chapter to begin.</p>
+          <h3 className="text-xl font-bold text-ink mb-2">Start writing</h3>
+          <p className="text-muted mb-4">Create your first chapter to begin.</p>
           <button
             onClick={onCreateNew}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-indigo-600 text-white hover:bg-indigo-500"
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-white hover:opacity-90"
           >
             <Plus size={16} />
             New Chapter
@@ -646,17 +640,17 @@ const WritingEditor = ({ chapter, onSave, onUpdate, onCreateNew }) => {
         />
 
         {/* white canvas */}
-        <div className="rounded-3xl bg-white shadow-2xl border border-slate-200 overflow-hidden flex-1 flex flex-col">
-          <div className="px-5 py-3 border-b border-slate-200 bg-white/70 backdrop-blur flex items-center justify-between">
+        <div className="rounded-3xl bg-white shadow-2xl border border-border overflow-hidden flex-1 flex flex-col">
+          <div className="px-5 py-3 border-b border-border bg-white/70 backdrop-blur flex items-center justify-between">
             <div className="flex items-center gap-4">
               <input
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                className="text-lg font-semibold bg-transparent text-slate-900 outline-none"
+                className="text-lg font-semibold bg-transparent text-ink outline-none"
                 placeholder="Chapter title"
               />
-              <div className="hidden sm:flex items-center gap-2 text-sm text-slate-600">
+              <div className="hidden sm:flex items-center gap-2 text-sm text-muted">
                 <Target size={14} />
                 <span>{count} words</span>
               </div>
@@ -666,7 +660,7 @@ const WritingEditor = ({ chapter, onSave, onUpdate, onCreateNew }) => {
               <button
                 type="button"
                 onClick={toggleFullscreen}
-                className="px-3 py-2 rounded-md text-sm border bg-white text-slate-700 border-slate-200 hover:bg-slate-50 transition-colors"
+                className="px-3 py-2 rounded-md text-sm border bg-white text-ink border-border hover:bg-white/80 transition-colors"
                 title="Fullscreen Writing Mode"
               >
                 <Maximize size={16} />
@@ -677,8 +671,8 @@ const WritingEditor = ({ chapter, onSave, onUpdate, onCreateNew }) => {
                 className={[
                   "px-3 py-2 rounded-md text-sm border",
                   preview
-                    ? "bg-indigo-50 text-indigo-700 border-indigo-200"
-                    : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50",
+                    ? "bg-primary/10 text-primary border-primary/30"
+                    : "bg-white text-ink border-border hover:bg-white/80",
                 ].join(" ")}
                 title="Preview"
               >
@@ -687,7 +681,7 @@ const WritingEditor = ({ chapter, onSave, onUpdate, onCreateNew }) => {
               <button
                 type="button"
                 onClick={handleSave}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-emerald-600 text-white hover:bg-emerald-500"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-primary text-white hover:opacity-90"
               >
                 <Save size={16} />
                 Save
@@ -698,8 +692,8 @@ const WritingEditor = ({ chapter, onSave, onUpdate, onCreateNew }) => {
           <div className="flex-1 p-6 overflow-auto">
             {preview ? (
               <div className="max-w-3xl">
-                <h1 className="text-3xl font-bold text-slate-900 mb-6">{title}</h1>
-                <div className="prose max-w-none">
+                <h1 className="text-3xl font-bold text-ink mb-6">{title}</h1>
+                <div className="prose max-w-none text-ink">
                   {content.split("\n").map((p, i) => (
                     <p key={i}>{p}</p>
                   ))}
@@ -709,13 +703,13 @@ const WritingEditor = ({ chapter, onSave, onUpdate, onCreateNew }) => {
               <textarea
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
-                className="w-full h-[60vh] min-h-[420px] resize-none outline-none text-lg leading-7 text-slate-900"
+                className="w-full h-[60vh] min-h-[420px] resize-none outline-none text-lg leading-7 text-ink"
                 placeholder="Start writing your story here..."
               />
             )}
           </div>
 
-          <div className="px-5 py-3 border-t border-slate-200 bg-white/70 text-sm text-slate-600 flex items-center justify-between">
+          <div className="px-5 py-3 border-t border-border bg-white/70 text-sm text-muted flex items-center justify-between">
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
                 <Clock size={14} />
@@ -726,7 +720,7 @@ const WritingEditor = ({ chapter, onSave, onUpdate, onCreateNew }) => {
                 <span>Auto-save enabled</span>
               </div>
             </div>
-            <button className="hover:text-slate-800" title="Download">
+            <button className="hover:text-ink" title="Download">
               <Download size={14} />
             </button>
           </div>
@@ -741,7 +735,7 @@ const WritingEditor = ({ chapter, onSave, onUpdate, onCreateNew }) => {
 
 /* ──────────────────────────────────────────────────────────────
    Main
-──────────────────────────────────────────────────────────────── */
+───────────────────────────────────────────────────────────── */
 export default function WriteSection() {
   const initial = useMemo(getInitialState, []);
   const [book, setBook] = useState(initial.book);
@@ -829,7 +823,7 @@ export default function WriteSection() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950">
+    <div className="min-h-screen bg-base bg-radial-fade text-ink">
       <TopBanner
         bookTitle={book?.title}
         onNewChapter={addChapter}
