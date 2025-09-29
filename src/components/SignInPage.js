@@ -2,19 +2,22 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Auth } from 'aws-amplify';
-import { Mail, User as UserIcon, Lock, Eye, EyeOff, Loader2, XCircle, CheckCircle, ArrowLeft } from 'lucide-react';
+import {
+  Mail, User as UserIcon, Lock, Eye, EyeOff,
+  Loader2, XCircle, CheckCircle, ArrowLeft
+} from 'lucide-react';
 
 const lc = (s='') => s.trim().toLowerCase();
+const LOGO_SRC = "/DahTruthLogo.png"; // place DahTruthLogo.png in /public
 
 export default function SignInPage() {
   const navigate = useNavigate();
   const [mode, setMode] = useState('signin'); // 'signin' | 'forgot' | 'reset' | 'newpwd'
   const [idMode, setIdMode] = useState('username'); // 'username' | 'email'
 
-  // we keep both fields visible at all times
+  // fields
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
-
   const [password, setPassword] = useState('');
   const [showPwd, setShowPwd] = useState(false);
   const [code, setCode] = useState('');
@@ -33,50 +36,35 @@ export default function SignInPage() {
     } catch {}
   }, []);
 
-  // Helper: pick the active identifier based on toggle
-  const getIdentifier = () => {
-    if (idMode === 'email') return lc(email || '');
-    return (username || '').trim();
-  };
+  // identifier helper
+  const getIdentifier = () => (idMode === 'email' ? lc(email || '') : (username || '').trim());
 
   const signIn = async (e) => {
     e.preventDefault();
     setErr(''); setMsg('');
-
     const identifier = getIdentifier();
-    if (!identifier || !password) {
-      return setErr(`Enter your ${idMode} and password.`);
-    }
+    if (!identifier || !password) return setErr(`Enter your ${idMode} and password.`);
 
     setLoading(true);
     try {
       const user = await Auth.signIn(identifier, password);
-
       if (user?.challengeName === 'NEW_PASSWORD_REQUIRED') {
         setChallengedUser(user);
         setMode('newpwd');
         setMsg('Set a new password to finish signing in.');
         return;
       }
-
       await Auth.currentAuthenticatedUser({ bypassCache: true });
       localStorage.removeItem('currentUser');
       navigate('/dashboard');
     } catch (e) {
       console.log('[SignIn error]', e);
-      if (e?.code === 'UserNotConfirmedException') {
-        setErr('Please confirm your email first. Check your inbox for the code.');
-      } else if (e?.code === 'NotAuthorizedException') {
-        setErr('Incorrect credentials. Try again or use “Forgot password”.');
-      } else if (e?.code === 'UserNotFoundException') {
-        setErr(`No account found for that ${idMode}.`);
-      } else if (e?.code === 'TooManyRequestsException') {
-        setErr('Too many attempts. Please wait a few minutes and try again.');
-      } else if (e?.code === 'PasswordResetRequiredException') {
-        setErr('Password reset required. Use “Forgot password”.');
-      } else {
-        setErr(e?.message || e?.code || 'Sign-in failed.');
-      }
+      if (e?.code === 'UserNotConfirmedException') setErr('Please confirm your email first. Check your inbox for the code.');
+      else if (e?.code === 'NotAuthorizedException') setErr('Incorrect credentials. Try again or use “Forgot password”.');
+      else if (e?.code === 'UserNotFoundException') setErr(`No account found for that ${idMode}.`);
+      else if (e?.code === 'TooManyRequestsException') setErr('Too many attempts. Please wait a few minutes and try again.');
+      else if (e?.code === 'PasswordResetRequiredException') setErr('Password reset required. Use “Forgot password”.');
+      else setErr(e?.message || e?.code || 'Sign-in failed.');
     } finally {
       setLoading(false);
     }
@@ -104,7 +92,6 @@ export default function SignInPage() {
   const forgotStart = async (e) => {
     e.preventDefault();
     setErr(''); setMsg('');
-
     const identifier = getIdentifier();
     if (!identifier) return setErr(`Enter your ${idMode} first.`);
 
@@ -115,13 +102,9 @@ export default function SignInPage() {
       setMode('reset');
     } catch (e) {
       console.log('[Forgot error]', e);
-      if (e?.code === 'UserNotFoundException') {
-        setErr(`No account found for that ${idMode}.`);
-      } else if (e?.code === 'TooManyRequestsException') {
-        setErr('Too many requests. Please try again later.');
-      } else {
-        setErr(e?.message || e?.code || 'Could not start password reset.');
-      }
+      if (e?.code === 'UserNotFoundException') setErr(`No account found for that ${idMode}.`);
+      else if (e?.code === 'TooManyRequestsException') setErr('Too many requests. Please try again later.');
+      else setErr(e?.message || e?.code || 'Could not start password reset.');
     } finally {
       setLoading(false);
     }
@@ -130,10 +113,8 @@ export default function SignInPage() {
   const forgotComplete = async (e) => {
     e.preventDefault();
     setErr(''); setMsg('');
-
     const identifier = getIdentifier();
     const resetCode = (code || '').trim();
-
     if (!identifier || !resetCode || !newPassword) {
       return setErr(`Enter ${idMode}, the 6-digit code, and a new password.`);
     }
@@ -159,7 +140,6 @@ export default function SignInPage() {
     setErr(''); setMsg('');
     const identifier = getIdentifier();
     if (!identifier) return setErr(`Enter your ${idMode} first.`);
-
     setLoading(true);
     try {
       await Auth.forgotPassword(identifier);
@@ -176,26 +156,33 @@ export default function SignInPage() {
     <button
       type="button"
       onClick={() => { setErr(''); setMsg(''); setMode('signin'); }}
-      className="mb-4 inline-flex items-center gap-2 text-slate-300 hover:text-white"
+      className="mb-4 inline-flex items-center gap-2 text-muted hover:text-ink"
     >
       <ArrowLeft size={16}/> Back to sign in
     </button>
   );
 
-  // Small segmented toggle for which identifier to use
   const IdToggle = () => (
     <div className="flex items-center justify-center gap-2 mb-2">
       <button
         type="button"
         onClick={() => setIdMode('username')}
-        className={`px-3 py-1 rounded-md text-sm border ${idMode==='username' ? 'bg-indigo-600 text-white border-indigo-500' : 'bg-slate-800/50 text-slate-300 border-white/10 hover:bg-slate-800/70'}`}
+        className={`px-3 py-1 rounded-md text-sm border transition-colors ${
+          idMode==='username'
+            ? 'bg-primary text-white border-primary'
+            : 'bg-white text-ink border-border hover:bg-white/80'
+        }`}
       >
         Use Username
       </button>
       <button
         type="button"
         onClick={() => setIdMode('email')}
-        className={`px-3 py-1 rounded-md text-sm border ${idMode==='email' ? 'bg-indigo-600 text-white border-indigo-500' : 'bg-slate-800/50 text-slate-300 border-white/10 hover:bg-slate-800/70'}`}
+        className={`px-3 py-1 rounded-md text-sm border transition-colors ${
+          idMode==='email'
+            ? 'bg-primary text-white border-primary'
+            : 'bg-white text-ink border-border hover:bg-white/80'
+        }`}
       >
         Use Email
       </button>
@@ -203,21 +190,38 @@ export default function SignInPage() {
   );
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6 bg-slate-950 text-slate-100">
-      <div className="w-full max-w-md bg-slate-900/70 border border-white/10 rounded-2xl p-6">
+    <div className="min-h-screen bg-base bg-radial-fade text-ink flex items-center justify-center p-6 relative overflow-hidden">
+      {/* soft background blobs */}
+      <div className="absolute inset-0 pointer-events-none opacity-20">
+        <div className="absolute -top-16 -left-10 w-72 h-72 rounded-full bg-accent blur-2xl" />
+        <div className="absolute top-20 right-10 w-80 h-80 rounded-full bg-primary blur-2xl" />
+        <div className="absolute -bottom-12 left-20 w-64 h-64 rounded-full bg-gold/60 blur-2xl" />
+      </div>
+
+      <div className="relative w-full max-w-md bg-white/80 backdrop-blur border border-border rounded-2xl p-6 shadow-xl">
+        {/* Brand header */}
+        <div className="text-center mb-5">
+          <div className="mx-auto w-16 h-16 rounded-full overflow-hidden border border-border bg-white/80 shadow">
+            <img src={LOGO_SRC} alt="DahTruth Story Lab logo" className="w-full h-full object-contain" />
+          </div>
+          <h1 className="mt-3 text-xl font-bold font-serif tracking-tight">DahTruth Story Lab</h1>
+          <p className="text-sm text-muted font-serif italic">Where the writing journey begins.</p>
+        </div>
+
         {mode !== 'signin' && <Back />}
-        <h1 className="text-2xl font-semibold mb-2">
+
+        <h2 className="text-2xl font-semibold mb-2">
           {mode === 'signin' ? 'Sign in' : mode === 'forgot' ? 'Forgot password' : mode === 'reset' ? 'Reset password' : 'Set new password'}
-        </h1>
+        </h2>
         {mode !== 'newpwd' && <IdToggle />}
 
         {msg && (
-          <div className="mb-4 flex items-center gap-2 rounded-lg px-3 py-2 text-sm bg-green-500/10 text-green-300 border border-green-500/20">
+          <div className="mb-4 flex items-center gap-2 rounded-lg px-3 py-2 text-sm bg-emerald-50 text-emerald-800 border border-emerald-200">
             <CheckCircle size={16}/> {msg}
           </div>
         )}
         {err && (
-          <div className="mb-4 flex items-center gap-2 rounded-lg px-3 py-2 text-sm bg-red-500/10 text-red-300 border border-red-500/20">
+          <div className="mb-4 flex items-center gap-2 rounded-lg px-3 py-2 text-sm bg-rose-50 text-rose-800 border border-rose-200">
             <XCircle size={16}/> {err}
           </div>
         )}
@@ -232,12 +236,14 @@ export default function SignInPage() {
                 onChange={e=>setUsername(e.target.value)}
                 placeholder="Username"
                 autoComplete="username"
-                className={`w-full pl-10 pr-3 py-3 rounded-lg border outline-none transition-colors ${idMode==='username'
-                  ? 'bg-slate-800/70 border-indigo-500 focus:border-indigo-500'
-                  : 'bg-slate-800/50 border-white/10 focus:border-white/20'}`}
+                className={`w-full pl-10 pr-3 py-3 rounded-lg border outline-none transition-colors placeholder:text-muted ${
+                  idMode==='username'
+                    ? 'bg-white border-primary focus:border-primary'
+                    : 'bg-white border-border focus:border-border'
+                }`}
                 required={idMode==='username'}
               />
-              <UserIcon className="absolute left-3 top-3.5 h-5 w-5 text-slate-400"/>
+              <UserIcon className="absolute left-3 top-3.5 h-5 w-5 text-muted"/>
             </div>
 
             {/* Email */}
@@ -248,27 +254,29 @@ export default function SignInPage() {
                 onChange={e=>setEmail(e.target.value)}
                 placeholder="Email"
                 autoComplete="email"
-                className={`w-full pl-10 pr-3 py-3 rounded-lg border outline-none transition-colors ${idMode==='email'
-                  ? 'bg-slate-800/70 border-indigo-500 focus:border-indigo-500'
-                  : 'bg-slate-800/50 border-white/10 focus:border-white/20'}`}
+                className={`w-full pl-10 pr-3 py-3 rounded-lg border outline-none transition-colors placeholder:text-muted ${
+                  idMode==='email'
+                    ? 'bg-white border-primary focus:border-primary'
+                    : 'bg-white border-border focus:border-border'
+                }`}
                 required={idMode==='email'}
               />
-              <Mail className="absolute left-3 top-3.5 h-5 w-5 text-slate-400"/>
+              <Mail className="absolute left-3 top-3.5 h-5 w-5 text-muted"/>
             </div>
 
             {/* Password */}
             <div className="relative">
               <input
-                type={showPwd?'text':'password'}
+                type={showPwd ? 'text' : 'password'}
                 value={password}
                 onChange={e=>setPassword(e.target.value)}
                 placeholder="Password"
                 autoComplete="current-password"
-                className="w-full pl-10 pr-10 py-3 rounded-lg bg-slate-800/50 border border-white/10 outline-none focus:border-indigo-500 focus:bg-slate-800/70 transition-colors"
+                className="w-full pl-10 pr-10 py-3 rounded-lg bg-white border border-border outline-none placeholder:text-muted focus:border-primary transition-colors"
                 required
               />
-              <Lock className="absolute left-3 top-3.5 h-5 w-5 text-slate-400"/>
-              <button type="button" className="absolute right-3 top-3.5 text-slate-400 hover:text-slate-300" onClick={()=>setShowPwd(v=>!v)}>
+              <Lock className="absolute left-3 top-3.5 h-5 w-5 text-muted"/>
+              <button type="button" className="absolute right-3 top-3.5 text-muted hover:text-ink" onClick={()=>setShowPwd(v=>!v)}>
                 {showPwd ? <EyeOff className="h-5 w-5"/> : <Eye className="h-5 w-5"/>}
               </button>
             </div>
@@ -276,7 +284,7 @@ export default function SignInPage() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 px-4 py-3 font-medium disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+              className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-primary text-white hover:opacity-90 px-4 py-3 font-medium disabled:opacity-60 disabled:cursor-not-allowed transition"
             >
               {loading ? <Loader2 size={16} className="animate-spin"/> : null} Sign in
             </button>
@@ -285,17 +293,17 @@ export default function SignInPage() {
               <button
                 type="button"
                 onClick={()=>{setErr('');setMsg('');setMode('forgot');}}
-                className="text-indigo-300 hover:text-indigo-200 text-sm transition-colors"
+                className="text-primary hover:opacity-80 text-sm transition"
               >
                 Forgot password?
               </button>
 
-              <div className="pt-4 border-t border-white/10">
-                <p className="text-slate-400 text-sm mb-2">Don't have an account?</p>
+              <div className="pt-4 border-t border-border">
+                <p className="text-muted text-sm mb-2">Don't have an account?</p>
                 <button
                   type="button"
-                  onClick={() => navigate('/register')}
-                  className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-slate-700 hover:bg-slate-600 px-4 py-2 font-medium text-slate-200 hover:text-white transition-colors"
+                  onClick={() => navigate('/auth/register')}
+                  className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-accent hover:opacity-90 px-4 py-2 font-medium text-ink transition"
                 >
                   Create Account
                 </button>
@@ -305,7 +313,7 @@ export default function SignInPage() {
                 <button
                   type="button"
                   onClick={() => navigate('/')}
-                  className="text-slate-400 hover:text-slate-300 text-sm transition-colors"
+                  className="text-muted hover:text-ink text-sm transition"
                 >
                   ← Back to Home
                 </button>
@@ -316,7 +324,6 @@ export default function SignInPage() {
 
         {mode === 'forgot' && (
           <form onSubmit={forgotStart} className="space-y-4" noValidate>
-            {/* Username */}
             <div className="relative">
               <input
                 type="text"
@@ -324,15 +331,16 @@ export default function SignInPage() {
                 onChange={e=>setUsername(e.target.value)}
                 placeholder="Username"
                 autoComplete="username"
-                className={`w-full pl-10 pr-3 py-3 rounded-lg border outline-none transition-colors ${idMode==='username'
-                  ? 'bg-slate-800/70 border-indigo-500 focus:border-indigo-500'
-                  : 'bg-slate-800/50 border-white/10 focus:border-white/20'}`}
+                className={`w-full pl-10 pr-3 py-3 rounded-lg border outline-none transition-colors placeholder:text-muted ${
+                  idMode==='username'
+                    ? 'bg-white border-primary focus:border-primary'
+                    : 'bg-white border-border focus:border-border'
+                }`}
                 required={idMode==='username'}
               />
-              <UserIcon className="absolute left-3 top-3.5 h-5 w-5 text-slate-400"/>
+              <UserIcon className="absolute left-3 top-3.5 h-5 w-5 text-muted"/>
             </div>
 
-            {/* Email */}
             <div className="relative">
               <input
                 type="email"
@@ -340,18 +348,20 @@ export default function SignInPage() {
                 onChange={e=>setEmail(e.target.value)}
                 placeholder="Email"
                 autoComplete="email"
-                className={`w-full pl-10 pr-3 py-3 rounded-lg border outline-none transition-colors ${idMode==='email'
-                  ? 'bg-slate-800/70 border-indigo-500 focus:border-indigo-500'
-                  : 'bg-slate-800/50 border-white/10 focus:border-white/20'}`}
+                className={`w-full pl-10 pr-3 py-3 rounded-lg border outline-none transition-colors placeholder:text-muted ${
+                  idMode==='email'
+                    ? 'bg-white border-primary focus:border-primary'
+                    : 'bg-white border-border focus:border-border'
+                }`}
                 required={idMode==='email'}
               />
-              <Mail className="absolute left-3 top-3.5 h-5 w-5 text-slate-400"/>
+              <Mail className="absolute left-3 top-3.5 h-5 w-5 text-muted"/>
             </div>
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 px-4 py-3 font-medium disabled:opacity-60 transition-colors"
+              className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-primary text-white hover:opacity-90 px-4 py-3 font-medium disabled:opacity-60 transition"
             >
               {loading ? <Loader2 size={16} className="animate-spin"/> : null} Send reset code
             </button>
@@ -360,7 +370,7 @@ export default function SignInPage() {
 
         {mode === 'reset' && (
           <form onSubmit={forgotComplete} className="space-y-4" noValidate>
-            <div className="text-xs text-slate-400 -mt-1">
+            <div className="text-xs text-muted -mt-1">
               Reset will use your <span className="font-semibold">{idMode}</span>.
             </div>
 
@@ -372,36 +382,36 @@ export default function SignInPage() {
                 placeholder="6-digit code"
                 maxLength={6}
                 inputMode="numeric"
-                className="w-full pl-10 pr-3 py-3 rounded-lg bg-slate-800/50 border border-white/10 outline-none tracking-widest focus:border-indigo-500 focus:bg-slate-800/70 transition-colors"
+                className="w-full pl-10 pr-3 py-3 rounded-lg bg-white border border-border outline-none tracking-widest placeholder:text-muted focus:border-primary transition-colors"
                 required
               />
-              <Mail className="absolute left-3 top-3.5 h-5 w-5 text-slate-400"/>
+              <Mail className="absolute left-3 top-3.5 h-5 w-5 text-muted"/>
             </div>
 
             <div className="relative">
               <input
-                type={showPwd?'text':'password'}
+                type={showPwd ? 'text' : 'password'}
                 value={newPassword}
                 onChange={e=>setNewPassword(e.target.value)}
                 placeholder="New password"
                 autoComplete="new-password"
-                className="w-full pl-10 pr-10 py-3 rounded-lg bg-slate-800/50 border border-white/10 outline-none focus:border-indigo-500 focus:bg-slate-800/70 transition-colors"
+                className="w-full pl-10 pr-10 py-3 rounded-lg bg-white border border-border outline-none placeholder:text-muted focus:border-primary transition-colors"
                 required
               />
-              <Lock className="absolute left-3 top-3.5 h-5 w-5 text-slate-400"/>
-              <button type="button" className="absolute right-3 top-3.5 text-slate-400 hover:text-slate-300" onClick={()=>setShowPwd(v=>!v)}>
+              <Lock className="absolute left-3 top-3.5 h-5 w-5 text-muted"/>
+              <button type="button" className="absolute right-3 top-3.5 text-muted hover:text-ink" onClick={()=>setShowPwd(v=>!v)}>
                 {showPwd ? <EyeOff className="h-5 w-5"/> : <Eye className="h-5 w-5"/>}
               </button>
             </div>
 
-            <div className="text-xs text-slate-400 bg-slate-800/30 p-3 rounded-lg">
+            <div className="text-xs text-muted bg-white/70 border border-border p-3 rounded-lg">
               Password must be at least 8 characters with uppercase, lowercase, number, and special character.
             </div>
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-green-600 hover:bg-green-500 px-4 py-3 font-medium disabled:opacity-60 transition-colors"
+              className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-primary text-white hover:opacity-90 px-4 py-3 font-medium disabled:opacity-60 transition"
             >
               {loading ? <Loader2 size={16} className="animate-spin"/> : null} Set new password
             </button>
@@ -411,7 +421,7 @@ export default function SignInPage() {
                 type="button"
                 onClick={resendCode}
                 disabled={loading || (!username && !email)}
-                className="text-indigo-300 hover:text-indigo-200 text-sm disabled:opacity-50 transition-colors"
+                className="text-primary hover:opacity-80 text-sm disabled:opacity-50 transition"
               >
                 Resend code
               </button>
@@ -423,23 +433,23 @@ export default function SignInPage() {
           <form onSubmit={completeNewPassword} className="space-y-4" noValidate>
             <div className="relative">
               <input
-                type={showPwd?'text':'password'}
+                type={showPwd ? 'text' : 'password'}
                 value={newPassword}
                 onChange={e=>setNewPassword(e.target.value)}
                 placeholder="New password"
                 autoComplete="new-password"
-                className="w-full pl-10 pr-10 py-3 rounded-lg bg-slate-800/50 border border-white/10 outline-none focus:border-indigo-500 focus:bg-slate-800/70 transition-colors"
+                className="w-full pl-10 pr-10 py-3 rounded-lg bg-white border border-border outline-none placeholder:text-muted focus:border-primary transition-colors"
                 required
               />
-              <Lock className="absolute left-3 top-3.5 h-5 w-5 text-slate-400"/>
-              <button type="button" className="absolute right-3 top-3.5 text-slate-400 hover:text-slate-300" onClick={()=>setShowPwd(v=>!v)}>
+              <Lock className="absolute left-3 top-3.5 h-5 w-5 text-muted"/>
+              <button type="button" className="absolute right-3 top-3.5 text-muted hover:text-ink" onClick={()=>setShowPwd(v=>!v)}>
                 {showPwd ? <EyeOff className="h-5 w-5"/> : <Eye className="h-5 w-5"/>}
               </button>
             </div>
             <button
               type="submit"
               disabled={loading}
-              className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-green-600 hover:bg-green-500 px-4 py-3 font-medium disabled:opacity-60 transition-colors"
+              className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-primary text-white hover:opacity-90 px-4 py-3 font-medium disabled:opacity-60 transition"
             >
               {loading ? <Loader2 size={16} className="animate-spin"/> : null} Continue
             </button>
