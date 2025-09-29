@@ -2,10 +2,14 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Auth } from 'aws-amplify';
-import { Eye, EyeOff, Mail, Lock, CheckCircle, XCircle, Loader2, User as UserIcon } from 'lucide-react';
+import {
+  Eye, EyeOff, Mail, Lock, CheckCircle, XCircle, Loader2,
+  User as UserIcon, ArrowLeft, Info, ShieldCheck, KeyRound
+} from 'lucide-react';
 
 const clean = (s = '') => s.trim();
 const lc = (s = '') => s.trim().toLowerCase();
+const LOGO_SRC = "/DahTruthLogo.png"; // place DahTruthLogo.png in /public
 
 export default function RegistrationPage() {
   const navigate = useNavigate();
@@ -23,13 +27,17 @@ export default function RegistrationPage() {
   const [code, setCode] = useState('');
   const [showPwd, setShowPwd] = useState(false);
   const [showPwd2, setShowPwd2] = useState(false);
+  const [showPwHelp, setShowPwHelp] = useState(false);
+  const [agree, setAgree] = useState(false);
+
   const [msg, setMsg] = useState('');
   const [err, setErr] = useState('');
   const [loading, setLoading] = useState(false);
 
   const onChange = (e) => {
-    const { name, value } = e.target;
-    setForm((f) => ({ ...f, [name]: value }));
+    const { name, value, type, checked } = e.target;
+    if (type === 'checkbox') setAgree(checked);
+    else setForm((f) => ({ ...f, [name]: value }));
     if (err) setErr('');
     if (msg) setMsg('');
   };
@@ -47,6 +55,10 @@ export default function RegistrationPage() {
       setErr('Please complete all fields.');
       return;
     }
+    if (!agree) {
+      setErr('Please agree to the Terms and Privacy Policy.');
+      return;
+    }
     if (/\s/.test(username)) {
       setErr('Username cannot contain spaces.');
       return;
@@ -59,13 +71,13 @@ export default function RegistrationPage() {
     setLoading(true);
     try {
       const signUpResult = await Auth.signUp({
-        username,                 // Cognito login username
+        username,
         password: pw,
         attributes: {
-          email,                  // email attribute
+          email,
           given_name: clean(form.firstName),
           family_name: clean(form.lastName),
-          preferred_username: username, // nice display handle
+          preferred_username: username,
         },
       });
       console.log('SignUp result:', signUpResult);
@@ -93,7 +105,6 @@ export default function RegistrationPage() {
     e.preventDefault();
     setErr(''); setMsg('');
 
-    // Prefer username if provided; otherwise use email
     const rawId = clean(form.username) || lc(form.email);
     const identifier = rawId.includes('@') ? lc(rawId) : rawId;
     const c = clean(code).replace(/\s+/g, '');
@@ -140,17 +151,22 @@ export default function RegistrationPage() {
     }
   };
 
-  // ---------- UI ----------
+  /* ---------- UI ---------- */
   if (step === 'confirm') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-indigo-950 flex items-center justify-center p-4 relative overflow-hidden">
+      <div className="min-h-screen bg-base bg-radial-fade text-ink flex items-center justify-center p-6 relative overflow-hidden">
         <DecorBlobs />
-        <div className="relative z-10 bg-blue-950/50 backdrop-blur-xl rounded-3xl shadow-2xl p-12 w-full max-w-md border border-blue-800/40">
-          <Header title="Confirm Your Account" icon={<Mail className="h-10 w-10 text-blue-300" />} />
+        <div className="relative w-full max-w-md bg-white/80 backdrop-blur border border-border rounded-3xl p-10 shadow-2xl">
+          <Header
+            title="Confirm Your Account"
+            subtitle="Enter the 6-digit code we sent to your email"
+            icon={<Mail className="h-8 w-8 text-primary" />}
+          />
+
           {msg && <Banner ok>{msg}</Banner>}
           {err && <Banner>{err}</Banner>}
 
-          <form onSubmit={onConfirm} className="space-y-6" noValidate>
+          <form onSubmit={onConfirm} className="space-y-5" noValidate>
             <Input
               type="text"
               name="username"
@@ -179,17 +195,19 @@ export default function RegistrationPage() {
               leftIcon={<Mail className="h-5 w-5" />}
               required
             />
+
             <Button type="submit" loading={loading} grad>
               Confirm & Continue
             </Button>
+
             <div className="text-center">
               <button
                 type="button"
                 onClick={resend}
                 disabled={loading || (!form.username && !form.email)}
-                className="text-blue-300 hover:text-blue-100 font-serif text-sm font-medium disabled:opacity-50 transition-colors"
+                className="text-primary hover:opacity-80 font-serif text-sm font-medium disabled:opacity-50 transition"
               >
-                Didn't receive the code? Resend
+                Didn’t receive the code? Resend
               </button>
             </div>
           </form>
@@ -197,9 +215,9 @@ export default function RegistrationPage() {
           <button
             type="button"
             onClick={() => setStep('register')}
-            className="w-full mt-6 text-blue-300 text-sm hover:text-blue-100 font-serif transition-colors"
+            className="w-full mt-6 text-muted hover:text-ink font-serif text-sm transition"
           >
-            ← Back to Registration
+            <span className="inline-flex items-center gap-2"><ArrowLeft size={16}/> Back to Registration</span>
           </button>
         </div>
       </div>
@@ -208,17 +226,21 @@ export default function RegistrationPage() {
 
   // Register step
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-indigo-950 flex items-center justify-center p-4 relative overflow-hidden">
+    <div className="min-h-screen bg-base bg-radial-fade text-ink flex items-center justify-center p-6 relative overflow-hidden">
       <DecorBlobs />
-      <div className="relative z-10 bg-blue-950/50 backdrop-blur-xl rounded-3xl shadow-2xl p-12 w-full max-w-lg border border-blue-800/40">
-        <Header title="Join DahTruth Story Lab" subtitle="Begin your writing journey today" />
+      <div className="relative w-full max-w-lg bg-white/80 backdrop-blur border border-border rounded-3xl p-10 shadow-2xl">
+        <Header
+          title="Create your account"
+          subtitle="Begin your writing journey today"
+        />
+
         {msg && <Banner ok>{msg}</Banner>}
         {err && <Banner>{err}</Banner>}
 
-        <form onSubmit={onRegister} className="space-y-6" noValidate>
+        <form onSubmit={onRegister} className="space-y-5" noValidate>
           <div className="grid grid-cols-2 gap-4">
-            <Input name="firstName" value={form.firstName} onChange={onChange} placeholder="First Name" required />
-            <Input name="lastName"  value={form.lastName}  onChange={onChange} placeholder="Last Name"  required />
+            <Input name="firstName" value={form.firstName} onChange={onChange} placeholder="First name" required />
+            <Input name="lastName"  value={form.lastName}  onChange={onChange} placeholder="Last name"  required />
           </div>
 
           <Input
@@ -237,34 +259,55 @@ export default function RegistrationPage() {
             name="email"
             value={form.email}
             onChange={onChange}
-            placeholder="Email Address"
+            placeholder="Email address"
             autoComplete="email"
             required
             leftIcon={<Mail className="h-5 w-5" />}
           />
 
-          <Password
-            name="password"
-            value={form.password}
-            onChange={onChange}
-            placeholder="Password"
-            show={showPwd}
-            setShow={setShowPwd}
-            autoComplete="new-password"
-          />
+          {/* Password + tooltip */}
+          <div className="space-y-3">
+            <Password
+              name="password"
+              value={form.password}
+              onChange={onChange}
+              placeholder="Password"
+              show={showPwd}
+              setShow={setShowPwd}
+              autoComplete="new-password"
+              rightAdornment={
+                <PwInfoPopover open={showPwHelp} setOpen={setShowPwHelp} />
+              }
+            />
 
-          <Password
-            name="confirmPassword"
-            value={form.confirmPassword}
-            onChange={onChange}
-            placeholder="Confirm Password"
-            show={showPwd2}
-            setShow={setShowPwd2}
-            autoComplete="new-password"
-          />
+            <Password
+              name="confirmPassword"
+              value={form.confirmPassword}
+              onChange={onChange}
+              placeholder="Confirm password"
+              show={showPwd2}
+              setShow={setShowPwd2}
+              autoComplete="new-password"
+            />
+          </div>
 
-          <div className="text-sm text-blue-200 bg-blue-900/30 p-4 rounded-xl font-serif">
-            Password must contain at least 8 characters with uppercase, lowercase, number, and special character.
+          {/* Terms & Privacy */}
+          <div className="flex items-start gap-3 rounded-xl bg-white/70 border border-border p-3">
+            <input
+              id="agree"
+              type="checkbox"
+              checked={agree}
+              onChange={onChange}
+              name="agree"
+              className="mt-1 h-4 w-4 rounded border-border text-primary focus:ring-primary"
+              required
+            />
+            <label htmlFor="agree" className="text-sm text-ink">
+              I agree to the{' '}
+              <a href="/terms" className="text-primary hover:opacity-80 underline underline-offset-2">Terms of Service</a>
+              {' '}and{' '}
+              <a href="/privacy" className="text-primary hover:opacity-80 underline underline-offset-2">Privacy Policy</a>.
+            </label>
           </div>
 
           <Button type="submit" loading={loading} grad>
@@ -273,12 +316,12 @@ export default function RegistrationPage() {
         </form>
 
         <div className="text-center mt-8">
-          <p className="text-blue-200 text-sm font-serif">
+          <p className="text-muted text-sm font-serif">
             Already have an account?{' '}
             <button
               type="button"
               onClick={() => navigate('/signin')}
-              className="text-blue-300 hover:text-blue-100 font-medium transition-colors"
+              className="text-primary hover:opacity-80 font-medium transition"
             >
               Sign in
             </button>
@@ -288,7 +331,7 @@ export default function RegistrationPage() {
         <button
           type="button"
           onClick={() => navigate('/')}
-          className="w-full mt-4 text-blue-300 text-sm hover:text-blue-100 font-serif transition-colors"
+          className="w-full mt-4 text-muted hover:text-ink font-serif text-sm transition"
         >
           ← Back to Home
         </button>
@@ -297,36 +340,41 @@ export default function RegistrationPage() {
   );
 }
 
-/* ---------- Pretty UI helpers ---------- */
+/* ---------- UI helpers (light/glass theme) ---------- */
 function DecorBlobs() {
   return (
-    <div className="absolute inset-0 opacity-15">
-      <div className="absolute top-20 left-10 w-72 h-72 bg-blue-500 rounded-full mix-blend-multiply filter blur-xl animate-pulse"></div>
-      <div className="absolute bottom-20 right-10 w-72 h-72 bg-teal-500 rounded-full mix-blend-multiply filter blur-xl animate-pulse delay-700"></div>
+    <div className="absolute inset-0 opacity-20 pointer-events-none">
+      <div className="absolute top-20 left-10 w-72 h-72 bg-accent rounded-full mix-blend-multiply blur-xl animate-pulse" />
+      <div className="absolute top-40 right-10 w-80 h-80 bg-primary rounded-full mix-blend-multiply blur-xl animate-pulse" />
+      <div className="absolute -bottom-10 left-24 w-64 h-64 bg-gold/60 rounded-full mix-blend-multiply blur-xl animate-pulse" />
     </div>
   );
 }
 
 function Header({ title, subtitle, icon }) {
   return (
-    <div className="text-center mb-10">
-      <div className="w-20 h-20 rounded-full overflow-hidden shadow-2xl border-2 border-blue-400/30 mx-auto mb-6">
-        <img src="/dahtruth-logo.png" alt="DahTruth Story Lab Logo" className="w-full h-full object-cover" />
+    <div className="text-center mb-8">
+      <div className="mx-auto w-16 h-16 rounded-full overflow-hidden border border-border bg-white/80 shadow">
+        <img src={LOGO_SRC} alt="DahTruth Story Lab logo" className="w-full h-full object-contain" />
       </div>
+      <h1 className="mt-3 text-xl font-bold font-serif tracking-tight">DahTruth Story Lab</h1>
+      <p className="text-sm text-muted font-serif italic">Where the writing journey begins.</p>
       {icon ? (
-        <div className="bg-blue-600/30 rounded-full p-4 w-20 h-20 mx-auto mb-6 flex items-center justify-center">
+        <div className="mt-4 inline-flex items-center justify-center rounded-full bg-primary/10 text-primary p-3">
           {icon}
         </div>
       ) : null}
-      <h2 className="text-3xl font-bold text-white font-serif mb-3">{title}</h2>
-      {subtitle ? <p className="text-blue-200 font-serif">{subtitle}</p> : null}
+      <h2 className="mt-4 text-2xl font-bold font-serif">{title}</h2>
+      {subtitle ? <p className="text-muted font-serif mt-1">{subtitle}</p> : null}
     </div>
   );
 }
 
 function Banner({ children, ok }) {
   return (
-    <div className={`mb-6 p-4 rounded-xl flex items-center backdrop-blur-sm border ${ok ? 'bg-green-500/20 border-green-400/30 text-green-100' : 'bg-red-500/20 border-red-400/30 text-red-100'}`}>
+    <div className={`mb-5 p-3 rounded-xl flex items-center border ${
+      ok ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-rose-50 border-rose-200 text-rose-800'
+    }`}>
       {ok ? <CheckCircle className="h-5 w-5 mr-2" /> : <XCircle className="h-5 w-5 mr-2" />}
       <span className="text-sm font-serif">{children}</span>
     </div>
@@ -335,24 +383,27 @@ function Banner({ children, ok }) {
 
 function Input({ leftIcon, className = '', ...props }) {
   return (
-    <div className="relative group">
-      {leftIcon ? <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-blue-300">{leftIcon}</div> : null}
+    <div className="relative">
+      {leftIcon ? (
+        <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-muted">
+          {leftIcon}
+        </div>
+      ) : null}
       <input
         {...props}
-        className={`w-full ${leftIcon ? 'pl-12' : 'pl-4'} pr-4 py-4 bg-blue-900/30 border border-blue-700/50 rounded-xl 
-          text-white placeholder-blue-300 backdrop-blur-sm
-          focus:ring-2 focus:ring-blue-400 focus:border-blue-400 focus:bg-blue-900/40
-          transition-all duration-300 font-serif ${className}`}
+        className={`w-full ${leftIcon ? 'pl-12' : 'pl-4'} pr-4 py-3 bg-white border border-border rounded-xl 
+          text-ink placeholder:text-muted backdrop-blur-sm
+          focus:border-primary focus:outline-none transition ${className}`}
       />
     </div>
   );
 }
 
-function Password({ name, value, onChange, placeholder, show, setShow, autoComplete }) {
+function Password({ name, value, onChange, placeholder, show, setShow, autoComplete, rightAdornment }) {
   return (
-    <div className="relative group">
-      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-        <Lock className="h-5 w-5 text-blue-300" />
+    <div className="relative">
+      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-muted">
+        <Lock className="h-5 w-5" />
       </div>
       <input
         type={show ? 'text' : 'password'}
@@ -361,35 +412,73 @@ function Password({ name, value, onChange, placeholder, show, setShow, autoCompl
         onChange={onChange}
         placeholder={placeholder}
         autoComplete={autoComplete}
-        className="w-full pl-12 pr-12 py-4 bg-blue-900/30 border border-blue-700/50 rounded-xl 
-          text-white placeholder-blue-300 backdrop-blur-sm
-          focus:ring-2 focus:ring-blue-400 focus:border-blue-400 focus:bg-blue-900/40
-          transition-all duration-300 font-serif"
+        className="w-full pl-12 pr-12 py-3 bg-white border border-border rounded-xl 
+          text-ink placeholder:text-muted backdrop-blur-sm
+          focus:border-primary focus:outline-none transition"
         required
       />
       <button
         type="button"
-        className="absolute inset-y-0 right-0 pr-4 flex items-center text-blue-300 hover:text-blue-100 transition-colors"
+        className="absolute inset-y-0 right-9 pr-2 flex items-center text-muted hover:text-ink transition"
         onClick={() => setShow(!show)}
+        aria-label={show ? 'Hide password' : 'Show password'}
       >
         {show ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
       </button>
+      {/* Right adornment (tooltip trigger) */}
+      <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
+        {rightAdornment || null}
+      </div>
     </div>
   );
 }
 
 function Button({ children, loading, grad, ...rest }) {
   const base = grad
-    ? 'bg-gradient-to-r from-blue-500 to-teal-500 hover:from-blue-400 hover:to-teal-400'
-    : 'bg-indigo-600 hover:bg-indigo-500';
+    ? 'bg-gradient-to-r from-accent to-primary text-ink hover:opacity-90'
+    : 'bg-primary text-white hover:opacity-90';
   return (
     <button
       {...rest}
       disabled={loading}
-      className={`w-full ${base} text-white py-4 px-6 rounded-xl font-serif font-bold text-lg transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center shadow-xl hover:shadow-2xl hover:scale-105`}
+      className={`w-full ${base} py-3 px-6 rounded-xl font-serif font-bold text-lg transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center shadow-xl`}
     >
-      {loading ? <Loader2 className="animate-spin h-6 w-6 mr-2" /> : null}
+      {loading ? <Loader2 className="animate-spin h-5 w-5 mr-2" /> : null}
       {children}
     </button>
+  );
+}
+
+/* Password tooltip (popover) */
+function PwInfoPopover({ open, setOpen }) {
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        className="p-1.5 rounded-md text-muted hover:text-ink hover:bg-white/70 border border-border"
+        aria-expanded={open}
+        aria-label="Password requirements"
+      >
+        <Info className="h-4 w-4" />
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-9 w-72 z-10 rounded-xl bg-white border border-border shadow-xl p-3">
+          <div className="flex items-center gap-2 mb-2">
+            <ShieldCheck className="h-5 w-5 text-primary" />
+            <span className="text-sm font-semibold text-ink">Password requirements</span>
+          </div>
+          <ul className="text-sm text-ink/80 space-y-1">
+            <li className="flex items-center gap-2"><KeyRound className="h-4 w-4 text-primary" /> At least 8 characters</li>
+            <li className="flex items-center gap-2"><KeyRound className="h-4 w-4 text-primary" /> One uppercase letter</li>
+            <li className="flex items-center gap-2"><KeyRound className="h-4 w-4 text-primary" /> One lowercase letter</li>
+            <li className="flex items-center gap-2"><KeyRound className="h-4 w-4 text-primary" /> One number</li>
+            <li className="flex items-center gap-2"><KeyRound className="h-4 w-4 text-primary" /> One special character</li>
+          </ul>
+        </div>
+      )}
+    </div>
   );
 }
