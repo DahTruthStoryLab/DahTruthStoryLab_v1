@@ -3,7 +3,7 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   BookOpen, Brain, Heart,
-  Sparkles, PenLine, Feather, ScrollText, Compass, Star, Quote
+  Feather, PenLine, ScrollText, Compass, Star, Users
 } from 'lucide-react';
 
 const LOGO_SRC = "/DahTruthLogo.png"; // put DahTruthLogo.png in /public
@@ -49,6 +49,7 @@ export default function LandingPage() {
               </div>
             </div>
 
+            {/* Only sign-in lives here; create account made high-contrast */}
             <div className="flex items-center gap-3">
               <button
                 onClick={goSignIn}
@@ -70,12 +71,7 @@ export default function LandingPage() {
       {/* Hero */}
       <main className="relative z-10 max-w-7xl mx-auto px-6 py-16">
         <div className="text-center mb-16">
-          {/* Brand badge */}
-          <div className="inline-flex items-center gap-2 rounded-full px-4 py-2 bg-white/70 border border-white/60 backdrop-blur mb-6">
-            <Sparkles className="w-4 h-4 text-primary" />
-            <span className="text-xs tracking-wide text-muted">DahTruth Story Lab</span>
-          </div>
-
+          {/* (Removed the small "DahTruth Story Lab" badge above the headline) */}
           <h2 className="text-5xl sm:text-6xl font-bold mb-6 font-serif leading-tight">
             Write boldly. <span className="text-gold">Edit clearly.</span><br />
             <span className="text-accent">Publish confidently.</span>
@@ -85,41 +81,19 @@ export default function LandingPage() {
             An inspiring, faith-centered space to plan, draft, and finish your novel—supported by smart tools and a caring community.
           </p>
 
-          {/* CTA buttons */}
-          <div className="flex flex-col sm:flex-row gap-6 justify-center mt-12">
+          {/* CTA buttons (removed secondary Sign In here) */}
+          <div className="flex justify-center mt-12">
             <button
               onClick={goRegister}
               className="px-8 py-4 rounded-full bg-gradient-to-r from-accent to-primary text-ink font-serif font-bold text-lg transition-all duration-300 shadow-2xl hover:opacity-90 hover:scale-105"
             >
               Start 8-Week Challenge
             </button>
-            <button
-              onClick={goSignIn}
-              className="px-8 py-4 rounded-full glass-soft border border-white/60 text-ink font-serif text-lg transition-all duration-300 hover:bg-white/80"
-            >
-              Sign In
-            </button>
-          </div>
-
-          {/* Icon strip */}
-          <div className="mt-10 flex flex-wrap items-center justify-center gap-6 text-muted">
-            <div className="inline-flex items-center gap-2">
-              <PenLine className="w-4 h-4 text-primary" /> Daily prompts
-            </div>
-            <div className="inline-flex items-center gap-2">
-              <ScrollText className="w-4 h-4 text-accent" /> Scene planning
-            </div>
-            <div className="inline-flex items-center gap-2">
-              <Star className="w-4 h-4 text-gold" /> Milestone goals
-            </div>
-            <div className="inline-flex items-center gap-2">
-              <Quote className="w-4 h-4 text-primary" /> Encouragement
-            </div>
           </div>
         </div>
 
         {/* Challenge Section */}
-        <section className="glass-panel rounded-3xl p-10 md:p-12 mb-16 border border-white/60 shadow-2xl">
+        <section className="glass-panel rounded-3xl p-10 md:p-12 mb-12 border border-white/60 shadow-2xl">
           <div className="text-center mb-10">
             <h3 className="text-3xl sm:text-4xl font-bold mb-4 font-serif">8-Week Novel Challenge</h3>
             <p className="text-xl text-ink/80 font-serif leading-relaxed max-w-3xl mx-auto">
@@ -150,8 +124,24 @@ export default function LandingPage() {
           </div>
         </section>
 
+        {/* List below the 8-week challenge */}
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-6 text-muted">
+          <div className="inline-flex items-center gap-2">
+            <PenLine className="w-4 h-4 text-primary" /> Writing prompts
+          </div>
+          <div className="inline-flex items-center gap-2">
+            <ScrollText className="w-4 h-4 text-accent" /> Scene planning
+          </div>
+          <div className="inline-flex items-center gap-2">
+            <Brain className="w-4 h-4 text-primary" /> Character development
+          </div>
+          <div className="inline-flex items-center gap-2">
+            <Users className="w-4 h-4 text-gold" /> Lab collaboration
+          </div>
+        </div>
+
         {/* Features Grid */}
-        <section className="grid md:grid-cols-3 gap-8">
+        <section className="mt-12 grid md:grid-cols-3 gap-8">
           <div className="glass-soft rounded-2xl p-8 border border-white/60 hover:scale-105 transition-all duration-300 shadow-xl">
             <div className="flex items-start gap-4 mb-6">
               <div className="flex items-center justify-center w-12 h-12 rounded-lg bg-primary/15">
