@@ -576,7 +576,7 @@ export default function Dashboard() {
                     <h2 className="text-xl font-bold text-ink">Recent Activity</h2>
                     <ChevronRight size={20} className="text-ink/60 hover:text-ink transition-colors cursor-pointer" />
                   </div>
-
+                          
                   <div className="space-y-4">
                     {recentChapters.length === 0 ? (
                       <div className="text-center py-8">
