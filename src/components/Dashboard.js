@@ -1,13 +1,13 @@
 // src/components/Dashboard.js
 import React, { useState, useEffect } from "react";
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation } from "react-router-dom";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import {
   Play, Plus, Settings, PencilLine, BookOpen, Calendar, Layers,
   UploadCloud, Store, User, Info, Home, ChevronRight, Menu, X, Bell, Search, FileText
 } from "lucide-react";
 
-// --------- Empty/Default Data (to be populated by user) ---------
+// --------- Demo/Default Data ---------
 const writingActivity = [
   { day: "Mon", words: 0 },
   { day: "Tue", words: 0 },
@@ -20,25 +20,21 @@ const writingActivity = [
 
 const recentChapters = [];
 
-// --------- Utility Components ---------
+// --------- Small UI helpers ---------
 const Card = ({ children, className = "", onClick }) => (
   <div className={`rounded-2xl glass-panel ${className}`} onClick={onClick}>
     {children}
   </div>
 );
-
 const CardBody = ({ children, className = "" }) => (
   <div className={`p-5 ${className}`}>{children}</div>
 );
-
 const StatLabel = ({ children }) => (
   <p className="text-xs uppercase tracking-wide text-muted">{children}</p>
 );
-
 const StatValue = ({ children }) => (
   <p className="text-3xl font-semibold text-ink mt-1">{children}</p>
 );
-
 const Progress = ({ value }) => (
   <div className="h-2 w-full rounded-full bg-primary/20">
     <div
@@ -48,34 +44,9 @@ const Progress = ({ value }) => (
   </div>
 );
 
-// --------- Top Banner Component ---------
-const TopBanner = () => (
-  <div className="bg-white/70 backdrop-blur-xl border-b border-white/60 text-ink sticky top-0 z-50">
-    <div className="px-6 py-3">
-      <div className="flex items-center justify-between">
-        <div className="flex-1" />
-        <div className="flex items-center gap-4">
-          <button className="p-2 rounded-lg hover:bg-white/70 hover:text-ink transition-colors">
-            <Search size={16} />
-          </button>
-          <button className="p-2 rounded-lg hover:bg-white/70 hover:text-ink transition-colors relative">
-            <Bell size={16} />
-            <div className="absolute -top-1 -right-1 w-3 h-3 bg-gold rounded-full" />
-          </button>
-          <div className="text-sm">
-            <span className="text-muted">Welcome back!</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-);
-
-// --------- Sidebar Component ---------
+// --------- Sidebar ---------
 const Sidebar = ({ isOpen, onClose, authorName, navigate, userNovels = [] }) => {
-  const location = useLocation();
-  const activePath = location.pathname;
-
+  const { pathname } = useLocation();
   const menuItems = [
     { icon: Home,       label: "Dashboard",         path: "/dashboard" },
     { icon: PencilLine, label: "Write",             path: "/writer" },
@@ -90,23 +61,21 @@ const Sidebar = ({ isOpen, onClose, authorName, navigate, userNovels = [] }) => 
 
   return (
     <>
-      {/* Mobile Overlay */}
-      {isOpen && (
-        <div className="fixed inset-0 bg-black/30 z-40 lg:hidden" onClick={onClose} />
-      )}
+      {/* Mobile overlay */}
+      {isOpen && <div className="fixed inset-0 bg-black/30 z-40 lg:hidden" onClick={onClose} />}
 
-      {/* Sidebar */}
+      {/* Sidebar — top-0 + h-screen since top banner is gone */}
       <div
         className={`
-          fixed top-16 left-0 h-[calc(100vh-4rem)] w-80 glass-panel z-40
+          fixed top-0 left-0 h-screen w-80 glass-panel bg-white/70 backdrop-blur-xl border-r border-white/60 z-40
           transform transition-transform duration-300 ease-in-out
-          ${isOpen ? 'translate-x-0' : '-translate-x-full'}
-          lg:translate-x-0 lg:static lg:z-auto lg:h-[calc(100vh-4rem)]
+          ${isOpen ? "translate-x-0" : "-translate-x-full"}
+          lg:translate-x-0 lg:static lg:z-auto lg:h-screen
           flex flex-col overflow-hidden
         `}
       >
-        {/* Tight top header with logo pinned to top */}
-        <div className="px-5 py-4 border-b border-white/60 flex-shrink-0">
+        {/* Header with DahTruth logo — pinned at the very top */}
+        <div className="px-5 py-3 border-b border-white/60 flex-shrink-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <img
@@ -115,7 +84,7 @@ const Sidebar = ({ isOpen, onClose, authorName, navigate, userNovels = [] }) => 
                 className="w-12 h-12 rounded-full shadow-lg border-2 border-white/20"
               />
               <div className="leading-tight">
-                <span className="block font-bold text-lg text-ink" style={{ fontFamily: 'Georgia, serif' }}>
+                <span className="block font-bold text-lg text-ink" style={{ fontFamily: "Georgia, serif" }}>
                   DahTruth
                 </span>
                 <span className="block text-xs text-muted -mt-0.5">StoryLab</span>
@@ -123,41 +92,49 @@ const Sidebar = ({ isOpen, onClose, authorName, navigate, userNovels = [] }) => 
             </div>
             <button
               onClick={onClose}
-              className="lg:hidden text-muted hover:text-ink transition-colors p-1 rounded-lg hover:bg-white/70"
+              className="lg:hidden text-muted hover:text-ink p-1 rounded-lg hover:bg-white/70 transition-colors"
+              aria-label="Close sidebar"
             >
               <X size={20} />
             </button>
           </div>
-          <p className="text-xs text-muted mt-2">Where your story comes to life</p>
+          <p className="text-xs text-muted mt-1">Where your story comes to life</p>
         </div>
 
-        {/* Aerodynamic Menu (no scale jump; left accent bar on hover/active) */}
-        <nav className="p-4 space-y-1.5 flex-1 overflow-y-auto">
+        {/* Aerodynamic Menu with translucent hover highlight */}
+        <nav className="p-3 space-y-1.5 flex-1 overflow-y-auto">
           {menuItems.map((item) => {
-            const isActive = activePath === item.path;
+            const isActive = pathname === item.path;
             return (
               <button
                 key={item.path}
                 type="button"
+                role="menuitem"
+                aria-current={isActive ? "page" : undefined}
                 onClick={() => navigate(item.path)}
                 className={`
-                  relative w-full h-11 rounded-xl text-left flex items-center gap-3 px-4
+                  group relative w-full h-11 rounded-xl border
+                  flex items-center gap-3 px-4
                   transition-colors duration-150
                   ${isActive
-                    ? 'bg-white/80 border border-border'
-                    : 'hover:bg-white/70 border border-transparent'
-                  }
+                    ? "bg-white/80 border-white/60"
+                    : "bg-transparent border-transparent hover:bg-accent/15 hover:border-white/60"}
                 `}
               >
                 {/* left accent rail */}
                 <span
                   className={`
-                    absolute left-0 top-2 bottom-2 w-1 rounded-full
-                    transition-all ${isActive ? 'bg-primary' : 'bg-transparent group-hover:bg-primary/60'}
+                    absolute left-0 top-1.5 bottom-1.5 w-1 rounded-full transition-all
+                    ${isActive ? "bg-primary" : "bg-transparent group-hover:bg-primary/60"}
                   `}
                 />
-                <item.icon size={18} className={`shrink-0 ${isActive ? 'text-ink' : 'text-ink/80'}`} />
-                <span className={`font-medium ${isActive ? 'text-ink' : 'text-ink/90'}`}>{item.label}</span>
+                {/* translucent hover veil */}
+                <span className="absolute inset-0 rounded-xl bg-white/40 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+                {/* content */}
+                <item.icon size={18} className={`relative z-10 ${isActive ? "text-ink" : "text-ink/80"}`} />
+                <span className={`relative z-10 font-medium ${isActive ? "text-ink" : "text-ink/90"}`}>
+                  {item.label}
+                </span>
               </button>
             );
           })}
@@ -170,8 +147,9 @@ const Sidebar = ({ isOpen, onClose, authorName, navigate, userNovels = [] }) => 
               Your Novels ({userNovels.length})
             </h3>
             <button
-              onClick={() => navigate('/writer')}
-              className="text-ink hover:opacity-80 p-1 rounded-lg hover:bg-white/70 transition-all duration-150"
+              onClick={() => navigate("/writer")}
+              className="text-ink hover:opacity-80 p-1 rounded-lg hover:bg-white/70 transition-colors"
+              aria-label="Create novel"
             >
               <Plus size={16} />
             </button>
@@ -184,21 +162,17 @@ const Sidebar = ({ isOpen, onClose, authorName, navigate, userNovels = [] }) => 
                 <p className="text-xs text-muted mt-1">Click + to create your first story</p>
               </div>
             ) : (
-              userNovels.map((novel, index) => (
+              userNovels.map((novel, i) => (
                 <button
-                  key={novel.id || index}
-                  onClick={() => navigate('/writer')}
+                  key={novel.id || i}
+                  onClick={() => navigate("/writer")}
                   className="w-full text-left p-3 rounded-lg glass-soft hover:bg-white/80 transition-colors"
                 >
-                  <h4 className="text-sm font-medium text-ink truncate">
-                    {novel.title || "Untitled Story"}
-                  </h4>
+                  <h4 className="text-sm font-medium text-ink truncate">{novel.title || "Untitled Story"}</h4>
                   <p className="text-xs text-muted">
                     {novel.words || novel.wordCount || 0} words
                     {novel.lastModified && (
-                      <span className="ml-2 opacity-75">
-                        • {new Date(novel.lastModified).toLocaleDateString()}
-                      </span>
+                      <span className="ml-2 opacity-75">• {new Date(novel.lastModified).toLocaleDateString()}</span>
                     )}
                   </p>
                 </button>
@@ -207,33 +181,34 @@ const Sidebar = ({ isOpen, onClose, authorName, navigate, userNovels = [] }) => 
           </div>
         </div>
 
-        {/* Author Info */}
+        {/* Author info */}
         <div className="p-4 border-t border-white/60 flex-shrink-0">
           <div className="p-4 glass-soft rounded-xl hover:bg-white/80 transition-colors">
             <div className="flex items-center gap-3 mb-3">
               <div className="w-8 h-8 rounded-full bg-gradient-to-br from-accent via-primary to-gold grid place-items-center shadow-md">
-                <span className="text-ink font-bold text-xs">{authorName.charAt(0).toUpperCase()}</span>
+                <span className="text-ink font-bold text-xs">{authorName?.charAt(0)?.toUpperCase?.() || "A"}</span>
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-ink truncate">{authorName}</p>
+                <p className="text-sm font-medium text-ink truncate">{authorName || "Author"}</p>
                 <p className="text-xs text-muted">Author</p>
               </div>
               <button
-                onClick={() => navigate('/profile')}
+                onClick={() => navigate("/profile")}
                 className="text-muted hover:text-ink p-1 rounded-lg hover:bg-white/70 transition-colors"
+                aria-label="Open profile settings"
               >
                 <Settings size={16} />
               </button>
             </div>
             <div className="space-y-2">
               <button
-                onClick={() => navigate('/profile')}
+                onClick={() => navigate("/profile")}
                 className="w-full text-left px-3 py-2 text-xs text-muted hover:text-ink hover:bg-white/70 rounded-lg transition-colors"
               >
                 Account Settings
               </button>
               <button
-                onClick={() => navigate('/')}
+                onClick={() => navigate("/")}
                 className="w-full text-left px-3 py-2 text-xs text-muted hover:text-ink hover:bg-white/70 rounded-lg transition-colors"
               >
                 Sign Out
@@ -246,7 +221,25 @@ const Sidebar = ({ isOpen, onClose, authorName, navigate, userNovels = [] }) => 
   );
 };
 
-// --------- Main Dashboard Component ---------
+// --------- Profile name helper (pull from multiple keys; live-updates) ---------
+function readAuthorName() {
+  try {
+    const keys = ["userProfile", "profile", "dt_profile", "currentUser"];
+    for (const key of keys) {
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      const obj = JSON.parse(raw);
+      if (obj.displayName) return obj.displayName;
+      const fn = obj.firstName || obj.given_name;
+      const ln = obj.lastName || obj.family_name;
+      if (fn || ln) return [fn, ln].filter(Boolean).join(" ");
+      if (obj.username) return obj.username;
+    }
+  } catch {}
+  return "New Author";
+}
+
+// --------- Main Dashboard ---------
 export default function Dashboard() {
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -254,68 +247,56 @@ export default function Dashboard() {
   const [authorName, setAuthorName] = useState("New Author");
   const [userNovels, setUserNovels] = useState([]);
 
-  // Get user data from localStorage and other sources
+  // init profile + novels
   useEffect(() => {
-    const userData = localStorage.getItem('currentUser');
-    const profileData = localStorage.getItem('userProfile');
-
-    if (profileData) {
-      const profile = JSON.parse(profileData);
-      if (profile.firstName && profile.lastName) {
-        setAuthorName(`${profile.firstName} ${profile.lastName}`);
-      } else if (profile.displayName) {
-        setAuthorName(profile.displayName);
-      }
-    } else if (userData) {
-      const user = JSON.parse(userData);
-      setAuthorName(`${user.firstName} ${user.lastName}`);
-    } else {
-      const mockUser = { firstName: "New", lastName: "Author" };
-      setAuthorName(`${mockUser.firstName} ${mockUser.lastName}`);
-    }
-
-    // Projects / novels
-    const projectData = localStorage.getItem('userProjects');
-    const novelsData = localStorage.getItem('userNovels');
-
-    if (projectData) {
-      setUserNovels(JSON.parse(projectData));
-    } else if (novelsData) {
-      setUserNovels(JSON.parse(novelsData));
-    } else {
-      const storyData = localStorage.getItem('currentStory');
+    setAuthorName(readAuthorName());
+    const projectData = localStorage.getItem("userProjects");
+    const novelsData = localStorage.getItem("userNovels");
+    if (projectData) setUserNovels(JSON.parse(projectData));
+    else if (novelsData) setUserNovels(JSON.parse(novelsData));
+    else {
+      const storyData = localStorage.getItem("currentStory");
       if (storyData) {
-        const story = JSON.parse(storyData);
-        setUserNovels([{
-          id: story.id || 1,
-          title: story.title || "Untitled Story",
-          words: story.wordCount || 0,
-          lastModified: story.lastModified || new Date().toISOString()
-        }]);
+        const s = JSON.parse(storyData);
+        setUserNovels([
+          {
+            id: s.id || 1,
+            title: s.title || "Untitled Story",
+            words: s.wordCount || 0,
+            lastModified: s.lastModified || new Date().toISOString(),
+          },
+        ]);
       }
     }
   }, []);
 
-  // Greeting
+  // live refresh name on profile update or storage changes
   useEffect(() => {
-    const hour = new Date().getHours();
-    if (hour < 12) setGreeting("Good Morning");
-    else if (hour < 17) setGreeting("Good Afternoon");
+    const refresh = () => setAuthorName(readAuthorName());
+    window.addEventListener("storage", refresh);
+    window.addEventListener("profile:updated", refresh);
+    return () => {
+      window.removeEventListener("storage", refresh);
+      window.removeEventListener("profile:updated", refresh);
+    };
+  }, []);
+
+  // greeting
+  useEffect(() => {
+    const h = new Date().getHours();
+    if (h < 12) setGreeting("Good Morning");
+    else if (h < 17) setGreeting("Good Afternoon");
     else setGreeting("Good Evening");
   }, []);
 
-  const goal = 25000;
-  const current = 0;
-  const todayTarget = 834;
-  const todayWritten = 0;
+  // simple stats
+  const goal = 25000, current = 0;
+  const todayTarget = 834, todayWritten = 0;
   const goalPercent = Math.min(100, Math.round((current / goal) * 100));
   const todayPercent = Math.min(100, Math.round((todayWritten / todayTarget) * 100));
 
   return (
     <div className="min-h-screen bg-base bg-radial-fade text-ink">
-      {/* Top Banner */}
-      <TopBanner />
-
       <div className="flex">
         {/* Sidebar */}
         <Sidebar
@@ -326,22 +307,22 @@ export default function Dashboard() {
           navigate={navigate}
         />
 
-        {/* Main Content */}
-        <div className="flex-1 lg:ml-0 min-h-[calc(100vh-4rem)] flex flex-col">
-          {/* Header */}
-          <div className="sticky top-16 z-30 bg-white/70 backdrop-blur-xl border-b border-white/60 shadow">
+        {/* Main */}
+        <div className="flex-1 min-h-screen flex flex-col">
+          {/* Header (no top banner; pulled to top) */}
+          <div className="sticky top-0 z-30 bg-white/70 backdrop-blur-xl border-b border-white/60 shadow">
             <div className="px-6 py-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
                   <button
                     onClick={() => setSidebarOpen(true)}
                     className="lg:hidden text-muted hover:text-ink p-2 rounded-lg hover:bg-white/70 transition-colors"
+                    aria-label="Open sidebar"
                   >
                     <Menu size={24} />
                   </button>
                   <div>
                     <h1 className="text-2xl md:text-3xl font-extrabold text-ink">
-                      {/* Replace star with writing-aligned icon */}
                       <span className="mr-2">📝</span>
                       {greeting}, Ready to Write?
                     </h1>
@@ -354,19 +335,31 @@ export default function Dashboard() {
                   </div>
                 </div>
 
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => navigate('/writer')}
-                    className="inline-flex items-center gap-2 rounded-2xl bg-accent hover:opacity-90 px-4 py-2 text-sm font-semibold shadow"
-                  >
-                    <Plus size={16} /> Create Novel
-                  </button>
-                  <button
-                    onClick={() => navigate('/writer')}
-                    className="inline-flex items-center gap-2 rounded-2xl glass-soft border border-white/40 px-4 py-2 text-sm font-semibold"
-                  >
-                    <Play size={16} /> Quick Start
-                  </button>
+                <div className="flex flex-col items-end gap-2">
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => navigate("/writer")}
+                      className="inline-flex items-center gap-2 rounded-2xl bg-accent hover:opacity-90 px-4 py-2 text-sm font-semibold shadow"
+                    >
+                      <Plus size={16} /> Create Novel
+                    </button>
+                    <button
+                      onClick={() => navigate("/writer")}
+                      className="inline-flex items-center gap-2 rounded-2xl glass-soft border border-white/40 px-4 py-2 text-sm font-semibold"
+                    >
+                      <Play size={16} /> Quick Start
+                    </button>
+                  </div>
+                  {/* Search + Bell moved beneath quick-start buttons */}
+                  <div className="flex items-center gap-2">
+                    <button className="p-2 rounded-lg glass-soft hover:bg-white/80 transition-colors" title="Search">
+                      <Search size={16} />
+                    </button>
+                    <button className="p-2 rounded-lg glass-soft hover:bg-white/80 transition-colors relative" title="Notifications">
+                      <Bell size={16} />
+                      <span className="absolute -top-1 -right-1 w-3 h-3 bg-gold rounded-full" />
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -383,12 +376,13 @@ export default function Dashboard() {
                       src="/DahTruthLogo.png"
                       alt="DahTruth Logo"
                       className="w-16 h-16 rounded-full shadow-lg border-2 border-white/20"
-                      onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                      onError={(e) => { e.currentTarget.style.display = "none"; }}
                     />
-                    {/* removed the pencil/book/paper icon trio here */}
                   </div>
-                  <h2 className="text-xl font-bold text-ink mb-3 flex items-center justify-center gap-2" style={{ fontFamily: 'Georgia, serif' }}>
-                    {/* paper & pencil vibe (left only) */}
+                  <h2
+                    className="text-xl font-bold text-ink mb-3 flex items-center justify-center gap-2"
+                    style={{ fontFamily: "Georgia, serif" }}
+                  >
                     <span className="text-xl">📝</span>
                     Welcome to DahTruth StoryLab!
                   </h2>
@@ -398,7 +392,7 @@ export default function Dashboard() {
                   </p>
                   <div className="flex gap-3 justify-center">
                     <button
-                      onClick={() => navigate('/writer')}
+                      onClick={() => navigate("/writer")}
                       className="inline-flex items-center gap-2 rounded-2xl bg-accent hover:opacity-90 px-5 py-2.5 text-sm font-semibold shadow"
                     >
                       <Plus size={16} /> Create Your First Novel
@@ -472,7 +466,7 @@ export default function Dashboard() {
                       {new Date().getDate()}
                     </div>
                     <div className="text-muted text-sm uppercase tracking-wide">
-                      {new Date().toLocaleDateString('en-US', { month: 'short', weekday: 'short' })}
+                      {new Date().toLocaleDateString("en-US", { month: "short", weekday: "short" })}
                     </div>
                   </div>
                 </CardBody>
@@ -481,7 +475,7 @@ export default function Dashboard() {
 
             {/* Quick Access */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <Card className="cursor-pointer hover:border-primary/50" onClick={() => navigate('/toc')}>
+              <Card className="cursor-pointer hover:border-white/60" onClick={() => navigate("/toc")}>
                 <CardBody className="text-center">
                   <BookOpen size={24} className="mx-auto mb-2 text-ink" />
                   <p className="font-semibold">Table of Contents</p>
@@ -489,7 +483,7 @@ export default function Dashboard() {
                 </CardBody>
               </Card>
 
-              <Card className="cursor-pointer hover:border-primary/50" onClick={() => navigate('/writer')}>
+              <Card className="cursor-pointer hover:border-white/60" onClick={() => navigate("/writer")}>
                 <CardBody className="text-center">
                   <PencilLine size={24} className="mx-auto mb-2 text-ink" />
                   <p className="font-semibold">Writer</p>
@@ -497,7 +491,7 @@ export default function Dashboard() {
                 </CardBody>
               </Card>
 
-              <Card className="cursor-pointer hover:border-primary/50" onClick={() => navigate('/project')}>
+              <Card className="cursor-pointer hover:border-white/60" onClick={() => navigate("/project")}>
                 <CardBody className="text-center">
                   <Layers size={24} className="mx-auto mb-2 text-ink" />
                   <p className="font-semibold">Project</p>
@@ -505,7 +499,7 @@ export default function Dashboard() {
                 </CardBody>
               </Card>
 
-              <Card className="cursor-pointer hover:border-primary/50" onClick={() => navigate('/calendar')}>
+              <Card className="cursor-pointer hover:border-white/60" onClick={() => navigate("/calendar")}>
                 <CardBody className="text-center">
                   <Calendar size={24} className="mx-auto mb-2 text-ink" />
                   <p className="font-semibold">Calendar</p>
@@ -521,9 +515,13 @@ export default function Dashboard() {
                   <div className="flex justify-between items-center mb-6">
                     <h2 className="text-xl font-bold text-ink">Writing Activity</h2>
                     <div className="flex gap-2">
-                      <button className="px-3 py-1 rounded-lg bg-primary text-white text-sm">7 days</button>
-                      <button className="px-3 py-1 rounded-lg text-ink/70 hover:bg-white/70 text-sm transition-colors">30 days</button>
-                      <button className="px-3 py-1 rounded-lg text-ink/70 hover:bg-white/70 text-sm transition-colors">All time</button>
+                      <button className="px-3 py-1 rounded-lg bg-primary text-ink text-sm">7 days</button>
+                      <button className="px-3 py-1 rounded-lg text-ink/70 hover:bg-white/70 text-sm transition-colors">
+                        30 days
+                      </button>
+                      <button className="px-3 py-1 rounded-lg text-ink/70 hover:bg-white/70 text-sm transition-colors">
+                        All time
+                      </button>
                     </div>
                   </div>
 
@@ -534,15 +532,14 @@ export default function Dashboard() {
                         <YAxis axisLine={false} tickLine={false} className="text-ink/70" />
                         <Tooltip
                           contentStyle={{
-                            backgroundColor: 'rgba(255,255,255,0.95)',
-                            border: '1px solid rgba(0,0,0,0.05)',
-                            borderRadius: '12px',
-                            boxShadow: '0 10px 25px rgba(0,0,0,0.08)',
-                            color: '#0F172A'
+                            backgroundColor: "rgba(255,255,255,0.95)",
+                            border: "1px solid rgba(0,0,0,0.05)",
+                            borderRadius: "12px",
+                            boxShadow: "0 10px 25px rgba(0,0,0,0.08)",
+                            color: "#0F172A",
                           }}
                         />
                         <defs>
-                          {/* Use your brand colors directly */}
                           <linearGradient id="brandGradient" x1="0%" y1="0%" x2="0%" y2="100%">
                             <stop offset="0%" stopColor="#CAB1D6" />
                             <stop offset="100%" stopColor="#EAF2FF" />
@@ -576,7 +573,7 @@ export default function Dashboard() {
                     <h2 className="text-xl font-bold text-ink">Recent Activity</h2>
                     <ChevronRight size={20} className="text-ink/60 hover:text-ink transition-colors cursor-pointer" />
                   </div>
-                          
+
                   <div className="space-y-4">
                     {recentChapters.length === 0 ? (
                       <div className="text-center py-8">
@@ -597,7 +594,9 @@ export default function Dashboard() {
                             <h3 className="font-medium text-ink text-sm truncate group-hover:opacity-80 transition-colors">
                               {chapter.title}
                             </h3>
-                            <p className="text-xs text-muted mt-1">{chapter.words} words • {chapter.time}</p>
+                            <p className="text-xs text-muted mt-1">
+                              {chapter.words} words • {chapter.time}
+                            </p>
                           </div>
                         </div>
                       ))
