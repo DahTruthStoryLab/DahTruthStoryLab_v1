@@ -1,6 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Route as RouteIcon } from "lucide-react";
+import { ArrowLeft, Map as RouteIcon } from "lucide-react"; // ✅ fixed: use Map
 
 const PageBanner = () => {
   return (
