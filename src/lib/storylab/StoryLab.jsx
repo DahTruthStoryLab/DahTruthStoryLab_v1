@@ -48,9 +48,7 @@ function loadChaptersFromLocalStorage() {
    Tiny, client-only "NLP-lite"
 --------------------------------*/
 const splitSentences = (txt) =>
-  (txt || "")
-    .replace(/\s+/g, " ")
-    .match(/[^.!?]+[.!?]?/g) || [];
+  (txt || "").replace(/\s+/g, " ").match(/[^.!?]+[.!?]?/g) || [];
 
 function guessCharacters(text) {
   const names = new Set();
@@ -68,7 +66,7 @@ function extractKeywordSentences(text, keyword) {
 }
 
 /* =========================================================
-   PAGE BANNER (centered, no top bar)
+   PAGE BANNER
 ========================================================= */
 const PageBanner = () => {
   return (
@@ -77,14 +75,12 @@ const PageBanner = () => {
         <div className="mx-auto mb-2 inline-flex items-center justify-center rounded-xl border border-white/50 bg-white/40 px-3 py-1">
           <BookOpen size={16} className="mr-2 text-ink/80" />
           <span className="text-xs font-semibold tracking-wide text-ink/80">
-            Story Lab
+            StoryLab
           </span>
         </div>
-        <h1 className="text-3xl font-extrabold text-ink">
-          Story Lab Sessions
-        </h1>
+        <h1 className="text-3xl font-extrabold text-ink">Modules & Sessions</h1>
         <p className="mt-1 text-sm text-ink/70">
-          An overview of the live modules and tools you’ll use together.
+          Clear, colorful entry points into everything you’ll use during the workshop.
         </p>
       </div>
     </div>
@@ -92,7 +88,7 @@ const PageBanner = () => {
 };
 
 /* =========================================================
-   QUICK OVERVIEW WIDGETS (Quote + Priorities)
+   AT-A-GLANCE (Quote + Priorities)
 ========================================================= */
 const QuoteBar = ({ chapters }) => {
   const [line, setLine] = useState("");
@@ -108,7 +104,7 @@ const QuoteBar = ({ chapters }) => {
   };
   useEffect(() => { pick(); }, [chapters]);
   return (
-    <div className="mb-8 rounded-2xl border border-white/50 bg-white/40 backdrop-blur-xl px-5 py-4 flex items-center justify-between">
+    <div className="rounded-2xl border border-white/50 bg-white/40 backdrop-blur-xl px-5 py-4 flex items-center justify-between">
       <div className="italic text-ink/90">“{line}”</div>
       <button
         onClick={pick}
@@ -131,7 +127,7 @@ const PrioritiesGlance = () => {
     });
   } catch {}
   return (
-    <div className="mb-8 rounded-2xl border border-white/50 bg-white/50 backdrop-blur-xl p-5">
+    <div className="rounded-2xl border border-white/50 bg-white/50 backdrop-blur-xl p-5">
       <div className="mb-3 text-ink font-semibold">Priorities at a Glance</div>
       <div className="grid grid-cols-3 gap-3">
         {["High","Medium","Low"].map(k => (
@@ -143,10 +139,10 @@ const PrioritiesGlance = () => {
       </div>
       <div className="mt-4 text-right">
         <Link
-          to="/story-lab/workshop"
-          className="inline-flex items-center gap-2 rounded-lg border border-white/60 bg-accent/70 px-3 py-1.5 text-sm font-medium text-ink hover:bg-accent"
+          to="/story-lab/workshop/priorities"
+          className="inline-flex items-center gap-2 rounded-lg border border-white/60 bg-gradient-to-r from-purple-600 via-violet-500 to-amber-400 px-3 py-1.5 text-sm font-medium text-white shadow hover:shadow-md"
         >
-          Open Workshop
+          Open Priority Cards
         </Link>
       </div>
     </div>
@@ -154,48 +150,37 @@ const PrioritiesGlance = () => {
 };
 
 /* =========================================================
-   AERO SIDEBAR (translucent + "pounce" hover)
+   AERO SIDEBAR
 ========================================================= */
 function AeroSidebar({ collapsed, setCollapsed, activeSection, setActiveSection }) {
   const location = useLocation();
 
   useEffect(() => {
     try {
-      localStorage.setItem(
-        "storylab_sidebar_collapsed",
-        JSON.stringify(collapsed)
-      );
+      localStorage.setItem("storylab_sidebar_collapsed", JSON.stringify(collapsed));
     } catch {}
   }, [collapsed]);
 
-  // ordered to mirror modules
   const items = [
     { key: "back", label: "Back to Dashboard", to: "/dashboard", icon: ChevronRight, type: "link", accent: true },
-    { key: "sessions", label: "Story Lab Sessions", section: "sessions", icon: BookOpen, type: "section" },
 
-    // Workshop Community
+    // Workshop Community (your “community ops” items)
+    { key: "community", label: "Workshop Community", section: "community", icon: Users, type: "section" },
     { key: "schedule", label: "Session Schedule", section: "schedule", icon: Calendar, type: "section" },
     { key: "pairs", label: "Breakout Pairings", section: "pairs", icon: Users, type: "section" },
     { key: "critique", label: "Critique Circle", to: "/story-lab/critique", icon: MessageSquare, type: "link" },
-    { key: "prompts", label: "Story Prompts", to: "/story-lab/prompts", icon: Sparkles, type: "link" },
-    // NEW: direct link to the Workshop modules page
+
+    // Live Session Modules
+    { key: "modules", label: "Live Session Modules", section: "modules", icon: Layers, type: "section" },
     { key: "workshop", label: "Workshop (Characters/Roadmap)", to: "/story-lab/workshop", icon: Layers, type: "link" },
-    { key: "chat", label: "Workshop Chat", section: "chat", icon: MessageCircle, type: "section" },
+    { key: "prompts", label: "Story Prompts", to: "/story-lab/prompts", icon: Sparkles, type: "link" },
 
-    // Story & Character Development
-    { key: "profiles", label: "Character Profiles", section: "profiles", icon: User, type: "section" },
-    { key: "clothesline", label: "Character Clothesline", section: "clothesline", icon: Pin, type: "section" },
-    { key: "world", label: "World Bible", section: "world", icon: Globe, type: "section" },
-    { key: "hfl", label: "Hopes • Fears • Legacy", section: "hfl", icon: Heart, type: "section" },
+    // Story & Character Dev
+    { key: "dev", label: "Story & Character Development", section: "dev", icon: BookOpen, type: "section" },
 
-    // AI + Human Balance
-    { key: "consistency", label: "Character Consistency", section: "consistency", icon: CheckCircle, type: "section" },
-    { key: "grammar", label: "Grammar Polish", section: "grammar", icon: Edit3, type: "section" },
-    { key: "summaries", label: "Scene Summaries", section: "summaries", icon: FileText, type: "section" },
-
-    // Faith & Legacy (last)
-    { key: "reflection", label: "Reflection Prompts", section: "reflection", icon: Star, type: "section" },
-    { key: "legacy", label: "Legacy Writing", section: "legacy", icon: Layers, type: "section" },
+    // AI / Faith & Legacy
+    { key: "ai", label: "AI + Human Balance", section: "ai", icon: CheckCircle, type: "section" },
+    { key: "faith", label: "Faith & Legacy", section: "faith", icon: Star, type: "section" },
   ];
 
   const isActiveRoute = (to) => location.pathname === to;
@@ -203,11 +188,8 @@ function AeroSidebar({ collapsed, setCollapsed, activeSection, setActiveSection 
 
   return (
     <>
-      {/* Mobile backdrop (click to hide) */}
       <div
-        className={`fixed inset-0 z-40 bg-black/40 md:hidden ${
-          collapsed ? "pointer-events-none opacity-0" : "opacity-100"
-        }`}
+        className={`fixed inset-0 z-40 bg-black/40 md:hidden ${collapsed ? "pointer-events-none opacity-0" : "opacity-100"}`}
         onClick={() => setCollapsed(true)}
         aria-hidden="true"
       />
@@ -216,9 +198,7 @@ function AeroSidebar({ collapsed, setCollapsed, activeSection, setActiveSection 
           "fixed left-0 top-0 z-50 h-screen",
           "border-r border-white/40 bg-white/20 backdrop-blur-2xl",
           "transition-all duration-300 ease-out shadow-[0_10px_40px_rgba(0,0,0,0.15)]",
-          collapsed
-            ? "w-20 -translate-x-0 md:translate-x-0 -left-64 md:left-0 md:w-20"
-            : "w-72 left-0",
+          collapsed ? "w-20 -translate-x-0 md:translate-x-0 -left-64 md:left-0 md:w-20" : "w-72 left-0",
           "md:translate-x-0 overflow-hidden",
         ].join(" ")}
         aria-label="Aero menu sidebar"
@@ -228,15 +208,10 @@ function AeroSidebar({ collapsed, setCollapsed, activeSection, setActiveSection 
           <BrandLogo className={`${collapsed ? "h-6" : "h-8"} w-auto`} />
           {!collapsed && (
             <div className="leading-tight">
-              <div
-                className="font-serif text-lg font-bold text-ink"
-                style={{ fontFamily: "Playfair Display, ui-serif, Georgia" }}
-              >
+              <div className="font-serif text-lg font-bold text-ink" style={{ fontFamily: "Playfair Display, ui-serif, Georgia" }}>
                 DahTruth
               </div>
-              <div className="text-[11px] tracking-wide text-ink/70">
-                Story Lab
-              </div>
+              <div className="text-[11px] tracking-wide text-ink/70">StoryLab</div>
             </div>
           )}
         </div>
@@ -248,11 +223,7 @@ function AeroSidebar({ collapsed, setCollapsed, activeSection, setActiveSection 
             className="inline-flex items-center gap-2 rounded-lg border border-white/40 bg-white/30 px-2 py-1 text-xs font-medium text-ink hover:bg-white/40"
             title={collapsed ? "Expand menu" : "Collapse menu"}
           >
-            <ChevronRight
-              className={`h-4 w-4 transition-transform ${
-                collapsed ? "" : "rotate-180"
-              }`}
-            />
+            <ChevronRight className={`h-4 w-4 transition-transform ${collapsed ? "" : "rotate-180"}`} />
             {!collapsed && <span>Collapse</span>}
           </button>
         </div>
@@ -268,36 +239,27 @@ function AeroSidebar({ collapsed, setCollapsed, activeSection, setActiveSection 
 
               const base =
                 "group relative flex w-full items-center gap-3 rounded-xl px-3 py-2 outline-none transition-all duration-200 focus:ring-2 focus:ring-ink/20";
-              const activeCls = it.accent
-                ? "bg-ink text-white shadow-lg"
-                : "bg-white/40 text-ink shadow";
-              const inactive =
-                "text-ink/80 hover:bg-white/30 hover:shadow hover:scale-[1.02] border border-transparent";
+              const activeCls = it.accent ? "bg-ink text-white shadow-lg" : "bg-white/40 text-ink shadow";
+              const inactive = "text-ink/80 hover:bg-white/30 hover:shadow hover:scale-[1.02] border border-transparent";
 
               const inner = (
                 <>
-                  {/* Left active dot on hover/active */}
                   <span
                     className={`absolute left-1 h-2 w-2 rounded-full transition-all duration-200 ${
-                      active
-                        ? "bg-gold opacity-100"
-                        : "bg-ink/30 opacity-0 group-hover:opacity-100"
+                      active ? "bg-gold opacity-100" : "bg-ink/30 opacity-0 group-hover:opacity-100"
                     }`}
                   />
                   <Icon className={`h-5 w-5 ${active ? "opacity-100" : "opacity-90"}`} />
                   {!collapsed && <span className="truncate">{it.label}</span>}
-                  {/* Right shimmer */}
-                  <span className="pointer-events-none absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100" style={{ background: "radial-gradient(60% 60% at 100% 0%, rgba(255,255,255,0.35), transparent)" }} />
+                  <span
+                    className="pointer-events-none absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100"
+                    style={{ background: "radial-gradient(60% 60% at 100% 0%, rgba(255,255,255,0.35), transparent)" }}
+                  />
                 </>
               );
 
               return it.type === "link" ? (
-                <Link
-                  key={it.key}
-                  to={it.to}
-                  className={`${base} ${active ? activeCls : inactive} border border-white/40`}
-                  title={collapsed ? it.label : undefined}
-                >
+                <Link key={it.key} to={it.to} className={`${base} ${active ? activeCls : inactive} border border-white/40`} title={collapsed ? it.label : undefined}>
                   {inner}
                 </Link>
               ) : (
@@ -319,7 +281,7 @@ function AeroSidebar({ collapsed, setCollapsed, activeSection, setActiveSection 
 }
 
 /* =========================================================
-   FEATURE CARD + SECTION HEADER (brand, light on dark)
+   FEATURE CARD + SECTION HEADER
 ========================================================= */
 const FeatureCard = ({ icon: Icon, title, status, description, onClick }) => {
   const statusColors = {
@@ -332,7 +294,7 @@ const FeatureCard = ({ icon: Icon, title, status, description, onClick }) => {
     <button
       type="button"
       onClick={onClick}
-      className="text-left rounded-2xl border border-white/50 bg-white/50 p-6 backdrop-blur-xl transition hover:shadow-lg"
+      className="text-left rounded-2xl border border-white/50 bg-white/50 p-6 backdrop-blur-xl transition hover:shadow-lg hover:scale-[1.01]"
     >
       <div className="mb-4 flex items-start justify-between">
         <div className="flex items-start gap-4">
@@ -342,9 +304,7 @@ const FeatureCard = ({ icon: Icon, title, status, description, onClick }) => {
           <div className="flex-1">
             <h3 className="mb-2 text-lg font-semibold text-ink">{title}</h3>
             {status && (
-              <span
-                className={`inline-block rounded-full border px-3 py-1 text-xs font-medium ${statusColors[status]}`}
-              >
+              <span className={`inline-block rounded-full border px-3 py-1 text-xs font-medium ${statusColors[status]}`}>
                 {status}
               </span>
             )}
@@ -372,7 +332,7 @@ const SectionHeader = ({ icon, title, subtitle }) => {
 };
 
 /* =========================================================
-   CHARACTER MANAGER (with icon header)
+   CHARACTER MANAGER (quick)
 ========================================================= */
 const CharacterManager = ({ seedText = "", onChange }) => {
   const [characters, setCharacters] = useState(() => {
@@ -416,10 +376,7 @@ const CharacterManager = ({ seedText = "", onChange }) => {
           <div className="text-sm text-ink/70">No characters found yet. Add them below.</div>
         )}
         {characters.map((character) => (
-          <div
-            key={character.id}
-            className="flex items-center gap-3 rounded-lg border border-white/60 bg-white/70 p-3"
-          >
+          <div key={character.id} className="flex items-center gap-3 rounded-lg border border-white/60 bg-white/70 p-3">
             {editingId === character.id ? (
               <input
                 type="text"
@@ -438,11 +395,7 @@ const CharacterManager = ({ seedText = "", onChange }) => {
                 {character.name}
               </span>
             )}
-            <button
-              onClick={() => deleteCharacter(character.id)}
-              className="text-ink/60 hover:text-ink"
-              title="Delete character"
-            >
+            <button onClick={() => deleteCharacter(character.id)} className="text-ink/60 hover:text-ink" title="Delete character">
               <Trash2 className="h-4 w-4" />
             </button>
           </div>
@@ -458,10 +411,7 @@ const CharacterManager = ({ seedText = "", onChange }) => {
           onKeyDown={(e) => e.key === "Enter" && addCharacter()}
           className="flex-1 rounded-lg border border-white/60 bg-white px-4 py-2 text-ink placeholder-ink/40 focus:border-ink/40 focus:outline-none"
         />
-        <button
-          onClick={addCharacter}
-          className="rounded-lg border border-white/60 bg-accent/60 px-4 py-2 font-medium text-ink hover:bg-accent/70"
-        >
+        <button onClick={addCharacter} className="rounded-lg border border-white/60 bg-accent/60 px-4 py-2 font-medium text-ink hover:bg-accent/70">
           <Plus className="h-5 w-5" />
         </button>
       </div>
@@ -470,13 +420,13 @@ const CharacterManager = ({ seedText = "", onChange }) => {
 };
 
 /* =========================================================
-   CLOTHESLINE + HFL (light panels to match scheme)
+   CLOTHESLINE PREVIEW CARD (kept on overview)
 ========================================================= */
-const ClotheslineWorkshop = ({ characters }) => {
+const ClotheslinePreview = ({ characters }) => {
   return (
     <div className="rounded-2xl border border-white/50 bg-white/60 p-6 backdrop-blur-xl">
       <h3 className="mb-2 text-xl font-semibold text-ink">Clothesline</h3>
-      <p className="mb-4 text-ink/70">Pin quick synopses for each character.</p>
+      <p className="mb-4 text-ink/70">Pin quick synopses for each character (open full module to edit).</p>
       <div className="flex items-center gap-4 overflow-x-auto pb-2">
         {(characters?.length ? characters : ["Protagonist", "Antagonist"]).map((name, idx) => (
           <div key={idx} className="min-w-[220px] rounded-xl border border-white/60 bg-white/80 p-4">
@@ -484,65 +434,24 @@ const ClotheslineWorkshop = ({ characters }) => {
               <Pin className="h-4 w-4 text-ink/70" />
               <div className="font-semibold text-ink">{name}</div>
             </div>
-            <p className="text-sm text-ink/80">
-              {name} plays a key role. Summarize traits, goals, and obstacles here.
-            </p>
+            <p className="text-sm text-ink/80">Traits, goals, and obstacles at a glance.</p>
           </div>
         ))}
       </div>
-    </div>
-  );
-};
-
-const HopesFearsLegacyWorkshop = ({ chapters, characters }) => {
-  const text = useMemo(() => chapters.map((c) => c.text).join("\n\n"), [chapters]);
-  const insights = useMemo(() => {
-    const result = {};
-    (characters || []).forEach((ch) => {
-      result[ch] = {
-        Hopes: extractKeywordSentences(text, "hope").slice(0, 3),
-        Fears: extractKeywordSentences(text, "fear").slice(0, 3),
-        Legacy: extractKeywordSentences(text, "legacy").slice(0, 3),
-      };
-    });
-    return result;
-  }, [text, characters]);
-
-  return (
-    <div className="rounded-2xl border border-white/50 bg-white/60 p-6 backdrop-blur-xl">
-      <h3 className="mb-4 text-xl font-semibold text-ink">Hopes, Fears & Legacy</h3>
-      {(!characters || characters.length === 0) && (
-        <div className="mb-3 text-ink/70">Add characters above to see targeted insights.</div>
-      )}
-      <div className="space-y-4">
-        {Object.entries(insights).map(([name, data]) => (
-          <div key={name} className="rounded-xl border border-white/60 bg-white/80 p-4">
-            <div className="mb-2 font-semibold text-ink">{name}</div>
-            <div className="grid gap-3 md:grid-cols-3">
-              {["Hopes", "Fears", "Legacy"].map((key) => (
-                <div key={key} className="rounded-lg border border-white/60 bg-white p-3">
-                  <div className="mb-2 text-sm font-medium text-ink/80">{key}</div>
-                  {data[key]?.length ? (
-                    <ul className="space-y-2 text-sm text-ink/90">
-                      {data[key].map((s, i) => (
-                        <li key={i}>• {s}</li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <div className="text-sm text-ink/60">No {key.toLowerCase()} yet.</div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
+      <div className="mt-4">
+        <Link
+          to="/story-lab/workshop/clothesline"
+          className="inline-flex items-center gap-2 rounded-lg border border-white/60 bg-white/70 px-3 py-1.5 text-sm text-ink hover:bg-white"
+        >
+          Open Clothesline
+        </Link>
       </div>
     </div>
   );
 };
 
 /* =========================================================
-   WORKSHOP SESSION CHAT (simple local chat)
+   WORKSHOP SESSION CHAT (overview page)
 ========================================================= */
 const WorkshopChat = () => {
   const [messages, setMessages] = useState([
@@ -595,11 +504,11 @@ const WorkshopChat = () => {
 };
 
 /* =========================================================
-   MAIN (with translucent sidebar + new order)
+   MAIN
 ========================================================= */
 export default function StoryLab() {
   const navigate = useNavigate();
-  const [activeSection, setActiveSection] = useState("sessions");
+  const [activeSection, setActiveSection] = useState("community");
   const [chapters, setChapters] = useState([]);
   const [workshopCharacters, setWorkshopCharacters] = useState([]);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
@@ -620,7 +529,7 @@ export default function StoryLab() {
 
   return (
     <div className="min-h-screen bg-base bg-radial-fade text-ink">
-      {/* Translucent Sidebar (no top banner) */}
+      {/* Sidebar */}
       <AeroSidebar
         collapsed={sidebarCollapsed && mobileSidebarHidden}
         setCollapsed={(v) => {
@@ -636,30 +545,20 @@ export default function StoryLab() {
         <div className="mx-auto max-w-7xl px-6 py-10">
           <PageBanner />
 
-          {/* Overview widgets */}
-          <QuoteBar chapters={chapters} />
-          <PrioritiesGlance />
+          {/* At-a-Glance Row */}
+          <div className="grid gap-6 md:grid-cols-2 mb-10">
+            <QuoteBar chapters={chapters} />
+            <PrioritiesGlance />
+          </div>
 
-          {/* Chapter info strip */}
-          {chapters.length > 0 && (
-            <div className="mb-10 rounded-xl border border-white/50 bg-white/50 p-4 backdrop-blur-xl">
-              <div className="flex items-center gap-3 text-ink">
-                <BookOpen className="h-5 w-5" />
-                <span>
-                  {chapters.length} chapter{chapters.length > 1 ? "s" : ""} loaded from your story
-                </span>
-              </div>
-            </div>
-          )}
-
-          {/* LAB SESSIONS (overview of the modules) */}
-          <section id="sessions" className="mb-14">
+          {/* Workshop Community */}
+          <section id="community" className="mb-14">
             <SectionHeader
-              icon="🧪"
-              title="Live Session Modules"
-              subtitle="A quick overview of what you’ll use during Story Lab Sessions."
+              icon="👥"
+              title="Workshop Community"
+              subtitle="Session logistics and collaboration spaces."
             />
-            <div className="mb-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-5">
+            <div className="mb-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
               <FeatureCard
                 icon={Calendar}
                 title="Session Schedule"
@@ -681,38 +580,54 @@ export default function StoryLab() {
                 description="Inline comments, reactions, audit logs and copy controls."
                 onClick={() => navigate("/story-lab/critique")}
               />
+            </div>
+            {/* Live chat space visible on overview */}
+            <div className="grid gap-6 md:grid-cols-2">
+              <WorkshopChat />
+              <ClotheslinePreview characters={workshopCharacters} />
+            </div>
+          </section>
+
+          {/* Live Session Modules */}
+          <section id="modules" className="mb-14">
+            <SectionHeader
+              icon="🧪"
+              title="Live Session Modules"
+              subtitle="Hands-on tools used during sessions."
+            />
+            <div className="mb-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+              <FeatureCard
+                icon={Pin}
+                title="Clothesline"
+                status="Ready"
+                description="Org-style character view with relationships at a glance."
+                onClick={() => navigate("/story-lab/workshop/clothesline")}
+              />
               <FeatureCard
                 icon={Sparkles}
                 title="Story Prompts"
                 status="Ready"
-                description="Creative, context-aware prompts when you’re stuck."
+                description="Context-aware prompts pulled from your actual manuscript."
                 onClick={() => navigate("/story-lab/prompts")}
               />
-              {/* NEW: open the Workshop modules page */}
               <FeatureCard
                 icon={Layers}
-                title="Workshop (Characters/Roadmap)"
+                title="Character Roadmap"
                 status="Ready"
-                description="Open modules for Characters, Roadmap, Priority Cards & Clothesline."
-                onClick={() => navigate("/story-lab/workshop")}
+                description="Milestones and beats that move your cast from A → B."
+                onClick={() => navigate("/story-lab/workshop?tab=roadmap")}
+              />
+              <FeatureCard
+                icon={CheckCircle}
+                title="Priority Cards"
+                status="Ready"
+                description="Drag, rank, and track scope/priority/status live."
+                onClick={() => navigate("/story-lab/workshop/priorities")}
               />
             </div>
           </section>
 
-          {/* WORKSHOP COMMUNITY */}
-          <section id="community" className="mb-14">
-            <SectionHeader
-              icon="👥"
-              title="Workshop Community"
-              subtitle="Tools that make collaboration smooth during and between sessions."
-            />
-            <div className="grid gap-6 md:grid-cols-2">
-              <ClotheslineWorkshop characters={workshopCharacters} />
-              <WorkshopChat />
-            </div>
-          </section>
-
-          {/* STORY & CHARACTER DEVELOPMENT */}
+          {/* Story & Character Development */}
           <section id="dev" className="mb-14">
             <SectionHeader
               icon="📖"
@@ -741,28 +656,21 @@ export default function StoryLab() {
               />
             </div>
 
-            {/* Interactive tools */}
+            {/* Inline tools */}
             <div className="grid gap-6">
               <CharacterManager
                 seedText={chapters.map((c) => c.text).join("\n\n")}
                 onChange={() => {}}
               />
               {activeSection === "hfl" && (
-                <HopesFearsLegacyWorkshop
-                  chapters={chapters}
-                  characters={workshopCharacters}
-                />
+                <HopesFearsLegacyWorkshop chapters={chapters} characters={workshopCharacters} />
               )}
             </div>
           </section>
 
-          {/* AI + HUMAN BALANCE */}
+          {/* AI + Human Balance */}
           <section id="ai" className="mb-14">
-            <SectionHeader
-              icon="✨"
-              title="AI + Human Balance"
-              subtitle="Assistive tools that respect your voice."
-            />
+            <SectionHeader icon="✨" title="AI + Human Balance" subtitle="Assistive tools that respect your voice." />
             <div className="grid gap-6 md:grid-cols-3">
               <FeatureCard
                 icon={CheckCircle}
@@ -785,7 +693,7 @@ export default function StoryLab() {
             </div>
           </section>
 
-          {/* FAITH + LEGACY */}
+          {/* Faith & Legacy */}
           <section id="faith" className="mb-24">
             <SectionHeader
               icon="💝"
@@ -826,7 +734,6 @@ export default function StoryLab() {
             >
               View Prompts
             </Link>
-            {/* NEW quick link */}
             <Link
               to="/story-lab/workshop"
               className="rounded-lg border border-white/60 bg-white/60 px-4 py-2 font-medium text-ink hover:bg-white/80"
@@ -839,6 +746,56 @@ export default function StoryLab() {
             <span className="text-sm">Next session in 2 days</span>
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/* =========================================================
+   HFL (inline)
+========================================================= */
+const HopesFearsLegacyWorkshop = ({ chapters, characters }) => {
+  const text = useMemo(() => chapters.map((c) => c.text).join("\n\n"), [chapters]);
+  const insights = useMemo(() => {
+    const result = {};
+    (characters || []).forEach((ch) => {
+      result[ch] = {
+        Hopes: extractKeywordSentences(text, "hope").slice(0, 3),
+        Fears: extractKeywordSentences(text, "fear").slice(0, 3),
+        Legacy: extractKeywordSentences(text, "legacy").slice(0, 3),
+      };
+    });
+    return result;
+  }, [text, characters]);
+
+  return (
+    <div className="rounded-2xl border border-white/50 bg-white/60 p-6 backdrop-blur-xl">
+      <h3 className="mb-4 text-xl font-semibold text-ink">Hopes, Fears & Legacy</h3>
+      {(!characters || characters.length === 0) && (
+        <div className="mb-3 text-ink/70">Add characters above to see targeted insights.</div>
+      )}
+      <div className="space-y-4">
+        {Object.entries(insights).map(([name, data]) => (
+          <div key={name} className="rounded-xl border border-white/60 bg-white/80 p-4">
+            <div className="mb-2 font-semibold text-ink">{name}</div>
+            <div className="grid gap-3 md:grid-cols-3">
+              {["Hopes", "Fears", "Legacy"].map((key) => (
+                <div key={key} className="rounded-lg border border-white/60 bg-white p-3">
+                  <div className="mb-2 text-sm font-medium text-ink/80">{key}</div>
+                  {data[key]?.length ? (
+                    <ul className="space-y-2 text-sm text-ink/90">
+                      {data[key].map((s, i) => (
+                        <li key={i}>• {s}</li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div className="text-sm text-ink/60">No {key.toLowerCase()} yet.</div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
