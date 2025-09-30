@@ -32,7 +32,6 @@ const Calendar             = lazy(() => import("./components/Calendar"));
 const StoryWorkshop        = lazy(() => import("./components/storylab/StoryWorkshop"));      // tabbed workshop
 const PriorityCards        = lazy(() => import("./components/storylab/PriorityCards"));      // direct module page
 
-
 /* =========================
    Global UI helpers
    ========================= */
