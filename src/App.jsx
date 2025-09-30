@@ -27,8 +27,11 @@ const WriteSection         = lazy(() => import("./components/WriteSection"));
 const StoryLab             = lazy(() => import("./lib/storylab/StoryLab"));
 const StoryPromptsWorkshop = lazy(() => import("./lib/storylab/StoryPromptsWorkshop"));
 const Calendar             = lazy(() => import("./components/Calendar"));
-// ⬇️ NEW: lazy import for the Workshop modules page
-const StoryWorkshop        = lazy(() => import("./components/storylab/StoryWorkshop"));
+
+// NEW: Workshop landing (tabs) + direct module page(s)
+const StoryWorkshop        = lazy(() => import("./components/storylab/StoryWorkshop"));      // tabbed workshop
+const PriorityCards        = lazy(() => import("./components/storylab/PriorityCards"));      // direct module page
+
 
 /* =========================
    Global UI helpers
