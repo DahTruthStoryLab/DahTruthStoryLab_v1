@@ -9,7 +9,7 @@ import {
   Navigate,
 } from "react-router-dom";
 
-// ✅ Place this with the other imports
+// ✅ Keep this direct import
 import Profile from "./components/Profile.jsx";
 
 /* =========================
@@ -27,6 +27,8 @@ const WriteSection         = lazy(() => import("./components/WriteSection"));
 const StoryLab             = lazy(() => import("./lib/storylab/StoryLab"));
 const StoryPromptsWorkshop = lazy(() => import("./lib/storylab/StoryPromptsWorkshop"));
 const Calendar             = lazy(() => import("./components/Calendar"));
+// ⬇️ NEW: lazy import for the Workshop modules page
+const StoryWorkshop        = lazy(() => import("./components/storylab/StoryWorkshop"));
 
 /* =========================
    Global UI helpers
@@ -146,6 +148,15 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <StoryPromptsWorkshop />
+              </ProtectedRoute>
+            }
+          />
+          {/* ⬇️ NEW: Workshop modules (Characters/Roadmap/Priorities/Clothesline) */}
+          <Route
+            path="/story-lab/workshop"
+            element={
+              <ProtectedRoute>
+                <StoryWorkshop />
               </ProtectedRoute>
             }
           />
