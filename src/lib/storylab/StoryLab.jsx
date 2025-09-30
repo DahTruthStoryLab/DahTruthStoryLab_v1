@@ -23,7 +23,7 @@ import {
   Send,
   MessageCircle,
 } from "lucide-react";
-import BrandLogo from "../../components/BrandLogo"; // keep this import; adjust path if needed
+import BrandLogo from "../../components/BrandLogo";
 
 /* -----------------------------
    Helpers: load chapters safely
@@ -62,26 +62,6 @@ function guessCharacters(text) {
   return Array.from(names).slice(0, 50);
 }
 
-function extractConflicts(text) {
-  const hits = [];
-  const needles = [
-    "conflict",
-    "tension",
-    "argument",
-    "fight",
-    "feud",
-    "rivalry",
-    "obstacle",
-    "problem",
-    "challenge",
-  ];
-  const sentences = splitSentences(text);
-  sentences.forEach((s) => {
-    if (needles.some((n) => s.toLowerCase().includes(n))) hits.push(s.trim());
-  });
-  return hits;
-}
-
 function extractKeywordSentences(text, keyword) {
   const k = keyword.toLowerCase();
   return splitSentences(text).filter((s) => s.toLowerCase().includes(k));
@@ -112,6 +92,68 @@ const PageBanner = () => {
 };
 
 /* =========================================================
+   QUICK OVERVIEW WIDGETS (Quote + Priorities)
+========================================================= */
+const QuoteBar = ({ chapters }) => {
+  const [line, setLine] = useState("");
+  const pick = () => {
+    const text = chapters.map(c => c.text || "").join(" ").replace(/\s+/g, " ");
+    const sentences = text.match(/[^.!?]+[.!?]/g) || [];
+    if (!sentences.length) {
+      setLine("Start writing, then refresh to surface a line from your story.");
+    } else {
+      const idx = Math.floor(Math.random() * sentences.length);
+      setLine(sentences[idx].trim());
+    }
+  };
+  useEffect(() => { pick(); }, [chapters]);
+  return (
+    <div className="mb-8 rounded-2xl border border-white/50 bg-white/40 backdrop-blur-xl px-5 py-4 flex items-center justify-between">
+      <div className="italic text-ink/90">“{line}”</div>
+      <button
+        onClick={pick}
+        className="ml-4 rounded-lg border border-white/60 bg-white/70 px-3 py-1.5 text-sm text-ink hover:bg-white"
+        title="New quote from your story"
+      >
+        Refresh
+      </button>
+    </div>
+  );
+};
+
+const PrioritiesGlance = () => {
+  const raw = localStorage.getItem("dahtruth-story-lab-toc-v3");
+  let counts = { High: 0, Medium: 0, Low: 0 };
+  try {
+    const proj = raw ? JSON.parse(raw) : null;
+    (proj?.priorities || []).forEach(x => {
+      counts[x.priority] = (counts[x.priority] || 0) + 1;
+    });
+  } catch {}
+  return (
+    <div className="mb-8 rounded-2xl border border-white/50 bg-white/50 backdrop-blur-xl p-5">
+      <div className="mb-3 text-ink font-semibold">Priorities at a Glance</div>
+      <div className="grid grid-cols-3 gap-3">
+        {["High","Medium","Low"].map(k => (
+          <div key={k} className="rounded-lg bg-white/80 border border-white/60 p-3 text-center">
+            <div className="text-2xl font-bold text-ink">{counts[k] || 0}</div>
+            <div className="text-xs text-ink/60">{k}</div>
+          </div>
+        ))}
+      </div>
+      <div className="mt-4 text-right">
+        <Link
+          to="/story-lab/workshop"
+          className="inline-flex items-center gap-2 rounded-lg border border-white/60 bg-accent/70 px-3 py-1.5 text-sm font-medium text-ink hover:bg-accent"
+        >
+          Open Workshop
+        </Link>
+      </div>
+    </div>
+  );
+};
+
+/* =========================================================
    AERO SIDEBAR (translucent + "pounce" hover)
 ========================================================= */
 function AeroSidebar({ collapsed, setCollapsed, activeSection, setActiveSection }) {
@@ -136,6 +178,8 @@ function AeroSidebar({ collapsed, setCollapsed, activeSection, setActiveSection 
     { key: "pairs", label: "Breakout Pairings", section: "pairs", icon: Users, type: "section" },
     { key: "critique", label: "Critique Circle", to: "/story-lab/critique", icon: MessageSquare, type: "link" },
     { key: "prompts", label: "Story Prompts", to: "/story-lab/prompts", icon: Sparkles, type: "link" },
+    // NEW: direct link to the Workshop modules page
+    { key: "workshop", label: "Workshop (Characters/Roadmap)", to: "/story-lab/workshop", icon: Layers, type: "link" },
     { key: "chat", label: "Workshop Chat", section: "chat", icon: MessageCircle, type: "section" },
 
     // Story & Character Development
@@ -431,7 +475,7 @@ const CharacterManager = ({ seedText = "", onChange }) => {
 const ClotheslineWorkshop = ({ characters }) => {
   return (
     <div className="rounded-2xl border border-white/50 bg-white/60 p-6 backdrop-blur-xl">
-      <h3 className="mb-2 text-xl font-semibold text-ink">Clothes Pin Workshop</h3>
+      <h3 className="mb-2 text-xl font-semibold text-ink">Clothesline</h3>
       <p className="mb-4 text-ink/70">Pin quick synopses for each character.</p>
       <div className="flex items-center gap-4 overflow-x-auto pb-2">
         {(characters?.length ? characters : ["Protagonist", "Antagonist"]).map((name, idx) => (
@@ -520,7 +564,7 @@ const WorkshopChat = () => {
         <div className="rounded-lg border border-white/60 bg-white/60 p-2">
           <MessageCircle className="h-5 w-5 text-ink/80" />
         </div>
-        <h3 className="text-lg font-semibold text-ink">Workshop Session Chat</h3>
+        <h3 className="text-lg font-semibold text-ink">Critique & Collaboration</h3>
       </div>
       <div className="mb-3 max-h-60 overflow-y-auto rounded-lg border border-white/60 bg-white/80 p-3">
         {messages.map((m) => (
@@ -574,7 +618,6 @@ export default function StoryLab() {
     setWorkshopCharacters(guessCharacters(allText));
   }, []);
 
-  // Content wrapper: margin matches sidebar width on md+
   return (
     <div className="min-h-screen bg-base bg-radial-fade text-ink">
       {/* Translucent Sidebar (no top banner) */}
@@ -592,6 +635,10 @@ export default function StoryLab() {
       <div className={`transition-all duration-300 ${sidebarCollapsed ? "md:ml-20" : "md:ml-72"}`}>
         <div className="mx-auto max-w-7xl px-6 py-10">
           <PageBanner />
+
+          {/* Overview widgets */}
+          <QuoteBar chapters={chapters} />
+          <PrioritiesGlance />
 
           {/* Chapter info strip */}
           {chapters.length > 0 && (
@@ -612,7 +659,7 @@ export default function StoryLab() {
               title="Live Session Modules"
               subtitle="A quick overview of what you’ll use during Story Lab Sessions."
             />
-            <div className="mb-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="mb-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-5">
               <FeatureCard
                 icon={Calendar}
                 title="Session Schedule"
@@ -641,10 +688,18 @@ export default function StoryLab() {
                 description="Creative, context-aware prompts when you’re stuck."
                 onClick={() => navigate("/story-lab/prompts")}
               />
+              {/* NEW: open the Workshop modules page */}
+              <FeatureCard
+                icon={Layers}
+                title="Workshop (Characters/Roadmap)"
+                status="Ready"
+                description="Open modules for Characters, Roadmap, Priority Cards & Clothesline."
+                onClick={() => navigate("/story-lab/workshop")}
+              />
             </div>
           </section>
 
-          {/* WORKSHOP COMMUNITY (raised up, includes Clothesline + Chat) */}
+          {/* WORKSHOP COMMUNITY */}
           <section id="community" className="mb-14">
             <SectionHeader
               icon="👥"
@@ -657,7 +712,7 @@ export default function StoryLab() {
             </div>
           </section>
 
-          {/* STORY & CHARACTER DEVELOPMENT (HFL replaces continuity alerts) */}
+          {/* STORY & CHARACTER DEVELOPMENT */}
           <section id="dev" className="mb-14">
             <SectionHeader
               icon="📖"
@@ -690,9 +745,7 @@ export default function StoryLab() {
             <div className="grid gap-6">
               <CharacterManager
                 seedText={chapters.map((c) => c.text).join("\n\n")}
-                onChange={(names) => {
-                  // just keep characters in-sync if needed later
-                }}
+                onChange={() => {}}
               />
               {activeSection === "hfl" && (
                 <HopesFearsLegacyWorkshop
@@ -703,7 +756,7 @@ export default function StoryLab() {
             </div>
           </section>
 
-          {/* AI + HUMAN BALANCE (last before Faith) */}
+          {/* AI + HUMAN BALANCE */}
           <section id="ai" className="mb-14">
             <SectionHeader
               icon="✨"
@@ -732,7 +785,7 @@ export default function StoryLab() {
             </div>
           </section>
 
-          {/* FAITH + LEGACY (always very last) */}
+          {/* FAITH + LEGACY */}
           <section id="faith" className="mb-24">
             <SectionHeader
               icon="💝"
@@ -772,6 +825,13 @@ export default function StoryLab() {
               className="rounded-lg border border-white/60 bg-white/60 px-4 py-2 font-medium text-ink hover:bg-white/80"
             >
               View Prompts
+            </Link>
+            {/* NEW quick link */}
+            <Link
+              to="/story-lab/workshop"
+              className="rounded-lg border border-white/60 bg-white/60 px-4 py-2 font-medium text-ink hover:bg-white/80"
+            >
+              Open Workshop
             </Link>
           </div>
           <div className="flex items-center gap-2 text-ink/70">
