@@ -441,6 +441,17 @@ export default function StoryPromptsWorkshop() {
     }
   }, []);
 
+  // Live refresh when project changes (from other views or tabs)
+  useEffect(() => {
+    const refresh = () => setChapters(loadChaptersFromLocalStorage());
+    window.addEventListener("project:change", refresh);
+    window.addEventListener("storage", refresh); // cross-tab refresh
+    return () => {
+      window.removeEventListener("project:change", refresh);
+      window.removeEventListener("storage", refresh);
+    };
+  }, []);
+
   // Load chapter's lab data
   useEffect(() => {
     if (!selectedChapter) return;
