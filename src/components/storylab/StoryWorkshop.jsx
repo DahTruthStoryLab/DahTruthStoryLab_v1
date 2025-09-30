@@ -1,14 +1,7 @@
 // src/components/storylab/StoryWorkshop.jsx
 import React from "react";
 import { Link, useNavigate } from "react-router-dom";
-import {
-  BookOpen,
-  Layers,
-  Pin,
-  Route as RouteIcon,
-  ListChecks,
-  ArrowLeft,
-} from "lucide-react";
+import { BookOpen, Layers, Pin, Map as RouteIcon, ListChecks, ArrowLeft } from "lucide-react";
 
 /* ---------------------------------------------------------
    PageBanner (enhanced aesthetic)
