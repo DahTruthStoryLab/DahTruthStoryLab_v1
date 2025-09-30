@@ -1,12 +1,12 @@
 // src/lib/storylab/StoryLab.jsx
 import React, { useState, useEffect, useMemo } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import {
   ArrowLeft, BookOpen, Users, Pin, Sparkles, Calendar, Clock, ChevronRight, Plus,
   Layers, Edit3, Trash2, Globe, Shield, Heart, Star, CheckCircle, FileText,
   MessageSquare, User
 } from "lucide-react";
-import BrandLogo from "../../components/BrandLogo"; // ✅ logo component
+import BrandLogo from "../../components/BrandLogo";
 
 /* -----------------------------
    Helpers: load chapters safely
@@ -44,68 +44,23 @@ function guessCharacters(text) {
   return Array.from(names).slice(0, 50);
 }
 
-function extractConflicts(text) {
-  const hits = [];
-  const needles = ["conflict","tension","argument","fight","feud","rivalry","obstacle","problem","challenge"];
-  const sentences = splitSentences(text);
-  sentences.forEach((s) => {
-    if (needles.some((n) => s.toLowerCase().includes(n))) hits.push(s.trim());
-  });
-  return hits;
-}
-
 function extractKeywordSentences(text, keyword) {
   const k = keyword.toLowerCase();
   return splitSentences(text).filter((s) => s.toLowerCase().includes(k));
 }
-
-/* =========================================================
-   TOP BANNER (navy) — now with BrandLogo in the left block
-========================================================= */
-const TopBanner = ({ navigate, toggleMobileSidebar }) => {
-  return (
-    <div className="sticky top-0 z-50 bg-[#0b1220] border-b border-slate-800 text-slate-100">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6">
-        <div className="h-16 flex items-center justify-between">
-          {/* LEFT: mobile menu + logo + title */}
-          <div className="flex items-center gap-3">
-            <button
-              onClick={toggleMobileSidebar}
-              className="md:hidden inline-flex items-center justify-center w-9 h-9 rounded-lg bg-white/10 hover:bg-white/15 border border-white/10"
-              aria-label="Toggle menu"
-            >
-              <span>☰</span>
-            </button>
-            <BrandLogo className="h-7 w-auto" />
-            <div className="font-extrabold tracking-wide">Story Lab</div>
-          </div>
-
-          {/* CENTER: subtitle (hidden on small) */}
-          <div className="text-center hidden md:block">
-            <div className="text-sm text-slate-300">Creative Workshop</div>
-            <div className="text-lg font-semibold text-slate-100">DahTruth Platform</div>
-          </div>
-
-          {/* RIGHT: back button */}
-          <button
-            onClick={() => navigate("/dashboard")}
-            className="inline-flex items-center gap-2 rounded-xl bg-sky-600 hover:bg-sky-500 px-3 py-2 text-sm font-medium text-white"
-          >
-            <ArrowLeft size={16} />
-            Back to Dashboard
-          </button>
-        </div>
-      </div>
-    </div>
+function extractConflicts(text) {
+  const needles = [
+    "conflict","tension","argument","fight","feud","rivalry","obstacle","problem","challenge",
+  ];
+  return splitSentences(text).filter((s) =>
+    needles.some((n) => s.toLowerCase().includes(n))
   );
-};
+}
 
 /* =========================================================
-   AERO SIDEBAR (glassmorphism)
-   - fixed under the TopBanner (top: 4rem)
-   - collapsible (stores preference in localStorage)
-   - highlights active item
-   - now shows small logo row at the top
+   AERO SIDEBAR — light/glass brand styling
+   - fixed, collapsible, with hover highlight
+   - includes "Back to Dashboard" as a menu item
 ========================================================= */
 function AeroSidebar({
   collapsed,
@@ -115,7 +70,6 @@ function AeroSidebar({
 }) {
   const location = useLocation();
 
-  // Persist collapsed preference
   useEffect(() => {
     try {
       localStorage.setItem("storylab_sidebar_collapsed", JSON.stringify(collapsed));
@@ -123,177 +77,174 @@ function AeroSidebar({
   }, [collapsed]);
 
   const itemsTop = [
-    { key: "home",    label: "Story Lab Home", to: "/story-lab", icon: BookOpen, type: "link" },
-    { key: "prompts", label: "Prompts",        to: "/story-lab/prompts", icon: Sparkles, type: "link" },
-    // Section toggles on this page:
-    { key: "clothesline", label: "Clothesline", icon: Pin, type: "section", section: "clothesline" },
-    { key: "hfl",         label: "Hopes • Fears • Legacy", icon: Heart, type: "section", section: "hfl" },
-    { key: "critique",    label: "Critique Circle", to: "/story-lab/critique", icon: MessageSquare, type: "link", accent: true },
+    { key: "home",        label: "Story Lab Home",   to: "/story-lab",            icon: BookOpen,      type: "link" },
+    { key: "prompts",     label: "Prompts",          to: "/story-lab/prompts",    icon: Sparkles,      type: "link" },
+    { key: "clothesline", label: "Clothesline",                               icon: Pin,           type: "section", section: "clothesline" },
+    { key: "hfl",         label: "Hopes • Fears • Legacy",                    icon: Heart,         type: "section", section: "hfl" },
+    { key: "characters",  label: "Character Manager",                         icon: Users,         type: "section", section: "characters" },
+    { key: "critique",    label: "Critique Circle",  to: "/story-lab/critique",  icon: MessageSquare, type: "link",  accent: true },
+  ];
+
+  const itemsBottom = [
+    { key: "back", label: "Back to Dashboard", to: "/dashboard", icon: ArrowLeft, type: "link", accent: true },
   ];
 
   const isActiveRoute = (to) => location.pathname === to;
   const isActiveSection = (key) => activeSection === key;
 
+  const baseItem =
+    "group flex items-center gap-3 w-full rounded-xl px-3 py-2 transition-colors outline-none focus:ring-2 focus:ring-accent/50";
+  const activeItem =
+    "bg-primary text-ink border border-white/60 shadow";
+  const inactiveItem =
+    "text-ink hover:bg-white/80 border border-white/0";
+
   return (
-    <>
-      {/* Backdrop for mobile */}
-      <div
-        className={`fixed inset-0 z-40 bg-black/40 md:hidden ${collapsed ? "pointer-events-none opacity-0" : "opacity-100"}`}
-        onClick={() => setCollapsed(true)}
-        aria-hidden="true"
-      />
-
-      <aside
-        className={[
-          "fixed z-50 md:z-30 left-0 top-16 h-[calc(100vh-4rem)]",
-          "backdrop-blur-xl bg-white/10 border-r border-white/10",
-          "shadow-[0_8px_40px_-10px_rgba(2,132,199,0.35)]",
-          "transition-all duration-300 ease-out",
-          collapsed ? "w-20 -translate-x-0 md:translate-x-0 -left-64 md:left-0 md:w-20" : "w-72 left-0",
-          "md:translate-x-0",
-          "overflow-hidden"
-        ].join(" ")}
-        aria-label="Aero menu sidebar"
-      >
-        {/* Small brand row */}
-        <div className="flex items-center gap-2 px-3 pt-3">
-          <BrandLogo className={`${collapsed ? "h-6" : "h-7"} w-auto`} />
-          {!collapsed && <span className="text-sm font-semibold text-white/90">DahTruth</span>}
-        </div>
-
-        {/* Collapse/expand trigger (desktop) */}
-        <div className="hidden md:flex items-center justify-end p-2">
+    <aside
+      className={[
+        "fixed left-0 top-0 h-screen z-40",
+        "bg-white/70 backdrop-blur-xl border-r border-white/60",
+        "transition-all duration-300 ease-out overflow-hidden",
+        collapsed ? "w-20" : "w-72",
+      ].join(" ")}
+      aria-label="Aero menu sidebar"
+    >
+      {/* Brand row */}
+      <div className="flex items-center gap-2 px-3 pt-4 pb-3">
+        <BrandLogo className={`${collapsed ? "h-7" : "h-8"} w-auto`} />
+        {!collapsed && (
+          <div className="leading-tight">
+            <div className="font-semibold text-ink">DahTruth</div>
+            <div className="text-[11px] text-muted -mt-0.5">Story Lab</div>
+          </div>
+        )}
+        <div className="ml-auto hidden md:block">
           <button
             onClick={() => setCollapsed((v) => !v)}
-            className="inline-flex items-center gap-2 rounded-lg px-2 py-1 bg-white/10 hover:bg-white/15 border border-white/10 text-slate-100"
-            title={collapsed ? "Expand menu" : "Collapse menu"}
+            className="inline-flex items-center gap-2 rounded-lg px-2 py-1 bg-white/60 hover:bg-white/80 border border-white/60 text-ink text-xs"
+            title={collapsed ? "Expand" : "Collapse"}
           >
             <ChevronRight className={`w-4 h-4 transition-transform ${collapsed ? "" : "rotate-180"}`} />
-            {!collapsed && <span className="text-xs">Collapse</span>}
+            {!collapsed && <span>Collapse</span>}
           </button>
         </div>
+      </div>
 
-        {/* Menu groups */}
-        <nav className="px-2 pb-3 overflow-y-auto h-[calc(100%-3rem)]">
-          <div className="mt-2 space-y-1">
-            {itemsTop.map((it) => {
-              const Icon = it.icon;
-              const active =
-                (it.type === "link" && isActiveRoute(it.to)) ||
-                (it.type === "section" && isActiveSection(it.section));
+      {/* Menu */}
+      <nav className="px-2 pb-2 overflow-y-auto h-[calc(100%-120px)]">
+        <div className="mt-1 space-y-1">
+          {itemsTop.map((it) => {
+            const Icon = it.icon;
+            const active =
+              (it.type === "link" && isActiveRoute(it.to)) ||
+              (it.type === "section" && isActiveSection(it.section));
 
-              const base =
-                "group flex items-center gap-3 w-full rounded-xl px-3 py-2 transition-colors outline-none focus:ring-2 focus:ring-sky-500/60";
-              const activeCls = it.accent
-                ? "bg-sky-600/95 text-white shadow-lg shadow-sky-900/30 border border-sky-500"
-                : "bg-white/15 text-white border border-white/20";
-              const inactive =
-                "text-slate-100/90 hover:text-white hover:bg-white/10 border border-transparent";
+            const cls = `${baseItem} ${active ? activeItem : inactiveItem} ${it.accent && !active ? "hover:bg-accent/30" : ""}`;
 
-              const inner = (
-                <>
-                  <Icon className={`w-5 h-5 ${active ? "" : "opacity-90"}`} />
-                  {!collapsed && <span className="truncate">{it.label}</span>}
-                </>
-              );
+            const inner = (
+              <>
+                <Icon className="w-5 h-5 opacity-90" />
+                {!collapsed && <span className="truncate">{it.label}</span>}
+              </>
+            );
 
-              return it.type === "link" ? (
-                <Link
-                  key={it.key}
-                  to={it.to}
-                  className={`${base} ${active ? activeCls : inactive}`}
-                  title={collapsed ? it.label : undefined}
-                >
-                  {inner}
-                </Link>
-              ) : (
-                <button
-                  key={it.key}
-                  onClick={() => setActiveSection(it.section)}
-                  className={`${base} ${active ? activeCls : inactive}`}
-                  title={collapsed ? it.label : undefined}
-                >
-                  {inner}
-                </button>
-              );
-            })}
-          </div>
+            return it.type === "link" ? (
+              <Link key={it.key} to={it.to} className={cls} title={collapsed ? it.label : undefined}>
+                {inner}
+              </Link>
+            ) : (
+              <button
+                key={it.key}
+                onClick={() => setActiveSection(it.section)}
+                className={cls}
+                title={collapsed ? it.label : undefined}
+              >
+                {inner}
+              </button>
+            );
+          })}
+        </div>
 
-          {/* Divider */}
-          <div className="my-4 border-t border-white/10" />
+        <div className="my-4 border-t border-white/60" />
 
-          {/* Bottom tiny legend */}
-          <div className={`px-3 ${collapsed ? "hidden" : "block"}`}>
-            <p className="text-[11px] leading-4 text-slate-100/70">
-              • Glassy “Aero” menu • Blur • Light-blue accents • Collapsible
-            </p>
-          </div>
-        </nav>
-      </aside>
-    </>
+        <div className="space-y-1">
+          {itemsBottom.map((it) => {
+            const Icon = it.icon;
+            const active = isActiveRoute(it.to);
+            const cls = `${baseItem} ${active ? activeItem : "text-ink hover:bg-accent/30 border border-white/0"}`;
+            return (
+              <Link key={it.key} to={it.to} className={cls} title={collapsed ? it.label : undefined}>
+                <Icon className="w-5 h-5 opacity-90" />
+                {!collapsed && <span className="truncate">{it.label}</span>}
+              </Link>
+            );
+          })}
+        </div>
+      </nav>
+    </aside>
   );
 }
 
 /* =========================================================
-   FEATURE CARDS (dark)
+   FEATURE CARD — light/glass brand styling
 ========================================================= */
 const FeatureCard = ({ icon: Icon, title, status, description, onClick }) => {
-  const statusColors = {
-    Ready: "bg-emerald-500/20 text-emerald-200 border-emerald-400/30",
-    Beta: "bg-sky-500/20 text-sky-200 border-sky-400/30",
-    "Coming Soon": "bg-slate-600/30 text-slate-300 border-slate-500/40",
+  const statusStyles = {
+    Ready:        "bg-primary text-ink border-white/60",
+    Beta:         "bg-accent/40 text-ink border-white/60",
+    "Coming Soon":"bg-muted/20 text-ink border-white/60",
   };
 
   return (
-    <div
+    <button
+      type="button"
       onClick={onClick}
-      className="bg-white/5 backdrop-blur-xl rounded-2xl p-6 border border-slate-800 hover:border-slate-700 transition-all cursor-pointer group"
+      className="text-left bg-white/70 backdrop-blur-xl rounded-2xl p-6 border border-white/60 hover:bg-white/80 transition-colors"
     >
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-start gap-4">
-          <div className="p-3 bg-white/10 rounded-xl border border-slate-700">
-            <Icon className="w-6 h-6 text-sky-300" />
+          <div className="p-3 bg-accent/20 rounded-xl border border-white/60">
+            <Icon className="w-6 h-6 text-ink/80" />
           </div>
           <div className="flex-1">
-            <h3 className="text-lg font-semibold text-slate-100 mb-2">{title}</h3>
+            <h3 className="text-lg font-semibold text-ink mb-2">{title}</h3>
             {status && (
-              <span
-                className={`inline-block px-3 py-1 rounded-full text-xs font-medium border ${statusColors[status]}`}
-              >
+              <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium border ${statusStyles[status]}`}>
                 {status}
               </span>
             )}
           </div>
         </div>
-        {/* fixed typo: text-slate-200 */}
-        <ChevronRight className="w-5 h-5 text-slate-200 group-hover:text-slate-100 transition-colors mt-1" />
+        <ChevronRight className="w-5 h-5 text-muted mt-1" />
       </div>
-      <p className="text-slate-300 text-sm leading-relaxed">{description}</p>
-    </div>
+      <p className="text-ink/80 text-sm leading-relaxed">{description}</p>
+    </button>
   );
 };
 
-const SectionHeader = ({ icon, title, subtitle }) => {
-  return (
-    <div className="flex items-start gap-3 mb-8">
-      <div className="p-3 bg-sky-600/20 rounded-xl border border-sky-700">
-        <span className="text-2xl">{icon}</span>
-      </div>
-      <div>
-        <h2 className="text-3xl font-bold text-slate-100 mb-2">{title}</h2>
-        {subtitle && <p className="text-slate-300">{subtitle}</p>}
-      </div>
+const SectionHeader = ({ icon, title, subtitle }) => (
+  <div className="flex items-start gap-3 mb-8">
+    <div className="p-3 rounded-xl bg-white/70 border border-white/60">
+      <span className="text-xl">{icon}</span>
     </div>
-  );
-};
+    <div>
+      <h2 className="text-3xl font-bold bg-gradient-to-r from-accent via-primary to-gold bg-clip-text text-transparent mb-1">
+        {title}
+      </h2>
+      {subtitle ? <p className="text-muted">{subtitle}</p> : null}
+    </div>
+  </div>
+);
 
 /* =========================================================
-   CHARACTER MANAGER (dark)
+   CHARACTER MANAGER — brand styling
 ========================================================= */
 const CharacterManager = ({ seedText = "", onChange }) => {
   const [characters, setCharacters] = useState(() => {
     const fromText = guessCharacters(seedText);
-    return fromText.length ? fromText.map((n, i) => ({ id: i + 1, name: n })) : [];
+    return fromText.length
+      ? fromText.map((n, i) => ({ id: i + 1, name: n }))
+      : [];
   });
   const [newCharacter, setNewCharacter] = useState("");
   const [editingId, setEditingId] = useState(null);
@@ -308,51 +259,52 @@ const CharacterManager = ({ seedText = "", onChange }) => {
     setCharacters((prev) => [...prev, { id: Date.now(), name: val }]);
     setNewCharacter("");
   };
-
-  const deleteCharacter = (id) => {
+  const delCharacter = (id) =>
     setCharacters((prev) => prev.filter((c) => c.id !== id));
-  };
-
   const updateCharacter = (id, name) => {
-    setCharacters((prev) => prev.map((c) => (c.id === id ? { ...c, name: name.trim() } : c)));
+    setCharacters((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, name: name.trim() } : c))
+    );
     setEditingId(null);
   };
 
   return (
-    <div className="bg-white/5 backdrop-blur-xl rounded-2xl p-6 border border-slate-800">
-      <h3 className="text-lg font-semibold text-slate-100 mb-4">Character Manager</h3>
+    <div className="bg-white/70 backdrop-blur-xl rounded-2xl p-6 border border-white/60">
+      <h3 className="text-lg font-semibold text-ink mb-4">Character Manager</h3>
 
       <div className="space-y-3 mb-4">
         {characters.length === 0 && (
-          <div className="text-slate-400 text-sm">No characters found yet. Add them below.</div>
+          <div className="text-muted text-sm">No characters yet. Add one.</div>
         )}
-        {characters.map((character) => (
+        {characters.map((ch) => (
           <div
-            key={character.id}
-            className="flex items-center gap-3 bg-slate-900/60 rounded-lg p-3 border border-slate-700"
+            key={ch.id}
+            className="flex items-center gap-3 bg-white/80 rounded-lg p-3 border border-white/60"
           >
-            {editingId === character.id ? (
+            {editingId === ch.id ? (
               <input
                 type="text"
-                defaultValue={character.name}
-                onBlur={(e) => updateCharacter(character.id, e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && updateCharacter(character.id, e.currentTarget.value)}
-                className="flex-1 bg-transparent border-b border-sky-500 text-slate-100 outline-none"
+                defaultValue={ch.name}
+                onBlur={(e) => updateCharacter(ch.id, e.target.value)}
+                onKeyDown={(e) =>
+                  e.key === "Enter" && updateCharacter(ch.id, e.currentTarget.value)
+                }
+                className="flex-1 bg-transparent border-b border-muted text-ink outline-none"
                 autoFocus
               />
             ) : (
               <span
-                onClick={() => setEditingId(character.id)}
-                className="flex-1 text-slate-100 cursor-pointer hover:text-sky-300"
+                onClick={() => setEditingId(ch.id)}
+                className="flex-1 text-ink cursor-pointer hover:text-ink/80"
                 title="Click to edit"
               >
-                {character.name}
+                {ch.name}
               </span>
             )}
             <button
-              onClick={() => deleteCharacter(character.id)}
-              className="text-rose-400/80 hover:text-rose-300 transition-colors"
-              title="Delete character"
+              onClick={() => delCharacter(ch.id)}
+              className="text-ink/60 hover:text-ink"
+              title="Delete"
             >
               <Trash2 className="w-4 h-4" />
             </button>
@@ -363,15 +315,16 @@ const CharacterManager = ({ seedText = "", onChange }) => {
       <div className="flex gap-2">
         <input
           type="text"
-          placeholder="Add new character..."
+          placeholder="Add new character…"
           value={newCharacter}
           onChange={(e) => setNewCharacter(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && addCharacter()}
-          className="flex-1 px-4 py-2 bg-slate-900/60 border border-slate-700 rounded-lg text-slate-100 placeholder-slate-400 focus:border-sky-500 focus:outline-none"
+          className="flex-1 px-4 py-2 bg-white border border-white/60 rounded-lg text-ink placeholder-muted focus:border-muted focus:outline-none"
         />
         <button
           onClick={addCharacter}
-          className="px-4 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-lg transition-all"
+          className="px-4 py-2 bg-accent/80 hover:bg-accent text-ink rounded-lg border border-white/60 transition-colors"
+          title="Add character"
         >
           <Plus className="w-5 h-5" />
         </button>
@@ -381,20 +334,27 @@ const CharacterManager = ({ seedText = "", onChange }) => {
 };
 
 /* =========================================================
-   WORKSHOP PANELS (dark)
+   WORKSHOP PANELS — brand styling
 ========================================================= */
 const StoryPromptsWorkshop = ({ chapters, characters }) => {
-  const fullText = useMemo(() => chapters.map((c) => c.text).join("\n\n"), [chapters]);
+  const fullText = useMemo(
+    () => chapters.map((c) => c.text).join("\n\n"),
+    [chapters]
+  );
 
   const prompts = useMemo(() => {
     const out = [];
     (characters || []).slice(0, 8).forEach((ch) => {
       out.push(`Explore the backstory of ${ch}.`);
-      out.push(`What does ${ch} fear the most? Write a scene that reveals it implicitly.`);
+      out.push(
+        `What does ${ch} fear the most? Write a scene that reveals it implicitly.`
+      );
     });
     const conflicts = extractConflicts(fullText);
     if (conflicts.length) {
-      out.push(`What happens if this conflict escalates further: "${conflicts[0]}".`);
+      out.push(
+        `What happens if this conflict escalates further: "${conflicts[0]}".`
+      );
     }
     const hopes = extractKeywordSentences(fullText, "hope");
     const fears = extractKeywordSentences(fullText, "fear");
@@ -406,8 +366,12 @@ const StoryPromptsWorkshop = ({ chapters, characters }) => {
 
     chapters.forEach((ch, i) => {
       if ((ch.text || "").length > 60) {
-        out.push(`Chapter ${i + 1}: raise the stakes in the final third without adding new characters.`);
-        out.push(`Chapter ${i + 1}: add a reversal that turns the POV character's goal on its head.`);
+        out.push(
+          `Chapter ${i + 1}: raise the stakes in the final third without adding new characters.`
+        );
+        out.push(
+          `Chapter ${i + 1}: add a reversal that turns the POV character's goal on its head.`
+        );
       }
     });
 
@@ -415,15 +379,18 @@ const StoryPromptsWorkshop = ({ chapters, characters }) => {
   }, [chapters, characters, fullText]);
 
   return (
-    <div className="bg-white/5 backdrop-blur-xl rounded-2xl p-6 border border-slate-800">
-      <h3 className="text-xl font-semibold text-slate-100 mb-2">Story Prompts Workshop</h3>
-      <p className="text-slate-400 mb-4">Prompts generated from your story chapters and characters.</p>
+    <div className="bg-white/70 backdrop-blur-xl rounded-2xl p-6 border border-white/60">
+      <h3 className="text-xl font-semibold text-ink mb-2">Story Prompts Workshop</h3>
+      <p className="text-ink/70 mb-4">Prompts generated from your story chapters and characters.</p>
       {prompts.length === 0 ? (
-        <div className="text-slate-400">No prompts yet. Add chapters first.</div>
+        <div className="text-muted">No prompts yet. Add chapters first.</div>
       ) : (
-        <ul className="grid md:grid-cols-2 gap-3">
+        <ul className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
           {prompts.map((p, i) => (
-            <li key={i} className="p-3 rounded-lg bg-slate-900/60 border border-slate-700 text-slate-100">
+            <li
+              key={i}
+              className="p-3 rounded-lg bg-white/80 border border-white/60 text-ink"
+            >
               • {p}
             </li>
           ))}
@@ -433,31 +400,33 @@ const StoryPromptsWorkshop = ({ chapters, characters }) => {
   );
 };
 
-const ClotheslineWorkshop = ({ characters }) => {
-  return (
-    <div className="bg-white/5 backdrop-blur-xl rounded-2xl p-6 border border-slate-800">
-      <h3 className="text-xl font-semibold text-slate-100 mb-2">Clothes Pin Workshop</h3>
-      <p className="text-slate-400 mb-4">Pin quick synopses for each character.</p>
-      <div className="flex items-center gap-4 overflow-x-auto pb-2">
-        {(characters?.length ? characters : ["Protagonist", "Antagonist"]).map((name, idx) => (
-          <div key={idx} className="min-w-[220px] bg-slate-900/60 border border-slate-700 rounded-xl p-4">
+const ClotheslineWorkshop = ({ characters }) => (
+  <div className="bg-white/70 backdrop-blur-xl rounded-2xl p-6 border border-white/60">
+    <h3 className="text-xl font-semibold text-ink mb-2">Clothes Pin Workshop</h3>
+    <p className="text-ink/70 mb-4">Pin quick synopses for each character.</p>
+    <div className="flex items-center gap-4 overflow-x-auto pb-2">
+      {(characters?.length ? characters : ["Protagonist", "Antagonist"]).map(
+        (name, idx) => (
+          <div
+            key={idx}
+            className="min-w-[220px] bg-white/80 border border-white/60 rounded-xl p-4"
+          >
             <div className="flex items-center gap-2 mb-2">
-              <Pin className="w-4 h-4 text-sky-300" />
-              <div className="font-semibold text-slate-100">{name}</div>
+              <Pin className="w-4 h-4 text-ink/70" />
+              <div className="font-semibold text-ink">{name}</div>
             </div>
-            <p className="text-sm text-slate-200/90">
-              {name} plays a key role in the story. Summarize traits, goals, and obstacles here.
+            <p className="text-sm text-ink/80">
+              {name} plays a key role. Summarize traits, goals, and obstacles here.
             </p>
           </div>
-        ))}
-      </div>
+        )
+      )}
     </div>
-  );
-};
+  </div>
+);
 
 const HopesFearsLegacyWorkshop = ({ chapters, characters }) => {
   const text = useMemo(() => chapters.map((c) => c.text).join("\n\n"), [chapters]);
-
   const insights = useMemo(() => {
     const result = {};
     (characters || []).forEach((ch) => {
@@ -471,25 +440,25 @@ const HopesFearsLegacyWorkshop = ({ chapters, characters }) => {
   }, [text, characters]);
 
   return (
-    <div className="bg-white/5 backdrop-blur-xl rounded-2xl p-6 border border-slate-800">
-      <h3 className="text-xl font-semibold text-slate-100 mb-4">Hopes, Fears & Legacy Workshop</h3>
+    <div className="bg-white/70 backdrop-blur-xl rounded-2xl p-6 border border-white/60">
+      <h3 className="text-xl font-semibold text-ink mb-4">Hopes, Fears & Legacy Workshop</h3>
       {(!characters || characters.length === 0) && (
-        <div className="text-slate-400 mb-3">Add characters above to see targeted insights.</div>
+        <div className="text-muted mb-3">Add characters above to see targeted insights.</div>
       )}
       <div className="space-y-4">
         {Object.entries(insights).map(([name, data]) => (
-          <div key={name} className="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
-            <div className="font-semibold text-slate-100 mb-2">{name}</div>
+          <div key={name} className="rounded-xl border border-white/60 bg-white/80 p-4">
+            <div className="font-semibold text-ink mb-2">{name}</div>
             <div className="grid md:grid-cols-3 gap-3">
               {["Hopes","Fears","Legacy"].map((key) => (
-                <div key={key} className="rounded-lg bg-black/30 p-3 border border-slate-800">
-                  <div className="text-slate-100 text-sm font-medium mb-2">{key}</div>
-                  {data[key] && data[key].length ? (
-                    <ul className="space-y-2 text-slate-200 text-sm">
+                <div key={key} className="rounded-lg bg-white p-3 border border-white/60">
+                  <div className="text-ink/80 text-sm font-medium mb-2">{key}</div>
+                  {data[key]?.length ? (
+                    <ul className="space-y-2 text-ink/90 text-sm">
                       {data[key].map((s, i) => <li key={i}>• {s}</li>)}
                     </ul>
                   ) : (
-                    <div className="text-slate-400 text-sm">No {key.toLowerCase()} found yet.</div>
+                    <div className="text-muted text-sm">No {key.toLowerCase()} yet.</div>
                   )}
                 </div>
               ))}
@@ -502,11 +471,10 @@ const HopesFearsLegacyWorkshop = ({ chapters, characters }) => {
 };
 
 /* =========================================================
-   MAIN COMPONENT (with Aero sidebar)
+   MAIN COMPONENT
 ========================================================= */
 export default function StoryLab() {
-  const navigate = useNavigate();
-  const [activeSection, setActiveSection] = useState("overview"); // "overview" | "clothesline" | "hfl"
+  const [activeSection, setActiveSection] = useState("overview"); // "overview" | "clothesline" | "hfl" | "characters"
   const [chapters, setChapters] = useState([]);
   const [workshopCharacters, setWorkshopCharacters] = useState([]);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
@@ -516,97 +484,79 @@ export default function StoryLab() {
       return false;
     }
   });
-  const [mobileSidebarHidden, setMobileSidebarHidden] = useState(true);
-
-  // Proper mobile toggle (opens/closes overlay sidebar)
-  const toggleMobileSidebar = () => setMobileSidebarHidden((v) => !v);
 
   useEffect(() => {
     setChapters(loadChaptersFromLocalStorage());
   }, []);
 
   const aiFeatures = [
-    { icon: Sparkles, title: "Story Prompts", status: "Ready", description: "Get creative AI-generated prompts tailored to your story's theme and chapter." },
-    { icon: CheckCircle, title: "Character Consistency", status: "Coming Soon", description: "AI checks for character inconsistencies like changing eye color or contradictions." },
-    { icon: Edit3, title: "Grammar Polish", status: "Coming Soon", description: "Smart grammar and clarity suggestions that preserve your unique voice." },
-    { icon: FileText, title: "Scene Summaries", status: "Ready", description: "Auto-generate chapter summaries and track plot threads." },
+    { icon: Sparkles,     title: "Story Prompts",         status: "Ready",        description: "Get creative AI-generated prompts tailored to your theme and chapter." },
+    { icon: CheckCircle,  title: "Character Consistency", status: "Coming Soon",  description: "Catch character detail contradictions as they happen." },
+    { icon: Edit3,        title: "Grammar Polish",        status: "Coming Soon",  description: "Improve clarity and flow while keeping your voice." },
+    { icon: FileText,     title: "Scene Summaries",       status: "Ready",        description: "Auto-generate summaries and track plot threads." },
   ];
 
   const storyFeatures = [
-    { icon: User, title: "Character Profiles", status: "Beta", description: "Create detailed character sheets and track relationships." },
-    { icon: Pin, title: "Character Clothesline", status: "Ready", description: "Pin and track traits, obstacles, and changes." },
-    { icon: Globe, title: "World Bible", status: "Beta", description: "Locations, cultures, and timelines that grow as you write." },
-    { icon: Shield, title: "Continuity Alerts", status: "Coming Soon", description: "Get notified when you break continuity rules mid-story." },
+    { icon: User,   title: "Character Profiles",   status: "Beta",        description: "Detailed sheets with relationships." },
+    { icon: Pin,    title: "Character Clothesline",status: "Ready",       description: "Pin traits, obstacles, and changes." },
+    { icon: Globe,  title: "World Bible",          status: "Beta",        description: "Locations, cultures, and timelines." },
+    { icon: Shield, title: "Continuity Alerts",    status: "Coming Soon", description: "Get notified when continuity breaks." },
   ];
 
   const workshopFeatures = [
-    { icon: Calendar, title: "Session Schedule", status: "Ready", description: "Six-session collaborative writing structure with goals." },
-    { icon: Users, title: "Breakout Pairings", status: "Ready", description: "Randomly pair writers for collaborative exercises and peer review." },
-    { icon: MessageSquare, title: "Critique Circle", status: "Ready", description: "Share drafts with your cohort, add inline comments, and track revisions securely." },
+    { icon: Calendar,     title: "Session Schedule",   status: "Ready", description: "Six-session collaborative structure with goals." },
+    { icon: Users,        title: "Breakout Pairings",  status: "Ready", description: "Random pairings for exercises and peer review." },
+    { icon: MessageSquare,title: "Critique Circle",    status: "Ready", description: "Share drafts, add inline comments, track revisions." },
   ];
 
   const faithFeatures = [
-    { icon: Heart, title: "Reflection Prompts", status: "Beta", description: "Daily questions to ground your writing in purpose and meaning." },
-    { icon: Star, title: "Legacy Writing", status: "Coming Soon", description: "Tools for writing with future generations in mind." },
+    { icon: Heart, title: "Reflection Prompts", status: "Beta",        description: "Daily questions to ground your writing." },
+    { icon: Star,  title: "Legacy Writing",     status: "Coming Soon", description: "Write with future generations in mind." },
   ];
 
   return (
-    <div className="min-h-screen bg-[#0b1220] text-slate-100">
-      {/* Top banner with working mobile toggle + logo */}
-      <TopBanner navigate={navigate} toggleMobileSidebar={toggleMobileSidebar} />
+    <div className="min-h-screen bg-base bg-radial-fade text-ink">
+      {/* Sidebar */}
+      <AeroSidebar
+        collapsed={sidebarCollapsed}
+        setCollapsed={setSidebarCollapsed}
+        activeSection={activeSection}
+        setActiveSection={setActiveSection}
+      />
 
-      {/* Aero Sidebar */}
-      <div className="md:block">
-        <AeroSidebar
-          // If mobile overlay is visible, treat as expanded even if desktop preference is "collapsed"
-          collapsed={sidebarCollapsed && mobileSidebarHidden}
-          setCollapsed={(v) => {
-            setSidebarCollapsed(v);
-            setMobileSidebarHidden(true); // closing also hides the mobile overlay
-          }}
-          activeSection={activeSection}
-          setActiveSection={setActiveSection}
-        />
-      </div>
-
-      {/* Content wrapper: left margin equals sidebar width on md+ */}
-      <div className={`transition-all duration-300 ${sidebarCollapsed ? "md:ml-20" : "md:ml-72"}`}>
-        <div className="max-w-7xl mx-auto px-6 py-12">
-          {/* Hero Section */}
-          <div className="text-center mb-16">
-            <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
+      {/* Content wrapper (left margin matches sidebar width) */}
+      <div className={`transition-all duration-300 ${sidebarCollapsed ? "md:ml-20" : "md:ml-72"} ml-20 md:ml-0`}>
+        <div className="max-w-7xl mx-auto px-6 py-10 md:py-12">
+          {/* Hero */}
+          <div className="text-center mb-12">
+            <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-accent via-primary to-gold bg-clip-text text-transparent mb-3">
               The All-in-One Writing Platform
             </h1>
-            <p className="text-lg text-slate-300 mb-8">
-              Where creativity meets discipline. Blend AI, community support, character tracking,
-              and faith-based reflection in one seamless writing experience.
+            <p className="text-ink/80">
+              Where creativity meets discipline—blend AI assistance, community, character tracking, and faith-based reflection.
             </p>
 
-            {/* Feature Pills (light-blue) */}
-            <div className="flex flex-wrap justify-center gap-4 mb-12">
-              <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-sky-600 text-white">
-                <Sparkles className="w-4 h-4" />
-                <span className="text-sm font-medium">AI-Powered Assistance</span>
+            {/* Feature pills */}
+            <div className="flex flex-wrap justify-center gap-3 mt-8">
+              <div className="px-4 py-2 rounded-full bg-primary border border-white/60 text-ink flex items-center gap-2">
+                <Sparkles className="w-4 h-4" /> <span className="text-sm font-medium">AI-Powered Assistance</span>
               </div>
-              <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-sky-600 text-white">
-                <Users className="w-4 h-4" />
-                <span className="text-sm font-medium">Writing Community</span>
+              <div className="px-4 py-2 rounded-full bg-primary border border-white/60 text-ink flex items-center gap-2">
+                <Users className="w-4 h-4" /> <span className="text-sm font-medium">Writing Community</span>
               </div>
-              <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-sky-600 text-white">
-                <Layers className="w-4 h-4" />
-                <span className="text-sm font-medium">Organization Tools</span>
+              <div className="px-4 py-2 rounded-full bg-primary border border-white/60 text-ink flex items-center gap-2">
+                <Layers className="w-4 h-4" /> <span className="text-sm font-medium">Organization Tools</span>
               </div>
-              <div className="flex items-center gap-2 px-4 py-2 rounded-full bg-sky-600 text-white">
-                <Heart className="w-4 h-4" />
-                <span className="text-sm font-medium">Faith Integration</span>
+              <div className="px-4 py-2 rounded-full bg-primary border border-white/60 text-ink flex items-center gap-2">
+                <Heart className="w-4 h-4" /> <span className="text-sm font-medium">Faith Integration</span>
               </div>
             </div>
           </div>
 
           {/* Chapter Info Bar */}
           {chapters.length > 0 && (
-            <div className="mb-12 p-4 bg-white/5 rounded-xl border border-slate-800">
-              <div className="flex items-center gap-3 text-slate-200">
+            <div className="mb-12 p-4 bg-white/70 backdrop-blur-xl rounded-xl border border-white/60">
+              <div className="flex items-center gap-3 text-ink">
                 <BookOpen className="w-5 h-5" />
                 <span>
                   {chapters.length} chapter{chapters.length > 1 ? "s" : ""} loaded from your story
@@ -615,76 +565,75 @@ export default function StoryLab() {
             </div>
           )}
 
-          {/* Lab Sessions */}
+          {/* Lab Sessions — 4 cards in one row on lg+ */}
           <section className="mb-16">
             <SectionHeader
               icon="🧪"
               title="Lab Sessions"
-              subtitle="Interactive workshops that analyze your story and support collaboration."
+              subtitle="Interactive workshops that analyze your story and generate personalized insights."
             />
-            <div className="grid gap-6 md:grid-cols-3 mb-8">
-              {/* Story Prompts Workshop */}
+
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4 mb-8">
               <Link
                 to="/story-lab/prompts"
-                className="rounded-2xl p-5 border text-left bg-sky-600 text-white hover:bg-sky-500 border-sky-500 transition-all block"
+                className="rounded-2xl p-5 border text-left bg-primary hover:bg-white/80 border-white/60 transition-colors block"
               >
                 <div className="text-lg font-semibold mb-1">Story Prompts Workshop</div>
-                <div className="text-sm opacity-90">
-                  Smart prompts based on your story structure and content.
-                </div>
+                <div className="text-sm text-ink/70">Prompts from themes, conflicts, and characters.</div>
               </Link>
 
-              {/* Clothesline */}
               <button
                 onClick={() => setActiveSection("clothesline")}
-                className={`rounded-2xl p-5 border text-left transition-all ${
+                className={`rounded-2xl p-5 border text-left transition-colors ${
                   activeSection === "clothesline"
-                    ? "bg-sky-600 text-white border-sky-500"
-                    : "bg-white/5 text-slate-100 border-slate-800 hover:bg-white/10"
+                    ? "bg-primary border-white/60"
+                    : "bg-white/70 border-white/60 hover:bg-white/80"
                 }`}
               >
                 <div className="text-lg font-semibold mb-1">Clothes Pin Workshop</div>
-                <div className="text-sm text-slate-300">Visual cards to summarize characters and roles.</div>
+                <div className="text-sm text-ink/70">Visual cards to summarize characters and roles.</div>
               </button>
 
-              {/* Hopes, Fears & Legacy */}
               <button
                 onClick={() => setActiveSection("hfl")}
-                className={`rounded-2xl p-5 border text-left transition-all ${
+                className={`rounded-2xl p-5 border text-left transition-colors ${
                   activeSection === "hfl"
-                    ? "bg-sky-600 text-white border-sky-500"
-                    : "bg-white/5 text-slate-100 border-slate-800 hover:bg-white/10"
+                    ? "bg-primary border-white/60"
+                    : "bg-white/70 border-white/60 hover:bg-white/80"
                 }`}
               >
                 <div className="text-lg font-semibold mb-1">Hopes, Fears & Legacy</div>
-                <div className="text-sm text-slate-300">Pulls sentences that reveal drives and long-term aims.</div>
+                <div className="text-sm text-ink/70">Pulls sentences that reveal drives and long-term aims.</div>
+              </button>
+
+              <button
+                onClick={() => setActiveSection("characters")}
+                className={`rounded-2xl p-5 border text-left transition-colors ${
+                  activeSection === "characters"
+                    ? "bg-primary border-white/60"
+                    : "bg-white/70 border-white/60 hover:bg-white/80"
+                }`}
+              >
+                <div className="text-lg font-semibold mb-1">Character Manager</div>
+                <div className="text-sm text-ink/70">Add/edit characters to feed prompts and analysis.</div>
               </button>
             </div>
 
-            {/* Critique Circle CTA */}
-            <div className="mb-8">
-              <Link
-                to="/story-lab/critique"
-                className="block rounded-2xl p-5 border bg-sky-600 text-white hover:bg-sky-500 border-sky-500 transition-all"
-              >
-                <div className="flex items-start gap-3">
-                  <MessageSquare className="w-5 h-5 mt-1" />
-                  <div>
-                    <div className="text-lg font-semibold mb-1">Critique Circle</div>
-                    <div className="text-sm opacity-90">
-                      Secure peer review with inline comments, reactions, copy-controls, and an audit log.
-                    </div>
-                  </div>
-                </div>
-              </Link>
-            </div>
-
-            {/* Active workshop panels */}
+            {/* Active panel */}
             {activeSection === "clothesline" && (
               <ClotheslineWorkshop characters={workshopCharacters} />
             )}
             {activeSection === "hfl" && (
               <HopesFearsLegacyWorkshop chapters={chapters} characters={workshopCharacters} />
+            )}
+            {activeSection === "characters" && (
+              <CharacterManager
+                seedText={chapters.map((c) => c.text).join("\n\n")}
+                onChange={setWorkshopCharacters}
+              />
+            )}
+            {activeSection === "overview" && (
+              <StoryPromptsWorkshop chapters={chapters} characters={workshopCharacters} />
             )}
           </section>
 
@@ -696,8 +645,8 @@ export default function StoryLab() {
               subtitle="AI that assists without overtaking your unique voice"
             />
             <div className="grid gap-6 md:grid-cols-2">
-              {aiFeatures.map((feature, idx) => (
-                <FeatureCard key={idx} {...feature} />
+              {aiFeatures.map((f, i) => (
+                <FeatureCard key={i} {...f} />
               ))}
             </div>
           </section>
@@ -709,17 +658,11 @@ export default function StoryLab() {
               title="Story & Character Development"
               subtitle="Character development, world building, and organization tools"
             />
-            <div className="grid gap-6 md:grid-cols-2 mb-8">
-              {storyFeatures.map((feature, idx) => (
-                <FeatureCard key={idx} {...feature} />
+            <div className="grid gap-6 md:grid-cols-2">
+              {storyFeatures.map((f, i) => (
+                <FeatureCard key={i} {...f} />
               ))}
             </div>
-
-            {/* Character Manager */}
-            <CharacterManager
-              seedText={chapters.map((c) => c.text).join("\n\n")}
-              onChange={setWorkshopCharacters}
-            />
           </section>
 
           {/* Workshop Community */}
@@ -730,8 +673,8 @@ export default function StoryLab() {
               subtitle="Collaborative writing sessions and accountability"
             />
             <div className="grid gap-6 md:grid-cols-3">
-              {workshopFeatures.map((feature, idx) => (
-                <FeatureCard key={idx} {...feature} />
+              {workshopFeatures.map((f, i) => (
+                <FeatureCard key={i} {...f} />
               ))}
             </div>
           </section>
@@ -744,32 +687,32 @@ export default function StoryLab() {
               subtitle="Spiritual grounding and legacy-focused writing"
             />
             <div className="grid gap-6 md:grid-cols-2">
-              {faithFeatures.map((feature, idx) => (
-                <FeatureCard key={idx} {...feature} />
+              {faithFeatures.map((f, i) => (
+                <FeatureCard key={i} {...f} />
               ))}
             </div>
           </section>
         </div>
       </div>
 
-      {/* Quick Actions Bar (dark) */}
-      <div className="fixed bottom-0 left-0 right-0 bg-[#0b1220]/95 backdrop-blur-xl border-t border-slate-800 p-4">
+      {/* Quick Actions Bar — brand glass */}
+      <div className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-xl border-t border-white/60 p-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Link
               to="/story-lab/critique"
-              className="px-6 py-3 bg-sky-600 hover:bg-sky-500 text-white rounded-lg font-medium transition-all shadow-lg"
+              className="px-6 py-3 bg-accent/80 hover:bg-accent text-ink rounded-lg font-medium transition-colors shadow"
             >
               Open Critique Circle
             </Link>
             <Link
               to="/story-lab/prompts"
-              className="px-4 py-2 bg-white/5 hover:bg-white/10 text-slate-100 rounded-lg font-medium transition-all border border-slate-800"
+              className="px-4 py-2 bg-white/70 hover:bg-white/90 text-ink rounded-lg font-medium transition-colors border border-white/60"
             >
               View Prompts
             </Link>
           </div>
-          <div className="flex items-center gap-2 text-slate-300">
+          <div className="flex items-center gap-2 text-ink/70">
             <Clock className="w-4 h-4" />
             <span className="text-sm">Next session in 2 days</span>
           </div>
