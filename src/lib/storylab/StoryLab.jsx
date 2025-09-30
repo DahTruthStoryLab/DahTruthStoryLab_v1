@@ -3,10 +3,10 @@ import React, { useState, useEffect, useMemo } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   ArrowLeft, BookOpen, Users, Pin, Sparkles, Calendar, Clock, ChevronRight, Plus,
-  Layers, Edit3, Trash2, Globe, Shield, Heart, Star, CheckCircle, FileText,
+  Layers, Edit3, Trash2, Globe, Heart, Star, CheckCircle, FileText,
   MessageSquare, User, Menu as MenuIcon
 } from "lucide-react";
-import BrandLogo from "../../components/BrandLogo"; // ✅ your logo
+import BrandLogo from "../../components/BrandLogo";
 
 /* -----------------------------
    Helpers: load chapters safely
@@ -42,25 +42,13 @@ function guessCharacters(text) {
   return Array.from(names).slice(0, 50);
 }
 
-function extractConflicts(text) {
-  const hits = [];
-  const needles = ["conflict","tension","argument","fight","feud","rivalry","obstacle","problem","challenge"];
-  const sentences = splitSentences(text);
-  sentences.forEach((s) => {
-    if (needles.some((n) => s.toLowerCase().includes(n))) hits.push(s.trim());
-  });
-  return hits;
-}
-
 function extractKeywordSentences(text, keyword) {
   const k = keyword.toLowerCase();
   return splitSentences(text).filter((s) => s.toLowerCase().includes(k));
 }
 
 /* =========================================================
-   AERO SIDEBAR (glassmorphism, brand colors)
-   - NO top banner; sidebar starts at very top
-   - collapsible; mobile overlay; hover “pounce”
+   AERO SIDEBAR (glassmorphism; brand serif heading)
 ========================================================= */
 function AeroSidebar({
   collapsed,
@@ -68,7 +56,7 @@ function AeroSidebar({
   activeSection,
   setActiveSection,
   onCloseMobile,
-  showMobile // controls slide-in on small screens
+  showMobile
 }) {
   const location = useLocation();
 
@@ -78,31 +66,31 @@ function AeroSidebar({
     } catch {}
   }, [collapsed]);
 
-  // Order mirrors your modules
+  // Ordered by modules as requested
   const itemsTop = [
     { key: "back", label: "Back to Dashboard", to: "/dashboard", icon: ArrowLeft, type: "link", accent: true },
     { key: "home", label: "Story Lab Home", to: "/story-lab", icon: BookOpen, type: "link" },
 
-    // Sessions (overview -> modules)
+    // Sessions overview & modules
     { key: "prompts-link", label: "Story Prompts", to: "/story-lab/prompts", icon: Sparkles, type: "link" },
     { key: "characters-consistency", label: "Character Consistency", icon: CheckCircle, type: "section", section: "overview" },
     { key: "grammar", label: "Grammar Polish", icon: Edit3, type: "section", section: "overview" },
     { key: "summaries", label: "Scene Summaries", icon: FileText, type: "section", section: "overview" },
 
     // Story & Character
-    { key: "profiles", label: "Character Profiles", icon: User, type: "section", section: "overview" },
-    { key: "clothesline", label: "Character Clothesline", icon: Pin, type: "section", section: "clothesline" },
-    { key: "world", label: "World Bible", icon: Globe, type: "section", section: "overview" },
-    { key: "hfl", label: "Hopes • Fears • Legacy", icon: Heart, type: "section", section: "hfl" },
+    { key: "profiles", label: "Character Profiles", icon: User, type: "section", section: "story" },
+    { key: "clothesline", label: "Character Clothesline", icon: Pin, type: "section", section: "community" },
+    { key: "world", label: "World Bible", icon: Globe, type: "section", section: "story" },
+    { key: "hfl", label: "Hopes • Fears • Legacy", icon: Heart, type: "section", section: "story" },
 
     // Workshop Community
-    { key: "schedule", label: "Session Schedule", icon: Calendar, type: "section", section: "overview" },
-    { key: "breakouts", label: "Breakout Pairings", icon: Users, type: "section", section: "overview" },
+    { key: "schedule", label: "Session Schedule", icon: Calendar, type: "section", section: "community" },
+    { key: "breakouts", label: "Breakout Pairings", icon: Users, type: "section", section: "community" },
     { key: "critique", label: "Critique Circle", to: "/story-lab/critique", icon: MessageSquare, type: "link", accent: true },
 
-    // Faith last
-    { key: "reflection", label: "Reflection Prompts", icon: Heart, type: "section", section: "overview" },
-    { key: "legacy", label: "Legacy Writing", icon: Star, type: "section", section: "overview" },
+    // Faith (last)
+    { key: "reflection", label: "Reflection Prompts", icon: Heart, type: "section", section: "faith" },
+    { key: "legacy", label: "Legacy Writing", icon: Star, type: "section", section: "faith" },
   ];
 
   const isActiveRoute = (to) => location.pathname === to;
@@ -110,7 +98,7 @@ function AeroSidebar({
 
   return (
     <>
-      {/* Mobile darkened backdrop */}
+      {/* Mobile backdrop */}
       <div
         className={`fixed inset-0 z-40 bg-black/40 md:hidden transition-opacity ${showMobile ? "opacity-100" : "pointer-events-none opacity-0"}`}
         onClick={onCloseMobile}
@@ -129,7 +117,7 @@ function AeroSidebar({
         ].join(" ")}
         aria-label="StoryLab sidebar"
       >
-        {/* Brand row — raised to the very top */}
+        {/* Brand row at top */}
         <div className="flex items-center gap-3 px-3 pt-3 pb-2">
           <BrandLogo className={`${collapsed ? "h-7" : "h-8"} w-auto`} />
           {!collapsed && (
@@ -140,7 +128,7 @@ function AeroSidebar({
           )}
         </div>
 
-        {/* Collapse/expand (desktop only) */}
+        {/* Collapse (desktop) */}
         <div className="hidden md:flex items-center justify-end p-2">
           <button
             onClick={() => setCollapsed((v) => !v)}
@@ -164,14 +152,12 @@ function AeroSidebar({
               const base =
                 "group relative flex items-center gap-3 w-full rounded-xl px-3 py-2 transition-all outline-none focus:ring-2 focus:ring-blue-400/60 hover:translate-x-0.5 hover:scale-[1.01]";
               const activeCls = it.accent
-                ? "bg-accent/30 text-ink border border-white/60 shadow-soft"
-                : "bg-primary text-ink border border-white/60 shadow-soft";
-              const inactive =
-                "text-ink hover:text-ink bg-white/40 border border-transparent";
+                ? "bg-accent/30 text-ink border border-white/60 shadow"
+                : "bg-white/80 text-ink border border-white/60 shadow";
+              const inactive = "text-ink bg-white/40 border border-transparent";
 
               const inner = (
                 <>
-                  {/* translucent hover sweep */}
                   <span className="absolute inset-0 rounded-xl bg-white/30 opacity-0 group-hover:opacity-100 transition-opacity" />
                   <Icon className={`w-5 h-5 relative z-10 ${active ? "opacity-100" : "opacity-90"}`} />
                   {!collapsed && <span className="truncate relative z-10 font-medium">{it.label}</span>}
@@ -204,7 +190,6 @@ function AeroSidebar({
             })}
           </div>
 
-          {/* Divider + tiny legend */}
           <div className="my-4 border-t border-white/60" />
           {!collapsed && (
             <div className="px-3">
@@ -233,7 +218,7 @@ const FeatureCard = ({ icon: Icon, title, status, description, onClick }) => {
     <button
       type="button"
       onClick={onClick}
-      className="text-left bg-white/70 backdrop-blur-xl rounded-2xl p-6 border border-white/60 hover:bg-white/80 transition-colors shadow-soft"
+      className="text-left bg-white/70 backdrop-blur-xl rounded-2xl p-6 border border-white/60 hover:bg-white/80 transition-colors shadow"
     >
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-start gap-4">
@@ -271,93 +256,10 @@ const SectionHeader = ({ icon, title, subtitle }) => (
 );
 
 /* =========================================================
-   CHARACTER MANAGER (brand glass)
-========================================================= */
-const CharacterManager = ({ seedText = "", onChange }) => {
-  const [characters, setCharacters] = useState(() => {
-    const fromText = guessCharacters(seedText);
-    return fromText.length ? fromText.map((n, i) => ({ id: i + 1, name: n })) : [];
-  });
-  const [newCharacter, setNewCharacter] = useState("");
-  const [editingId, setEditingId] = useState(null);
-
-  useEffect(() => {
-    onChange?.(characters.map((c) => c.name));
-  }, [characters, onChange]);
-
-  const addCharacter = () => {
-    const val = newCharacter.trim();
-    if (!val) return;
-    setCharacters((prev) => [...prev, { id: Date.now(), name: val }]);
-    setNewCharacter("");
-  };
-  const deleteCharacter = (id) => setCharacters((prev) => prev.filter((c) => c.id !== id));
-  const updateCharacter = (id, name) => {
-    setCharacters((prev) => prev.map((c) => (c.id === id ? { ...c, name: name.trim() } : c)));
-    setEditingId(null);
-  };
-
-  return (
-    <div className="bg-white/70 backdrop-blur-xl rounded-2xl p-6 border border-white/60 shadow-soft">
-      <h3 className="text-lg font-semibold text-ink mb-4">Character Manager</h3>
-
-      <div className="space-y-3 mb-4">
-        {characters.length === 0 && (
-          <div className="text-ink/70 text-sm">No characters yet. Add some below.</div>
-        )}
-        {characters.map((ch) => (
-          <div key={ch.id} className="flex items-center gap-3 bg-white/60 rounded-lg p-3 border border-white/60">
-            {editingId === ch.id ? (
-              <input
-                type="text"
-                defaultValue={ch.name}
-                onBlur={(e) => updateCharacter(ch.id, e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && updateCharacter(ch.id, e.currentTarget.value)}
-                className="flex-1 bg-transparent border-b border-muted text-ink outline-none"
-                autoFocus
-              />
-            ) : (
-              <span
-                onClick={() => setEditingId(ch.id)}
-                className="flex-1 text-ink cursor-pointer hover:text-ink/80"
-                title="Click to edit"
-              >
-                {ch.name}
-              </span>
-            )}
-            <button onClick={() => deleteCharacter(ch.id)} className="text-ink/60 hover:text-ink" title="Delete">
-              <Trash2 className="w-4 h-4" />
-            </button>
-          </div>
-        ))}
-      </div>
-
-      <div className="flex gap-2">
-        <input
-          type="text"
-          placeholder="Add new character…"
-          value={newCharacter}
-          onChange={(e) => setNewCharacter(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && addCharacter()}
-          className="flex-1 px-4 py-2 bg-white border border-white/60 rounded-lg text-ink placeholder-muted focus:border-muted focus:outline-none"
-        />
-        <button
-          onClick={addCharacter}
-          className="px-4 py-2 bg-accent/60 hover:bg-accent text-ink rounded-lg border border-white/60 transition-colors"
-          title="Add character"
-        >
-          <Plus className="w-5 h-5" />
-        </button>
-      </div>
-    </div>
-  );
-};
-
-/* =========================================================
    WORKSHOP PANELS (brand glass)
 ========================================================= */
 const ClotheslineWorkshop = ({ characters }) => (
-  <div className="bg-white/70 backdrop-blur-xl rounded-2xl p-6 border border-white/60 shadow-soft">
+  <div className="bg-white/70 backdrop-blur-xl rounded-2xl p-6 border border-white/60 shadow">
     <h3 className="text-xl font-semibold text-ink mb-2">Clothes Pin Workshop</h3>
     <p className="text-ink/70 mb-4">Pin quick synopses for each character.</p>
     <div className="flex items-center gap-4 overflow-x-auto pb-2">
@@ -391,7 +293,7 @@ const HopesFearsLegacyWorkshop = ({ chapters, characters }) => {
   }, [text, characters]);
 
   return (
-    <div className="bg-white/70 backdrop-blur-xl rounded-2xl p-6 border border-white/60 shadow-soft">
+    <div className="bg-white/70 backdrop-blur-xl rounded-2xl p-6 border border-white/60 shadow">
       <h3 className="text-xl font-semibold text-ink mb-4">Hopes, Fears & Legacy Workshop</h3>
       {(!characters || characters.length === 0) && (
         <div className="text-ink/70 mb-3">Add characters above to see targeted insights.</div>
@@ -422,11 +324,11 @@ const HopesFearsLegacyWorkshop = ({ chapters, characters }) => {
 };
 
 /* =========================================================
-   MAIN COMPONENT (no top banner; brand glass; mobile menu)
+   MAIN (no top bar; mobile menu button)
 ========================================================= */
 export default function StoryLab() {
   const navigate = useNavigate();
-  const [activeSection, setActiveSection] = useState("overview"); // "overview" | "clothesline" | "hfl"
+  const [activeSection, setActiveSection] = useState("overview"); // "overview" | "story" | "community" | "faith"
   const [chapters, setChapters] = useState([]);
   const [workshopCharacters, setWorkshopCharacters] = useState([]);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
@@ -439,12 +341,13 @@ export default function StoryLab() {
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   useEffect(() => {
-    setChapters(loadChaptersFromLocalStorage());
+    const chs = loadChaptersFromLocalStorage();
+    setChapters(chs);
   }, []);
 
-  // Groups (text only; styles handled by FeatureCard)
+  // Section content groups
   const aiFeatures = [
-    { icon: Sparkles, title: "Story Prompts", status: "Ready", description: "Get creative AI-generated prompts tailored to your story's theme and chapter." },
+    { icon: Sparkles, title: "Story Prompts", status: "Ready", description: "AI-generated prompts tailored to your story's theme and chapter." },
     { icon: CheckCircle, title: "Character Consistency", status: "Coming Soon", description: "Detect and flag character contradictions to keep details aligned." },
     { icon: Edit3, title: "Grammar Polish", status: "Coming Soon", description: "Clarity and flow suggestions that keep your voice intact." },
     { icon: FileText, title: "Scene Summaries", status: "Ready", description: "Auto-generate chapter summaries and track plot threads." },
@@ -452,7 +355,6 @@ export default function StoryLab() {
 
   const storyFeatures = [
     { icon: User, title: "Character Profiles", status: "Beta", description: "Create detailed character sheets and track relationships." },
-    { icon: Pin, title: "Character Clothesline", status: "Ready", description: "Pin and track traits, obstacles, and changes." },
     { icon: Globe, title: "World Bible", status: "Beta", description: "Locations, cultures, and timelines that grow as you write." },
     { icon: Heart, title: "Hopes • Fears • Legacy", status: "Beta", description: "Surface motivational drivers and long-view stakes per character." },
   ];
@@ -470,7 +372,7 @@ export default function StoryLab() {
 
   return (
     <div className="min-h-screen bg-base bg-radial-fade text-ink">
-      {/* Mobile menu button (since we removed the top bar) */}
+      {/* Mobile menu button */}
       <div className="md:hidden sticky top-0 z-40 bg-white/70 backdrop-blur-xl border-b border-white/60">
         <div className="px-4 py-3 flex items-center justify-between">
           <button
@@ -489,7 +391,7 @@ export default function StoryLab() {
         </div>
       </div>
 
-      {/* Aero Sidebar */}
+      {/* Sidebar */}
       <AeroSidebar
         collapsed={sidebarCollapsed}
         setCollapsed={setSidebarCollapsed}
@@ -499,18 +401,18 @@ export default function StoryLab() {
         onCloseMobile={() => setMobileSidebarOpen(false)}
       />
 
-      {/* Content wrapper: left margin equals sidebar width on md+ */}
+      {/* Content wrapper (left gutter = sidebar width) */}
       <div className={`transition-all duration-300 ${sidebarCollapsed ? "md:ml-20" : "md:ml-72"}`}>
         <div className="max-w-7xl mx-auto px-6 py-10 md:py-12">
           {/* Sessions banner */}
           <div className="mb-6">
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/70 border border-white/60 shadow-soft">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/70 border border-white/60 shadow">
               <span className="text-sm font-serif font-semibold">Story Lab Sessions</span>
               <span className="text-muted text-xs">overview</span>
             </div>
           </div>
 
-          {/* Hero Section */}
+          {/* Hero */}
           <div className="text-center mb-12">
             <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-accent via-primary to-gold bg-clip-text text-transparent mb-3 font-serif">
               The All-in-One Writing Platform
@@ -520,9 +422,9 @@ export default function StoryLab() {
             </p>
           </div>
 
-          {/* Chapter Info Bar */}
+          {/* Chapter Info */}
           {chapters.length > 0 && (
-            <div className="mb-12 p-4 bg-white/70 backdrop-blur-xl rounded-xl border border-white/60 shadow-soft">
+            <div className="mb-12 p-4 bg-white/70 backdrop-blur-xl rounded-xl border border-white/60 shadow">
               <div className="flex items-center gap-3 text-ink">
                 <BookOpen className="w-5 h-5" />
                 <span>
@@ -532,19 +434,18 @@ export default function StoryLab() {
             </div>
           )}
 
-          {/* Lab Sessions (cards use translucent brand colors) */}
+          {/* Lab Sessions — OVERVIEW ONLY (4 modules) */}
           <section className="mb-16">
             <SectionHeader
               icon="🧪"
               title="Lab Sessions"
-              subtitle="Interactive workshops that analyze your story and support collaboration."
+              subtitle="Overview of the interactive modules available in your Story Lab."
             />
 
-            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 mb-8">
-              {/* Story Prompts Workshop (link) */}
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
               <Link
                 to="/story-lab/prompts"
-                className="rounded-2xl p-5 border text-left bg-white/70 hover:bg-white/80 border-white/60 transition-all block shadow-soft"
+                className="rounded-2xl p-5 border text-left bg-white/70 hover:bg-white/80 border-white/60 transition-all block shadow"
               >
                 <div className="text-lg font-semibold mb-1">Story Prompts Workshop</div>
                 <div className="text-sm text-ink/70">
@@ -552,60 +453,61 @@ export default function StoryLab() {
                 </div>
               </Link>
 
-              {/* Clothesline (toggle section) */}
-              <button
-                onClick={() => setActiveSection("clothesline")}
-                className={`rounded-2xl p-5 border text-left transition-all shadow-soft ${
-                  activeSection === "clothesline"
-                    ? "bg-primary border-white/60"
-                    : "bg-white/70 border-white/60 hover:bg-white/80"
-                }`}
-              >
-                <div className="text-lg font-semibold mb-1">Clothes Pin Workshop</div>
-                <div className="text-sm text-ink/70">Visual cards to summarize characters and roles.</div>
-              </button>
+              <FeatureCard
+                icon={Calendar}
+                title="Session Schedule"
+                status="Ready"
+                description="Six-session collaborative writing structure with goals."
+              />
 
-              {/* Hopes, Fears & Legacy (toggle section) */}
-              <button
-                onClick={() => setActiveSection("hfl")}
-                className={`rounded-2xl p-5 border text-left transition-all shadow-soft ${
-                  activeSection === "hfl"
-                    ? "bg-primary border-white/60"
-                    : "bg-white/70 border-white/60 hover:bg-white/80"
-                }`}
+              <FeatureCard
+                icon={Users}
+                title="Breakout Pairings"
+                status="Ready"
+                description="Randomly pair writers for collaborative exercises and peer review."
+              />
+
+              <Link
+                to="/story-lab/critique"
+                className="rounded-2xl p-5 border text-left bg-white/70 hover:bg-white/80 border-white/60 transition-all block shadow"
               >
-                <div className="text-lg font-semibold mb-1">Hopes, Fears & Legacy</div>
-                <div className="text-sm text-ink/70">Reveal core drives and long-view stakes per character.</div>
-              </button>
+                <div className="text-lg font-semibold mb-1">Critique Circle</div>
+                <div className="text-sm text-ink/70">
+                  Share drafts, add inline comments, control copying, and keep an audit trail.
+                </div>
+              </Link>
             </div>
-
-            {/* Active workshop panels */}
-            {activeSection === "clothesline" && (
-              <ClotheslineWorkshop characters={workshopCharacters} />
-            )}
-            {activeSection === "hfl" && (
-              <HopesFearsLegacyWorkshop chapters={chapters} characters={workshopCharacters} />
-            )}
           </section>
 
-          {/* Workshop Community (raised section) */}
-          <section className="mb-12">
+          {/* Workshop Community — with Clothes Pin panel */}
+          <section className="mb-12" id="community">
             <SectionHeader
               icon="👥"
               title="Workshop Community"
               subtitle="Collaborative writing sessions and accountability"
             />
-            <div className="grid gap-6 md:grid-cols-3">
-              {workshopFeatures.map((feature, idx) => (
-                <FeatureCard key={idx} {...feature} onClick={() => {
-                  if (feature.title === "Critique Circle") navigate("/story-lab/critique");
-                }} />
+            <div className="grid gap-6 md:grid-cols-3 mb-8">
+              {[
+                { icon: Calendar, title: "Session Schedule", status: "Ready", description: "Plan your cohort sessions and milestones." },
+                { icon: Users, title: "Breakout Pairings", status: "Ready", description: "Create dynamic pairs for focused exercises." },
+                { icon: MessageSquare, title: "Critique Circle", status: "Ready", description: "Secure sharing with comments and reactions." },
+              ].map((feature, idx) => (
+                <FeatureCard
+                  key={idx}
+                  {...feature}
+                  onClick={() => {
+                    if (feature.title === "Critique Circle") navigate("/story-lab/critique");
+                  }}
+                />
               ))}
             </div>
+
+            {/* Clothesline moved here */}
+            <ClotheslineWorkshop characters={workshopCharacters} />
           </section>
 
-          {/* Story & Character Development */}
-          <section className="mb-12">
+          {/* Story & Character Development — includes HFL panel */}
+          <section className="mb-12" id="story">
             <SectionHeader
               icon="📖"
               title="Story & Character Development"
@@ -617,14 +519,19 @@ export default function StoryLab() {
               ))}
             </div>
 
-            {/* Character Manager */}
+            {/* Character Manager feeds HFL & Clothesline */}
             <CharacterManager
               seedText={chapters.map((c) => c.text).join("\n\n")}
-              onChange={() => { /* feed prompts/HFL panels via local state if needed */ }}
+              onChange={setWorkshopCharacters}
             />
+
+            {/* HFL lives here (replaces continuity alerts) */}
+            <div className="mt-8">
+              <HopesFearsLegacyWorkshop chapters={chapters} characters={workshopCharacters} />
+            </div>
           </section>
 
-          {/* AI + Human Balance (last before Faith) */}
+          {/* AI + Human Balance (second-to-last) */}
           <section className="mb-12">
             <SectionHeader
               icon="✨"
@@ -633,15 +540,19 @@ export default function StoryLab() {
             />
             <div className="grid gap-6 md:grid-cols-2">
               {aiFeatures.map((feature, idx) => (
-                <FeatureCard key={idx} {...feature} onClick={() => {
-                  if (feature.title === "Story Prompts") navigate("/story-lab/prompts");
-                }} />
+                <FeatureCard
+                  key={idx}
+                  {...feature}
+                  onClick={() => {
+                    if (feature.title === "Story Prompts") navigate("/story-lab/prompts");
+                  }}
+                />
               ))}
             </div>
           </section>
 
           {/* Faith + Legacy (very last) */}
-          <section className="mb-24">
+          <section className="mb-24" id="faith">
             <SectionHeader
               icon="💝"
               title="Faith + Legacy"
@@ -662,7 +573,7 @@ export default function StoryLab() {
           <div className="flex items-center gap-4">
             <Link
               to="/story-lab/critique"
-              className="px-6 py-3 bg-accent/70 hover:bg-accent text-ink rounded-lg font-medium transition-all shadow-soft"
+              className="px-6 py-3 bg-accent/70 hover:bg-accent text-ink rounded-lg font-medium transition-all shadow"
             >
               Open Critique Circle
             </Link>
