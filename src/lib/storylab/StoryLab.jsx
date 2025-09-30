@@ -73,14 +73,13 @@ const PageBanner = () => {
     <div className="mx-auto mb-8">
       <div className="mx-auto max-w-3xl rounded-2xl border border-white/40 bg-white/20 backdrop-blur-xl px-6 py-5 text-center shadow-[0_8px_28px_rgba(0,0,0,0.12)]">
         <div className="mx-auto mb-2 inline-flex items-center justify-center rounded-xl border border-white/50 bg-white/40 px-3 py-1">
-          <BookOpen size={16} className="mr-2 text-ink/80" />
           <span className="text-xs font-semibold tracking-wide text-ink/80">
-            StoryLab
+            DahTruth · StoryLab
           </span>
         </div>
         <h1 className="text-3xl font-extrabold text-ink">Modules & Sessions</h1>
         <p className="mt-1 text-sm text-ink/70">
-          Clear, colorful entry points into everything you’ll use during the workshop.
+          Clear, colorful entry points into everything you'll use during the workshop.
         </p>
       </div>
     </div>
@@ -105,7 +104,7 @@ const QuoteBar = ({ chapters }) => {
   useEffect(() => { pick(); }, [chapters]);
   return (
     <div className="rounded-2xl border border-white/50 bg-white/40 backdrop-blur-xl px-5 py-4 flex items-center justify-between">
-      <div className="italic text-ink/90">“{line}”</div>
+      <div className="italic text-ink/90">"{line}"</div>
       <button
         onClick={pick}
         className="ml-4 rounded-lg border border-white/60 bg-white/70 px-3 py-1.5 text-sm text-ink hover:bg-white"
@@ -164,7 +163,7 @@ function AeroSidebar({ collapsed, setCollapsed, activeSection, setActiveSection 
   const items = [
     { key: "back", label: "Back to Dashboard", to: "/dashboard", icon: ChevronRight, type: "link", accent: true },
 
-    // Workshop Community (your “community ops” items)
+    // Workshop Community (your "community ops" items)
     { key: "community", label: "Workshop Community", section: "community", icon: Users, type: "section" },
     { key: "schedule", label: "Session Schedule", section: "schedule", icon: Calendar, type: "section" },
     { key: "pairs", label: "Breakout Pairings", section: "pairs", icon: Users, type: "section" },
@@ -455,7 +454,7 @@ const ClotheslinePreview = ({ characters }) => {
 ========================================================= */
 const WorkshopChat = () => {
   const [messages, setMessages] = useState([
-    { id: 1, who: "Facilitator", text: "Welcome! Share a line you’re proud of from today." },
+    { id: 1, who: "Facilitator", text: "Welcome! Share a line you're proud of from today." },
   ]);
   const [input, setInput] = useState("");
   const nextId = useRef(2);
@@ -799,4 +798,4 @@ const HopesFearsLegacyWorkshop = ({ chapters, characters }) => {
       </div>
     </div>
   );
-}
+};
