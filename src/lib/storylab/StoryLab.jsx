@@ -4,7 +4,6 @@ import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   BookOpen,
   Users,
-  Pin,
   Sparkles,
   Calendar,
   Clock,
@@ -66,28 +65,34 @@ function extractKeywordSentences(text, keyword) {
 }
 
 /* =========================================================
-   PAGE BANNER
+   ENHANCED PAGE BANNER (your design)
 ========================================================= */
 const PageBanner = () => {
   return (
     <div className="mx-auto mb-8">
-      <div className="mx-auto max-w-3xl rounded-2xl border border-white/40 bg-white/20 backdrop-blur-xl px-6 py-5 text-center shadow-[0_8px_28px_rgba(0,0,0,0.12)]">
-        <div className="mx-auto mb-2 inline-flex items-center justify-center rounded-xl border border-white/50 bg-white/40 px-3 py-1">
-          <span className="text-xs font-semibold tracking-wide text-ink/80">
-            DahTruth · StoryLab
-          </span>
+      <div className="relative mx-auto max-w-3xl rounded-2xl border border-white/40 bg-white/20 backdrop-blur-xl px-6 py-6 text-center shadow-[0_8px_28px_rgba(0,0,0,0.12)] overflow-hidden">
+        {/* Subtle gradient overlay */}
+        <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 via-transparent to-amber-500/5 pointer-events-none" />
+        {/* Content */}
+        <div className="relative z-10">
+          <div className="mx-auto mb-3 inline-flex items-center justify-center rounded-xl border border-white/50 bg-white/40 px-4 py-1.5 shadow-sm">
+            <BookOpen size={14} className="mr-2 text-ink/70" />
+            <span className="text-xs font-semibold tracking-wide text-ink/80">
+              DahTruth · StoryLab
+            </span>
+          </div>
+          <h1 className="text-3xl font-extrabold text-ink mb-2">Modules & Sessions</h1>
+          <p className="mt-1 text-sm text-ink/70 max-w-xl mx-auto">
+            Clear, colorful entry points into everything you'll use during the workshop.
+          </p>
         </div>
-        <h1 className="text-3xl font-extrabold text-ink">Modules & Sessions</h1>
-        <p className="mt-1 text-sm text-ink/70">
-          Clear, colorful entry points into everything you'll use during the workshop.
-        </p>
       </div>
     </div>
   );
 };
 
 /* =========================================================
-   AT-A-GLANCE (Quote + Priorities)
+   QUICK OVERVIEW WIDGETS (Quote + Priorities)
 ========================================================= */
 const QuoteBar = ({ chapters }) => {
   const [line, setLine] = useState("");
@@ -103,8 +108,8 @@ const QuoteBar = ({ chapters }) => {
   };
   useEffect(() => { pick(); }, [chapters]);
   return (
-    <div className="rounded-2xl border border-white/50 bg-white/40 backdrop-blur-xl px-5 py-4 flex items-center justify-between">
-      <div className="italic text-ink/90">"{line}"</div>
+    <div className="mb-8 rounded-2xl border border-white/50 bg-white/40 backdrop-blur-xl px-5 py-4 flex items-center justify-between">
+      <div className="italic text-ink/90">“{line}”</div>
       <button
         onClick={pick}
         className="ml-4 rounded-lg border border-white/60 bg-white/70 px-3 py-1.5 text-sm text-ink hover:bg-white"
@@ -126,7 +131,7 @@ const PrioritiesGlance = () => {
     });
   } catch {}
   return (
-    <div className="rounded-2xl border border-white/50 bg-white/50 backdrop-blur-xl p-5">
+    <div className="mb-8 rounded-2xl border border-white/50 bg-white/50 backdrop-blur-xl p-5">
       <div className="mb-3 text-ink font-semibold">Priorities at a Glance</div>
       <div className="grid grid-cols-3 gap-3">
         {["High","Medium","Low"].map(k => (
@@ -138,10 +143,10 @@ const PrioritiesGlance = () => {
       </div>
       <div className="mt-4 text-right">
         <Link
-          to="/story-lab/workshop/priorities"
-          className="inline-flex items-center gap-2 rounded-lg border border-white/60 bg-gradient-to-r from-purple-600 via-violet-500 to-amber-400 px-3 py-1.5 text-sm font-medium text-white shadow hover:shadow-md"
+          to="/story-lab/workshop"
+          className="inline-flex items-center gap-2 rounded-lg border border-white/60 bg-accent/70 px-3 py-1.5 text-sm font-medium text-ink hover:bg-accent"
         >
-          Open Priority Cards
+          Open Workshop
         </Link>
       </div>
     </div>
@@ -149,7 +154,7 @@ const PrioritiesGlance = () => {
 };
 
 /* =========================================================
-   AERO SIDEBAR
+   AERO SIDEBAR (translucent + "pounce" hover)
 ========================================================= */
 function AeroSidebar({ collapsed, setCollapsed, activeSection, setActiveSection }) {
   const location = useLocation();
@@ -162,24 +167,30 @@ function AeroSidebar({ collapsed, setCollapsed, activeSection, setActiveSection 
 
   const items = [
     { key: "back", label: "Back to Dashboard", to: "/dashboard", icon: ChevronRight, type: "link", accent: true },
+    { key: "sessions", label: "Story Lab Sessions", section: "sessions", icon: BookOpen, type: "section" },
 
-    // Workshop Community (your "community ops" items)
-    { key: "community", label: "Workshop Community", section: "community", icon: Users, type: "section" },
+    // Workshop Community
     { key: "schedule", label: "Session Schedule", section: "schedule", icon: Calendar, type: "section" },
     { key: "pairs", label: "Breakout Pairings", section: "pairs", icon: Users, type: "section" },
     { key: "critique", label: "Critique Circle", to: "/story-lab/critique", icon: MessageSquare, type: "link" },
-
-    // Live Session Modules
-    { key: "modules", label: "Live Session Modules", section: "modules", icon: Layers, type: "section" },
-    { key: "workshop", label: "Workshop (Characters/Roadmap)", to: "/story-lab/workshop", icon: Layers, type: "link" },
     { key: "prompts", label: "Story Prompts", to: "/story-lab/prompts", icon: Sparkles, type: "link" },
+    { key: "workshop", label: "Workshop (Characters/Roadmap)", to: "/story-lab/workshop", icon: Layers, type: "link" },
+    { key: "chat", label: "Workshop Chat", section: "chat", icon: MessageCircle, type: "section" },
 
-    // Story & Character Dev
-    { key: "dev", label: "Story & Character Development", section: "dev", icon: BookOpen, type: "section" },
+    // Story & Character Development
+    { key: "profiles", label: "Character Profiles", section: "profiles", icon: User, type: "section" },
+    { key: "clothesline", label: "Character Clothesline", section: "clothesline", icon: Layers, type: "section" },
+    { key: "world", label: "World Bible", section: "world", icon: Globe, type: "section" },
+    { key: "hfl", label: "Hopes • Fears • Legacy", to: "/story-lab/hopes-fears-legacy", icon: Heart, type: "link" },
 
-    // AI / Faith & Legacy
-    { key: "ai", label: "AI + Human Balance", section: "ai", icon: CheckCircle, type: "section" },
-    { key: "faith", label: "Faith & Legacy", section: "faith", icon: Star, type: "section" },
+    // AI + Human Balance
+    { key: "consistency", label: "Character Consistency", section: "consistency", icon: CheckCircle, type: "section" },
+    { key: "grammar", label: "Grammar Polish", section: "grammar", icon: Edit3, type: "section" },
+    { key: "summaries", label: "Scene Summaries", section: "summaries", icon: FileText, type: "section" },
+
+    // Faith & Legacy
+    { key: "reflection", label: "Reflection Prompts", section: "reflection", icon: Star, type: "section" },
+    { key: "legacy", label: "Legacy Writing", section: "legacy", icon: Layers, type: "section" },
   ];
 
   const isActiveRoute = (to) => location.pathname === to;
@@ -197,7 +208,9 @@ function AeroSidebar({ collapsed, setCollapsed, activeSection, setActiveSection 
           "fixed left-0 top-0 z-50 h-screen",
           "border-r border-white/40 bg-white/20 backdrop-blur-2xl",
           "transition-all duration-300 ease-out shadow-[0_10px_40px_rgba(0,0,0,0.15)]",
-          collapsed ? "w-20 -translate-x-0 md:translate-x-0 -left-64 md:left-0 md:w-20" : "w-72 left-0",
+          collapsed
+            ? "w-20 -translate-x-0 md:translate-x-0 -left-64 md:left-0 md:w-20"
+            : "w-72 left-0",
           "md:translate-x-0 overflow-hidden",
         ].join(" ")}
         aria-label="Aero menu sidebar"
@@ -210,7 +223,7 @@ function AeroSidebar({ collapsed, setCollapsed, activeSection, setActiveSection 
               <div className="font-serif text-lg font-bold text-ink" style={{ fontFamily: "Playfair Display, ui-serif, Georgia" }}>
                 DahTruth
               </div>
-              <div className="text-[11px] tracking-wide text-ink/70">StoryLab</div>
+              <div className="text-[11px] tracking-wide text-ink/70">Story Lab</div>
             </div>
           )}
         </div>
@@ -293,7 +306,7 @@ const FeatureCard = ({ icon: Icon, title, status, description, onClick }) => {
     <button
       type="button"
       onClick={onClick}
-      className="text-left rounded-2xl border border-white/50 bg-white/50 p-6 backdrop-blur-xl transition hover:shadow-lg hover:scale-[1.01]"
+      className="text-left rounded-2xl border border-white/50 bg-white/50 p-6 backdrop-blur-xl transition hover:shadow-lg"
     >
       <div className="mb-4 flex items-start justify-between">
         <div className="flex items-start gap-4">
@@ -331,7 +344,7 @@ const SectionHeader = ({ icon, title, subtitle }) => {
 };
 
 /* =========================================================
-   CHARACTER MANAGER (quick)
+   CHARACTER MANAGER (simple)
 ========================================================= */
 const CharacterManager = ({ seedText = "", onChange }) => {
   const [characters, setCharacters] = useState(() => {
@@ -375,7 +388,10 @@ const CharacterManager = ({ seedText = "", onChange }) => {
           <div className="text-sm text-ink/70">No characters found yet. Add them below.</div>
         )}
         {characters.map((character) => (
-          <div key={character.id} className="flex items-center gap-3 rounded-lg border border-white/60 bg-white/70 p-3">
+          <div
+            key={character.id}
+            className="flex items-center gap-3 rounded-lg border border-white/60 bg-white/70 p-3"
+          >
             {editingId === character.id ? (
               <input
                 type="text"
@@ -394,7 +410,11 @@ const CharacterManager = ({ seedText = "", onChange }) => {
                 {character.name}
               </span>
             )}
-            <button onClick={() => deleteCharacter(character.id)} className="text-ink/60 hover:text-ink" title="Delete character">
+            <button
+              onClick={() => deleteCharacter(character.id)}
+              className="text-ink/60 hover:text-ink"
+              title="Delete character"
+            >
               <Trash2 className="h-4 w-4" />
             </button>
           </div>
@@ -410,7 +430,10 @@ const CharacterManager = ({ seedText = "", onChange }) => {
           onKeyDown={(e) => e.key === "Enter" && addCharacter()}
           className="flex-1 rounded-lg border border-white/60 bg-white px-4 py-2 text-ink placeholder-ink/40 focus:border-ink/40 focus:outline-none"
         />
-        <button onClick={addCharacter} className="rounded-lg border border-white/60 bg-accent/60 px-4 py-2 font-medium text-ink hover:bg-accent/70">
+        <button
+          onClick={addCharacter}
+          className="rounded-lg border border-white/60 bg-accent/60 px-4 py-2 font-medium text-ink hover:bg-accent/70"
+        >
           <Plus className="h-5 w-5" />
         </button>
       </div>
@@ -419,42 +442,37 @@ const CharacterManager = ({ seedText = "", onChange }) => {
 };
 
 /* =========================================================
-   CLOTHESLINE PREVIEW CARD (kept on overview)
+   CLOTHESLINE PREVIEW (uses clothesline image if present)
 ========================================================= */
 const ClotheslinePreview = ({ characters }) => {
   return (
     <div className="rounded-2xl border border-white/50 bg-white/60 p-6 backdrop-blur-xl">
       <h3 className="mb-2 text-xl font-semibold text-ink">Clothesline</h3>
-      <p className="mb-4 text-ink/70">Pin quick synopses for each character (open full module to edit).</p>
+      <p className="mb-4 text-ink/70">At-a-glance view of relationships — click through for full module.</p>
       <div className="flex items-center gap-4 overflow-x-auto pb-2">
         {(characters?.length ? characters : ["Protagonist", "Antagonist"]).map((name, idx) => (
           <div key={idx} className="min-w-[220px] rounded-xl border border-white/60 bg-white/80 p-4">
             <div className="mb-2 flex items-center gap-2">
-              <Pin className="h-4 w-4 text-ink/70" />
+              {/* Put your file at /public/assets/clothesline.png */}
+              <img src="/assets/clothesline.png" alt="Clothesline" className="h-4 w-4 opacity-80" />
               <div className="font-semibold text-ink">{name}</div>
             </div>
-            <p className="text-sm text-ink/80">Traits, goals, and obstacles at a glance.</p>
+            <p className="text-sm text-ink/80">
+              {name} plays a key role. Summarize traits, goals, and obstacles here.
+            </p>
           </div>
         ))}
-      </div>
-      <div className="mt-4">
-        <Link
-          to="/story-lab/workshop/clothesline"
-          className="inline-flex items-center gap-2 rounded-lg border border-white/60 bg-white/70 px-3 py-1.5 text-sm text-ink hover:bg-white"
-        >
-          Open Clothesline
-        </Link>
       </div>
     </div>
   );
 };
 
 /* =========================================================
-   WORKSHOP SESSION CHAT (overview page)
+   WORKSHOP SESSION CHAT
 ========================================================= */
 const WorkshopChat = () => {
   const [messages, setMessages] = useState([
-    { id: 1, who: "Facilitator", text: "Welcome! Share a line you're proud of from today." },
+    { id: 1, who: "Facilitator", text: "Welcome! Share a line you’re proud of from today." },
   ]);
   const [input, setInput] = useState("");
   const nextId = useRef(2);
@@ -507,7 +525,7 @@ const WorkshopChat = () => {
 ========================================================= */
 export default function StoryLab() {
   const navigate = useNavigate();
-  const [activeSection, setActiveSection] = useState("community");
+  const [activeSection, setActiveSection] = useState("sessions");
   const [chapters, setChapters] = useState([]);
   const [workshopCharacters, setWorkshopCharacters] = useState([]);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
@@ -528,7 +546,6 @@ export default function StoryLab() {
 
   return (
     <div className="min-h-screen bg-base bg-radial-fade text-ink">
-      {/* Sidebar */}
       <AeroSidebar
         collapsed={sidebarCollapsed && mobileSidebarHidden}
         setCollapsed={(v) => {
@@ -539,25 +556,34 @@ export default function StoryLab() {
         setActiveSection={setActiveSection}
       />
 
-      {/* Content */}
       <div className={`transition-all duration-300 ${sidebarCollapsed ? "md:ml-20" : "md:ml-72"}`}>
         <div className="mx-auto max-w-7xl px-6 py-10">
           <PageBanner />
 
-          {/* At-a-Glance Row */}
-          <div className="grid gap-6 md:grid-cols-2 mb-10">
-            <QuoteBar chapters={chapters} />
-            <PrioritiesGlance />
-          </div>
+          {/* Overview widgets */}
+          <QuoteBar chapters={chapters} />
+          <PrioritiesGlance />
 
-          {/* Workshop Community */}
-          <section id="community" className="mb-14">
+          {/* Chapter info strip */}
+          {chapters.length > 0 && (
+            <div className="mb-10 rounded-xl border border-white/50 bg-white/50 p-4 backdrop-blur-xl">
+              <div className="flex items-center gap-3 text-ink">
+                <BookOpen className="h-5 w-5" />
+                <span>
+                  {chapters.length} chapter{chapters.length > 1 ? "s" : ""} loaded from your story
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* LIVE SESSION MODULES */}
+          <section id="sessions" className="mb-14">
             <SectionHeader
-              icon="👥"
-              title="Workshop Community"
-              subtitle="Session logistics and collaboration spaces."
+              icon="🧪"
+              title="Live Session Modules"
+              subtitle="What we’ll open during live sessions."
             />
-            <div className="mb-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="mb-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-5">
               <FeatureCard
                 icon={Calendar}
                 title="Session Schedule"
@@ -579,54 +605,37 @@ export default function StoryLab() {
                 description="Inline comments, reactions, audit logs and copy controls."
                 onClick={() => navigate("/story-lab/critique")}
               />
-            </div>
-            {/* Live chat space visible on overview */}
-            <div className="grid gap-6 md:grid-cols-2">
-              <WorkshopChat />
-              <ClotheslinePreview characters={workshopCharacters} />
-            </div>
-          </section>
-
-          {/* Live Session Modules */}
-          <section id="modules" className="mb-14">
-            <SectionHeader
-              icon="🧪"
-              title="Live Session Modules"
-              subtitle="Hands-on tools used during sessions."
-            />
-            <div className="mb-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-              <FeatureCard
-                icon={Pin}
-                title="Clothesline"
-                status="Ready"
-                description="Org-style character view with relationships at a glance."
-                onClick={() => navigate("/story-lab/workshop/clothesline")}
-              />
               <FeatureCard
                 icon={Sparkles}
                 title="Story Prompts"
                 status="Ready"
-                description="Context-aware prompts pulled from your actual manuscript."
+                description="Creative, context-aware prompts when you’re stuck."
                 onClick={() => navigate("/story-lab/prompts")}
               />
               <FeatureCard
                 icon={Layers}
                 title="Character Roadmap"
                 status="Ready"
-                description="Milestones and beats that move your cast from A → B."
-                onClick={() => navigate("/story-lab/workshop?tab=roadmap")}
-              />
-              <FeatureCard
-                icon={CheckCircle}
-                title="Priority Cards"
-                status="Ready"
-                description="Drag, rank, and track scope/priority/status live."
-                onClick={() => navigate("/story-lab/workshop/priorities")}
+                description="Characters, Roadmap, Priority Cards & Clothesline."
+                onClick={() => navigate("/story-lab/workshop")}
               />
             </div>
           </section>
 
-          {/* Story & Character Development */}
+          {/* WORKSHOP COMMUNITY */}
+          <section id="community" className="mb-14">
+            <SectionHeader
+              icon="👥"
+              title="Workshop Community"
+              subtitle="Collaboration tools during and between sessions."
+            />
+            <div className="grid gap-6 md:grid-cols-2">
+              <ClotheslinePreview characters={workshopCharacters} />
+              <WorkshopChat />
+            </div>
+          </section>
+
+          {/* STORY & CHARACTER DEVELOPMENT */}
           <section id="dev" className="mb-14">
             <SectionHeader
               icon="📖"
@@ -651,25 +660,25 @@ export default function StoryLab() {
                 title="Hopes • Fears • Legacy"
                 status="Ready"
                 description="Mine your text for motivational drivers and thematic threads."
-                onClick={() => setActiveSection("hfl")}
+                onClick={() => navigate("/story-lab/hopes-fears-legacy")}
               />
             </div>
 
-            {/* Inline tools */}
             <div className="grid gap-6">
               <CharacterManager
                 seedText={chapters.map((c) => c.text).join("\n\n")}
                 onChange={() => {}}
               />
-              {activeSection === "hfl" && (
-                <HopesFearsLegacyWorkshop chapters={chapters} characters={workshopCharacters} />
-              )}
             </div>
           </section>
 
-          {/* AI + Human Balance */}
+          {/* AI + HUMAN BALANCE */}
           <section id="ai" className="mb-14">
-            <SectionHeader icon="✨" title="AI + Human Balance" subtitle="Assistive tools that respect your voice." />
+            <SectionHeader
+              icon="✨"
+              title="AI + Human Balance"
+              subtitle="Assistive tools that respect your voice."
+            />
             <div className="grid gap-6 md:grid-cols-3">
               <FeatureCard
                 icon={CheckCircle}
@@ -692,7 +701,7 @@ export default function StoryLab() {
             </div>
           </section>
 
-          {/* Faith & Legacy */}
+          {/* FAITH + LEGACY */}
           <section id="faith" className="mb-24">
             <SectionHeader
               icon="💝"
@@ -749,53 +758,3 @@ export default function StoryLab() {
     </div>
   );
 }
-
-/* =========================================================
-   HFL (inline)
-========================================================= */
-const HopesFearsLegacyWorkshop = ({ chapters, characters }) => {
-  const text = useMemo(() => chapters.map((c) => c.text).join("\n\n"), [chapters]);
-  const insights = useMemo(() => {
-    const result = {};
-    (characters || []).forEach((ch) => {
-      result[ch] = {
-        Hopes: extractKeywordSentences(text, "hope").slice(0, 3),
-        Fears: extractKeywordSentences(text, "fear").slice(0, 3),
-        Legacy: extractKeywordSentences(text, "legacy").slice(0, 3),
-      };
-    });
-    return result;
-  }, [text, characters]);
-
-  return (
-    <div className="rounded-2xl border border-white/50 bg-white/60 p-6 backdrop-blur-xl">
-      <h3 className="mb-4 text-xl font-semibold text-ink">Hopes, Fears & Legacy</h3>
-      {(!characters || characters.length === 0) && (
-        <div className="mb-3 text-ink/70">Add characters above to see targeted insights.</div>
-      )}
-      <div className="space-y-4">
-        {Object.entries(insights).map(([name, data]) => (
-          <div key={name} className="rounded-xl border border-white/60 bg-white/80 p-4">
-            <div className="mb-2 font-semibold text-ink">{name}</div>
-            <div className="grid gap-3 md:grid-cols-3">
-              {["Hopes", "Fears", "Legacy"].map((key) => (
-                <div key={key} className="rounded-lg border border-white/60 bg-white p-3">
-                  <div className="mb-2 text-sm font-medium text-ink/80">{key}</div>
-                  {data[key]?.length ? (
-                    <ul className="space-y-2 text-sm text-ink/90">
-                      {data[key].map((s, i) => (
-                        <li key={i}>• {s}</li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <div className="text-sm text-ink/60">No {key.toLowerCase()} yet.</div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-};
