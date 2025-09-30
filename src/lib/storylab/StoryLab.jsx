@@ -2,11 +2,11 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
-  ArrowLeft, BookOpen, Users, Pin, Sparkles, Calendar, Clock,
-  ChevronRight, Plus, Layers, Edit3, Trash2, Globe, Heart, Star,
-  CheckCircle, FileText, MessageSquare, User
+  ArrowLeft, BookOpen, Users, Pin, Sparkles, Calendar, Clock, ChevronRight, Plus,
+  Layers, Edit3, Trash2, Globe, Shield, Heart, Star, CheckCircle, FileText,
+  MessageSquare, User, Menu as MenuIcon
 } from "lucide-react";
-import BrandLogo from "../../components/BrandLogo";
+import BrandLogo from "../../components/BrandLogo"; // ✅ your logo
 
 /* -----------------------------
    Helpers: load chapters safely
@@ -41,61 +41,34 @@ function guessCharacters(text) {
   });
   return Array.from(names).slice(0, 50);
 }
+
+function extractConflicts(text) {
+  const hits = [];
+  const needles = ["conflict","tension","argument","fight","feud","rivalry","obstacle","problem","challenge"];
+  const sentences = splitSentences(text);
+  sentences.forEach((s) => {
+    if (needles.some((n) => s.toLowerCase().includes(n))) hits.push(s.trim());
+  });
+  return hits;
+}
+
 function extractKeywordSentences(text, keyword) {
   const k = keyword.toLowerCase();
   return splitSentences(text).filter((s) => s.toLowerCase().includes(k));
 }
-function extractConflicts(text) {
-  const needles = ["conflict","tension","argument","fight","feud","rivalry","obstacle","problem","challenge"];
-  return splitSentences(text).filter((s) => needles.some((n) => s.toLowerCase().includes(n)));
-}
 
 /* =========================================================
-   Top glass bar (brand light scheme)
-========================================================= */
-const TopBar = ({ navigate, toggleMobileSidebar }) => (
-  <div className="sticky top-0 z-50 bg-white/70 backdrop-blur-xl border-b border-white/60 text-ink">
-    <div className="max-w-7xl mx-auto px-6">
-      <div className="h-16 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={toggleMobileSidebar}
-            className="md:hidden inline-flex items-center justify-center w-9 h-9 rounded-lg bg-white/50 hover:bg-white/70 border border-white/60"
-            aria-label="Toggle menu"
-          >
-            <span className="text-ink/80">☰</span>
-          </button>
-          <BrandLogo className="h-7 w-auto" />
-          <div className="leading-tight">
-            <div className="text-lg font-bold bg-gradient-to-r from-accent via-primary to-gold bg-clip-text text-transparent">
-              Story Lab
-            </div>
-            <div className="text-xs text-muted -mt-0.5">Where your writing journey begins</div>
-          </div>
-        </div>
-
-        {/* Back here AND in sidebar for convenience */}
-        <Link
-          to="/dashboard"
-          className="inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium glass hover:bg-white/70 transition-colors"
-          title="Back to Dashboard"
-        >
-          <ArrowLeft size={16} className="text-ink/80" />
-          <span className="text-ink">Back</span>
-        </Link>
-      </div>
-    </div>
-  </div>
-);
-
-/* =========================================================
-   Aero Sidebar (light/glass + bounce + ordered items)
+   AERO SIDEBAR (glassmorphism, brand colors)
+   - NO top banner; sidebar starts at very top
+   - collapsible; mobile overlay; hover “pounce”
 ========================================================= */
 function AeroSidebar({
   collapsed,
   setCollapsed,
   activeSection,
   setActiveSection,
+  onCloseMobile,
+  showMobile // controls slide-in on small screens
 }) {
   const location = useLocation();
 
@@ -105,123 +78,122 @@ function AeroSidebar({
     } catch {}
   }, [collapsed]);
 
-  // Scroll helper for in-page sections
-  const scrollTo = (id) => {
-    const el = document.getElementById(id);
-    if (el) el.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
+  // Order mirrors your modules
+  const itemsTop = [
+    { key: "back", label: "Back to Dashboard", to: "/dashboard", icon: ArrowLeft, type: "link", accent: true },
+    { key: "home", label: "Story Lab Home", to: "/story-lab", icon: BookOpen, type: "link" },
 
-  // Ordered by your modules (including Back at bottom)
-  const items = [
-    // Sessions + AI + Dev + Faith in the requested order
-    { key: "promptsLink", label: "Story Prompts", to: "/story-lab/prompts", icon: Sparkles, type: "link" },
+    // Sessions (overview -> modules)
+    { key: "prompts-link", label: "Story Prompts", to: "/story-lab/prompts", icon: Sparkles, type: "link" },
+    { key: "characters-consistency", label: "Character Consistency", icon: CheckCircle, type: "section", section: "overview" },
+    { key: "grammar", label: "Grammar Polish", icon: Edit3, type: "section", section: "overview" },
+    { key: "summaries", label: "Scene Summaries", icon: FileText, type: "section", section: "overview" },
 
-    { key: "charConsistency", label: "Character Consistency", icon: CheckCircle, type: "scroll", target: "ai" },
-    { key: "grammar",         label: "Grammar Polish",        icon: Edit3,       type: "scroll", target: "ai" },
-    { key: "sceneSum",        label: "Scene Summaries",       icon: FileText,    type: "scroll", target: "ai" },
+    // Story & Character
+    { key: "profiles", label: "Character Profiles", icon: User, type: "section", section: "overview" },
+    { key: "clothesline", label: "Character Clothesline", icon: Pin, type: "section", section: "clothesline" },
+    { key: "world", label: "World Bible", icon: Globe, type: "section", section: "overview" },
+    { key: "hfl", label: "Hopes • Fears • Legacy", icon: Heart, type: "section", section: "hfl" },
 
-    { key: "profiles",        label: "Character Profiles",    icon: User,        type: "scroll", target: "dev" },
-    { key: "clothesline",     label: "Character Clothesline", icon: Pin,         type: "section", section: "clothesline", target: "dev" },
-    { key: "world",           label: "World Bible",           icon: Globe,       type: "scroll", target: "dev" },
-    { key: "hfl",             label: "Hopes • Fears • Legacy",icon: Heart,       type: "section", section: "hfl", target: "dev" },
+    // Workshop Community
+    { key: "schedule", label: "Session Schedule", icon: Calendar, type: "section", section: "overview" },
+    { key: "breakouts", label: "Breakout Pairings", icon: Users, type: "section", section: "overview" },
+    { key: "critique", label: "Critique Circle", to: "/story-lab/critique", icon: MessageSquare, type: "link", accent: true },
 
-    { key: "schedule",        label: "Session Schedule",      icon: Calendar,    type: "scroll", target: "sessions" },
-    { key: "breakouts",       label: "Breakout Pairings",     icon: Users,       type: "scroll", target: "sessions" },
-    { key: "critique",        label: "Critique Circle",       to: "/story-lab/critique", icon: MessageSquare, type: "link", accent: true },
-
-    { key: "reflection",      label: "Reflection Prompts",    icon: Heart,       type: "scroll", target: "faith" },
-    { key: "legacy",          label: "Legacy Writing",        icon: Star,        type: "scroll", target: "faith" },
-
-    { key: "back",            label: "Back to Dashboard",     to: "/dashboard",  icon: ArrowLeft, type: "link" },
+    // Faith last
+    { key: "reflection", label: "Reflection Prompts", icon: Heart, type: "section", section: "overview" },
+    { key: "legacy", label: "Legacy Writing", icon: Star, type: "section", section: "overview" },
   ];
 
   const isActiveRoute = (to) => location.pathname === to;
+  const isActiveSection = (key) => activeSection === key;
 
   return (
     <>
-      {/* Mobile overlay */}
+      {/* Mobile darkened backdrop */}
       <div
-        className={`fixed inset-0 z-40 bg-black/40 md:hidden ${collapsed ? "pointer-events-none opacity-0" : "opacity-100"}`}
-        onClick={() => setCollapsed(true)}
+        className={`fixed inset-0 z-40 bg-black/40 md:hidden transition-opacity ${showMobile ? "opacity-100" : "pointer-events-none opacity-0"}`}
+        onClick={onCloseMobile}
         aria-hidden="true"
       />
 
       <aside
         className={[
-          "fixed z-50 md:z-30 left-0 top-16 h-[calc(100vh-4rem)]",
-          "bg-white/40 backdrop-blur-xl border-r border-white/60 shadow-[0_8px_40px_-10px_rgba(0,0,0,0.15)]",
-          "transition-all duration-300 ease-out overflow-hidden",
-          collapsed ? "w-20 -translate-x-0 md:translate-x-0 -left-64 md:left-0 md:w-20" : "w-72 left-0",
-          "md:translate-x-0"
+          "fixed z-50 left-0 top-0 h-screen",
+          "backdrop-blur-md bg-white/60 border-r border-white/60",
+          "shadow-[0_12px_48px_-10px_rgba(16,24,40,0.25)]",
+          "transition-all duration-300 ease-out",
+          showMobile ? "translate-x-0" : "-translate-x-full md:translate-x-0",
+          collapsed ? "w-20" : "w-72",
+          "overflow-hidden"
         ].join(" ")}
-        aria-label="Aero menu sidebar"
+        aria-label="StoryLab sidebar"
       >
-        {/* Brand row */}
-        <div className="flex items-center gap-2 px-3 pt-3">
-          <BrandLogo className={`${collapsed ? "h-6" : "h-7"} w-auto`} />
+        {/* Brand row — raised to the very top */}
+        <div className="flex items-center gap-3 px-3 pt-3 pb-2">
+          <BrandLogo className={`${collapsed ? "h-7" : "h-8"} w-auto`} />
           {!collapsed && (
-            <span className="text-sm font-semibold text-ink font-serif">
-              DahTruth Story Lab
-            </span>
+            <div className="leading-tight">
+              <div className="text-ink font-serif font-bold text-lg">DahTruth</div>
+              <div className="text-[11px] text-ink/70 -mt-0.5 font-serif">Story Lab</div>
+            </div>
           )}
         </div>
 
-        {/* Collapse button */}
+        {/* Collapse/expand (desktop only) */}
         <div className="hidden md:flex items-center justify-end p-2">
           <button
             onClick={() => setCollapsed((v) => !v)}
-            className="inline-flex items-center gap-2 rounded-lg px-2 py-1 bg-white/60 hover:bg-white/70 border border-white/60 text-ink/80"
+            className="inline-flex items-center gap-2 rounded-lg px-2 py-1 bg-white/60 hover:bg-white/70 border border-white/60 text-ink"
             title={collapsed ? "Expand menu" : "Collapse menu"}
           >
             <ChevronRight className={`w-4 h-4 transition-transform ${collapsed ? "" : "rotate-180"}`} />
-            {!collapsed && <span className="text-xs">Collapse</span>}
+            {!collapsed && <span className="text-xs font-medium">Collapse</span>}
           </button>
         </div>
 
         {/* Menu */}
-        <nav className="px-2 pb-3 overflow-y-auto h-[calc(100%-3rem)]">
+        <nav className="px-2 pb-3 overflow-y-auto h-[calc(100%-4.25rem)]">
           <div className="mt-2 space-y-1">
-            {items.map((it) => {
+            {itemsTop.map((it) => {
               const Icon = it.icon;
               const active =
                 (it.type === "link" && isActiveRoute(it.to)) ||
-                (it.type === "section" && activeSection === it.section);
+                (it.type === "section" && isActiveSection(it.section));
 
               const base =
-                "group flex items-center gap-3 w-full rounded-xl px-3 py-2 outline-none transition-all " +
-                "focus:ring-2 focus:ring-primary hover:bg-white/50 hover:shadow-sm hover:translate-x-0.5";
+                "group relative flex items-center gap-3 w-full rounded-xl px-3 py-2 transition-all outline-none focus:ring-2 focus:ring-blue-400/60 hover:translate-x-0.5 hover:scale-[1.01]";
               const activeCls = it.accent
-                ? "bg-accent/70 text-ink border border-white/60 shadow"
-                : "bg-white/70 text-ink border border-white/60 shadow";
-              const inactive = "text-ink/80 border border-transparent";
+                ? "bg-accent/30 text-ink border border-white/60 shadow-soft"
+                : "bg-primary text-ink border border-white/60 shadow-soft";
+              const inactive =
+                "text-ink hover:text-ink bg-white/40 border border-transparent";
 
               const inner = (
                 <>
-                  <Icon className={`w-5 h-5 ${active ? "text-ink" : "text-ink/80"} transition-transform group-hover:scale-110`} />
-                  {!collapsed && <span className="truncate">{it.label}</span>}
+                  {/* translucent hover sweep */}
+                  <span className="absolute inset-0 rounded-xl bg-white/30 opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <Icon className={`w-5 h-5 relative z-10 ${active ? "opacity-100" : "opacity-90"}`} />
+                  {!collapsed && <span className="truncate relative z-10 font-medium">{it.label}</span>}
                 </>
               );
 
-              if (it.type === "link") {
-                return (
-                  <Link
-                    key={it.key}
-                    to={it.to}
-                    className={`${base} ${active ? activeCls : inactive}`}
-                    title={collapsed ? it.label : undefined}
-                  >
-                    {inner}
-                  </Link>
-                );
-              }
-
-              // scroll/section buttons
-              return (
+              return it.type === "link" ? (
+                <Link
+                  key={it.key}
+                  to={it.to}
+                  className={`${base} ${active ? activeCls : inactive}`}
+                  title={collapsed ? it.label : undefined}
+                  onClick={onCloseMobile}
+                >
+                  {inner}
+                </Link>
+              ) : (
                 <button
                   key={it.key}
                   onClick={() => {
-                    if (it.section) setActiveSection(it.section);
-                    if (it.target) scrollTo(it.target);
+                    setActiveSection(it.section);
+                    onCloseMobile?.();
                   }}
                   className={`${base} ${active ? activeCls : inactive}`}
                   title={collapsed ? it.label : undefined}
@@ -232,11 +204,12 @@ function AeroSidebar({
             })}
           </div>
 
+          {/* Divider + tiny legend */}
           <div className="my-4 border-t border-white/60" />
           {!collapsed && (
             <div className="px-3">
-              <p className="text-[11px] leading-4 text-muted">
-                Translucent hover highlights • gentle bounce on hover • ordered by modules
+              <p className="text-[11px] leading-4 text-ink/70 font-serif">
+                • Translucent “Aero” menu • Hover glow • Light brand palette
               </p>
             </div>
           )}
@@ -247,57 +220,58 @@ function AeroSidebar({
 }
 
 /* =========================================================
-   Reusable Feature Card (light/glass)
+   FEATURE CARDS (brand glass)
 ========================================================= */
 const FeatureCard = ({ icon: Icon, title, status, description, onClick }) => {
-  const statusStyles = {
-    Ready: "bg-primary text-ink border-white/60",
-    Beta: "bg-accent/40 text-ink border-white/60",
-    "Coming Soon": "bg-muted/20 text-ink border-white/60",
+  const statusColors = {
+    Ready: "bg-emerald-500/15 text-ink border-emerald-300/40",
+    Beta: "bg-blue-500/15 text-ink border-blue-300/40",
+    "Coming Soon": "bg-slate-400/20 text-ink border-slate-300/50",
   };
 
   return (
-    <div
+    <button
+      type="button"
       onClick={onClick}
-      className="bg-white/70 backdrop-blur-xl rounded-2xl p-6 border border-white/60 hover:bg-white/80 transition-colors cursor-pointer"
+      className="text-left bg-white/70 backdrop-blur-xl rounded-2xl p-6 border border-white/60 hover:bg-white/80 transition-colors shadow-soft"
     >
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-start gap-4">
-          <div className="p-3 bg-white/80 rounded-xl border border-white/60">
+          <div className="p-3 bg-white/60 rounded-xl border border-white/60">
             <Icon className="w-6 h-6 text-ink/80" />
           </div>
           <div className="flex-1">
             <h3 className="text-lg font-semibold text-ink mb-2">{title}</h3>
             {status && (
-              <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium border ${statusStyles[status]}`}>
+              <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium border ${statusColors[status]}`}>
                 {status}
               </span>
             )}
           </div>
         </div>
-        <ChevronRight className="w-5 h-5 text-muted mt-1" />
+        <ChevronRight className="w-5 h-5 text-ink/60 mt-1" />
       </div>
       <p className="text-ink/80 text-sm leading-relaxed">{description}</p>
-    </div>
+    </button>
   );
 };
 
-const SectionHeader = ({ icon, title, subtitle, id }) => (
-  <div id={id} className="flex items-start gap-3 mb-8">
+const SectionHeader = ({ icon, title, subtitle }) => (
+  <div className="flex items-start gap-3 mb-8">
     <div className="p-3 rounded-xl bg-white/70 border border-white/60">
-      <span className="text-xl">{icon}</span>
+      <span className="text-2xl">{icon}</span>
     </div>
     <div>
-      <h2 className="text-3xl font-bold bg-gradient-to-r from-accent via-primary to-gold bg-clip-text text-transparent mb-1">
+      <h2 className="text-3xl font-bold bg-gradient-to-r from-accent via-primary to-gold bg-clip-text text-transparent mb-1 font-serif">
         {title}
       </h2>
-      {subtitle ? <p className="text-muted">{subtitle}</p> : null}
+      {subtitle ? <p className="text-ink/70">{subtitle}</p> : null}
     </div>
   </div>
 );
 
 /* =========================================================
-   Light/glass Workshop Panels
+   CHARACTER MANAGER (brand glass)
 ========================================================= */
 const CharacterManager = ({ seedText = "", onChange }) => {
   const [characters, setCharacters] = useState(() => {
@@ -324,15 +298,15 @@ const CharacterManager = ({ seedText = "", onChange }) => {
   };
 
   return (
-    <div className="bg-white/70 backdrop-blur-xl rounded-2xl p-6 border border-white/60">
+    <div className="bg-white/70 backdrop-blur-xl rounded-2xl p-6 border border-white/60 shadow-soft">
       <h3 className="text-lg font-semibold text-ink mb-4">Character Manager</h3>
 
       <div className="space-y-3 mb-4">
         {characters.length === 0 && (
-          <div className="text-muted text-sm">No characters yet. Add one.</div>
+          <div className="text-ink/70 text-sm">No characters yet. Add some below.</div>
         )}
         {characters.map((ch) => (
-          <div key={ch.id} className="flex items-center gap-3 bg-white/80 rounded-lg p-3 border border-white/60">
+          <div key={ch.id} className="flex items-center gap-3 bg-white/60 rounded-lg p-3 border border-white/60">
             {editingId === ch.id ? (
               <input
                 type="text"
@@ -351,11 +325,7 @@ const CharacterManager = ({ seedText = "", onChange }) => {
                 {ch.name}
               </span>
             )}
-            <button
-              onClick={() => deleteCharacter(ch.id)}
-              className="text-ink/60 hover:text-ink"
-              title="Delete"
-            >
+            <button onClick={() => deleteCharacter(ch.id)} className="text-ink/60 hover:text-ink" title="Delete">
               <Trash2 className="w-4 h-4" />
             </button>
           </div>
@@ -383,53 +353,11 @@ const CharacterManager = ({ seedText = "", onChange }) => {
   );
 };
 
-const StoryPromptsWorkshop = ({ chapters, characters }) => {
-  const fullText = useMemo(() => chapters.map((c) => c.text).join("\n\n"), [chapters]);
-
-  const prompts = useMemo(() => {
-    const out = [];
-    (characters || []).slice(0, 8).forEach((ch) => {
-      out.push(`Explore the backstory of ${ch}.`);
-      out.push(`What does ${ch} fear the most? Write a scene that reveals it implicitly.`);
-    });
-    const conflicts = extractConflicts(fullText);
-    if (conflicts.length) out.push(`What happens if this conflict escalates further: "${conflicts[0]}".`);
-    const hopes = extractKeywordSentences(fullText, "hope");
-    const fears = extractKeywordSentences(fullText, "fear");
-    const legacy = extractKeywordSentences(fullText, "legacy");
-    if (hopes[0])  out.push(`Write a scene where this hope comes true: "${hopes[0]}".`);
-    if (fears[0])  out.push(`Force the protagonist to confront this fear: "${fears[0]}".`);
-    if (legacy[0]) out.push(`Foreshadow this legacy in a quiet, symbolic moment: "${legacy[0]}".`);
-    chapters.forEach((ch, i) => {
-      if ((ch.text || "").length > 60) {
-        out.push(`Chapter ${i + 1}: raise the stakes in the final third without adding new characters.`);
-        out.push(`Chapter ${i + 1}: add a reversal that turns the POV character's goal on its head.`);
-      }
-    });
-    return Array.from(new Set(out)).slice(0, 24);
-  }, [chapters, characters, fullText]);
-
-  return (
-    <div className="bg-white/70 backdrop-blur-xl rounded-2xl p-6 border border-white/60">
-      <h3 className="text-xl font-semibold text-ink mb-2">Story Prompts Workshop</h3>
-      <p className="text-ink/70 mb-4">Prompts generated from your chapters and characters.</p>
-      {prompts.length === 0 ? (
-        <div className="text-muted">No prompts yet. Add chapters first.</div>
-      ) : (
-        <ul className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {prompts.map((p, i) => (
-            <li key={i} className="p-3 rounded-lg bg-white/80 border border-white/60 text-ink">
-              • {p}
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  );
-};
-
+/* =========================================================
+   WORKSHOP PANELS (brand glass)
+========================================================= */
 const ClotheslineWorkshop = ({ characters }) => (
-  <div className="bg-white/70 backdrop-blur-xl rounded-2xl p-6 border border-white/60">
+  <div className="bg-white/70 backdrop-blur-xl rounded-2xl p-6 border border-white/60 shadow-soft">
     <h3 className="text-xl font-semibold text-ink mb-2">Clothes Pin Workshop</h3>
     <p className="text-ink/70 mb-4">Pin quick synopses for each character.</p>
     <div className="flex items-center gap-4 overflow-x-auto pb-2">
@@ -454,8 +382,8 @@ const HopesFearsLegacyWorkshop = ({ chapters, characters }) => {
     const result = {};
     (characters || []).forEach((ch) => {
       result[ch] = {
-        Hopes:  extractKeywordSentences(text, "hope").slice(0, 3),
-        Fears:  extractKeywordSentences(text, "fear").slice(0, 3),
+        Hopes: extractKeywordSentences(text, "hope").slice(0, 3),
+        Fears: extractKeywordSentences(text, "fear").slice(0, 3),
         Legacy: extractKeywordSentences(text, "legacy").slice(0, 3),
       };
     });
@@ -463,17 +391,17 @@ const HopesFearsLegacyWorkshop = ({ chapters, characters }) => {
   }, [text, characters]);
 
   return (
-    <div className="bg-white/70 backdrop-blur-xl rounded-2xl p-6 border border-white/60">
+    <div className="bg-white/70 backdrop-blur-xl rounded-2xl p-6 border border-white/60 shadow-soft">
       <h3 className="text-xl font-semibold text-ink mb-4">Hopes, Fears & Legacy Workshop</h3>
       {(!characters || characters.length === 0) && (
-        <div className="text-muted mb-3">Add characters above to see targeted insights.</div>
+        <div className="text-ink/70 mb-3">Add characters above to see targeted insights.</div>
       )}
       <div className="space-y-4">
         {Object.entries(insights).map(([name, data]) => (
           <div key={name} className="rounded-xl border border-white/60 bg-white/80 p-4">
             <div className="font-semibold text-ink mb-2">{name}</div>
             <div className="grid md:grid-cols-3 gap-3">
-              {["Hopes", "Fears", "Legacy"].map((key) => (
+              {["Hopes","Fears","Legacy"].map((key) => (
                 <div key={key} className="rounded-lg bg-white p-3 border border-white/60">
                   <div className="text-ink/80 text-sm font-medium mb-2">{key}</div>
                   {data[key]?.length ? (
@@ -481,7 +409,7 @@ const HopesFearsLegacyWorkshop = ({ chapters, characters }) => {
                       {data[key].map((s, i) => <li key={i}>• {s}</li>)}
                     </ul>
                   ) : (
-                    <div className="text-muted text-sm">No {key.toLowerCase()} yet.</div>
+                    <div className="text-ink/60 text-sm">No {key.toLowerCase()} yet.</div>
                   )}
                 </div>
               ))}
@@ -494,11 +422,11 @@ const HopesFearsLegacyWorkshop = ({ chapters, characters }) => {
 };
 
 /* =========================================================
-   MAIN (Sessions → Dev → Faith → AI)
+   MAIN COMPONENT (no top banner; brand glass; mobile menu)
 ========================================================= */
 export default function StoryLab() {
   const navigate = useNavigate();
-  const [activeSection, setActiveSection] = useState("overview"); // "clothesline" | "hfl"
+  const [activeSection, setActiveSection] = useState("overview"); // "overview" | "clothesline" | "hfl"
   const [chapters, setChapters] = useState([]);
   const [workshopCharacters, setWorkshopCharacters] = useState([]);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
@@ -508,63 +436,93 @@ export default function StoryLab() {
       return false;
     }
   });
-  const [mobileSidebarHidden, setMobileSidebarHidden] = useState(true);
-  const toggleMobileSidebar = () => setMobileSidebarHidden((v) => !v);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   useEffect(() => {
     setChapters(loadChaptersFromLocalStorage());
   }, []);
 
-  // Updated groups per your order (Story Prompts moved out of AI)
+  // Groups (text only; styles handled by FeatureCard)
   const aiFeatures = [
-    { icon: CheckCircle, title: "Character Consistency", status: "Coming Soon", description: "AI checks for inconsistent traits and contradictions." },
-    { icon: Edit3,       title: "Grammar Polish",        status: "Coming Soon", description: "Clarity and grammar suggestions that keep your voice." },
-    { icon: FileText,    title: "Scene Summaries",       status: "Ready",       description: "Auto-generate chapter summaries and track threads." },
+    { icon: Sparkles, title: "Story Prompts", status: "Ready", description: "Get creative AI-generated prompts tailored to your story's theme and chapter." },
+    { icon: CheckCircle, title: "Character Consistency", status: "Coming Soon", description: "Detect and flag character contradictions to keep details aligned." },
+    { icon: Edit3, title: "Grammar Polish", status: "Coming Soon", description: "Clarity and flow suggestions that keep your voice intact." },
+    { icon: FileText, title: "Scene Summaries", status: "Ready", description: "Auto-generate chapter summaries and track plot threads." },
   ];
 
   const storyFeatures = [
-    { icon: User,     title: "Character Profiles",      status: "Beta",  description: "Create detailed character sheets and track relationships." },
-    { icon: Pin,      title: "Character Clothesline",   status: "Ready", description: "Pin and track traits, obstacles, and changes." },
-    { icon: Globe,    title: "World Bible",             status: "Beta",  description: "Locations, cultures, and timelines that grow with your draft." },
-    { icon: Heart,    title: "Hopes • Fears • Legacy",  status: "Ready", description: "Surface motivating hopes, fears, and legacy threads." },
+    { icon: User, title: "Character Profiles", status: "Beta", description: "Create detailed character sheets and track relationships." },
+    { icon: Pin, title: "Character Clothesline", status: "Ready", description: "Pin and track traits, obstacles, and changes." },
+    { icon: Globe, title: "World Bible", status: "Beta", description: "Locations, cultures, and timelines that grow as you write." },
+    { icon: Heart, title: "Hopes • Fears • Legacy", status: "Beta", description: "Surface motivational drivers and long-view stakes per character." },
+  ];
+
+  const workshopFeatures = [
+    { icon: Calendar, title: "Session Schedule", status: "Ready", description: "Six-session collaborative writing structure with goals." },
+    { icon: Users, title: "Breakout Pairings", status: "Ready", description: "Randomly pair writers for collaborative exercises and peer review." },
+    { icon: MessageSquare, title: "Critique Circle", status: "Ready", description: "Share drafts with your cohort, add inline comments, and track revisions securely." },
   ];
 
   const faithFeatures = [
     { icon: Heart, title: "Reflection Prompts", status: "Beta", description: "Daily questions to ground your writing in purpose and meaning." },
-    { icon: Star,  title: "Legacy Writing",     status: "Coming Soon", description: "Tools for writing with future generations in mind." },
+    { icon: Star, title: "Legacy Writing", status: "Coming Soon", description: "Tools for writing with future generations in mind." },
   ];
 
   return (
     <div className="min-h-screen bg-base bg-radial-fade text-ink">
-      <TopBar navigate={navigate} toggleMobileSidebar={toggleMobileSidebar} />
+      {/* Mobile menu button (since we removed the top bar) */}
+      <div className="md:hidden sticky top-0 z-40 bg-white/70 backdrop-blur-xl border-b border-white/60">
+        <div className="px-4 py-3 flex items-center justify-between">
+          <button
+            onClick={() => setMobileSidebarOpen(true)}
+            className="inline-flex items-center gap-2 rounded-lg px-3 py-2 bg-white/60 hover:bg-white/80 border border-white/60"
+          >
+            <MenuIcon size={18} />
+            <span className="text-sm font-medium">Menu</span>
+          </button>
 
-      {/* Sidebar */}
+          <div className="flex items-center gap-2">
+            <BrandLogo className="h-7 w-auto" />
+            <span className="font-serif font-semibold">DahTruth Story Lab</span>
+          </div>
+          <div className="w-10" />
+        </div>
+      </div>
+
+      {/* Aero Sidebar */}
       <AeroSidebar
-        collapsed={sidebarCollapsed && mobileSidebarHidden}
-        setCollapsed={(v) => {
-          setSidebarCollapsed(v);
-          setMobileSidebarHidden(true);
-        }}
+        collapsed={sidebarCollapsed}
+        setCollapsed={setSidebarCollapsed}
         activeSection={activeSection}
         setActiveSection={setActiveSection}
+        showMobile={mobileSidebarOpen}
+        onCloseMobile={() => setMobileSidebarOpen(false)}
       />
 
-      {/* Content wrapper (left margin = sidebar width) */}
+      {/* Content wrapper: left margin equals sidebar width on md+ */}
       <div className={`transition-all duration-300 ${sidebarCollapsed ? "md:ml-20" : "md:ml-72"}`}>
-        <div className="max-w-7xl mx-auto px-6 py-12">
-          {/* Hero */}
+        <div className="max-w-7xl mx-auto px-6 py-10 md:py-12">
+          {/* Sessions banner */}
+          <div className="mb-6">
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/70 border border-white/60 shadow-soft">
+              <span className="text-sm font-serif font-semibold">Story Lab Sessions</span>
+              <span className="text-muted text-xs">overview</span>
+            </div>
+          </div>
+
+          {/* Hero Section */}
           <div className="text-center mb-12">
-            <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-accent via-primary to-gold bg-clip-text text-transparent mb-3">
+            <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-accent via-primary to-gold bg-clip-text text-transparent mb-3 font-serif">
               The All-in-One Writing Platform
             </h1>
             <p className="text-ink/80">
-              Blend collaborative sessions, organization tools, faith-centered prompts, and smart AI assistance.
+              Where creativity meets discipline—blend AI assistance, community, character tracking, and faith-based reflection.
             </p>
           </div>
 
-          {/* Chapters info */}
+          {/* Chapter Info Bar */}
           {chapters.length > 0 && (
-            <div className="mb-12 p-4 bg-white/70 backdrop-blur-xl rounded-xl border border-white/60">
+            <div className="mb-12 p-4 bg-white/70 backdrop-blur-xl rounded-xl border border-white/60 shadow-soft">
               <div className="flex items-center gap-3 text-ink">
                 <BookOpen className="w-5 h-5" />
                 <span>
@@ -574,53 +532,54 @@ export default function StoryLab() {
             </div>
           )}
 
-          {/* =========== LAB SESSIONS (first) =========== */}
+          {/* Lab Sessions (cards use translucent brand colors) */}
           <section className="mb-16">
             <SectionHeader
-              id="sessions"
               icon="🧪"
-              title="Story Lab Sessions"
-              subtitle="Interactive workshops for collaboration and momentum."
+              title="Lab Sessions"
+              subtitle="Interactive workshops that analyze your story and support collaboration."
             />
 
-            {/* 4 cards in one line on large screens */}
-            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4 mb-8">
-              <button
-                type="button"
-                onClick={() => document.getElementById("sessions")?.scrollIntoView({ behavior: "smooth" })}
-                className="rounded-2xl p-5 text-left bg-white/70 hover:bg-white/80 border border-white/60 transition-colors"
-              >
-                <div className="text-lg font-semibold mb-1">Session Schedule</div>
-                <div className="text-sm text-ink/70">Six-session collaborative structure with goals.</div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => document.getElementById("sessions")?.scrollIntoView({ behavior: "smooth" })}
-                className="rounded-2xl p-5 text-left bg-white/70 hover:bg-white/80 border border-white/60 transition-colors"
-              >
-                <div className="text-lg font-semibold mb-1">Breakout Pairings</div>
-                <div className="text-sm text-ink/70">Random pairing for timed exercises and peer review.</div>
-              </button>
-
-              <Link
-                to="/story-lab/critique"
-                className="rounded-2xl p-5 text-left bg-white/70 hover:bg-white/80 border border-white/60 transition-colors block"
-              >
-                <div className="text-lg font-semibold mb-1">Critique Circle</div>
-                <div className="text-sm text-ink/70">Secure sharing, inline comments, reactions & audit log.</div>
-              </Link>
-
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 mb-8">
+              {/* Story Prompts Workshop (link) */}
               <Link
                 to="/story-lab/prompts"
-                className="rounded-2xl p-5 text-left bg-white/70 hover:bg-white/80 border border-white/60 transition-colors block"
+                className="rounded-2xl p-5 border text-left bg-white/70 hover:bg-white/80 border-white/60 transition-all block shadow-soft"
               >
-                <div className="text-lg font-semibold mb-1">Story Prompts</div>
-                <div className="text-sm text-ink/70">Context-aware prompts to keep you moving.</div>
+                <div className="text-lg font-semibold mb-1">Story Prompts Workshop</div>
+                <div className="text-sm text-ink/70">
+                  Smart prompts based on your story structure and content.
+                </div>
               </Link>
+
+              {/* Clothesline (toggle section) */}
+              <button
+                onClick={() => setActiveSection("clothesline")}
+                className={`rounded-2xl p-5 border text-left transition-all shadow-soft ${
+                  activeSection === "clothesline"
+                    ? "bg-primary border-white/60"
+                    : "bg-white/70 border-white/60 hover:bg-white/80"
+                }`}
+              >
+                <div className="text-lg font-semibold mb-1">Clothes Pin Workshop</div>
+                <div className="text-sm text-ink/70">Visual cards to summarize characters and roles.</div>
+              </button>
+
+              {/* Hopes, Fears & Legacy (toggle section) */}
+              <button
+                onClick={() => setActiveSection("hfl")}
+                className={`rounded-2xl p-5 border text-left transition-all shadow-soft ${
+                  activeSection === "hfl"
+                    ? "bg-primary border-white/60"
+                    : "bg-white/70 border-white/60 hover:bg-white/80"
+                }`}
+              >
+                <div className="text-lg font-semibold mb-1">Hopes, Fears & Legacy</div>
+                <div className="text-sm text-ink/70">Reveal core drives and long-view stakes per character.</div>
+              </button>
             </div>
 
-            {/* Optional: inline workshops if you want them visible here */}
+            {/* Active workshop panels */}
             {activeSection === "clothesline" && (
               <ClotheslineWorkshop characters={workshopCharacters} />
             )}
@@ -629,41 +588,64 @@ export default function StoryLab() {
             )}
           </section>
 
-          {/* =========== STORY & CHARACTER DEVELOPMENT (second) =========== */}
-          <section className="mb-16">
+          {/* Workshop Community (raised section) */}
+          <section className="mb-12">
             <SectionHeader
-              id="dev"
+              icon="👥"
+              title="Workshop Community"
+              subtitle="Collaborative writing sessions and accountability"
+            />
+            <div className="grid gap-6 md:grid-cols-3">
+              {workshopFeatures.map((feature, idx) => (
+                <FeatureCard key={idx} {...feature} onClick={() => {
+                  if (feature.title === "Critique Circle") navigate("/story-lab/critique");
+                }} />
+              ))}
+            </div>
+          </section>
+
+          {/* Story & Character Development */}
+          <section className="mb-12">
+            <SectionHeader
               icon="📖"
               title="Story & Character Development"
-              subtitle="Characters, worlds, and structure—beautifully organized."
+              subtitle="Character development, world building, and organization tools"
             />
             <div className="grid gap-6 md:grid-cols-2 mb-8">
               {storyFeatures.map((feature, idx) => (
-                <FeatureCard
-                  key={idx}
-                  {...feature}
-                  onClick={() => {
-                    if (feature.title.includes("Clothesline")) setActiveSection("clothesline");
-                    if (feature.title.includes("Hopes")) setActiveSection("hfl");
-                  }}
-                />
+                <FeatureCard key={idx} {...feature} />
               ))}
             </div>
 
-            {/* Character manager feeds HFL & prompts */}
+            {/* Character Manager */}
             <CharacterManager
               seedText={chapters.map((c) => c.text).join("\n\n")}
-              onChange={setWorkshopCharacters}
+              onChange={() => { /* feed prompts/HFL panels via local state if needed */ }}
             />
           </section>
 
-          {/* =========== FAITH + LEGACY (third) =========== */}
-          <section className="mb-16">
+          {/* AI + Human Balance (last before Faith) */}
+          <section className="mb-12">
             <SectionHeader
-              id="faith"
+              icon="✨"
+              title="AI + Human Balance"
+              subtitle="AI that assists without overtaking your unique voice"
+            />
+            <div className="grid gap-6 md:grid-cols-2">
+              {aiFeatures.map((feature, idx) => (
+                <FeatureCard key={idx} {...feature} onClick={() => {
+                  if (feature.title === "Story Prompts") navigate("/story-lab/prompts");
+                }} />
+              ))}
+            </div>
+          </section>
+
+          {/* Faith + Legacy (very last) */}
+          <section className="mb-24">
+            <SectionHeader
               icon="💝"
               title="Faith + Legacy"
-              subtitle="Writing with purpose and impact."
+              subtitle="Spiritual grounding and legacy-focused writing"
             />
             <div className="grid gap-6 md:grid-cols-2">
               {faithFeatures.map((feature, idx) => (
@@ -671,37 +653,22 @@ export default function StoryLab() {
               ))}
             </div>
           </section>
-
-          {/* =========== AI + HUMAN BALANCE (last) =========== */}
-          <section className="mb-24">
-            <SectionHeader
-              id="ai"
-              icon="✨"
-              title="AI + Human Balance"
-              subtitle="Subtle assistance that never drowns your voice."
-            />
-            <div className="grid gap-6 md:grid-cols-2">
-              {aiFeatures.map((feature, idx) => (
-                <FeatureCard key={idx} {...feature} />
-              ))}
-            </div>
-          </section>
         </div>
       </div>
 
-      {/* Quick Actions glass bar */}
+      {/* Quick Actions Bar — brand glass */}
       <div className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-xl border-t border-white/60 p-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Link
               to="/story-lab/critique"
-              className="px-6 py-3 bg-accent hover:bg-accent/90 text-ink rounded-xl font-medium transition-colors shadow"
+              className="px-6 py-3 bg-accent/70 hover:bg-accent text-ink rounded-lg font-medium transition-all shadow-soft"
             >
               Open Critique Circle
             </Link>
             <Link
               to="/story-lab/prompts"
-              className="px-4 py-2 glass border border-white/60 hover:bg-white/90 rounded-xl font-medium transition-colors text-ink"
+              className="px-4 py-2 bg-white/70 hover:bg-white/90 text-ink rounded-lg font-medium transition-all border border-white/60"
             >
               View Prompts
             </Link>
