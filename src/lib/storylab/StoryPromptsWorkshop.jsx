@@ -6,52 +6,44 @@ import {
 } from "lucide-react";
 
 /* =========================================================
-   STORAGE HELPERS (unchanged)
+   STORAGE HELPERS (updated to use shared store)
 ========================================================= */
-const STORAGE_KEY = "dahtruth-story-lab-toc-v3";
+// ⬇️ REPLACE your storage helpers with these imports + one helper
+import {
+  loadProject as getProject,
+  saveProject as setProject,
+  ensureWorkshopFields
+} from "../../lib/storylab/projectStore";
 
-const getProject = () => {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-};
-
-const setProject = (project) => {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(project));
-    window.dispatchEvent(new Event("project:change"));
-  } catch {}
-};
-
-const updateChapterById = (id, updater) => {
-  const proj = getProject();
+/** Update a chapter by id, using the shared store */
+function updateChapterById(id, updater) {
+  const proj = ensureWorkshopFields(getProject());
   if (!proj || !Array.isArray(proj.chapters)) return;
   const i = proj.chapters.findIndex((c) => c.id === id);
   if (i === -1) return;
+  // Normalize the text field so all views see the same content
   const current = proj.chapters[i] || {};
-  const next = updater(current) || current;
-  proj.chapters[i] = next;
+  const normalized = {
+    ...current,
+    text: current.text ?? current.content ?? current.body ?? ""
+  };
+  const next = updater(normalized) || normalized;
+  // Always write to `text` (single source of truth)
+  proj.chapters[i] = { ...next, text: next.text ?? "" };
   setProject(proj);
-};
+  try { window.dispatchEvent(new Event("project:change")); } catch {}
+}
 
 function loadChaptersFromLocalStorage() {
-  const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) return [];
-  try {
-    const parsed = JSON.parse(raw);
-    const list = parsed?.chapters ?? [];
-    return list.map((c, idx) => ({
-      id: c.id ?? idx,
-      title: c.title ?? `Chapter ${idx + 1}`,
-      text: c.text ?? c.content ?? c.body ?? "",
-      storyLab: c.storyLab || {},
-    }));
-  } catch {
-    return [];
-  }
+  const proj = ensureWorkshopFields(getProject());
+  if (!proj) return [];
+  const list = proj?.chapters ?? [];
+  return list.map((c, idx) => ({
+    id: c.id ?? idx,
+    title: c.title ?? `Chapter ${idx + 1}`,
+    text: c.text ?? c.content ?? c.body ?? "",
+    storyLab: c.storyLab || {},
+  }));
 }
 
 /* =========================================================
@@ -452,7 +444,7 @@ export default function StoryPromptsWorkshop() {
   // Load chapter's lab data
   useEffect(() => {
     if (!selectedChapter) return;
-    const proj = getProject();
+    const proj = ensureWorkshopFields(getProject());
     const ch = proj?.chapters?.find((c) => c.id === selectedChapter.id);
     const lab = ch?.storyLab || {};
     setPinned(Array.isArray(lab.pinned) ? lab.pinned : []);
@@ -509,12 +501,14 @@ export default function StoryPromptsWorkshop() {
   const sendToChapter = () => {
     if (!selectedChapter || !scratchpadContent.trim()) return;
     updateChapterById(selectedChapter.id, (c) => {
-      const existing = c.content ?? c.text ?? c.body ?? "";
-      const separator = existing && !/\n$/.test(existing) ? "\n\n" : "";
+      const existing = c.text || "";
+      const sep = existing && !/\n$/.test(existing) ? "\n\n" : "";
+      // Add a bold marker so it's clearly a prompt-driven insert
+      const block = `**[WRITING PROMPT]** ${currentPrompt || "Session Work"}\n\n${scratchpadContent}\n\n`;
       return {
         ...c,
-        content: `${existing}${separator}${scratchpadContent}\n\n`,
-        lastEdited: "Just now",
+        text: `${existing}${sep}${block}`,
+        lastEdited: new Date().toISOString(),
       };
     });
     setToast("Sent to chapter");
@@ -639,8 +633,8 @@ export default function StoryPromptsWorkshop() {
                 <select
                   value={selectedChapter?.id ?? ""}
                   onChange={(e) => {
-                    const idVal = isNaN(Number(e.target.value)) ? e.target.value : Number(e.target.value);
-                    const ch = chapters.find((c) => c.id === idVal);
+                    const idVal = e.target.value; // keep as string
+                    const ch = chapters.find((c) => String(c.id) === String(idVal));
                     setSelectedChapter(ch || null);
                   }}
                   className="px-3 py-2 bg-white border border-white/60 rounded-lg text-ink text-sm"
