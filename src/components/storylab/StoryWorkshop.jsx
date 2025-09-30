@@ -386,6 +386,7 @@ const sectionHeader = { display: "flex", justifyContent: "space-between", alignI
 const btn = { border: "1px solid #cfd8e3", background: "white", borderRadius: 8, padding: "8px 12px", cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 8 };
 
 const grid = { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 };
+const twocol = { display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, alignItems: "start" };
 const card = { border: "1px solid #e5e7eb", borderRadius: 12, padding: 12, background: "rgba(255,255,255,0.96)" };
 const cardRow = { ...card, display: "grid", gridTemplateColumns: "auto 1fr auto auto", alignItems: "center", gap: 10 };
 const rowBetween = { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 };
