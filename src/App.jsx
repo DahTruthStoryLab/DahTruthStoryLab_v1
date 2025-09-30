@@ -138,14 +138,45 @@ export default function App() {
           />
 
           {/* Story Lab */}
-          <Route
-            path="/story-lab"
-            element={
-              <ProtectedRoute>
-                <StoryLab />
-              </ProtectedRoute>
-            }
-          />
+<Route
+  path="/story-lab"
+  element={
+    <ProtectedRoute>
+      <StoryLab />
+    </ProtectedRoute>
+  }
+/>
+
+{/* Story Prompts */}
+<Route
+  path="/story-lab/prompts"
+  element={
+    <ProtectedRoute>
+      <StoryPromptsWorkshop />
+    </ProtectedRoute>
+  }
+/>
+
+{/* NEW: Workshop (tabbed page) */}
+<Route
+  path="/story-lab/workshop"
+  element={
+    <ProtectedRoute>
+      <StoryWorkshop />
+    </ProtectedRoute>
+  }
+/>
+
+{/* NEW: Direct module page — Priority Cards */}
+<Route
+  path="/story-lab/workshop/priorities"
+  element={
+    <ProtectedRoute>
+      <PriorityCards />
+    </ProtectedRoute>
+  }
+/>
+
           <Route
             path="/story-lab/prompts"
             element={
