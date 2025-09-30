@@ -1,12 +1,29 @@
 // src/lib/storylab/StoryLab.jsx
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
-  ArrowLeft, BookOpen, Users, Pin, Sparkles, Calendar, Clock, ChevronRight, Plus,
-  Layers, Edit3, Trash2, Globe, Heart, Star, CheckCircle, FileText,
-  MessageSquare, User, Menu as MenuIcon
+  BookOpen,
+  Users,
+  Pin,
+  Sparkles,
+  Calendar,
+  Clock,
+  ChevronRight,
+  Plus,
+  Layers,
+  Edit3,
+  Trash2,
+  Globe,
+  Heart,
+  Star,
+  CheckCircle,
+  FileText,
+  MessageSquare,
+  User,
+  Send,
+  MessageCircle,
 } from "lucide-react";
-import BrandLogo from "../../components/BrandLogo";
+import BrandLogo from "../../components/BrandLogo"; // keep this import; adjust path if needed
 
 /* -----------------------------
    Helpers: load chapters safely
@@ -31,15 +48,38 @@ function loadChaptersFromLocalStorage() {
    Tiny, client-only "NLP-lite"
 --------------------------------*/
 const splitSentences = (txt) =>
-  (txt || "").replace(/\s+/g, " ").match(/[^.!?]+[.!?]?/g) || [];
+  (txt || "")
+    .replace(/\s+/g, " ")
+    .match(/[^.!?]+[.!?]?/g) || [];
 
 function guessCharacters(text) {
   const names = new Set();
-  const tokens = (text || "").match(/\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2}\b/g) || [];
+  const tokens =
+    (text || "").match(/\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2}\b/g) || [];
   tokens.forEach((t) => {
     if (!["I", "The", "A", "And", "But"].includes(t)) names.add(t.trim());
   });
   return Array.from(names).slice(0, 50);
+}
+
+function extractConflicts(text) {
+  const hits = [];
+  const needles = [
+    "conflict",
+    "tension",
+    "argument",
+    "fight",
+    "feud",
+    "rivalry",
+    "obstacle",
+    "problem",
+    "challenge",
+  ];
+  const sentences = splitSentences(text);
+  sentences.forEach((s) => {
+    if (needles.some((n) => s.toLowerCase().includes(n))) hits.push(s.trim());
+  });
+  return hits;
 }
 
 function extractKeywordSentences(text, keyword) {
@@ -48,49 +88,70 @@ function extractKeywordSentences(text, keyword) {
 }
 
 /* =========================================================
-   AERO SIDEBAR (glassmorphism; brand serif heading)
+   PAGE BANNER (centered, no top bar)
 ========================================================= */
-function AeroSidebar({
-  collapsed,
-  setCollapsed,
-  activeSection,
-  setActiveSection,
-  onCloseMobile,
-  showMobile
-}) {
+const PageBanner = () => {
+  return (
+    <div className="mx-auto mb-8">
+      <div className="mx-auto max-w-3xl rounded-2xl border border-white/40 bg-white/20 backdrop-blur-xl px-6 py-5 text-center shadow-[0_8px_28px_rgba(0,0,0,0.12)]">
+        <div className="mx-auto mb-2 inline-flex items-center justify-center rounded-xl border border-white/50 bg-white/40 px-3 py-1">
+          <BookOpen size={16} className="mr-2 text-ink/80" />
+          <span className="text-xs font-semibold tracking-wide text-ink/80">
+            Story Lab
+          </span>
+        </div>
+        <h1 className="text-3xl font-extrabold text-ink">
+          Story Lab Sessions
+        </h1>
+        <p className="mt-1 text-sm text-ink/70">
+          An overview of the live modules and tools you’ll use together.
+        </p>
+      </div>
+    </div>
+  );
+};
+
+/* =========================================================
+   AERO SIDEBAR (translucent + "pounce" hover)
+========================================================= */
+function AeroSidebar({ collapsed, setCollapsed, activeSection, setActiveSection }) {
   const location = useLocation();
 
   useEffect(() => {
     try {
-      localStorage.setItem("storylab_sidebar_collapsed", JSON.stringify(collapsed));
+      localStorage.setItem(
+        "storylab_sidebar_collapsed",
+        JSON.stringify(collapsed)
+      );
     } catch {}
   }, [collapsed]);
 
-  // Ordered by modules as requested
-  const itemsTop = [
-    { key: "back", label: "Back to Dashboard", to: "/dashboard", icon: ArrowLeft, type: "link", accent: true },
-    { key: "home", label: "Story Lab Home", to: "/story-lab", icon: BookOpen, type: "link" },
-
-    // Sessions overview & modules
-    { key: "prompts-link", label: "Story Prompts", to: "/story-lab/prompts", icon: Sparkles, type: "link" },
-    { key: "characters-consistency", label: "Character Consistency", icon: CheckCircle, type: "section", section: "overview" },
-    { key: "grammar", label: "Grammar Polish", icon: Edit3, type: "section", section: "overview" },
-    { key: "summaries", label: "Scene Summaries", icon: FileText, type: "section", section: "overview" },
-
-    // Story & Character
-    { key: "profiles", label: "Character Profiles", icon: User, type: "section", section: "story" },
-    { key: "clothesline", label: "Character Clothesline", icon: Pin, type: "section", section: "community" },
-    { key: "world", label: "World Bible", icon: Globe, type: "section", section: "story" },
-    { key: "hfl", label: "Hopes • Fears • Legacy", icon: Heart, type: "section", section: "story" },
+  // ordered to mirror modules
+  const items = [
+    { key: "back", label: "Back to Dashboard", to: "/dashboard", icon: ChevronRight, type: "link", accent: true },
+    { key: "sessions", label: "Story Lab Sessions", section: "sessions", icon: BookOpen, type: "section" },
 
     // Workshop Community
-    { key: "schedule", label: "Session Schedule", icon: Calendar, type: "section", section: "community" },
-    { key: "breakouts", label: "Breakout Pairings", icon: Users, type: "section", section: "community" },
-    { key: "critique", label: "Critique Circle", to: "/story-lab/critique", icon: MessageSquare, type: "link", accent: true },
+    { key: "schedule", label: "Session Schedule", section: "schedule", icon: Calendar, type: "section" },
+    { key: "pairs", label: "Breakout Pairings", section: "pairs", icon: Users, type: "section" },
+    { key: "critique", label: "Critique Circle", to: "/story-lab/critique", icon: MessageSquare, type: "link" },
+    { key: "prompts", label: "Story Prompts", to: "/story-lab/prompts", icon: Sparkles, type: "link" },
+    { key: "chat", label: "Workshop Chat", section: "chat", icon: MessageCircle, type: "section" },
 
-    // Faith (last)
-    { key: "reflection", label: "Reflection Prompts", icon: Heart, type: "section", section: "faith" },
-    { key: "legacy", label: "Legacy Writing", icon: Star, type: "section", section: "faith" },
+    // Story & Character Development
+    { key: "profiles", label: "Character Profiles", section: "profiles", icon: User, type: "section" },
+    { key: "clothesline", label: "Character Clothesline", section: "clothesline", icon: Pin, type: "section" },
+    { key: "world", label: "World Bible", section: "world", icon: Globe, type: "section" },
+    { key: "hfl", label: "Hopes • Fears • Legacy", section: "hfl", icon: Heart, type: "section" },
+
+    // AI + Human Balance
+    { key: "consistency", label: "Character Consistency", section: "consistency", icon: CheckCircle, type: "section" },
+    { key: "grammar", label: "Grammar Polish", section: "grammar", icon: Edit3, type: "section" },
+    { key: "summaries", label: "Scene Summaries", section: "summaries", icon: FileText, type: "section" },
+
+    // Faith & Legacy (last)
+    { key: "reflection", label: "Reflection Prompts", section: "reflection", icon: Star, type: "section" },
+    { key: "legacy", label: "Legacy Writing", section: "legacy", icon: Layers, type: "section" },
   ];
 
   const isActiveRoute = (to) => location.pathname === to;
@@ -98,69 +159,91 @@ function AeroSidebar({
 
   return (
     <>
-      {/* Mobile backdrop */}
+      {/* Mobile backdrop (click to hide) */}
       <div
-        className={`fixed inset-0 z-40 bg-black/40 md:hidden transition-opacity ${showMobile ? "opacity-100" : "pointer-events-none opacity-0"}`}
-        onClick={onCloseMobile}
+        className={`fixed inset-0 z-40 bg-black/40 md:hidden ${
+          collapsed ? "pointer-events-none opacity-0" : "opacity-100"
+        }`}
+        onClick={() => setCollapsed(true)}
         aria-hidden="true"
       />
-
       <aside
         className={[
-          "fixed z-50 left-0 top-0 h-screen",
-          "backdrop-blur-md bg-white/60 border-r border-white/60",
-          "shadow-[0_12px_48px_-10px_rgba(16,24,40,0.25)]",
-          "transition-all duration-300 ease-out",
-          showMobile ? "translate-x-0" : "-translate-x-full md:translate-x-0",
-          collapsed ? "w-20" : "w-72",
-          "overflow-hidden"
+          "fixed left-0 top-0 z-50 h-screen",
+          "border-r border-white/40 bg-white/20 backdrop-blur-2xl",
+          "transition-all duration-300 ease-out shadow-[0_10px_40px_rgba(0,0,0,0.15)]",
+          collapsed
+            ? "w-20 -translate-x-0 md:translate-x-0 -left-64 md:left-0 md:w-20"
+            : "w-72 left-0",
+          "md:translate-x-0 overflow-hidden",
         ].join(" ")}
-        aria-label="StoryLab sidebar"
+        aria-label="Aero menu sidebar"
       >
-        {/* Brand row at top */}
-        <div className="flex items-center gap-3 px-3 pt-3 pb-2">
-          <BrandLogo className={`${collapsed ? "h-7" : "h-8"} w-auto`} />
+        {/* Brand row */}
+        <div className="flex items-center gap-2 px-3 pt-4 pb-3 border-b border-white/40">
+          <BrandLogo className={`${collapsed ? "h-6" : "h-8"} w-auto`} />
           {!collapsed && (
             <div className="leading-tight">
-              <div className="text-ink font-serif font-bold text-lg">DahTruth</div>
-              <div className="text-[11px] text-ink/70 -mt-0.5 font-serif">Story Lab</div>
+              <div
+                className="font-serif text-lg font-bold text-ink"
+                style={{ fontFamily: "Playfair Display, ui-serif, Georgia" }}
+              >
+                DahTruth
+              </div>
+              <div className="text-[11px] tracking-wide text-ink/70">
+                Story Lab
+              </div>
             </div>
           )}
         </div>
 
-        {/* Collapse (desktop) */}
+        {/* Collapse toggle (desktop) */}
         <div className="hidden md:flex items-center justify-end p-2">
           <button
             onClick={() => setCollapsed((v) => !v)}
-            className="inline-flex items-center gap-2 rounded-lg px-2 py-1 bg-white/60 hover:bg-white/70 border border-white/60 text-ink"
+            className="inline-flex items-center gap-2 rounded-lg border border-white/40 bg-white/30 px-2 py-1 text-xs font-medium text-ink hover:bg-white/40"
             title={collapsed ? "Expand menu" : "Collapse menu"}
           >
-            <ChevronRight className={`w-4 h-4 transition-transform ${collapsed ? "" : "rotate-180"}`} />
-            {!collapsed && <span className="text-xs font-medium">Collapse</span>}
+            <ChevronRight
+              className={`h-4 w-4 transition-transform ${
+                collapsed ? "" : "rotate-180"
+              }`}
+            />
+            {!collapsed && <span>Collapse</span>}
           </button>
         </div>
 
         {/* Menu */}
-        <nav className="px-2 pb-3 overflow-y-auto h-[calc(100%-4.25rem)]">
-          <div className="mt-2 space-y-1">
-            {itemsTop.map((it) => {
+        <nav className="h-[calc(100%-6.25rem)] overflow-y-auto px-2 pb-6 pt-2">
+          <div className="space-y-1">
+            {items.map((it) => {
               const Icon = it.icon;
               const active =
                 (it.type === "link" && isActiveRoute(it.to)) ||
                 (it.type === "section" && isActiveSection(it.section));
 
               const base =
-                "group relative flex items-center gap-3 w-full rounded-xl px-3 py-2 transition-all outline-none focus:ring-2 focus:ring-blue-400/60 hover:translate-x-0.5 hover:scale-[1.01]";
+                "group relative flex w-full items-center gap-3 rounded-xl px-3 py-2 outline-none transition-all duration-200 focus:ring-2 focus:ring-ink/20";
               const activeCls = it.accent
-                ? "bg-accent/30 text-ink border border-white/60 shadow"
-                : "bg-white/80 text-ink border border-white/60 shadow";
-              const inactive = "text-ink bg-white/40 border border-transparent";
+                ? "bg-ink text-white shadow-lg"
+                : "bg-white/40 text-ink shadow";
+              const inactive =
+                "text-ink/80 hover:bg-white/30 hover:shadow hover:scale-[1.02] border border-transparent";
 
               const inner = (
                 <>
-                  <span className="absolute inset-0 rounded-xl bg-white/30 opacity-0 group-hover:opacity-100 transition-opacity" />
-                  <Icon className={`w-5 h-5 relative z-10 ${active ? "opacity-100" : "opacity-90"}`} />
-                  {!collapsed && <span className="truncate relative z-10 font-medium">{it.label}</span>}
+                  {/* Left active dot on hover/active */}
+                  <span
+                    className={`absolute left-1 h-2 w-2 rounded-full transition-all duration-200 ${
+                      active
+                        ? "bg-gold opacity-100"
+                        : "bg-ink/30 opacity-0 group-hover:opacity-100"
+                    }`}
+                  />
+                  <Icon className={`h-5 w-5 ${active ? "opacity-100" : "opacity-90"}`} />
+                  {!collapsed && <span className="truncate">{it.label}</span>}
+                  {/* Right shimmer */}
+                  <span className="pointer-events-none absolute inset-0 rounded-xl opacity-0 group-hover:opacity-100" style={{ background: "radial-gradient(60% 60% at 100% 0%, rgba(255,255,255,0.35), transparent)" }} />
                 </>
               );
 
@@ -168,20 +251,16 @@ function AeroSidebar({
                 <Link
                   key={it.key}
                   to={it.to}
-                  className={`${base} ${active ? activeCls : inactive}`}
+                  className={`${base} ${active ? activeCls : inactive} border border-white/40`}
                   title={collapsed ? it.label : undefined}
-                  onClick={onCloseMobile}
                 >
                   {inner}
                 </Link>
               ) : (
                 <button
                   key={it.key}
-                  onClick={() => {
-                    setActiveSection(it.section);
-                    onCloseMobile?.();
-                  }}
-                  className={`${base} ${active ? activeCls : inactive}`}
+                  onClick={() => setActiveSection(it.section)}
+                  className={`${base} ${active ? activeCls : inactive} border border-white/40`}
                   title={collapsed ? it.label : undefined}
                 >
                   {inner}
@@ -189,15 +268,6 @@ function AeroSidebar({
               );
             })}
           </div>
-
-          <div className="my-4 border-t border-white/60" />
-          {!collapsed && (
-            <div className="px-3">
-              <p className="text-[11px] leading-4 text-ink/70 font-serif">
-                • Translucent “Aero” menu • Hover glow • Light brand palette
-              </p>
-            </div>
-          )}
         </nav>
       </aside>
     </>
@@ -205,78 +275,180 @@ function AeroSidebar({
 }
 
 /* =========================================================
-   FEATURE CARDS (brand glass)
+   FEATURE CARD + SECTION HEADER (brand, light on dark)
 ========================================================= */
 const FeatureCard = ({ icon: Icon, title, status, description, onClick }) => {
   const statusColors = {
-    Ready: "bg-emerald-500/15 text-ink border-emerald-300/40",
-    Beta: "bg-blue-500/15 text-ink border-blue-300/40",
-    "Coming Soon": "bg-slate-400/20 text-ink border-slate-300/50",
+    Ready: "bg-emerald-500/20 text-emerald-800 border-emerald-600/40",
+    Beta: "bg-sky-500/20 text-sky-800 border-sky-600/40",
+    "Coming Soon": "bg-slate-500/20 text-slate-800 border-slate-600/40",
   };
 
   return (
     <button
       type="button"
       onClick={onClick}
-      className="text-left bg-white/70 backdrop-blur-xl rounded-2xl p-6 border border-white/60 hover:bg-white/80 transition-colors shadow"
+      className="text-left rounded-2xl border border-white/50 bg-white/50 p-6 backdrop-blur-xl transition hover:shadow-lg"
     >
-      <div className="flex items-start justify-between mb-4">
+      <div className="mb-4 flex items-start justify-between">
         <div className="flex items-start gap-4">
-          <div className="p-3 bg-white/60 rounded-xl border border-white/60">
-            <Icon className="w-6 h-6 text-ink/80" />
+          <div className="rounded-xl border border-white/60 bg-white/60 p-3">
+            <Icon className="h-6 w-6 text-ink/80" />
           </div>
           <div className="flex-1">
-            <h3 className="text-lg font-semibold text-ink mb-2">{title}</h3>
+            <h3 className="mb-2 text-lg font-semibold text-ink">{title}</h3>
             {status && (
-              <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium border ${statusColors[status]}`}>
+              <span
+                className={`inline-block rounded-full border px-3 py-1 text-xs font-medium ${statusColors[status]}`}
+              >
                 {status}
               </span>
             )}
           </div>
         </div>
-        <ChevronRight className="w-5 h-5 text-ink/60 mt-1" />
+        <ChevronRight className="mt-1 h-5 w-5 text-ink/50" />
       </div>
-      <p className="text-ink/80 text-sm leading-relaxed">{description}</p>
+      <p className="text-sm leading-relaxed text-ink/80">{description}</p>
     </button>
   );
 };
 
-const SectionHeader = ({ icon, title, subtitle }) => (
-  <div className="flex items-start gap-3 mb-8">
-    <div className="p-3 rounded-xl bg-white/70 border border-white/60">
-      <span className="text-2xl">{icon}</span>
+const SectionHeader = ({ icon, title, subtitle }) => {
+  return (
+    <div className="mb-8 flex items-start gap-3">
+      <div className="rounded-xl border border-white/60 bg-white/50 p-3">
+        <span className="text-2xl">{icon}</span>
+      </div>
+      <div>
+        <h2 className="mb-1 text-3xl font-bold text-ink">{title}</h2>
+        {subtitle && <p className="text-ink/70">{subtitle}</p>}
+      </div>
     </div>
-    <div>
-      <h2 className="text-3xl font-bold bg-gradient-to-r from-accent via-primary to-gold bg-clip-text text-transparent mb-1 font-serif">
-        {title}
-      </h2>
-      {subtitle ? <p className="text-ink/70">{subtitle}</p> : null}
-    </div>
-  </div>
-);
+  );
+};
 
 /* =========================================================
-   WORKSHOP PANELS (brand glass)
+   CHARACTER MANAGER (with icon header)
 ========================================================= */
-const ClotheslineWorkshop = ({ characters }) => (
-  <div className="bg-white/70 backdrop-blur-xl rounded-2xl p-6 border border-white/60 shadow">
-    <h3 className="text-xl font-semibold text-ink mb-2">Clothes Pin Workshop</h3>
-    <p className="text-ink/70 mb-4">Pin quick synopses for each character.</p>
-    <div className="flex items-center gap-4 overflow-x-auto pb-2">
-      {(characters?.length ? characters : ["Protagonist", "Antagonist"]).map((name, idx) => (
-        <div key={idx} className="min-w-[220px] bg-white/80 border border-white/60 rounded-xl p-4">
-          <div className="flex items-center gap-2 mb-2">
-            <Pin className="w-4 h-4 text-ink/70" />
-            <div className="font-semibold text-ink">{name}</div>
-          </div>
-          <p className="text-sm text-ink/80">
-            {name} plays a key role. Summarize traits, goals, and obstacles here.
-          </p>
+const CharacterManager = ({ seedText = "", onChange }) => {
+  const [characters, setCharacters] = useState(() => {
+    const fromText = guessCharacters(seedText);
+    return fromText.length ? fromText.map((n, i) => ({ id: i + 1, name: n })) : [];
+  });
+  const [newCharacter, setNewCharacter] = useState("");
+  const [editingId, setEditingId] = useState(null);
+
+  useEffect(() => {
+    onChange?.(characters.map((c) => c.name));
+  }, [characters, onChange]);
+
+  const addCharacter = () => {
+    const val = newCharacter.trim();
+    if (!val) return;
+    setCharacters((prev) => [...prev, { id: Date.now(), name: val }]);
+    setNewCharacter("");
+  };
+
+  const deleteCharacter = (id) => {
+    setCharacters((prev) => prev.filter((c) => c.id !== id));
+  };
+
+  const updateCharacter = (id, name) => {
+    setCharacters((prev) => prev.map((c) => (c.id === id ? { ...c, name: name.trim() } : c)));
+    setEditingId(null);
+  };
+
+  return (
+    <div className="rounded-2xl border border-white/50 bg-white/60 p-6 backdrop-blur-xl">
+      <div className="mb-4 flex items-center gap-3">
+        <div className="rounded-lg border border-white/60 bg-white/60 p-2">
+          <User className="h-5 w-5 text-ink/80" />
         </div>
-      ))}
+        <h3 className="text-lg font-semibold text-ink">Character Manager</h3>
+      </div>
+
+      <div className="mb-4 space-y-3">
+        {characters.length === 0 && (
+          <div className="text-sm text-ink/70">No characters found yet. Add them below.</div>
+        )}
+        {characters.map((character) => (
+          <div
+            key={character.id}
+            className="flex items-center gap-3 rounded-lg border border-white/60 bg-white/70 p-3"
+          >
+            {editingId === character.id ? (
+              <input
+                type="text"
+                defaultValue={character.name}
+                onBlur={(e) => updateCharacter(character.id, e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && updateCharacter(character.id, e.currentTarget.value)}
+                className="flex-1 border-b border-ink/30 bg-transparent text-ink outline-none"
+                autoFocus
+              />
+            ) : (
+              <span
+                onClick={() => setEditingId(character.id)}
+                className="flex-1 cursor-pointer text-ink hover:text-ink/80"
+                title="Click to edit"
+              >
+                {character.name}
+              </span>
+            )}
+            <button
+              onClick={() => deleteCharacter(character.id)}
+              className="text-ink/60 hover:text-ink"
+              title="Delete character"
+            >
+              <Trash2 className="h-4 w-4" />
+            </button>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex gap-2">
+        <input
+          type="text"
+          placeholder="Add new character…"
+          value={newCharacter}
+          onChange={(e) => setNewCharacter(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && addCharacter()}
+          className="flex-1 rounded-lg border border-white/60 bg-white px-4 py-2 text-ink placeholder-ink/40 focus:border-ink/40 focus:outline-none"
+        />
+        <button
+          onClick={addCharacter}
+          className="rounded-lg border border-white/60 bg-accent/60 px-4 py-2 font-medium text-ink hover:bg-accent/70"
+        >
+          <Plus className="h-5 w-5" />
+        </button>
+      </div>
     </div>
-  </div>
-);
+  );
+};
+
+/* =========================================================
+   CLOTHESLINE + HFL (light panels to match scheme)
+========================================================= */
+const ClotheslineWorkshop = ({ characters }) => {
+  return (
+    <div className="rounded-2xl border border-white/50 bg-white/60 p-6 backdrop-blur-xl">
+      <h3 className="mb-2 text-xl font-semibold text-ink">Clothes Pin Workshop</h3>
+      <p className="mb-4 text-ink/70">Pin quick synopses for each character.</p>
+      <div className="flex items-center gap-4 overflow-x-auto pb-2">
+        {(characters?.length ? characters : ["Protagonist", "Antagonist"]).map((name, idx) => (
+          <div key={idx} className="min-w-[220px] rounded-xl border border-white/60 bg-white/80 p-4">
+            <div className="mb-2 flex items-center gap-2">
+              <Pin className="h-4 w-4 text-ink/70" />
+              <div className="font-semibold text-ink">{name}</div>
+            </div>
+            <p className="text-sm text-ink/80">
+              {name} plays a key role. Summarize traits, goals, and obstacles here.
+            </p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
 
 const HopesFearsLegacyWorkshop = ({ chapters, characters }) => {
   const text = useMemo(() => chapters.map((c) => c.text).join("\n\n"), [chapters]);
@@ -293,25 +465,27 @@ const HopesFearsLegacyWorkshop = ({ chapters, characters }) => {
   }, [text, characters]);
 
   return (
-    <div className="bg-white/70 backdrop-blur-xl rounded-2xl p-6 border border-white/60 shadow">
-      <h3 className="text-xl font-semibold text-ink mb-4">Hopes, Fears & Legacy Workshop</h3>
+    <div className="rounded-2xl border border-white/50 bg-white/60 p-6 backdrop-blur-xl">
+      <h3 className="mb-4 text-xl font-semibold text-ink">Hopes, Fears & Legacy</h3>
       {(!characters || characters.length === 0) && (
-        <div className="text-ink/70 mb-3">Add characters above to see targeted insights.</div>
+        <div className="mb-3 text-ink/70">Add characters above to see targeted insights.</div>
       )}
       <div className="space-y-4">
         {Object.entries(insights).map(([name, data]) => (
           <div key={name} className="rounded-xl border border-white/60 bg-white/80 p-4">
-            <div className="font-semibold text-ink mb-2">{name}</div>
-            <div className="grid md:grid-cols-3 gap-3">
-              {["Hopes","Fears","Legacy"].map((key) => (
-                <div key={key} className="rounded-lg bg-white p-3 border border-white/60">
-                  <div className="text-ink/80 text-sm font-medium mb-2">{key}</div>
+            <div className="mb-2 font-semibold text-ink">{name}</div>
+            <div className="grid gap-3 md:grid-cols-3">
+              {["Hopes", "Fears", "Legacy"].map((key) => (
+                <div key={key} className="rounded-lg border border-white/60 bg-white p-3">
+                  <div className="mb-2 text-sm font-medium text-ink/80">{key}</div>
                   {data[key]?.length ? (
-                    <ul className="space-y-2 text-ink/90 text-sm">
-                      {data[key].map((s, i) => <li key={i}>• {s}</li>)}
+                    <ul className="space-y-2 text-sm text-ink/90">
+                      {data[key].map((s, i) => (
+                        <li key={i}>• {s}</li>
+                      ))}
                     </ul>
                   ) : (
-                    <div className="text-ink/60 text-sm">No {key.toLowerCase()} yet.</div>
+                    <div className="text-sm text-ink/60">No {key.toLowerCase()} yet.</div>
                   )}
                 </div>
               ))}
@@ -324,11 +498,64 @@ const HopesFearsLegacyWorkshop = ({ chapters, characters }) => {
 };
 
 /* =========================================================
-   MAIN (no top bar; mobile menu button)
+   WORKSHOP SESSION CHAT (simple local chat)
+========================================================= */
+const WorkshopChat = () => {
+  const [messages, setMessages] = useState([
+    { id: 1, who: "Facilitator", text: "Welcome! Share a line you’re proud of from today." },
+  ]);
+  const [input, setInput] = useState("");
+  const nextId = useRef(2);
+
+  const send = () => {
+    const t = input.trim();
+    if (!t) return;
+    setMessages((m) => [...m, { id: nextId.current++, who: "You", text: t }]);
+    setInput("");
+  };
+
+  return (
+    <div className="rounded-2xl border border-white/50 bg-white/60 p-6 backdrop-blur-xl">
+      <div className="mb-3 flex items-center gap-2">
+        <div className="rounded-lg border border-white/60 bg-white/60 p-2">
+          <MessageCircle className="h-5 w-5 text-ink/80" />
+        </div>
+        <h3 className="text-lg font-semibold text-ink">Workshop Session Chat</h3>
+      </div>
+      <div className="mb-3 max-h-60 overflow-y-auto rounded-lg border border-white/60 bg-white/80 p-3">
+        {messages.map((m) => (
+          <div key={m.id} className="mb-2">
+            <span className="mr-2 text-xs font-semibold text-ink/70">{m.who}:</span>
+            <span className="text-ink">{m.text}</span>
+          </div>
+        ))}
+      </div>
+      <div className="flex gap-2">
+        <input
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && send()}
+          placeholder="Type a message…"
+          className="flex-1 rounded-lg border border-white/60 bg-white px-3 py-2 text-ink placeholder-ink/40 focus:border-ink/40 focus:outline-none"
+        />
+        <button
+          onClick={send}
+          className="inline-flex items-center gap-2 rounded-lg border border-white/60 bg-accent/60 px-3 py-2 font-medium text-ink hover:bg-accent/70"
+        >
+          <Send size={16} />
+          Send
+        </button>
+      </div>
+    </div>
+  );
+};
+
+/* =========================================================
+   MAIN (with translucent sidebar + new order)
 ========================================================= */
 export default function StoryLab() {
   const navigate = useNavigate();
-  const [activeSection, setActiveSection] = useState("overview"); // "overview" | "story" | "community" | "faith"
+  const [activeSection, setActiveSection] = useState("sessions");
   const [chapters, setChapters] = useState([]);
   const [workshopCharacters, setWorkshopCharacters] = useState([]);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
@@ -338,95 +565,39 @@ export default function StoryLab() {
       return false;
     }
   });
-  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
+  const [mobileSidebarHidden, setMobileSidebarHidden] = useState(true);
 
   useEffect(() => {
-    const chs = loadChaptersFromLocalStorage();
-    setChapters(chs);
+    const loaded = loadChaptersFromLocalStorage();
+    setChapters(loaded);
+    const allText = loaded.map((c) => c.text).join("\n\n");
+    setWorkshopCharacters(guessCharacters(allText));
   }, []);
 
-  // Section content groups
-  const aiFeatures = [
-    { icon: Sparkles, title: "Story Prompts", status: "Ready", description: "AI-generated prompts tailored to your story's theme and chapter." },
-    { icon: CheckCircle, title: "Character Consistency", status: "Coming Soon", description: "Detect and flag character contradictions to keep details aligned." },
-    { icon: Edit3, title: "Grammar Polish", status: "Coming Soon", description: "Clarity and flow suggestions that keep your voice intact." },
-    { icon: FileText, title: "Scene Summaries", status: "Ready", description: "Auto-generate chapter summaries and track plot threads." },
-  ];
-
-  const storyFeatures = [
-    { icon: User, title: "Character Profiles", status: "Beta", description: "Create detailed character sheets and track relationships." },
-    { icon: Globe, title: "World Bible", status: "Beta", description: "Locations, cultures, and timelines that grow as you write." },
-    { icon: Heart, title: "Hopes • Fears • Legacy", status: "Beta", description: "Surface motivational drivers and long-view stakes per character." },
-  ];
-
-  const workshopFeatures = [
-    { icon: Calendar, title: "Session Schedule", status: "Ready", description: "Six-session collaborative writing structure with goals." },
-    { icon: Users, title: "Breakout Pairings", status: "Ready", description: "Randomly pair writers for collaborative exercises and peer review." },
-    { icon: MessageSquare, title: "Critique Circle", status: "Ready", description: "Share drafts with your cohort, add inline comments, and track revisions securely." },
-  ];
-
-  const faithFeatures = [
-    { icon: Heart, title: "Reflection Prompts", status: "Beta", description: "Daily questions to ground your writing in purpose and meaning." },
-    { icon: Star, title: "Legacy Writing", status: "Coming Soon", description: "Tools for writing with future generations in mind." },
-  ];
-
+  // Content wrapper: margin matches sidebar width on md+
   return (
     <div className="min-h-screen bg-base bg-radial-fade text-ink">
-      {/* Mobile menu button */}
-      <div className="md:hidden sticky top-0 z-40 bg-white/70 backdrop-blur-xl border-b border-white/60">
-        <div className="px-4 py-3 flex items-center justify-between">
-          <button
-            onClick={() => setMobileSidebarOpen(true)}
-            className="inline-flex items-center gap-2 rounded-lg px-3 py-2 bg-white/60 hover:bg-white/80 border border-white/60"
-          >
-            <MenuIcon size={18} />
-            <span className="text-sm font-medium">Menu</span>
-          </button>
-
-          <div className="flex items-center gap-2">
-            <BrandLogo className="h-7 w-auto" />
-            <span className="font-serif font-semibold">DahTruth Story Lab</span>
-          </div>
-          <div className="w-10" />
-        </div>
-      </div>
-
-      {/* Sidebar */}
+      {/* Translucent Sidebar (no top banner) */}
       <AeroSidebar
-        collapsed={sidebarCollapsed}
-        setCollapsed={setSidebarCollapsed}
+        collapsed={sidebarCollapsed && mobileSidebarHidden}
+        setCollapsed={(v) => {
+          setSidebarCollapsed(v);
+          setMobileSidebarHidden(true);
+        }}
         activeSection={activeSection}
         setActiveSection={setActiveSection}
-        showMobile={mobileSidebarOpen}
-        onCloseMobile={() => setMobileSidebarOpen(false)}
       />
 
-      {/* Content wrapper (left gutter = sidebar width) */}
+      {/* Content */}
       <div className={`transition-all duration-300 ${sidebarCollapsed ? "md:ml-20" : "md:ml-72"}`}>
-        <div className="max-w-7xl mx-auto px-6 py-10 md:py-12">
-          {/* Sessions banner */}
-          <div className="mb-6">
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/70 border border-white/60 shadow">
-              <span className="text-sm font-serif font-semibold">Story Lab Sessions</span>
-              <span className="text-muted text-xs">overview</span>
-            </div>
-          </div>
+        <div className="mx-auto max-w-7xl px-6 py-10">
+          <PageBanner />
 
-          {/* Hero */}
-          <div className="text-center mb-12">
-            <h1 className="text-4xl md:text-5xl font-bold bg-gradient-to-r from-accent via-primary to-gold bg-clip-text text-transparent mb-3 font-serif">
-              The All-in-One Writing Platform
-            </h1>
-            <p className="text-ink/80">
-              Where creativity meets discipline—blend AI assistance, community, character tracking, and faith-based reflection.
-            </p>
-          </div>
-
-          {/* Chapter Info */}
+          {/* Chapter info strip */}
           {chapters.length > 0 && (
-            <div className="mb-12 p-4 bg-white/70 backdrop-blur-xl rounded-xl border border-white/60 shadow">
+            <div className="mb-10 rounded-xl border border-white/50 bg-white/50 p-4 backdrop-blur-xl">
               <div className="flex items-center gap-3 text-ink">
-                <BookOpen className="w-5 h-5" />
+                <BookOpen className="h-5 w-5" />
                 <span>
                   {chapters.length} chapter{chapters.length > 1 ? "s" : ""} loaded from your story
                 </span>
@@ -434,158 +605,177 @@ export default function StoryLab() {
             </div>
           )}
 
-          {/* Lab Sessions — OVERVIEW ONLY (4 modules) */}
-          <section className="mb-16">
+          {/* LAB SESSIONS (overview of the modules) */}
+          <section id="sessions" className="mb-14">
             <SectionHeader
               icon="🧪"
-              title="Lab Sessions"
-              subtitle="Overview of the interactive modules available in your Story Lab."
+              title="Live Session Modules"
+              subtitle="A quick overview of what you’ll use during Story Lab Sessions."
             />
-
-            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-              <Link
-                to="/story-lab/prompts"
-                className="rounded-2xl p-5 border text-left bg-white/70 hover:bg-white/80 border-white/60 transition-all block shadow"
-              >
-                <div className="text-lg font-semibold mb-1">Story Prompts Workshop</div>
-                <div className="text-sm text-ink/70">
-                  Smart prompts based on your story structure and content.
-                </div>
-              </Link>
-
+            <div className="mb-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
               <FeatureCard
                 icon={Calendar}
                 title="Session Schedule"
                 status="Ready"
-                description="Six-session collaborative writing structure with goals."
+                description="Plan your six-session arc with goals and homework."
+                onClick={() => setActiveSection("schedule")}
               />
-
               <FeatureCard
                 icon={Users}
                 title="Breakout Pairings"
                 status="Ready"
-                description="Randomly pair writers for collaborative exercises and peer review."
+                description="Pair up for collaborative exercises and peer review."
+                onClick={() => setActiveSection("pairs")}
               />
-
-              <Link
-                to="/story-lab/critique"
-                className="rounded-2xl p-5 border text-left bg-white/70 hover:bg-white/80 border-white/60 transition-all block shadow"
-              >
-                <div className="text-lg font-semibold mb-1">Critique Circle</div>
-                <div className="text-sm text-ink/70">
-                  Share drafts, add inline comments, control copying, and keep an audit trail.
-                </div>
-              </Link>
+              <FeatureCard
+                icon={MessageSquare}
+                title="Critique Circle"
+                status="Ready"
+                description="Inline comments, reactions, audit logs and copy controls."
+                onClick={() => navigate("/story-lab/critique")}
+              />
+              <FeatureCard
+                icon={Sparkles}
+                title="Story Prompts"
+                status="Ready"
+                description="Creative, context-aware prompts when you’re stuck."
+                onClick={() => navigate("/story-lab/prompts")}
+              />
             </div>
           </section>
 
-          {/* Workshop Community — with Clothes Pin panel */}
-          <section className="mb-12" id="community">
+          {/* WORKSHOP COMMUNITY (raised up, includes Clothesline + Chat) */}
+          <section id="community" className="mb-14">
             <SectionHeader
               icon="👥"
               title="Workshop Community"
-              subtitle="Collaborative writing sessions and accountability"
+              subtitle="Tools that make collaboration smooth during and between sessions."
             />
-            <div className="grid gap-6 md:grid-cols-3 mb-8">
-              {[
-                { icon: Calendar, title: "Session Schedule", status: "Ready", description: "Plan your cohort sessions and milestones." },
-                { icon: Users, title: "Breakout Pairings", status: "Ready", description: "Create dynamic pairs for focused exercises." },
-                { icon: MessageSquare, title: "Critique Circle", status: "Ready", description: "Secure sharing with comments and reactions." },
-              ].map((feature, idx) => (
-                <FeatureCard
-                  key={idx}
-                  {...feature}
-                  onClick={() => {
-                    if (feature.title === "Critique Circle") navigate("/story-lab/critique");
-                  }}
-                />
-              ))}
+            <div className="grid gap-6 md:grid-cols-2">
+              <ClotheslineWorkshop characters={workshopCharacters} />
+              <WorkshopChat />
             </div>
-
-            {/* Clothesline moved here */}
-            <ClotheslineWorkshop characters={workshopCharacters} />
           </section>
 
-          {/* Story & Character Development — includes HFL panel */}
-          <section className="mb-12" id="story">
+          {/* STORY & CHARACTER DEVELOPMENT (HFL replaces continuity alerts) */}
+          <section id="dev" className="mb-14">
             <SectionHeader
               icon="📖"
               title="Story & Character Development"
-              subtitle="Character development, world building, and organization tools"
+              subtitle="Organize, explore, and deepen your world and cast."
             />
-            <div className="grid gap-6 md:grid-cols-2 mb-8">
-              {storyFeatures.map((feature, idx) => (
-                <FeatureCard key={idx} {...feature} />
-              ))}
+            <div className="mb-8 grid gap-6 md:grid-cols-3">
+              <FeatureCard
+                icon={User}
+                title="Character Profiles"
+                status="Beta"
+                description="Create detailed sheets and track relationships."
+              />
+              <FeatureCard
+                icon={Globe}
+                title="World Bible"
+                status="Beta"
+                description="Locations, cultures, and timelines that grow with your draft."
+              />
+              <FeatureCard
+                icon={Heart}
+                title="Hopes • Fears • Legacy"
+                status="Ready"
+                description="Mine your text for motivational drivers and thematic threads."
+                onClick={() => setActiveSection("hfl")}
+              />
             </div>
 
-            {/* Character Manager feeds HFL & Clothesline */}
-            <CharacterManager
-              seedText={chapters.map((c) => c.text).join("\n\n")}
-              onChange={setWorkshopCharacters}
-            />
-
-            {/* HFL lives here (replaces continuity alerts) */}
-            <div className="mt-8">
-              <HopesFearsLegacyWorkshop chapters={chapters} characters={workshopCharacters} />
+            {/* Interactive tools */}
+            <div className="grid gap-6">
+              <CharacterManager
+                seedText={chapters.map((c) => c.text).join("\n\n")}
+                onChange={(names) => {
+                  // just keep characters in-sync if needed later
+                }}
+              />
+              {activeSection === "hfl" && (
+                <HopesFearsLegacyWorkshop
+                  chapters={chapters}
+                  characters={workshopCharacters}
+                />
+              )}
             </div>
           </section>
 
-          {/* AI + Human Balance (second-to-last) */}
-          <section className="mb-12">
+          {/* AI + HUMAN BALANCE (last before Faith) */}
+          <section id="ai" className="mb-14">
             <SectionHeader
               icon="✨"
               title="AI + Human Balance"
-              subtitle="AI that assists without overtaking your unique voice"
+              subtitle="Assistive tools that respect your voice."
             />
-            <div className="grid gap-6 md:grid-cols-2">
-              {aiFeatures.map((feature, idx) => (
-                <FeatureCard
-                  key={idx}
-                  {...feature}
-                  onClick={() => {
-                    if (feature.title === "Story Prompts") navigate("/story-lab/prompts");
-                  }}
-                />
-              ))}
+            <div className="grid gap-6 md:grid-cols-3">
+              <FeatureCard
+                icon={CheckCircle}
+                title="Character Consistency"
+                status="Coming Soon"
+                description="Catch contradictions like changing eye color or voice."
+              />
+              <FeatureCard
+                icon={Edit3}
+                title="Grammar Polish"
+                status="Coming Soon"
+                description="Clarity and correctness without flattening your style."
+              />
+              <FeatureCard
+                icon={FileText}
+                title="Scene Summaries"
+                status="Ready"
+                description="Auto-generate summaries and track plot threads."
+              />
             </div>
           </section>
 
-          {/* Faith + Legacy (very last) */}
-          <section className="mb-24" id="faith">
+          {/* FAITH + LEGACY (always very last) */}
+          <section id="faith" className="mb-24">
             <SectionHeader
               icon="💝"
-              title="Faith + Legacy"
-              subtitle="Spiritual grounding and legacy-focused writing"
+              title="Faith & Legacy"
+              subtitle="Spiritual grounding and writing with the future in mind."
             />
             <div className="grid gap-6 md:grid-cols-2">
-              {faithFeatures.map((feature, idx) => (
-                <FeatureCard key={idx} {...feature} />
-              ))}
+              <FeatureCard
+                icon={Star}
+                title="Reflection Prompts"
+                status="Beta"
+                description="Daily questions to focus your heart before you write."
+              />
+              <FeatureCard
+                icon={Layers}
+                title="Legacy Writing"
+                status="Coming Soon"
+                description="Shape work that serves readers beyond the moment."
+              />
             </div>
           </section>
         </div>
       </div>
 
-      {/* Quick Actions Bar — brand glass */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-xl border-t border-white/60 p-4">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
+      {/* Quick Actions Bar */}
+      <div className="fixed bottom-0 left-0 right-0 border-t border-white/60 bg-white/80 p-4 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-7xl items-center justify-between">
           <div className="flex items-center gap-4">
             <Link
               to="/story-lab/critique"
-              className="px-6 py-3 bg-accent/70 hover:bg-accent text-ink rounded-lg font-medium transition-all shadow"
+              className="rounded-lg bg-accent/70 px-6 py-3 font-medium text-ink shadow hover:bg-accent"
             >
               Open Critique Circle
             </Link>
             <Link
               to="/story-lab/prompts"
-              className="px-4 py-2 bg-white/70 hover:bg-white/90 text-ink rounded-lg font-medium transition-all border border-white/60"
+              className="rounded-lg border border-white/60 bg-white/60 px-4 py-2 font-medium text-ink hover:bg-white/80"
             >
               View Prompts
             </Link>
           </div>
           <div className="flex items-center gap-2 text-ink/70">
-            <Clock className="w-4 h-4" />
+            <Clock className="h-4 w-4" />
             <span className="text-sm">Next session in 2 days</span>
           </div>
         </div>
