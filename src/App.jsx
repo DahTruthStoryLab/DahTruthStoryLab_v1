@@ -38,7 +38,7 @@ const Clothesline          = lazy(() => import("./components/storylab/Clotheslin
 const HopesFearsLegacy     = lazy(() => import("./components/storylab/HopesFearsLegacy"));
 
 // NEW: Workshop Community hub (all-in-one)
-const WorkshopCohort = lazy(() => import("./components/storylab/WorkshopCohort"));
+const WorkshopCohort       = lazy(() => import("./components/storylab/WorkshopCohort"));
 
 /* =========================
    Global UI helpers
@@ -112,185 +112,59 @@ export default function App() {
       <Suspense fallback={<Fallback />}>
         <Routes>
           {/* Public */}
-            <Route path="/" element={<LandingPage />} />
-            <Route path="/signin" element={<SignInPage />} />
-            <Route path="/auth/register" element={<RegistrationPage />} />
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/signin" element={<SignInPage />} />
+          <Route path="/auth/register" element={<RegistrationPage />} />
 
           {/* Protected */}
-            <Route
-              path="/dashboard"
-              element={
-                <ProtectedRoute>
-                  <Dashboard />
-                </ProtectedRoute>
-              }
-            />
+          <Route
+            path="/dashboard"
+            element={
+              <ProtectedRoute>
+                <Dashboard />
+              </ProtectedRoute>
+            }
+          />
 
           {/* Writer */}
-            <Route
-              path="/writer"
-              element={
-                <ProtectedRoute>
-                  <WriteSection />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/write"
-              element={
-                <ProtectedRoute>
-                  <WriteSection />
-                </ProtectedRoute>
-              }
-            />
+          <Route
+            path="/writer"
+            element={
+              <ProtectedRoute>
+                <WriteSection />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/write"
+            element={
+              <ProtectedRoute>
+                <WriteSection />
+              </ProtectedRoute>
+            }
+          />
 
           {/* StoryLab (overview) */}
-            <Route
-              path="/story-lab"
-              element={
-                <ProtectedRoute>
-                  <StoryLab />
-                </ProtectedRoute>
-              }
-            />
+          <Route
+            path="/story-lab"
+            element={
+              <ProtectedRoute>
+                <StoryLab />
+              </ProtectedRoute>
+            }
+          />
 
           {/* Story Prompts (workshop prompts page) */}
-            <Route
-              path="/story-lab/prompts"
-              element={
-                <ProtectedRoute>
-                  <StoryPromptsWorkshop />
-                </ProtectedRoute>
-              }
-            />
+          <Route
+            path="/story-lab/prompts"
+            element={
+              <ProtectedRoute>
+                <StoryPromptsWorkshop />
+              </ProtectedRoute>
+            }
+          />
 
-          {/* Workshop hub (tabs/cards) */}
-            <Route
-              path="/story-lab/workshop"
-              element={
-                <ProtectedRoute>
-                  <StoryWorkshop />
-                </ProtectedRoute>
-              }
-            />
-
-          {/* Workshop modules (direct routes) */}
-            <Route
-              path="/story-lab/workshop/priorities"
-              element={
-                <ProtectedRoute>
-                  <PriorityCards />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/story-lab/workshop/roadmap"
-              element={
-                <ProtectedRoute>
-                  <CharacterRoadmap />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/story-lab/workshop/clothesline"
-              element={
-                <ProtectedRoute>
-                  <Clothesline />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/story-lab/workshop/hfl"
-              element={
-                <ProtectedRoute>
-                  <HopesFearsLegacy />
-                </ProtectedRoute>
-              }
-            />
-
-          {/* Table of Contents (selector + direct) */}
-            <Route
-              path="/toc"
-              element={
-                <ProtectedRoute>
-                  <TableOfContentsRouter />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/toc/v1"
-              element={
-                <ProtectedRoute>
-                  <TOCPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/toc/v2"
-              element={
-                <ProtectedRoute>
-                  <TOCPage2 />
-                </ProtectedRoute>
-              }
-            />
-
-          {/* Project */}
-            <Route
-              path="/project"
-              element={
-                <ProtectedRoute>
-                  <ProjectPage />
-                </ProtectedRoute>
-              }
-            />
-
-          {/* Calendar */}
-            <Route
-              path="/calendar"
-              element={
-                <ProtectedRoute>
-                  <Calendar />
-                </ProtectedRoute>
-              }
-            />
-
-          {/* Profile */}
-            <Route
-              path="/profile"
-              element={
-                <ProtectedRoute>
-                  <Profile />
-                </ProtectedRoute>
-              }
-            />
-
-          {/* Misc */}
-            <Route path="/whoami" element={<WhoAmI />} />
-            <Route
-              path="/publishing"
-              element={
-                <ProtectedRoute>
-                  <Placeholder title="Publishing" />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/store"
-              element={
-                <ProtectedRoute>
-                  <Placeholder title="Store" />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/about"
-              element={
-                <ProtectedRoute>
-                  <Placeholder title="About" />
-                </ProtectedRoute>
-              }
-            />
-{/* Workshop Community (Schedule + Breakouts + Critique) */}
+          {/* Workshop Community (Schedule + Breakouts + Critique) */}
           <Route
             path="/story-lab/community"
             element={
@@ -299,9 +173,136 @@ export default function App() {
               </ProtectedRoute>
             }
           />
-          
+
+          {/* Workshop hub (launcher) */}
+          <Route
+            path="/story-lab/workshop"
+            element={
+              <ProtectedRoute>
+                <StoryWorkshop />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Workshop modules (direct routes) */}
+          <Route
+            path="/story-lab/workshop/priorities"
+            element={
+              <ProtectedRoute>
+                <PriorityCards />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/story-lab/workshop/roadmap"
+            element={
+              <ProtectedRoute>
+                <CharacterRoadmap />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/story-lab/workshop/clothesline"
+            element={
+              <ProtectedRoute>
+                <Clothesline />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/story-lab/workshop/hfl"
+            element={
+              <ProtectedRoute>
+                <HopesFearsLegacy />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Table of Contents (selector + direct) */}
+          <Route
+            path="/toc"
+            element={
+              <ProtectedRoute>
+                <TableOfContentsRouter />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/toc/v1"
+            element={
+              <ProtectedRoute>
+                <TOCPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/toc/v2"
+            element={
+              <ProtectedRoute>
+                <TOCPage2 />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Project */}
+          <Route
+            path="/project"
+            element={
+              <ProtectedRoute>
+                <ProjectPage />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Calendar */}
+          <Route
+            path="/calendar"
+            element={
+              <ProtectedRoute>
+                <Calendar />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Profile */}
+          <Route
+            path="/profile"
+            element={
+              <ProtectedRoute>
+                <Profile />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Misc */}
+          <Route path="/whoami" element={<WhoAmI />} />
+          <Route
+            path="/publishing"
+            element={
+              <ProtectedRoute>
+                <Placeholder title="Publishing" />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/store"
+            element={
+              <ProtectedRoute>
+                <Placeholder title="Store" />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/about"
+            element={
+              <ProtectedRoute>
+                <Placeholder title="About" />
+              </ProtectedRoute>
+            }
+          />
+
           {/* Fallback */}
-            <Route path="*" element={<Placeholder title="Not Found" />} />
+          <Route path="*" element={<Placeholder title="Not Found" />} />
         </Routes>
       </Suspense>
     </Router>
