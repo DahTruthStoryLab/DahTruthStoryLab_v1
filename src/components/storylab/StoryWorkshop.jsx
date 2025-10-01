@@ -1,11 +1,11 @@
-// src/components/storylab/StoryWorkshop.jsx
+/// src/components/storylab/StoryWorkshop.jsx
 import React from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   BookOpen,
   Layers,
   Pin,
-  Map as RouteIcon, // ✅ alias Map to RouteIcon (Lucide has no "Route")
+  Map as RouteIcon, // ✅ Lucide has no "Route" icon; alias Map -> RouteIcon
   ListChecks,
   ArrowLeft,
 } from "lucide-react";
@@ -115,5 +115,3 @@ export default function StoryWorkshop() {
     </div>
   );
 }
-
-
