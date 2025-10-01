@@ -419,7 +419,7 @@ const WorkshopChat = () => {
    Character Manager (inline)
 ========================= */
 const CharacterManager = () => {
-  const [names, setNames] = useState<string[]>([]);
+  const [names, setNames] = useState([]);     // ⬅️ no <string[]>
   const [newName, setNewName] = useState("");
 
   const add = () => {
@@ -446,16 +446,25 @@ const CharacterManager = () => {
           placeholder="Add character name…"
           className="flex-1 rounded-lg border border-white/60 bg-white px-3 py-2 text-ink placeholder-ink/40 focus:border-ink/40 focus:outline-none"
         />
-        <button onClick={add} className="rounded-lg border border-white/60 bg-accent/60 px-4 py-2 font-medium text-ink hover:bg-accent/70">
+        <button
+          onClick={add}
+          className="rounded-lg border border-white/60 bg-accent/60 px-4 py-2 font-medium text-ink hover:bg-accent/70"
+        >
           Add
         </button>
       </div>
       <div className="grid gap-2">
         {names.length === 0 && <div className="text-sm text-ink/60">No characters yet.</div>}
         {names.map((n, i) => (
-          <div key={`${n}-${i}`} className="flex items-center justify-between rounded-lg border border-white/60 bg-white/80 p-2">
+          <div
+            key={`${n}-${i}`}
+            className="flex items-center justify-between rounded-lg border border-white/60 bg-white/80 p-2"
+          >
             <div className="text-ink">{n}</div>
-            <button onClick={() => remove(i)} className="rounded-md border border-white/60 bg-white px-2 py-1 text-xs text-ink/70 hover:text-ink">
+            <button
+              onClick={() => remove(i)}
+              className="rounded-md border border-white/60 bg-white px-2 py-1 text-xs text-ink/70 hover:text-ink"
+            >
               Remove
             </button>
           </div>
