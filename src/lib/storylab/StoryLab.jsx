@@ -520,26 +520,23 @@ export default function StoryLab() {
               title="Workshop Community"
               subtitle="Everything you’ll use together during live sessions."
             />
-            <div className="mb-8 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-              <FeatureCard
-                icon={Calendar}
-                title="Session Schedule"
-                description="Set and track the six-session arc, goals, and homework."
-                onClick={() => setActiveKey("schedule")}
-              />
-              <FeatureCard
-                icon={Users}
-                title="Breakout Pairings"
-                description="Auto/random assignments for partner work."
-                onClick={() => setActiveKey("pairs")}
-              />
-              <FeatureCard
-                icon={MessageSquare}
-                title="Critique & Collaboration"
-                description="Inline comments and real-time discussion."
-                onClick={() => navigate("/story-lab/critique")}
-              />
-            </div>
+            <section id="community" className="mb-14">
+        <SectionHeader
+          icon="👥"
+          title="Workshop Community"
+          subtitle="Schedule, Breakout Pairings, and Critique — all in one place."
+        />
+      
+        <div className="grid gap-6">
+          <FeatureCard
+            icon={Users}
+            title="Open Workshop Community"
+            status="Ready"
+            description="Manage sessions, pairings, and live critique from one hub."
+            onClick={() => navigate("/story-lab/community")}
+          />
+        </div>
+      </section>
 
             {/* Inline stubs for schedule/pairs/chat */}
             {activeKey === "schedule" && (
