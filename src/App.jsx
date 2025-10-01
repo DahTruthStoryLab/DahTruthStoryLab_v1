@@ -37,6 +37,9 @@ const CharacterRoadmap     = lazy(() => import("./components/storylab/CharacterR
 const Clothesline          = lazy(() => import("./components/storylab/Clothesline"));
 const HopesFearsLegacy     = lazy(() => import("./components/storylab/HopesFearsLegacy"));
 
+// NEW: Workshop Community hub (all-in-one)
+const WorkshopCohort = lazy(() => import("./components/storylab/WorkshopCohort"));
+
 /* =========================
    Global UI helpers
    ========================= */
@@ -287,7 +290,16 @@ export default function App() {
                 </ProtectedRoute>
               }
             />
-
+{/* Workshop Community (Schedule + Breakouts + Critique) */}
+          <Route
+            path="/story-lab/community"
+            element={
+              <ProtectedRoute>
+                <WorkshopCohort />
+              </ProtectedRoute>
+            }
+          />
+          
           {/* Fallback */}
             <Route path="*" element={<Placeholder title="Not Found" />} />
         </Routes>
