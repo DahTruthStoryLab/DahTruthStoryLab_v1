@@ -1,61 +1,61 @@
 // src/lib/storylab/projectStore.js
+
+// Primary key going forward (new)
+const KEY_NEW = "dt_project_v1";
+// Legacy key (what you already had)
 export const STORAGE_KEY = "dahtruth-story-lab-toc-v3";
 
-/** Safe localStorage getters (avoid SSR/test crashes) */
+/** Safe localStorage guard (avoid SSR/test crashes) */
 function hasStorage() {
-  try { return typeof window !== "undefined" && !!window.localStorage; } catch { return false; }
+  try { return typeof window !== "undefined" && !!window.localStorage; }
+  catch { return false; }
 }
 
-/** Load whole project (whatever structure you already have) */
-export function loadProject() {
-  if (!hasStorage()) return null;
+/** Tiny uid */
+export function uid() {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    const parsed = raw ? JSON.parse(raw) : null;
-    return migrate(parsed);
-  } catch {
-    return null;
-  }
+    if (typeof crypto !== "undefined" && crypto.randomUUID) return crypto.randomUUID();
+  } catch {}
+  return `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
 }
 
-/** Save whole project back */
+/** Load project (prefers new key, migrates from old if present) */
+export function loadProject() {
+  if (!hasStorage()) return ensureWorkshopFields({});
+  // 1) Try new key
+  try {
+    const raw = localStorage.getItem(KEY_NEW);
+    if (raw) return ensureWorkshopFields(JSON.parse(raw));
+  } catch {}
+
+  // 2) Fallback to legacy key and migrate
+  try {
+    const rawOld = localStorage.getItem(STORAGE_KEY);
+    if (rawOld) {
+      const migrated = migrateFromOld(JSON.parse(rawOld));
+      // Save immediately under new key so future loads are fast
+      saveProject(migrated);
+      return migrated;
+    }
+  } catch {}
+
+  // 3) Nothing found — return a fresh scaffold
+  return ensureWorkshopFields({});
+}
+
+/** Save whole project to the new key */
 export function saveProject(next) {
   if (!hasStorage()) return;
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    localStorage.setItem(KEY_NEW, JSON.stringify(next));
   } catch {
     // ignore quota/JSON issues for now
   }
 }
 
-/** Ensure new sections exist without breaking older data */
+/** Ensure all workshop sections exist + sensible defaults */
 export function ensureWorkshopFields(project) {
-  if (!project) return project;
-  project.characters ||= []; // [{id,name,strengths,weaknesses}]
-  project.roadmap   ||= [];  // [{id,title,done}]
-  project.priorities||= [];  // [{id,title,priority:'High'|'Medium'|'Low',done:false}]
-  project.scenes    ||= [];  // clothesline: [{id,title,notes}]
-  return project;
-}
+  const p = project && typeof project === "object" ? project : {};
 
-/** Pull ALL story text (combines chapter text fields) */
-export function getFullStoryText(project) {
-  if (!project) return "";
-  const chapters = project.chapters || [];
-  return chapters
-    .map(c => c.text || c.content || c.body || "")
-    .filter(Boolean)
-    .join(" ");
-}
-
-/** Simple uid */
-export function uid() {
-  return (crypto?.randomUUID?.() || `${Date.now()}_${Math.random().toString(36).slice(2)}`);
-}
-
-/** Tiny migration to keep older saves from breaking */
-function migrate(p) {
-  if (!p) return p;
-  if (!Array.isArray(p.chapters)) p.chapters = [];
-  return ensureWorkshopFields(p);
-}
+  p.title    = p.title || "My Story";
+  p.chapters = Array.isArray(p.chapters) ? p.chapt
