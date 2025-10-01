@@ -300,6 +300,15 @@ export default function App() {
               </ProtectedRoute>
             }
           />
+          
+          <Route
+            path="/story-lab/community"
+            element={
+              <ProtectedRoute>
+                <WorkshopCohort />
+              </ProtectedRoute>
+            }
+          />
 
           {/* Fallback */}
           <Route path="*" element={<Placeholder title="Not Found" />} />
