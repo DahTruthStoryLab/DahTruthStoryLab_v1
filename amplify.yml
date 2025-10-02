@@ -3,17 +3,13 @@ frontend:
   phases:
     preBuild:
       commands:
-        # Force Node 18
-        - nvm use 18 || . ~/.nvm/nvm.sh && nvm install 18 && nvm use 18
+        - nvm install 20.19.4
+        - nvm use 20.19.4
         - node -v
-
-        # We are intentionally NOT using npm ci because the lockfile is out of sync.
-        # Remove any stale lockfile so install can proceed.
-        - rm -f package-lock.json
-        - npm install --no-audit --no-fund
+        - npm ci --legacy-peer-deps
     build:
       commands:
-        - export NODE_OPTIONS="--max_old_space_size=4096"
+        - export NODE_OPTIONS=--max_old_space_size=4096
         - export CI=false
         - npm run build
   artifacts:
@@ -24,3 +20,4 @@ frontend:
     paths:
       - node_modules/**/*
       - ~/.npm/**/*
+      - ~/.cache/**/*
