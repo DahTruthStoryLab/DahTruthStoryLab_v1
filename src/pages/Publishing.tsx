@@ -1,22 +1,12 @@
-// BEFORE
-import PageShell from "@/components/layout/PageShell";
-import AeroBanner from "@/components/layout/AeroBanner";
-
-// AFTER (relative from src/pages → src/components)
+import React, { useMemo, useState } from "react";
 import PageShell from "../components/layout/PageShell";
 import AeroBanner from "../components/layout/AeroBanner";
 
 /**
  * Publishing Suite (StoryLab)
- * - Adds page breaks per chapter
- * - Adds headers/footers with page numbers (via DOCX export)
- * - Presets for publishing standards & platforms
- * - Keeps browser HTML/PDF export (with page breaks) but note: browsers can't render running headers/footers consistently
- *
- * To enable true headers/footers + page numbers, use Export DOCX below.
- *
- * Install once:
- *   npm i docx file-saver
+ * - Page breaks per chapter in preview/print (browser)
+ * - True headers/footers + page numbers in DOCX export
+ * - Presets for manuscript standards and platforms
  */
 
 // ---- Types ----
@@ -66,51 +56,113 @@ const theme = {
 };
 
 // ---- UI bits ----
-function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
+function Toggle({
+  checked,
+  onChange,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+}) {
   return (
     <button
       onClick={() => onChange(!checked)}
       style={{
-        width: 48, height: 24, borderRadius: 999,
+        width: 48,
+        height: 24,
+        borderRadius: 999,
         background: checked ? theme.accent : "#CBD5E1",
-        border: "none", position: "relative", cursor: "pointer",
-      }} aria-pressed={checked}
+        border: "none",
+        position: "relative",
+        cursor: "pointer",
+      }}
+      aria-pressed={checked}
     >
-      <span style={{ position: "absolute", top: 2, left: checked ? 26 : 2, width: 20, height: 20, borderRadius: 999, background: theme.white, transition: "left .15s ease" }} />
+      <span
+        style={{
+          position: "absolute",
+          top: 2,
+          left: checked ? 26 : 2,
+          width: 20,
+          height: 20,
+          borderRadius: 999,
+          background: theme.white,
+          transition: "left .15s ease",
+        }}
+      />
     </button>
   );
 }
 
-function Field({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string; }) {
+function Field({
+  label,
+  value,
+  onChange,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+}) {
   return (
     <div>
       <div style={{ color: theme.subtext, fontSize: 12 }}>{label}</div>
-      <textarea value={value} onChange={(e) => onChange(e.target.value)} rows={label.length > 12 ? 3 : 2} placeholder={placeholder}
-        style={{ width: "100%", marginTop: 6, fontSize: 14, padding: 10, border: `1px solid ${theme.border}`, borderRadius: 12, background: theme.white, color: theme.text }} />
+      <textarea
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        rows={label.length > 12 ? 3 : 2}
+        placeholder={placeholder}
+        style={{
+          width: "100%",
+          marginTop: 6,
+          fontSize: 14,
+          padding: 10,
+          border: `1px solid ${theme.border}`,
+          borderRadius: 12,
+          background: theme.white,
+          color: theme.text,
+        }}
+      />
     </div>
   );
 }
 
 // ---- Helpers ----
-function safeFile(name: string): string { return (name || "manuscript").replace(/[^\w\-]+/g, "_"); }
-function escapeXML(s: string): string { return s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&apos;"); }
+function safeFile(name: string): string {
+  return (name || "manuscript").replace(/[^\w\-]+/g, "_");
+}
+function escapeXML(s: string): string {
+  return s
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&apos;");
+}
 function compiledHTMLBody(plain: string): string {
-  const esc = (t: string) => t.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
-  return plain.split("\n\n").map((b) => `<p>${esc(b).replaceAll("\n", "<br/>")}</p>`).join("\n");
+  const esc = (t: string) =>
+    t.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+  return plain
+    .split("\n\n")
+    .map((b) => `<p>${esc(b).replaceAll("\n", "<br/>")}</p>`)
+    .join("\n");
 }
 
-// ---- Presets (manuscript rules) ----
-const MANUSCRIPT_PRESETS: Record<ManuscriptPresetKey, {
-  label: string;
-  fontFamily: string;
-  fontSizePt: number;
-  lineHeight: number; // 2.0 double, 1.5 etc.
-  firstLineIndentInches: number; // 0.5 typical
-  paragraphSpacingPt: number; // space after paragraph
-  align: "left" | "justify";
-  chapterTitleCase: "UPPER" | "Capitalize" | "AsIs";
-  chapterStartsOnNewPage: boolean;
-}> = {
+// ---- Manuscript presets ----
+const MANUSCRIPT_PRESETS: Record<
+  ManuscriptPresetKey,
+  {
+    label: string;
+    fontFamily: string;
+    fontSizePt: number;
+    lineHeight: number; // 2.0 double, 1.5 etc.
+    firstLineIndentInches: number; // 0.5 typical
+    paragraphSpacingPt: number; // space after paragraph
+    align: "left" | "justify";
+    chapterTitleCase: "UPPER" | "Capitalize" | "AsIs";
+    chapterStartsOnNewPage: boolean;
+  }
+> = {
   Agents_Standard_12pt_TNR_Double: {
     label: "Agents: Standard (TNR 12, double)",
     fontFamily: "Times New Roman",
@@ -157,16 +209,25 @@ const MANUSCRIPT_PRESETS: Record<ManuscriptPresetKey, {
   },
 };
 
-// ---- Platform presets (affect headers/footers, margins, trim, etc.) ----
-const PLATFORM_PRESETS: Record<PlatformPresetKey, {
-  label: string;
-  trim?: { widthInch: number; heightInch: number } | null; // paper size for print
-  margins: { top: number; right: number; bottom: number; left: number; gutter?: number };
-  headers: boolean;
-  footers: boolean;
-  pageNumbers: boolean;
-  showTOCInEbook: boolean;
-}> = {
+// ---- Platform presets ----
+const PLATFORM_PRESETS: Record<
+  PlatformPresetKey,
+  {
+    label: string;
+    trim?: { widthInch: number; heightInch: number } | null;
+    margins: {
+      top: number;
+      right: number;
+      bottom: number;
+      left: number;
+      gutter?: number;
+    };
+    headers: boolean;
+    footers: boolean;
+    pageNumbers: boolean;
+    showTOCInEbook: boolean;
+  }
+> = {
   KDP_Ebook: {
     label: "KDP eBook",
     trim: null,
@@ -212,12 +273,6 @@ const PLATFORM_PRESETS: Record<PlatformPresetKey, {
     pageNumbers: true,
     showTOCInEbook: false,
   },
-    margins: { top: 1, right: 0.75, bottom: 1, left: 0.75, gutter: 0.5 },
-    headers: true,
-    footers: true,
-    pageNumbers: true,
-    showTOCInEbook: false,
-  },
   Draft2Digital_Ebook: {
     label: "Draft2Digital eBook",
     trim: null,
@@ -240,36 +295,104 @@ const PLATFORM_PRESETS: Record<PlatformPresetKey, {
 
 // ---- Styles ----
 const styles = {
-  sectionShell: { maxWidth: 1120, margin: "0 auto", padding: "20px 24px" } as React.CSSProperties,
-  glassCard: { background: theme.surface, border: `1px solid ${theme.border}`, borderRadius: 16, padding: 20, boxShadow: "0 8px 30px rgba(2,20,40,.08)", backdropFilter: "blur(6px)" } as React.CSSProperties,
+  sectionShell: {
+    maxWidth: 1120,
+    margin: "0 auto",
+    padding: "20px 24px",
+  } as React.CSSProperties,
+  glassCard: {
+    background: theme.surface,
+    border: `1px solid ${theme.border}`,
+    borderRadius: 16,
+    padding: 20,
+    boxShadow: "0 8px 30px rgba(2,20,40,.08)",
+    backdropFilter: "blur(6px)",
+  } as React.CSSProperties,
   label: { fontSize: 12, color: theme.subtext } as React.CSSProperties,
-  input: { border: `1px solid ${theme.border}`, borderRadius: 12, padding: "10px 12px", fontSize: 14, width: "100%", background: theme.white, color: theme.text } as React.CSSProperties,
-  lightBtn: { padding: "10px 14px", borderRadius: 12, border: `1px solid ${theme.border}`, background: theme.white, color: theme.text, cursor: "pointer" } as React.CSSProperties,
-  primaryBtn: { padding: "10px 14px", borderRadius: 12, border: "none", background: theme.accent, color: theme.white, cursor: "pointer" } as React.CSSProperties,
-  darkBtn: { padding: "10px 14px", borderRadius: 12, border: "none", background: theme.primary, color: theme.white, cursor: "pointer" } as React.CSSProperties,
-  preview: { border: `1px solid ${theme.border}`, borderRadius: 12, padding: 16, background: theme.bg, height: 360, overflow: "auto" } as React.CSSProperties,
+  input: {
+    border: `1px solid ${theme.border}`,
+    borderRadius: 12,
+    padding: "10px 12px",
+    fontSize: 14,
+    width: "100%",
+    background: theme.white,
+    color: theme.text,
+  } as React.CSSProperties,
+  lightBtn: {
+    padding: "10px 14px",
+    borderRadius: 12,
+    border: `1px solid ${theme.border}`,
+    background: theme.white,
+    color: theme.text,
+    cursor: "pointer",
+  } as React.CSSProperties,
+  primaryBtn: {
+    padding: "10px 14px",
+    borderRadius: 12,
+    border: "none",
+    background: theme.accent,
+    color: theme.white,
+    cursor: "pointer",
+  } as React.CSSProperties,
+  darkBtn: {
+    padding: "10px 14px",
+    borderRadius: 12,
+    border: "none",
+    background: theme.primary,
+    color: theme.white,
+    cursor: "pointer",
+  } as React.CSSProperties,
+  preview: {
+    border: `1px solid ${theme.border}`,
+    borderRadius: 12,
+    padding: 16,
+    background: theme.bg,
+    height: 360,
+    overflow: "auto",
+  } as React.CSSProperties,
 };
 
 const STEPS: { key: StepKey; label: string }[] = [
   { key: "builder", label: "Manuscript Builder" },
-  { key: "proof",   label: "Proof & Consistency" },
-  { key: "format",  label: "Format & Styles" },
-  { key: "export",  label: "Export" },
-  { key: "prep",    label: "Publishing Prep" },
+  { key: "proof", label: "Proof & Consistency" },
+  { key: "format", label: "Format & Styles" },
+  { key: "export", label: "Export" },
+  { key: "prep", label: "Publishing Prep" },
 ];
 
 export default function Publishing(): JSX.Element {
   const [step, setStep] = useState<StepKey>("builder");
   const stepIndex = STEPS.findIndex((s) => s.key === step);
-  const goNext = () => setStep(STEPS[Math.min(stepIndex + 1, STEPS.length - 1)].key);
+  const goNext = () =>
+    setStep(STEPS[Math.min(stepIndex + 1, STEPS.length - 1)].key);
   const goBack = () => setStep(STEPS[Math.max(stepIndex - 1, 0)].key);
 
-  const [meta, setMeta] = useState<Meta>({ title: "Working Title", author: "Your Name", year: new Date().getFullYear().toString(), authorLast: "YourLastName" });
+  const [meta, setMeta] = useState<Meta>({
+    title: "Working Title",
+    author: "Your Name",
+    year: new Date().getFullYear().toString(),
+    authorLast: "YourLastName",
+  });
 
   const [chapters, setChapters] = useState<Chapter[]>([
-    { id: "c1", title: "Chapter 1 – Beginnings", included: true,  text: "The morning held the kind of quiet that asks for a first sentence..." },
-    { id: "c2", title: "Chapter 2 – Turning",    included: true,  text: "Change arrived softly, a hinge on a well-oiled door..." },
-    { id: "c3", title: "Chapter 3 – Night Watch", included: false, text: "They counted the hours by the cooling of the tea..." },
+    {
+      id: "c1",
+      title: "Chapter 1 – Beginnings",
+      included: true,
+      text: "The morning held the kind of quiet that asks for a first sentence...",
+    },
+    {
+      id: "c2",
+      title: "Chapter 2 – Turning",
+      included: true,
+      text: "Change arrived softly, a hinge on a well-oiled door...",
+    },
+    {
+      id: "c3",
+      title: "Chapter 3 – Night Watch",
+      included: false,
+      text: "They counted the hours by the cooling of the tea...",
+    },
   ]);
 
   const [matter, setMatter] = useState<Matter>({
@@ -283,90 +406,161 @@ export default function Publishing(): JSX.Element {
     notes: "",
   });
 
-  // Presets
-  const [manuscriptPreset, setManuscriptPreset] = useState<ManuscriptPresetKey>("Agents_Standard_12pt_TNR_Double");
-  const [platformPreset, setPlatformPreset] = useState<PlatformPresetKey>("Generic_Manuscript_Submission");
+  // Presets state
+  const [manuscriptPreset, setManuscriptPreset] =
+    useState<ManuscriptPresetKey>("Agents_Standard_12pt_TNR_Double");
+  const [platformPreset, setPlatformPreset] =
+    useState<PlatformPresetKey>("Generic_Manuscript_Submission");
 
-  // Specific toggles derived from presets
+  // Derived preset objects
   const ms = MANUSCRIPT_PRESETS[manuscriptPreset];
   const pf = PLATFORM_PRESETS[platformPreset];
-
-  // Derived flags
   const includeHeadersFooters = pf.headers || pf.footers;
 
   // Compile plain text
   const compiled: string = useMemo(() => {
-    const vars = (s: string) => s.replaceAll("{title}", meta.title).replaceAll("{author}", meta.author).replaceAll("{year}", meta.year);
+    const vars = (s: string) =>
+      s
+        .replaceAll("{title}", meta.title)
+        .replaceAll("{author}", meta.author)
+        .replaceAll("{year}", meta.year);
 
     const parts: string[] = [];
+    // Front matter
     parts.push(vars(matter.titlePage));
     parts.push("\n\n" + vars(matter.copyright));
     if (matter.dedication) parts.push("\n\nDedication\n" + matter.dedication);
     if (matter.epigraph) parts.push("\n\nEpigraph\n" + matter.epigraph);
     if (matter.toc) {
-      parts.push("\n\nContents\n" + chapters.filter(c => c.included).map((c, i) => `${i + 1}. ${c.title}`).join("\n"));
+      parts.push(
+        "\n\nContents\n" +
+          chapters
+            .filter((c) => c.included)
+            .map((c, i) => `${i + 1}. ${c.title}`)
+            .join("\n")
+      );
     }
 
-    chapters.forEach((c) => {
+    // Chapters
+    chapters.forEach((c, idx) => {
       if (!c.included) return;
-      const indent = ms.firstLineIndentInches > 0 ? "" : ""; // visual only; handled in export styles
-      const txt = (ms.lineHeight >= 2 ? c.text.replaceAll(" ", "  ") : c.text);
-      parts.push("\n\n" + c.title + "\n" + indent + txt);
+      const txt = ms.lineHeight >= 2 ? c.text.replaceAll(" ", "  ") : c.text;
+      parts.push("\n\n" + c.title + "\n" + txt);
     });
 
-    if (matter.acknowledgments) parts.push("\n\nAcknowledgments\n" + matter.acknowledgments);
-    if (matter.aboutAuthor)     parts.push("\n\nAbout the Author\n" + vars(matter.aboutAuthor));
-    if (matter.notes)           parts.push("\n\nNotes\n" + matter.notes);
+    // Back matter
+    if (matter.acknowledgments)
+      parts.push("\n\nAcknowledgments\n" + matter.acknowledgments);
+    if (matter.aboutAuthor)
+      parts.push("\n\nAbout the Author\n" + vars(matter.aboutAuthor));
+    if (matter.notes) parts.push("\n\nNotes\n" + matter.notes);
 
     return parts.join("\n").trim();
-  }, [chapters, matter, meta, ms.lineHeight, ms.firstLineIndentInches]);
+  }, [chapters, matter, meta, ms.lineHeight]);
 
-  const wordCount = useMemo(() => compiled.split(/\s+/).filter(Boolean).length, [compiled]);
+  const wordCount = useMemo(
+    () => compiled.split(/\s+/).filter(Boolean).length,
+    [compiled]
+  );
 
   // ---- HTML Preview / Print CSS ----
   const compiledHTML: string = useMemo(() => {
-    const escape = (s: string) => s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
-    const blocks = compiled.split("\n\n").map((b) => `<p>${escape(b).replaceAll("\n", "<br/>")}</p>`).join("\n");
+    const escape = (s: string) =>
+      s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 
-    // NOTE: Browsers ignore running headers/footers margin boxes; we provide page breaks only.
+    // Front matter blocks
+    const front = [
+      matter.titlePage,
+      matter.copyright,
+      matter.dedication && `Dedication\n${matter.dedication}`,
+      matter.epigraph && `Epigraph\n${matter.epigraph}`,
+    ]
+      .filter(Boolean)
+      .map((s) =>
+        `<p>${escape(String(s)).replaceAll("\n", "<br/>")}</p>`
+      )
+      .join("\n");
+
+    // TOC
+    const toc = matter.toc
+      ? `<h2 class="chapter" style="page-break-before: always">Contents</h2><p>${chapters
+          .filter((c) => c.included)
+          .map((c, i) => `${i + 1}. ${escape(c.title)}`)
+          .join("<br/>")}</p>`
+      : "";
+
+    // Chapter bodies with page breaks
+    const chapterized = chapters
+      .filter((c) => c.included)
+      .map((c) => {
+        const t =
+          ms.chapterTitleCase === "UPPER"
+            ? c.title.toUpperCase()
+            : ms.chapterTitleCase === "Capitalize"
+            ? c.title.replace(/\b(\w)/g, (m) => m.toUpperCase())
+            : c.title;
+        const body = escape(c.text)
+          .replaceAll("\n\n", "</p><p>")
+          .replaceAll("\n", "<br/>");
+        return `<h2 class="chapter">${
+          t
+        }</h2><p>${body}</p>`;
+      })
+      .join("\n");
+
+    const back = [
+      matter.acknowledgments &&
+        `Acknowledgments\n${matter.acknowledgments}`,
+      matter.aboutAuthor && `About the Author\n${matter.aboutAuthor}`,
+      matter.notes && `Notes\n${matter.notes}`,
+    ]
+      .filter(Boolean)
+      .map((s) => {
+        const lines = String(s).split("\n");
+        return `<h2 class="chapter">${lines[0]}</h2><p>${escape(
+          lines.slice(1).join("\n")
+        ).replaceAll("\n", "<br/>")}</p>`;
+      })
+      .join("\n");
+
     const css = `
       @page { margin: ${pf.margins.top}in ${pf.margins.right}in ${pf.margins.bottom}in ${pf.margins.left}in; }
       body { font-family: ${ms.fontFamily}; font-size: ${ms.fontSizePt}pt; margin: 0; line-height: ${ms.lineHeight}; color: #111; }
-      p { orphans: 3; widows: 3; ${ms.align === "justify" ? "text-align: justify;" : ""} ${ms.firstLineIndentInches ? `text-indent: ${ms.firstLineIndentInches}in;` : ""} ${ms.paragraphSpacingPt ? `margin: 0 0 ${ms.paragraphSpacingPt}pt 0;` : ""} }
-      h2.chapter { ${ms.chapterStartsOnNewPage ? "page-break-before: always;" : ""} text-align:center; margin: 0 0 1em 0; font-weight: bold; }
+      p { orphans: 3; widows: 3; ${ms.align === "justify" ? "text-align: justify;" : ""} ${
+      ms.firstLineIndentInches
+        ? `text-indent: ${ms.firstLineIndentInches}in;`
+        : ""
+    } ${ms.paragraphSpacingPt ? `margin: 0 0 ${ms.paragraphSpacingPt}pt 0;` : ""} }
+      h2.chapter { ${
+        ms.chapterStartsOnNewPage ? "page-break-before: always;" : ""
+      } text-align:center; margin: 0 0 1em 0; font-weight: bold; }
     `;
 
     const titleBlock = `
-      <div style="text-align:center; font-size:${ms.fontSizePt + 4}pt; font-weight:bold; margin-bottom: 1.5em;">${meta.title}</div>
+      <div style="text-align:center; font-size:${
+        ms.fontSizePt + 4
+      }pt; font-weight:bold; margin-bottom: 1.5em;">${meta.title}</div>
       <div style="text-align:center; margin-bottom: 2em;">by ${meta.author} • ${meta.year}</div>
     `;
-
-    // Insert chapter headings with page breaks visually in preview (not altering compiled text).
-    const chapterized = chapters.filter(c => c.included).map((c) => {
-      const t = (ms.chapterTitleCase === "UPPER" ? c.title.toUpperCase() : ms.chapterTitleCase === "Capitalize" ? c.title.replace(/\b(\w)/g, (m) => m.toUpperCase()) : c.title);
-      const body = escape(c.text).replaceAll("\n\n", "</p><p>").replaceAll("\n", "<br/>");
-      return `<h2 class="chapter">${t}</h2><p>${body}</p>`;
-    }).join("\n");
-
-    const front = [matter.titlePage, matter.copyright, matter.dedication && `Dedication\n${matter.dedication}`, matter.epigraph && `Epigraph\n${matter.epigraph}`].filter(Boolean).map(s => `<p>${escape(String(s)).replaceAll("\n", "<br/>")}</p>`).join("\n");
-
-    const toc = matter.toc ? `<h2 class="chapter" style="page-break-before: always">Contents</h2><p>${chapters.filter(c=>c.included).map((c,i)=>`${i+1}. ${escape(c.title)}`).join("<br/>")}</p>` : "";
-
-    const back = [matter.acknowledgments && `Acknowledgments\n${matter.acknowledgments}`, matter.aboutAuthor && `About the Author\n${matter.aboutAuthor}`, matter.notes && `Notes\n${matter.notes}`].filter(Boolean).map(s => `<h2 class="chapter">${String(s).split("\n")[0]}</h2><p>${escape(String(s)).split("\n").slice(1).join("<br/>")}</p>`).join("\n");
 
     return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${meta.title}</title><style>${css}</style></head><body>${titleBlock}${front}${toc}${chapterized}${back}</body></html>`;
   }, [compiled, chapters, matter, meta, ms, pf]);
 
-  // ---- Grammar hooks (basic) ----
+  // ---- Proof (basic) ----
   const [proofResults, setProofResults] = useState<string[]>([]);
   function runGrammarChecks() {
     const issues: string[] = [];
     if (compiled.match(/ {2,}/)) issues.push("Multiple consecutive spaces found.");
-    if (compiled.match(/[“”]/) && !compiled.match(/[‘’]/)) issues.push("Smart quotes present; ensure consistency of quotes.");
-    if (compiled.match(/--/)) issues.push("Double hyphen found; replace with period or true em dash per style.");
-    const longParas = compiled.split("\n\n").filter(p => p.split(/\s+/).length > 250).length;
-    if (longParas) issues.push(`${longParas} very long paragraph(s) detected; consider breaking for readability.`);
-    setProofResults(issues.length ? issues : ["No basic issues found."]); 
+    if (compiled.match(/[“”]/) && !compiled.match(/[‘’]/))
+      issues.push("Smart quotes present; ensure consistency.");
+    if (compiled.match(/--/))
+      issues.push("Double hyphen found; consider an em dash or period.");
+    const longParas = compiled
+      .split("\n\n")
+      .filter((p) => p.split(/\s+/).length > 250).length;
+    if (longParas)
+      issues.push(`${longParas} very long paragraph(s); consider breaking up.`);
+    setProofResults(issues.length ? issues : ["No basic issues found."]);
   }
 
   // ---- Exports ----
@@ -376,227 +570,272 @@ export default function Publishing(): JSX.Element {
     w.document.open();
     w.document.write(compiledHTML);
     w.document.close();
-    setTimeout(() => { w.focus(); w.print(); }, 200);
+    setTimeout(() => {
+      w.focus();
+      w.print();
+    }, 200);
   };
 
- const exportEPUBXHTML = (): void => {
-  const xhtmlParts = [
-    '<?xml version="1.0" encoding="UTF-8"?>',
-    '<!DOCTYPE html>',
-    '<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">',
-    "<head>",
-    '  <meta charset="utf-8"/>',
-    "  <title>" + escapeXML(meta.title) + "</title>",
-    '  <meta name="author" content="' + escapeXML(meta.author) + '"/>',
-    "  <style>",
-    "    body { font-family: serif; margin:1em; line-height:" +
-      (doubleSpace ? 2 : 1.45) +
-      "; }",
-    "    p { margin: 0 0 1em 0; }",
-    "  </style>",
-    "</head>",
-    "<body>",
-    compiledHTMLBody(compiled),
-    "</body>",
-    "</html>",
-  ];
-
-  const xhtml = xhtmlParts.join("\n");
-  const blob = new Blob([xhtml], { type: "application/xhtml+xml;charset=utf-8" });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = `${safeFile(meta.title)}.xhtml`;
-  a.click();
-  URL.revokeObjectURL(a.href);
-};
-
-  // ---- True EPUB packager (.epub) ----
-  // Replace your entire exportEPUB with this:
-async function exportEPUB(): Promise<void> {
-  const JSZip = (await import("jszip")).default;
-
-  const included = chapters.filter((c) => c.included);
-
-  const esc = (s: string) =>
-    s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
-
-  const para = (t: string) =>
-    "<p>" + esc(t).replaceAll("\n\n", "</p><p>").replaceAll("\n", "<br/>") + "</p>";
-
-  const makeXhtml = (title: string, body: string) =>
-    [
-      '<?xml version="1.0" encoding="utf-8"?>',
+  // XHTML (EPUB-readable) export
+  const exportEPUBXHTML = (): void => {
+    const xhtmlParts = [
+      '<?xml version="1.0" encoding="UTF-8"?>',
       "<!DOCTYPE html>",
       '<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">',
       "<head>",
       '  <meta charset="utf-8"/>',
-      "  <title>" + escapeXML(title) + "</title>",
-      '  <link rel="stylesheet" type="text/css" href="styles.css"/>',
+      "  <title>" + escapeXML(meta.title) + "</title>",
+      '  <meta name="author" content="' + escapeXML(meta.author) + '"/>',
+      "  <style>",
+      "    body { font-family: serif; margin:1em; line-height:" +
+        (ms.lineHeight || 1.45) +
+        "; }",
+      "    p { margin: 0 0 1em 0; }",
+      "  </style>",
       "</head>",
       "<body>",
-      body,
+      compiledHTMLBody(compiled),
+      "</body>",
+      "</html>",
+    ];
+
+    const xhtml = xhtmlParts.join("\n");
+    const blob = new Blob([xhtml], {
+      type: "application/xhtml+xml;charset=utf-8",
+    });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `${safeFile(meta.title)}.xhtml`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+
+  // True .epub packager
+  async function exportEPUB(): Promise<void> {
+    const JSZip = (await import("jszip")).default;
+
+    const included = chapters.filter((c) => c.included);
+
+    const esc = (s: string) =>
+      s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+    const para = (t: string) =>
+      "<p>" +
+      esc(t).replaceAll("\n\n", "</p><p>").replaceAll("\n", "<br/>") +
+      "</p>";
+
+    const makeXhtml = (title: string, body: string) =>
+      [
+        '<?xml version="1.0" encoding="utf-8"?>',
+        "<!DOCTYPE html>",
+        '<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">',
+        "<head>",
+        '  <meta charset="utf-8"/>',
+        "  <title>" + escapeXML(title) + "</title>",
+        '  <link rel="stylesheet" type="text/css" href="styles.css"/>',
+        "</head>",
+        "<body>",
+        body,
+        "</body>",
+        "</html>",
+      ].join("\n");
+
+    // Title page
+    const titleXhtml = makeXhtml(
+      meta.title,
+      '<h1 style="text-align:center">' +
+        esc(meta.title) +
+        '</h1><div style="text-align:center">' +
+        esc(meta.author) +
+        " • " +
+        esc(meta.year) +
+        "</div>"
+    );
+
+    // Front matter
+    const frontBits: string[] = [];
+    frontBits.push(
+      para(
+        matter.titlePage
+          .replaceAll("{title}", meta.title)
+          .replaceAll("{author}", meta.author)
+      )
+    );
+    frontBits.push(
+      para(
+        matter.copyright
+          .replaceAll("{year}", meta.year)
+          .replaceAll("{author}", meta.author)
+      )
+    );
+    if (matter.dedication)
+      frontBits.push("<h2>Dedication</h2>" + para(matter.dedication));
+    if (matter.epigraph)
+      frontBits.push("<h2>Epigraph</h2>" + para(matter.epigraph));
+    const frontXhtml = makeXhtml("Front Matter", frontBits.join("\n"));
+
+    // Chapters
+    const chapterFiles = included.map((c, i) => {
+      const id = "chap" + (i + 1);
+      const href = "chap" + (i + 1) + ".xhtml";
+      const content = makeXhtml(
+        c.title,
+        '<h2 style="text-align:center">' +
+          esc(c.title) +
+          "</h2>" +
+          para(c.text)
+      );
+      return { id, href, title: c.title, content };
+    });
+
+    // Back matter
+    const backBits: string[] = [];
+    if (matter.acknowledgments)
+      backBits.push("<h2>Acknowledgments</h2>" + para(matter.acknowledgments));
+    if (matter.aboutAuthor)
+      backBits.push(
+        "<h2>About the Author</h2>" +
+          para(matter.aboutAuthor.replaceAll("{author}", meta.author))
+      );
+    if (matter.notes) backBits.push("<h2>Notes</h2>" + para(matter.notes));
+    const backXhtml = makeXhtml("Back Matter", backBits.join("\n"));
+
+    // nav.xhtml (TOC)
+    const navXhtml = [
+      '<?xml version="1.0" encoding="utf-8"?>',
+      "<!DOCTYPE html>",
+      '<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xml:lang="en">',
+      '<head><meta charset="utf-8"/><title>Table of Contents</title></head>',
+      "<body>",
+      '<nav epub:type="toc"><h1>Contents</h1><ol>',
+      '  <li><a href="title.xhtml">Title</a></li>',
+      '  <li><a href="front.xhtml">Front Matter</a></li>',
+      chapterFiles
+        .map(
+          (cf) => '  <li><a href="' + cf.href + '">' + esc(cf.title) + "</a></li>"
+        )
+        .join("\n"),
+      '  <li><a href="back.xhtml">Back Matter</a></li>',
+      "</ol></nav>",
       "</body>",
       "</html>",
     ].join("\n");
 
-  // Title page
-  const titleXhtml = makeXhtml(
-    meta.title,
-    '<h1 style="text-align:center">' +
-      esc(meta.title) +
-      '</h1><div style="text-align:center">' +
-      esc(meta.author) +
-      " • " +
-      esc(meta.year) +
-      "</div>"
-  );
+    // OPF manifest & spine
+    const manifestItems = [
+      { id: "title", href: "title.xhtml", mediaType: "application/xhtml+xml" },
+      { id: "front", href: "front.xhtml", mediaType: "application/xhtml+xml" },
+      ...chapterFiles.map((cf) => ({
+        id: cf.id,
+        href: cf.href,
+        mediaType: "application/xhtml+xml",
+      })),
+      { id: "back", href: "back.xhtml", mediaType: "application/xhtml+xml" },
+      {
+        id: "nav",
+        href: "nav.xhtml",
+        mediaType: "application/xhtml+xml",
+        properties: "nav",
+      },
+      { id: "css", href: "styles.css", mediaType: "text/css" },
+    ];
 
-  // Front matter
-  const frontBits: string[] = [];
-  frontBits.push(
-    para(matter.titlePage.replaceAll("{title}", meta.title).replaceAll("{author}", meta.author))
-  );
-  frontBits.push(
-    para(matter.copyright.replaceAll("{year}", meta.year).replaceAll("{author}", meta.author))
-  );
-  if (matter.dedication) frontBits.push("<h2>Dedication</h2>" + para(matter.dedication));
-  if (matter.epigraph) frontBits.push("<h2>Epigraph</h2>" + para(matter.epigraph));
-  const frontXhtml = makeXhtml("Front Matter", frontBits.join("\n"));
+    const spineItems = ["title", "front", ...chapterFiles.map((cf) => cf.id), "back"];
 
-  // Chapters
-  const chapterFiles = included.map((c, i) => {
-    const id = "chap" + (i + 1);
-    const href = "chap" + (i + 1) + ".xhtml";
-    const content = makeXhtml(
-      c.title,
-      '<h2 style="text-align:center">' + esc(c.title) + "</h2>" + para(c.text)
-    );
-    return { id, href, title: c.title, content };
-  });
+    const css =
+      "body{font-family:serif;line-height:" +
+      (ms.lineHeight || 1.45) +
+      ";margin:1em;} h1,h2{text-align:center} p{margin:0 0 1em 0;}";
 
-  // Back matter
-  const backBits: string[] = [];
-  if (matter.acknowledgments)
-    backBits.push("<h2>Acknowledgments</h2>" + para(matter.acknowledgments));
-  if (matter.aboutAuthor)
-    backBits.push(
-      "<h2>About the Author</h2>" +
-        para(matter.aboutAuthor.replaceAll("{author}", meta.author))
-    );
-  if (matter.notes) backBits.push("<h2>Notes</h2>" + para(matter.notes));
-  const backXhtml = makeXhtml("Back Matter", backBits.join("\n"));
+    const uid =
+      typeof crypto !== "undefined" && (crypto as any).randomUUID
+        ? (crypto as any).randomUUID()
+        : "storylab-" + Date.now();
 
-  // nav.xhtml (table of contents)
-  const navXhtml = [
-    '<?xml version="1.0" encoding="utf-8"?>',
-    "<!DOCTYPE html>",
-    '<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xml:lang="en">',
-    '<head><meta charset="utf-8"/><title>Table of Contents</title></head>',
-    "<body>",
-    '<nav epub:type="toc"><h1>Contents</h1><ol>',
-    '  <li><a href="title.xhtml">Title</a></li>',
-    '  <li><a href="front.xhtml">Front Matter</a></li>',
-    chapterFiles
-      .map((cf) => '  <li><a href="' + cf.href + '">' + esc(cf.title) + "</a></li>")
-      .join("\n"),
-    '  <li><a href="back.xhtml">Back Matter</a></li>',
-    "</ol></nav>",
-    "</body>",
-    "</html>",
-  ].join("\n");
+    const packageOpf = [
+      '<?xml version="1.0" encoding="utf-8"?>',
+      '<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="pub-id">',
+      '  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">',
+      '    <dc:identifier id="pub-id">urn:uuid:' + uid + "</dc:identifier>",
+      "    <dc:title>" + escapeXML(meta.title) + "</dc:title>",
+      "    <dc:creator>" + escapeXML(meta.author) + "</dc:creator>",
+      "    <dc:language>en</dc:language>",
+      '    <meta property="dcterms:modified">' +
+        new Date().toISOString().replace(/\..*/, "") +
+        "Z</meta>",
+      "  </metadata>",
+      "  <manifest>",
+      manifestItems
+        .map((mi: any) => {
+          return (
+            '<item id="' +
+            mi.id +
+            '" href="' +
+            mi.href +
+            '" media-type="' +
+            mi.mediaType +
+            '"' +
+            (mi.properties ? ' properties="' + mi.properties + '"/>' : '"/>')
+          );
+        })
+        .join("\n    "),
+      "  </manifest>",
+      "  <spine>",
+      spineItems.map((id) => '<itemref idref="' + id + '"/>').join("\n    "),
+      "  </spine>",
+      "</package>",
+    ].join("\n");
 
-  // OPF manifest & spine
-  const manifestItems = [
-    { id: "title", href: "title.xhtml", mediaType: "application/xhtml+xml" },
-    { id: "front", href: "front.xhtml", mediaType: "application/xhtml+xml" },
-    ...chapterFiles.map((cf) => ({ id: cf.id, href: cf.href, mediaType: "application/xhtml+xml" })),
-    { id: "back", href: "back.xhtml", mediaType: "application/xhtml+xml" },
-    { id: "nav", href: "nav.xhtml", mediaType: "application/xhtml+xml", properties: "nav" },
-    { id: "css", href: "styles.css", mediaType: "text/css" },
-  ];
+    const containerXml = [
+      '<?xml version="1.0"?>',
+      '<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">',
+      "  <rootfiles>",
+      '    <rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/>',
+      "  </rootfiles>",
+      "</container>",
+    ].join("\n");
 
-  const spineItems = ["title", "front", ...chapterFiles.map((cf) => cf.id), "back"];
+    // Build EPUB zip
+    const zip = new JSZip();
+    zip.file("mimetype", "application/epub+zip", { compression: "STORE" });
+    zip.folder("META-INF")!.file("container.xml", containerXml);
 
-  const css =
-    "body{font-family:serif;line-height:" +
-    (doubleSpace ? 2 : 1.45) +
-    ";margin:1em;} h1,h2{text-align:center} p{margin:0 0 1em 0;}";
+    const oebps = zip.folder("OEBPS")!;
+    oebps.file("title.xhtml", titleXhtml);
+    oebps.file("front.xhtml", frontXhtml);
+    chapterFiles.forEach((cf) => oebps.file(cf.href, cf.content));
+    oebps.file("back.xhtml", backXhtml);
+    oebps.file("nav.xhtml", navXhtml);
+    oebps.file("styles.css", css);
+    oebps.file("content.opf", packageOpf);
 
-  const uid =
-    (typeof crypto !== "undefined" && (crypto as any).randomUUID)
-      ? (crypto as any).randomUUID()
-      : "storylab-" + Date.now();
+    const blob = await zip.generateAsync({
+      type: "blob",
+      mimeType: "application/epub+zip",
+    });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `${safeFile(meta.title)}.epub`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
 
-  const packageOpf = [
-    '<?xml version="1.0" encoding="utf-8"?>',
-    '<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="pub-id">',
-    '  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">',
-    '    <dc:identifier id="pub-id">urn:uuid:' + uid + "</dc:identifier>",
-    "    <dc:title>" + escapeXML(meta.title) + "</dc:title>",
-    "    <dc:creator>" + escapeXML(meta.author) + "</dc:creator>",
-    "    <dc:language>en</dc:language>",
-    '    <meta property="dcterms:modified">' +
-      new Date().toISOString().replace(/\..*/, "") +
-      "Z</meta>",
-    "  </metadata>",
-    "  <manifest>",
-    manifestItems
-      .map((mi: any) => {
-        return (
-          '<item id="' +
-          mi.id +
-          '" href="' +
-          mi.href +
-          '" media-type="' +
-          mi.mediaType +
-          '"' +
-          (mi.properties ? ' properties="' + mi.properties + '"/>' : '"/>')
-        );
-      })
-      .join("\n    "),
-    "  </manifest>",
-    "  <spine>",
-    spineItems.map((id) => '<itemref idref="' + id + '"/>').join("\n    "),
-    "  </spine>",
-    "</package>",
-  ].join("\n");
-
-  const containerXml = [
-    '<?xml version="1.0"?>',
-    '<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">',
-    "  <rootfiles>",
-    '    <rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/>',
-    "  </rootfiles>",
-    "</container>",
-  ].join("\n");
-
-  // Build EPUB zip
-  const zip = new JSZip();
-  zip.file("mimetype", "application/epub+zip", { compression: "STORE" });
-  zip.folder("META-INF")!.file("container.xml", containerXml);
-
-  const oebps = zip.folder("OEBPS")!;
-  oebps.file("title.xhtml", titleXhtml);
-  oebps.file("front.xhtml", frontXhtml);
-  chapterFiles.forEach((cf) => oebps.file(cf.href, cf.content));
-  oebps.file("back.xhtml", backXhtml);
-  oebps.file("nav.xhtml", navXhtml);
-  oebps.file("styles.css", css);
-  oebps.file("content.opf", packageOpf);
-
-  const blob = await zip.generateAsync({ type: "blob", mimeType: "application/epub+zip" });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = `${safeFile(meta.title)}.epub`;
-  a.click();
-  URL.revokeObjectURL(a.href);
-}
-
-  // ---- DOCX Export with headers/footers, page numbers, breaks ----
+  // DOCX with headers/footers & page numbers
   async function exportDOCX() {
     const { saveAs } = await import("file-saver");
     const docx = await import("docx");
-    const { Document, Packer, Paragraph, HeadingLevel, TextRun, AlignmentType, PageNumber, Header, Footer, SectionType, convertInchesToTwip } = docx as any;
+    const {
+      Document,
+      Packer,
+      Paragraph,
+      HeadingLevel,
+      TextRun,
+      AlignmentType,
+      PageNumber,
+      Header,
+      Footer,
+      SectionType,
+      convertInchesToTwip,
+    } = docx as any;
 
     const sectionProps: any = {
       properties: {
@@ -606,27 +845,63 @@ async function exportEPUB(): Promise<void> {
             top: convertInchesToTwip(pf.margins.top),
             right: convertInchesToTwip(pf.margins.right),
             bottom: convertInchesToTwip(pf.margins.bottom),
-            left: convertInchesToTwip((pf.margins.left || 1) + (pf.margins.gutter || 0)),
+            left: convertInchesToTwip(
+              (pf.margins.left || 1) + (pf.margins.gutter || 0)
+            ),
             gutter: convertInchesToTwip(pf.margins.gutter || 0),
           },
-          size: pf.trim ? { width: convertInchesToTwip(pf.trim.widthInch), height: convertInchesToTwip(pf.trim.heightInch) } : undefined,
+          size: pf.trim
+            ? {
+                width: convertInchesToTwip(pf.trim.widthInch),
+                height: convertInchesToTwip(pf.trim.heightInch),
+              }
+            : undefined,
         },
       },
     };
 
-    const header = pf.headers ? new Header({
-      children: [ new Paragraph({ alignment: AlignmentType.RIGHT, children: [ new TextRun({ text: `${meta.authorLast || meta.author} — ${meta.title}`, italics: true }) ] }) ],
-    }) : undefined;
+    const header = pf.headers
+      ? new Header({
+          children: [
+            new Paragraph({
+              alignment: AlignmentType.RIGHT,
+              children: [
+                new TextRun({
+                  text: `${meta.authorLast || meta.author} — ${meta.title}`,
+                  italics: true,
+                }),
+              ],
+            }),
+          ],
+        })
+      : undefined;
 
-    const footer = pf.footers ? new Footer({
-      children: [ new Paragraph({ alignment: AlignmentType.CENTER, children: [ new TextRun({ children: [PageNumber.CURRENT] }) ] }) ],
-    }) : undefined;
+    const footer = pf.footers
+      ? new Footer({
+          children: [
+            new Paragraph({
+              alignment: AlignmentType.CENTER,
+              children: [new TextRun({ children: [PageNumber.CURRENT] })],
+            }),
+          ],
+        })
+      : undefined;
 
     const doc = new Document({
-      sections: [ { ...sectionProps, headers: header ? { default: header } : undefined, footers: footer ? { default: footer } : undefined, children: [] } ],
+      sections: [
+        {
+          ...sectionProps,
+          headers: header ? { default: header } : undefined,
+          footers: footer ? { default: footer } : undefined,
+          children: [],
+        },
+      ],
       styles: {
         default: {
-          document: { run: { font: ms.fontFamily, size: ms.fontSizePt * 2 }, paragraph: { spacing: { line: Math.round(ms.lineHeight * 240) } } },
+          document: {
+            run: { font: ms.fontFamily, size: ms.fontSizePt * 2 },
+            paragraph: { spacing: { line: Math.round(ms.lineHeight * 240) } },
+          },
         },
       },
     });
@@ -634,52 +909,98 @@ async function exportEPUB(): Promise<void> {
     const sectionChildren: any[] = [];
 
     // Title page
-    sectionChildren.push(new Paragraph({ text: meta.title, heading: HeadingLevel.TITLE, alignment: AlignmentType.CENTER }));
-    sectionChildren.push(new Paragraph({ text: `by ${meta.author}`, alignment: AlignmentType.CENTER }));
-    sectionChildren.push(new Paragraph({ text: `${meta.year}`, alignment: AlignmentType.CENTER }));
+    sectionChildren.push(
+      new Paragraph({
+        text: meta.title,
+        heading: HeadingLevel.TITLE,
+        alignment: AlignmentType.CENTER,
+      })
+    );
+    sectionChildren.push(
+      new Paragraph({ text: `by ${meta.author}`, alignment: AlignmentType.CENTER })
+    );
+    sectionChildren.push(
+      new Paragraph({ text: `${meta.year}`, alignment: AlignmentType.CENTER })
+    );
 
-    // Front matter
+    // Front matter simple blocks
     const fmBlocks = [
-      matter.copyright && `© ${meta.year} ${meta.author}. All rights reserved.`,
+      `© ${meta.year} ${meta.author}. All rights reserved.`,
       matter.dedication && `Dedication\n${matter.dedication}`,
       matter.epigraph && `Epigraph\n${matter.epigraph}`,
     ].filter(Boolean) as string[];
 
     fmBlocks.forEach((b) => {
-      sectionChildren.push(new Paragraph({ text: "", }));
-      String(b).split("\n").forEach(line => { sectionChildren.push(new Paragraph({ text: line })); });
+      sectionChildren.push(new Paragraph({ text: "" }));
+      String(b)
+        .split("\n")
+        .forEach((line) => {
+          sectionChildren.push(new Paragraph({ text: line }));
+        });
     });
 
-    // TOC (simple text list)
+    // TOC (plain text)
     if (matter.toc && pf.showTOCInEbook) {
-      sectionChildren.push(new Paragraph({ text: "", }));
-      sectionChildren.push(new Paragraph({ text: "Contents", heading: HeadingLevel.HEADING_2, alignment: AlignmentType.CENTER }));
-      chapters.filter(c=>c.included).forEach((c, i) => {
-        sectionChildren.push(new Paragraph({ text: `${i+1}. ${c.title}` }));
-      });
+      sectionChildren.push(new Paragraph({ text: "" }));
+      sectionChildren.push(
+        new Paragraph({
+          text: "Contents",
+          heading: HeadingLevel.HEADING_2,
+          alignment: AlignmentType.CENTER,
+        })
+      );
+      chapters
+        .filter((c) => c.included)
+        .forEach((c, i) => {
+          sectionChildren.push(new Paragraph({ text: `${i + 1}. ${c.title}` }));
+        });
     }
 
     function chapterTitleText(t: string): string {
       if (ms.chapterTitleCase === "UPPER") return t.toUpperCase();
-      if (ms.chapterTitleCase === "Capitalize") return t.replace(/\b(\w)/g, (m) => m.toUpperCase());
+      if (ms.chapterTitleCase === "Capitalize")
+        return t.replace(/\b(\w)/g, (m) => m.toUpperCase());
       return t;
     }
 
     // Chapters with page breaks
-    chapters.filter(c=>c.included).forEach((c, idx) => {
-      if (ms.chapterStartsOnNewPage || idx === 0) {
-        // explicit page break except for very first body section after title page
-        sectionChildren.push(new Paragraph({}));
-        if (idx > 0) sectionChildren.push(new Paragraph({ children: [], pageBreakBefore: true }));
-      }
-      sectionChildren.push(new Paragraph({ text: chapterTitleText(c.title), heading: HeadingLevel.HEADING_2, alignment: AlignmentType.CENTER }));
+    chapters
+      .filter((c) => c.included)
+      .forEach((c, idx) => {
+        // page break before each new chapter except first body after title page
+        if (ms.chapterStartsOnNewPage || idx === 0) {
+          sectionChildren.push(new Paragraph({}));
+          if (idx > 0)
+            sectionChildren.push(
+              new Paragraph({ children: [], pageBreakBefore: true })
+            );
+        }
+        sectionChildren.push(
+          new Paragraph({
+            text: chapterTitleText(c.title),
+            heading: HeadingLevel.HEADING_2,
+            alignment: AlignmentType.CENTER,
+          })
+        );
 
-      // Body paragraphs
-      c.text.split("\n\n").forEach(par => {
-        const runs = par.split("\n").map((line, i) => new TextRun({ text: (i ? "\n" : "") + line }));
-        sectionChildren.push(new Paragraph({ children: runs, indent: { firstLine: ms.firstLineIndentInches ? convertInchesToTwip(ms.firstLineIndentInches) : 0 }, spacing: { after: ms.paragraphSpacingPt * 20 } }));
+        // Body paragraphs
+        c.text.split("\n\n").forEach((par) => {
+          const runs = par
+            .split("\n")
+            .map((line, i) => new TextRun({ text: (i ? "\n" : "") + line }));
+          sectionChildren.push(
+            new Paragraph({
+              children: runs,
+              indent: {
+                firstLine: ms.firstLineIndentInches
+                  ? convertInchesToTwip(ms.firstLineIndentInches)
+                  : 0,
+              },
+              spacing: { after: ms.paragraphSpacingPt * 20 },
+            })
+          );
+        });
       });
-    });
 
     // Back matter
     const bmBlocks = [
@@ -691,88 +1012,197 @@ async function exportEPUB(): Promise<void> {
     bmBlocks.forEach((b) => {
       sectionChildren.push(new Paragraph({ children: [], pageBreakBefore: true }));
       const [head, ...rest] = String(b).split("\n");
-      sectionChildren.push(new Paragraph({ text: head, heading: HeadingLevel.HEADING_2, alignment: AlignmentType.CENTER }));
-      rest.forEach(line => sectionChildren.push(new Paragraph({ text: line })));
+      sectionChildren.push(
+        new Paragraph({
+          text: head,
+          heading: HeadingLevel.HEADING_2,
+          alignment: AlignmentType.CENTER,
+        })
+      );
+      rest.forEach((line) => sectionChildren.push(new Paragraph({ text: line })));
     });
 
-    (doc as any).Sections[0].Properties = (doc as any).Sections[0].Properties; // keep types quiet
+    // Attach section children
+    (doc as any).Sections[0].Properties = (doc as any).Sections[0].Properties;
     (doc as any).Sections[0].Children = sectionChildren;
 
     const blob = await Packer.toBlob(doc);
     saveAs(blob, `${safeFile(meta.title)}.docx`);
   }
 
+  // ---- UI ----
   return (
     <PageShell style={{ background: theme.bg, minHeight: "100vh" }}>
-      <AeroBanner size="md" title="Publishing Suite" subtitle="Presets • Page Breaks • Headers & Footers" />
+      <AeroBanner
+        size="md"
+        title="Publishing Suite"
+        subtitle="Presets • Page Breaks • Headers & Footers"
+      />
 
       <div style={{ ...styles.sectionShell }}>
         {/* Tabs */}
-        <div style={{ display: "flex", gap: 8, marginBottom: 20, overflowX: "auto" }}>
+        <div
+          style={{
+            display: "flex",
+            gap: 8,
+            marginBottom: 20,
+            overflowX: "auto",
+          }}
+        >
           {STEPS.map((s, i) => (
-            <button key={s.key} onClick={() => setStep(s.key)}
-              style={{ padding: "12px 18px", borderRadius: 12, border: s.key === step ? `2px solid ${theme.accent}` : `2px solid ${theme.border}`, background: s.key === step ? theme.highlight : theme.white, color: s.key === step ? theme.primary : theme.subtext, fontWeight: s.key === step ? 700 : 500, cursor: "pointer", whiteSpace: "nowrap", fontSize: 14 }}>
-              <span style={{ marginRight: 8 }}>{i + 1}</span>{s.label}
+            <button
+              key={s.key}
+              onClick={() => setStep(s.key)}
+              style={{
+                padding: "12px 18px",
+                borderRadius: 12,
+                border:
+                  s.key === step
+                    ? `2px solid ${theme.accent}`
+                    : `2px solid ${theme.border}`,
+                background:
+                  s.key === step ? theme.highlight : theme.white,
+                color: s.key === step ? theme.primary : theme.subtext,
+                fontWeight: s.key === step ? 700 : 500,
+                cursor: "pointer",
+                whiteSpace: "nowrap",
+                fontSize: 14,
+              }}
+            >
+              <span style={{ marginRight: 8 }}>{i + 1}</span>
+              {s.label}
             </button>
           ))}
         </div>
 
         {/* Meta */}
         <div style={{ ...styles.glassCard, marginBottom: 20 }}>
-          <h3 style={{ margin: "0 0 16px 0", fontSize: 18, color: theme.text }}>Manuscript Details</h3>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 16 }}>
+          <h3 style={{ margin: "0 0 16px 0", fontSize: 18, color: theme.text }}>
+            Manuscript Details
+          </h3>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+              gap: 16,
+            }}
+          >
             <div>
-              <label style={{ ...styles.label, display: "block", marginBottom: 6 }}>Title</label>
-              <input style={styles.input} value={meta.title} onChange={(e) => setMeta({ ...meta, title: e.target.value })} placeholder="Enter your book title" />
+              <label style={{ ...styles.label, display: "block", marginBottom: 6 }}>
+                Title
+              </label>
+              <input
+                style={styles.input}
+                value={meta.title}
+                onChange={(e) => setMeta({ ...meta, title: e.target.value })}
+                placeholder="Enter your book title"
+              />
             </div>
             <div>
-              <label style={{ ...styles.label, display: "block", marginBottom: 6 }}>Author</label>
-              <input style={styles.input} value={meta.author} onChange={(e) => setMeta({ ...meta, author: e.target.value })} placeholder="Enter author name" />
+              <label style={{ ...styles.label, display: "block", marginBottom: 6 }}>
+                Author
+              </label>
+              <input
+                style={styles.input}
+                value={meta.author}
+                onChange={(e) => setMeta({ ...meta, author: e.target.value })}
+                placeholder="Enter author name"
+              />
             </div>
             <div>
-              <label style={{ ...styles.label, display: "block", marginBottom: 6 }}>Publication Year</label>
-              <input style={styles.input} value={meta.year} onChange={(e) => setMeta({ ...meta, year: e.target.value })} placeholder="YYYY" />
+              <label style={{ ...styles.label, display: "block", marginBottom: 6 }}>
+                Publication Year
+              </label>
+              <input
+                style={styles.input}
+                value={meta.year}
+                onChange={(e) => setMeta({ ...meta, year: e.target.value })}
+                placeholder="YYYY"
+              />
             </div>
             <div>
-              <label style={{ ...styles.label, display: "block", marginBottom: 6 }}>Author Last Name (header)</label>
-              <input style={styles.input} value={meta.authorLast || ""} onChange={(e) => setMeta({ ...meta, authorLast: e.target.value })} placeholder="For running header" />
+              <label style={{ ...styles.label, display: "block", marginBottom: 6 }}>
+                Author Last Name (header)
+              </label>
+              <input
+                style={styles.input}
+                value={meta.authorLast || ""}
+                onChange={(e) => setMeta({ ...meta, authorLast: e.target.value })}
+                placeholder="For running header"
+              />
             </div>
-            <div style={{ display: "flex", alignItems: "end", gap: 16, color: theme.subtext, fontSize: 14 }}>
-              <div>Words: <strong>{wordCount.toLocaleString()}</strong></div>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "end",
+                gap: 16,
+                color: theme.subtext,
+                fontSize: 14,
+              }}
+            >
+              <div>
+                Words: <strong>{wordCount.toLocaleString()}</strong>
+              </div>
             </div>
           </div>
         </div>
 
         {/* Format & Presets */}
         <div style={{ ...styles.glassCard, marginBottom: 20 }}>
-          <h3 style={{ margin: "0 0 16px 0", fontSize: 18, color: theme.text }}>Format & Presets</h3>
+          <h3 style={{ margin: "0 0 16px 0", fontSize: 18, color: theme.text }}>
+            Format & Presets
+          </h3>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 16 }}>
             <div style={{ minWidth: 260 }}>
               <div style={styles.label}>Manuscript Preset</div>
-              <select value={manuscriptPreset} onChange={(e) => setManuscriptPreset(e.target.value as ManuscriptPresetKey)} style={{ ...styles.input, height: 40 }}>
+              <select
+                value={manuscriptPreset}
+                onChange={(e) =>
+                  setManuscriptPreset(e.target.value as ManuscriptPresetKey)
+                }
+                style={{ ...styles.input, height: 40 }}
+              >
                 {Object.entries(MANUSCRIPT_PRESETS).map(([k, v]) => (
-                  <option key={k} value={k}>{v.label}</option>
+                  <option key={k} value={k}>
+                    {v.label}
+                  </option>
                 ))}
               </select>
             </div>
             <div style={{ minWidth: 260 }}>
               <div style={styles.label}>Platform Preset</div>
-              <select value={platformPreset} onChange={(e) => setPlatformPreset(e.target.value as PlatformPresetKey)} style={{ ...styles.input, height: 40 }}>
+              <select
+                value={platformPreset}
+                onChange={(e) =>
+                  setPlatformPreset(e.target.value as PlatformPresetKey)
+                }
+                style={{ ...styles.input, height: 40 }}
+              >
                 {Object.entries(PLATFORM_PRESETS).map(([k, v]) => (
-                  <option key={k} value={k}>{v.label}</option>
+                  <option key={k} value={k}>
+                    {v.label}
+                  </option>
                 ))}
               </select>
               <div style={{ color: theme.subtext, fontSize: 12, marginTop: 6 }}>
-                {includeHeadersFooters ? "DOCX export will include headers/footers + page numbers." : "Headers/footers disabled for this platform (typical for eBooks)."}
+                {includeHeadersFooters
+                  ? "DOCX export will include headers/footers + page numbers."
+                  : "Headers/footers disabled for this platform (typical for eBooks)."}
               </div>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
               <span style={styles.label}>Double Spacing</span>
-              <Toggle checked={ms.lineHeight >= 2} onChange={() => {
-                // Toggle between 2.0 and 1.5 quickly (for convenience)
-                const alt = { ...MANUSCRIPT_PRESETS[manuscriptPreset], lineHeight: ms.lineHeight >= 2 ? 1.5 : 2.0 } as any;
-                MANUSCRIPT_PRESETS[manuscriptPreset] = alt; // local mutation for session; in real app keep in state
-              }} />
+              <Toggle
+                checked={ms.lineHeight >= 2}
+                onChange={() => {
+                  // quick toggle between 2.0 and 1.5 (demo only)
+                  const alt = {
+                    ...MANUSCRIPT_PRESETS[manuscriptPreset],
+                    lineHeight: ms.lineHeight >= 2 ? 1.5 : 2.0,
+                  } as any;
+                  (MANUSCRIPT_PRESETS as any)[manuscriptPreset] = alt;
+                }}
+              />
             </div>
           </div>
         </div>
@@ -782,25 +1212,86 @@ async function exportEPUB(): Promise<void> {
           {step === "builder" && (
             <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 24 }}>
               <div>
-                <h3 style={{ margin: "0 0 16px 0", fontSize: 18, color: theme.text }}>Live Preview</h3>
+                <h3 style={{ margin: "0 0 16px 0", fontSize: 18, color: theme.text }}>
+                  Live Preview
+                </h3>
                 <div style={styles.preview}>
-                  <iframe title="preview" style={{ width: "100%", height: 328, border: 0 }} srcDoc={compiledHTML} />
+                  <iframe
+                    title="preview"
+                    style={{ width: "100%", height: 328, border: 0 }}
+                    srcDoc={compiledHTML}
+                  />
                 </div>
               </div>
               <div>
-                <h3 style={{ margin: "0 0 16px 0", fontSize: 18, color: theme.text }}>Front & Back Matter</h3>
+                <h3 style={{ margin: "0 0 16px 0", fontSize: 18, color: theme.text }}>
+                  Front & Back Matter
+                </h3>
                 <div style={{ display: "grid", gap: 12 }}>
-                  <Field label="Title Page" value={matter.titlePage} onChange={(v) => setMatter({ ...matter, titlePage: v })} />
-                  <Field label="Copyright" value={matter.copyright} onChange={(v) => setMatter({ ...matter, copyright: v })} />
-                  <Field label="Dedication" value={matter.dedication} onChange={(v) => setMatter({ ...matter, dedication: v })} />
-                  <Field label="Epigraph" value={matter.epigraph} onChange={(v) => setMatter({ ...matter, epigraph: v })} />
-                  <label style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8, fontSize: 14, color: theme.text }}>
-                    <input type="checkbox" checked={matter.toc} onChange={(e) => setMatter({ ...matter, toc: e.target.checked })} /> Include Table of Contents
+                  <Field
+                    label="Title Page"
+                    value={matter.titlePage}
+                    onChange={(v) => setMatter({ ...matter, titlePage: v })}
+                  />
+                  <Field
+                    label="Copyright"
+                    value={matter.copyright}
+                    onChange={(v) => setMatter({ ...matter, copyright: v })}
+                  />
+                  <Field
+                    label="Dedication"
+                    value={matter.dedication}
+                    onChange={(v) => setMatter({ ...matter, dedication: v })}
+                  />
+                  <Field
+                    label="Epigraph"
+                    value={matter.epigraph}
+                    onChange={(v) => setMatter({ ...matter, epigraph: v })}
+                  />
+                  <label
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                      marginTop: 8,
+                      fontSize: 14,
+                      color: theme.text,
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={matter.toc}
+                      onChange={(e) =>
+                        setMatter({ ...matter, toc: e.target.checked })
+                      }
+                    />{" "}
+                    Include Table of Contents
                   </label>
-                  <div style={{ borderTop: `1px solid ${theme.border}`, margin: "8px 0" }} />
-                  <Field label="Acknowledgments" value={matter.acknowledgments} onChange={(v) => setMatter({ ...matter, acknowledgments: v })} />
-                  <Field label="About the Author" value={matter.aboutAuthor} onChange={(v) => setMatter({ ...matter, aboutAuthor: v })} />
-                  <Field label="Author Notes" value={matter.notes} onChange={(v) => setMatter({ ...matter, notes: v })} />
+                  <div
+                    style={{
+                      borderTop: `1px solid ${theme.border}`,
+                      margin: "8px 0",
+                    }}
+                  />
+                  <Field
+                    label="Acknowledgments"
+                    value={matter.acknowledgments}
+                    onChange={(v) =>
+                      setMatter({ ...matter, acknowledgments: v })
+                    }
+                  />
+                  <Field
+                    label="About the Author"
+                    value={matter.aboutAuthor}
+                    onChange={(v) =>
+                      setMatter({ ...matter, aboutAuthor: v })
+                    }
+                  />
+                  <Field
+                    label="Author Notes"
+                    value={matter.notes}
+                    onChange={(v) => setMatter({ ...matter, notes: v })}
+                  />
                 </div>
               </div>
             </div>
@@ -808,19 +1299,42 @@ async function exportEPUB(): Promise<void> {
 
           {step === "proof" && (
             <div>
-              <h3 style={{ margin: "0 0 16px 0", fontSize: 18, color: theme.text }}>Proof & Consistency</h3>
-              <p style={{ color: theme.subtext, fontSize: 14 }}>Local quick checks; wire to deeper services later.</p>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12, marginTop: 16 }}>
-                <button style={styles.lightBtn} onClick={runGrammarChecks}>Grammar Check</button>
-                <button style={styles.lightBtn} onClick={runGrammarChecks}>Style Analysis</button>
-                <button style={styles.lightBtn} onClick={runGrammarChecks}>Character Consistency</button>
-                <button style={styles.lightBtn} onClick={runGrammarChecks}>Timeline Validation</button>
-                <button style={styles.primaryBtn} onClick={runGrammarChecks}>Run All Checks</button>
+              <h3 style={{ margin: "0 0 16px 0", fontSize: 18, color: theme.text }}>
+                Proof & Consistency
+              </h3>
+              <p style={{ color: theme.subtext, fontSize: 14 }}>
+                Local quick checks; wire to deeper services later.
+              </p>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                  gap: 12,
+                  marginTop: 16,
+                }}
+              >
+                <button style={styles.lightBtn} onClick={runGrammarChecks}>
+                  Grammar Check
+                </button>
+                <button style={styles.lightBtn} onClick={runGrammarChecks}>
+                  Style Analysis
+                </button>
+                <button style={styles.lightBtn} onClick={runGrammarChecks}>
+                  Character Consistency
+                </button>
+                <button style={styles.lightBtn} onClick={runGrammarChecks}>
+                  Timeline Validation
+                </button>
+                <button style={styles.primaryBtn} onClick={runGrammarChecks}>
+                  Run All Checks
+                </button>
               </div>
               {!!proofResults.length && (
                 <div style={{ marginTop: 16, ...styles.glassCard }}>
                   <ul style={{ margin: 0, paddingLeft: 18, color: theme.text }}>
-                    {proofResults.map((r, i) => <li key={i}>{r}</li>)}
+                    {proofResults.map((r, i) => (
+                      <li key={i}>{r}</li>
+                    ))}
                   </ul>
                 </div>
               )}
@@ -829,32 +1343,71 @@ async function exportEPUB(): Promise<void> {
 
           {step === "format" && (
             <div>
-              <h3 style={{ margin: "0 0 16px 0", fontSize: 18, color: theme.text }}>Format Preview</h3>
+              <h3 style={{ margin: "0 0 16px 0", fontSize: 18, color: theme.text }}>
+                Format Preview
+              </h3>
               <div style={styles.preview}>
-                <iframe title="format-preview" style={{ width: "100%", height: 328, border: 0 }} srcDoc={compiledHTML} />
+                <iframe
+                  title="format-preview"
+                  style={{ width: "100%", height: 328, border: 0 }}
+                  srcDoc={compiledHTML}
+                />
               </div>
               <p style={{ color: theme.subtext, fontSize: 12, marginTop: 8 }}>
-                * For true headers/footers + page numbers, use the DOCX export and finalize in Word/LibreOffice (or export PDF from there).
+                * For true headers/footers + page numbers, use the DOCX export and
+                finalize in Word/LibreOffice (then export PDF from there).
               </p>
             </div>
           )}
 
           {step === "export" && (
             <div>
-              <h3 style={{ margin: "0 0 16px 0", fontSize: 18, color: theme.text }}>Export</h3>
-              <p style={{ color: theme.subtext, fontSize: 14 }}>Choose your format. DOCX includes headers/footers and page numbers per selected presets.</p>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12, marginTop: 16 }}>
-                $1
-                <button style={styles.primaryBtn} onClick={exportEPUB}>📖 Export EPUB (.epub)</button>
+              <h3 style={{ margin: "0 0 16px 0", fontSize: 18, color: theme.text }}>
+                Export
+              </h3>
+              <p style={{ color: theme.subtext, fontSize: 14 }}>
+                DOCX includes headers/footers and page numbers per selected presets.
+              </p>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                  gap: 12,
+                  marginTop: 16,
+                }}
+              >
+                <button style={styles.lightBtn} onClick={exportPDF}>
+                  📄 Export PDF
+                </button>
+                <button style={styles.lightBtn} onClick={exportDOCX}>
+                  📝 Export DOCX
+                </button>
+                <button style={styles.primaryBtn} onClick={exportEPUB}>
+                  📖 Export EPUB (.epub)
+                </button>
+                <button style={styles.darkBtn} onClick={exportEPUBXHTML}>
+                  📑 Export EPUB XHTML
+                </button>
               </div>
             </div>
           )}
 
           {step === "prep" && (
             <div>
-              <h3 style={{ margin: "0 0 16px 0", fontSize: 18, color: theme.text }}>Publishing Preparation</h3>
-              <p style={{ color: theme.subtext, fontSize: 14 }}>Get your submission assets ready.</p>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12, marginTop: 16 }}>
+              <h3 style={{ margin: "0 0 16px 0", fontSize: 18, color: theme.text }}>
+                Publishing Preparation
+              </h3>
+              <p style={{ color: theme.subtext, fontSize: 14 }}>
+                Get your submission assets ready.
+              </p>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                  gap: 12,
+                  marginTop: 16,
+                }}
+              >
                 <button style={styles.lightBtn}>📝 Synopsis Generator</button>
                 <button style={styles.lightBtn}>✉️ Query Letter Builder</button>
                 <button style={styles.lightBtn}>✅ Self-Publishing Checklist</button>
@@ -868,24 +1421,122 @@ async function exportEPUB(): Promise<void> {
 
         {/* Chapters */}
         <div style={styles.glassCard}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-            <h3 style={{ margin: 0, fontSize: 18, color: theme.text }}>Chapter Management</h3>
-            <button style={styles.primaryBtn} onClick={() => setChapters((prev) => [...prev, { id: (typeof crypto !== "undefined" && "randomUUID" in crypto) ? crypto.randomUUID() : `c_${Date.now()}`, title: `Chapter ${prev.length + 1} – Untitled`, included: true, text: "New chapter text..." }])}>+ Add Chapter</button>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+              marginBottom: 14,
+            }}
+          >
+            <h3 style={{ margin: 0, fontSize: 18, color: theme.text }}>
+              Chapter Management
+            </h3>
+            <button
+              style={styles.primaryBtn}
+              onClick={() =>
+                setChapters((prev) => [
+                  ...prev,
+                  {
+                    id:
+                      typeof crypto !== "undefined" &&
+                      "randomUUID" in crypto
+                        ? (crypto as any).randomUUID()
+                        : `c_${Date.now()}`,
+                    title: `Chapter ${prev.length + 1} – Untitled`,
+                    included: true,
+                    text: "New chapter text...",
+                  },
+                ])
+              }
+            >
+              + Add Chapter
+            </button>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+              gap: 12,
+            }}
+          >
             {chapters.map((c, i) => (
-              <div key={c.id} style={{ border: `1px solid ${theme.border}`, borderRadius: 12, padding: 14, background: c.included ? theme.white : "#F9FBFD" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+              <div
+                key={c.id}
+                style={{
+                  border: `1px solid ${theme.border}`,
+                  borderRadius: 12,
+                  padding: 14,
+                  background: c.included ? theme.white : "#F9FBFD",
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "flex-start",
+                    marginBottom: 8,
+                  }}
+                >
                   <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: theme.text }}>{c.title}</div>
-                    <div style={{ fontSize: 12, color: theme.subtext, marginTop: 4 }}>{c.text.slice(0, 100)}…</div>
+                    <div
+                      style={{
+                        fontSize: 14,
+                        fontWeight: 700,
+                        color: theme.text,
+                      }}
+                    >
+                      {c.title}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 12,
+                        color: theme.subtext,
+                        marginTop: 4,
+                      }}
+                    >
+                      {c.text.slice(0, 100)}…
+                    </div>
                   </div>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                      <button style={{ ...styles.lightBtn, padding: "6px 8px" }} onClick={() => setChapters((prev) => { const next = [...prev]; const to = Math.max(0, Math.min(next.length - 1, i - 1)); const [item] = next.splice(i, 1); next.splice(to, 0, item); return next; })}>↑</button>
-                      <button style={{ ...styles.lightBtn, padding: "6px 8px" }} onClick={() => setChapters((prev) => { const next = [...prev]; const to = Math.max(0, Math.min(next.length - 1, i + 1)); const [item] = next.splice(i, 1); next.splice(to, 0, item); return next; })}>↓</button>
+                      <button
+                        style={{ ...styles.lightBtn, padding: "6px 8px" }}
+                        onClick={() =>
+                          setChapters((prev) => {
+                            const next = [...prev];
+                            const to = Math.max(0, Math.min(next.length - 1, i - 1));
+                            const [item] = next.splice(i, 1);
+                            next.splice(to, 0, item);
+                            return next;
+                          })
+                        }
+                      >
+                        ↑
+                      </button>
+                      <button
+                        style={{ ...styles.lightBtn, padding: "6px 8px" }}
+                        onClick={() =>
+                          setChapters((prev) => {
+                            const next = [...prev];
+                            const to = Math.max(0, Math.min(next.length - 1, i + 1));
+                            const [item] = next.splice(i, 1);
+                            next.splice(to, 0, item);
+                            return next;
+                          })
+                        }
+                      >
+                        ↓
+                      </button>
                     </div>
-                    <Toggle checked={c.included} onChange={(v) => setChapters((prev) => prev.map((x) => (x.id === c.id ? { ...x, included: v } : x)))} />
+                    <Toggle
+                      checked={c.included}
+                      onChange={(v) =>
+                        setChapters((prev) =>
+                          prev.map((x) => (x.id === c.id ? { ...x, included: v } : x))
+                        )
+                      }
+                    />
                   </div>
                 </div>
               </div>
@@ -895,8 +1546,16 @@ async function exportEPUB(): Promise<void> {
 
         {/* Footer nav */}
         <div style={{ display: "flex", justifyContent: "space-between", marginTop: 16 }}>
-          <button style={styles.lightBtn} onClick={goBack} disabled={stepIndex === 0}>← Back</button>
-          <button style={styles.primaryBtn} onClick={goNext} disabled={stepIndex === STEPS.length - 1}>Next →</button>
+          <button style={styles.lightBtn} onClick={goBack} disabled={stepIndex === 0}>
+            ← Back
+          </button>
+          <button
+            style={styles.primaryBtn}
+            onClick={goNext}
+            disabled={stepIndex === STEPS.length - 1}
+          >
+            Next →
+          </button>
         </div>
       </div>
     </PageShell>
