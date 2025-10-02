@@ -6,7 +6,8 @@ frontend:
         - nvm install 20
         - nvm use 20
         - node -v
-        - npm ci --legacy-peer-deps
+        # Use install (not ci) so we can resolve the new TS 4.9.5 graph
+        - npm install --legacy-peer-deps
     build:
       commands:
         - export NODE_OPTIONS="--max_old_space_size=4096"
@@ -21,4 +22,3 @@ frontend:
       - node_modules/**/*
       - ~/.npm/**/*
       - ~/.cache/**/*
-
