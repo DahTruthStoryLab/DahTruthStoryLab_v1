@@ -139,7 +139,7 @@ const getInitialData = () => {
 };
 
 /* ──────────────────────────────────────────────────────────────
-   Component
+   Component (Light/Glass theme)
 ──────────────────────────────────────────────────────────────── */
 export default function TOCPage() {
   const initialData = getInitialData();
@@ -253,43 +253,37 @@ export default function TOCPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-950 via-blue-950 to-indigo-950 py-8 relative overflow-hidden">
+    <div className="min-h-screen bg-base bg-radial-fade text-ink">
       {/* Top utility bar with Back */}
-      <div className="sticky top-0 z-40 -mt-8 mb-4 bg-sky-950/60 backdrop-blur-xl border-b border-sky-800/40">
+      <div className="sticky top-0 z-40 -mt-8 mb-4 bg-white/80 backdrop-blur-xl border-b border-border">
         <div className="max-w-5xl mx-auto px-4 py-2 flex items-center justify-between">
           <NavLink
             to="/dashboard"
-            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white/10 text-white border border-white/20 hover:bg-white/15"
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-white border border-border hover:bg-white/90 text-ink"
           >
             <ArrowLeft size={16} />
             Back to Dashboard
           </NavLink>
-          <div className="text-xs text-sky-100/80">
+          <div className="text-xs text-muted">
             Saved {Math.round((Date.now() - lastSaved) / 1000 / 60) || 0}m ago
           </div>
         </div>
       </div>
 
-      {/* Ambient blobs */}
-      <div className="absolute inset-0 opacity-20 pointer-events-none">
-        <div className="absolute top-20 left-10 w-72 h-72 bg-sky-500 rounded-full mix-blend-multiply blur-3xl"></div>
-        <div className="absolute bottom-20 right-10 w-72 h-72 bg-teal-500 rounded-full mix-blend-multiply blur-3xl"></div>
-      </div>
-
       <div className="relative z-10 mx-auto max-w-5xl px-4">
         {/* Header banner */}
-        <div className="rounded-3xl bg-gradient-to-r from-slate-900/90 via-indigo-900/90 to-slate-900/90 backdrop-blur-xl text-white shadow-2xl border border-sky-800/40">
+        <div className="rounded-3xl bg-white/85 backdrop-blur-xl text-ink shadow-glass border border-border">
           <div className="flex items-center justify-between px-6 py-5">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center">
-                <BookOpen size={18} />
+              <div className="w-10 h-10 rounded-xl bg-white/70 border border-border flex items-center justify-center">
+                <BookOpen size={18} className="text-muted" />
               </div>
-              <h1 className="text-3xl font-extrabold drop-shadow-sm">Table of Contents</h1>
+              <h1 className="text-3xl font-extrabold">Table of Contents</h1>
             </div>
             <div className="flex items-center gap-2">
               <button
                 onClick={saveNow}
-                className="hidden sm:inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-green-600/30 border border-green-400/30 hover:bg-green-600/40 text-green-100 text-sm"
+                className="hidden sm:inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-white border border-border hover:bg-white/90 text-ink text-sm"
                 title="Save now (Ctrl+S)"
               >
                 <Save size={16} />
@@ -297,7 +291,7 @@ export default function TOCPage() {
               </button>
               <button
                 onClick={() => exportToText(book, chapters)}
-                className="hidden sm:inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-sky-600/30 border border-sky-400/30 hover:bg-sky-600/40 text-sky-100 text-sm"
+                className="hidden sm:inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-white border border-border hover:bg-white/90 text-ink text-sm"
                 title="Export as text file"
               >
                 <Download size={16} />
@@ -305,7 +299,7 @@ export default function TOCPage() {
               </button>
               <button
                 onClick={generateAll}
-                className="hidden sm:inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-indigo-600/30 border border-indigo-400/30 hover:bg-indigo-600/40 text-indigo-100 text-sm"
+                className="hidden sm:inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-white border border-border hover:bg-white/90 text-ink text-sm"
                 title="Generate AI synopses for chapters without one"
               >
                 <Sparkles size={16} />
@@ -313,7 +307,7 @@ export default function TOCPage() {
               </button>
               <button
                 onClick={addChapter}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-500 hover:bg-indigo-400 text-white text-sm shadow"
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-white text-sm shadow-soft hover:opacity-95"
                 title="New chapter (Ctrl+N)"
               >
                 <Plus size={16} /> New Chapter
@@ -323,27 +317,27 @@ export default function TOCPage() {
         </div>
 
         {/* Book banner */}
-        <div className="mt-4 rounded-3xl bg-sky-900/40 backdrop-blur-xl text-white shadow-2xl border border-sky-700/40">
+        <div className="mt-4 rounded-3xl bg-white/80 backdrop-blur-xl text-ink shadow-soft border border-border">
           <div className="px-6 py-4">
             <div className="flex items-center justify-between">
               <div>
                 <div className="text-xl font-semibold">{book.title}</div>
-                <div className="text-sm text-slate-200/90 mt-1">
+                <div className="text-sm text-muted mt-1">
                   {totalWords.toLocaleString()} / {book.targetWords.toLocaleString()} words
                   {totalReadingTime > 0 && ` • ~${totalReadingTime} min read`}
                 </div>
-                <div className="mt-2 w-64 bg-slate-700 rounded-full h-2">
+                <div className="mt-2 w-64 bg-white border border-border rounded-full h-2">
                   <div
-                    className="bg-sky-400 h-2 rounded-full transition-all duration-300"
+                    className="bg-primary h-2 rounded-full transition-all duration-300"
                     style={{ width: `${Math.min(progress, 100)}%` }}
                   />
                 </div>
-                <div className="text-xs text-slate-300 mt-1">{progress.toFixed(1)}% complete</div>
+                <div className="text-xs text-muted mt-1">{progress.toFixed(1)}% complete</div>
               </div>
               <div className="text-right">
                 <div className="text-3xl font-extrabold">{chapters.length}</div>
-                <div className="text-xs uppercase tracking-wide text-slate-300">Chapters</div>
-                <div className="text-xs text-slate-300/90 mt-1">
+                <div className="text-xs uppercase tracking-wide text-muted">Chapters</div>
+                <div className="text-xs text-muted mt-1">
                   Last saved {Math.round((Date.now() - lastSaved) / 1000 / 60) || 0}m ago
                 </div>
               </div>
@@ -352,21 +346,21 @@ export default function TOCPage() {
         </div>
 
         {/* Search + Quick add */}
-        <div className="mt-4 rounded-3xl bg-sky-900/40 backdrop-blur-xl text-white shadow-2xl border border-sky-700/40">
+        <div className="mt-4 rounded-3xl bg-white/80 backdrop-blur-xl text-ink shadow-soft border border-border">
           <div className="px-6 py-4 space-y-4">
             {/* Search */}
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-300" size={16} />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" size={16} />
               <input
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder="Search chapters by title, content, or synopsis..."
-                className="w-full pl-10 pr-10 py-3 rounded-xl bg-sky-800/30 border border-sky-600/40 text-sm outline-none placeholder:text-slate-300/80 backdrop-blur-sm font-serif"
+                className="w-full pl-10 pr-10 py-3 rounded-xl bg-white/70 border border-border text-sm outline-none placeholder:text-muted"
               />
               {searchTerm && (
                 <button
                   onClick={() => setSearchTerm("")}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-300 hover:text-white"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted hover:text-ink"
                 >
                   <X size={16} />
                 </button>
@@ -380,16 +374,16 @@ export default function TOCPage() {
                 onChange={(e) => setQuickTitle(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && addChapter()}
                 placeholder="Quick add: Chapter title…"
-                className="flex-1 rounded-xl bg-sky-800/30 border border-sky-600/40 px-4 py-3 text-sm outline-none placeholder:text-slate-300/80 backdrop-blur-sm font-serif"
+                className="flex-1 rounded-xl bg-white/70 border border-border px-4 py-3 text-sm outline-none"
               />
               <button
                 onClick={addChapter}
-                className="px-4 py-3 rounded-xl bg-indigo-500 hover:bg-indigo-400 text-white text-sm min-w-[84px]"
+                className="px-4 py-3 rounded-xl bg-primary hover:opacity-95 text-white text-sm min-w-[84px]"
               >
                 Add
               </button>
             </div>
-            <div className="text-xs text-slate-300/90">
+            <div className="text-xs text-muted">
               Press <b>Enter</b> to add • <b>Ctrl+S</b> to save • <b>Ctrl+N</b> for new chapter
               {searchTerm && (
                 <span> • Showing {filteredChapters.length} of {chapters.length} chapters</span>
@@ -401,10 +395,10 @@ export default function TOCPage() {
         {/* Chapters list */}
         <div className="mt-6 space-y-4">
           {filteredChapters.length === 0 && searchTerm ? (
-            <div className="rounded-3xl bg-sky-900/40 backdrop-blur-xl text-white shadow-2xl border border-sky-700/40 p-8 text-center">
-              <Search className="mx-auto mb-3 text-slate-300" size={32} />
+            <div className="rounded-3xl bg-white/80 backdrop-blur-xl text-ink shadow-soft border border-border p-8 text-center">
+              <Search className="mx-auto mb-3 text-muted" size={32} />
               <div className="text-lg font-medium mb-1">No chapters found</div>
-              <div className="text-sm text-slate-300/90">
+              <div className="text-sm text-muted">
                 Try adjusting your search term or clear the search to see all chapters.
               </div>
             </div>
@@ -418,12 +412,12 @@ export default function TOCPage() {
               return (
                 <div
                   key={ch.id}
-                  className="rounded-3xl bg-sky-900/40 backdrop-blur-xl text-white shadow-2xl border border-sky-700/40 overflow-hidden"
+                  className="rounded-3xl bg-white/85 backdrop-blur-xl text-ink shadow-soft border border-border overflow-hidden"
                 >
                   <div className="px-5 py-4 flex items-start gap-3">
                     <button
                       onClick={() => toggleOpen(ch.id)}
-                      className="mt-0.5 shrink-0 p-2 rounded-lg bg-sky-800/40 hover:bg-sky-800/60 backdrop-blur-sm"
+                      className="mt-0.5 shrink-0 p-2 rounded-lg bg-white/70 border border-border hover:bg-white"
                       title={isOpen ? "Collapse" : "Expand"}
                     >
                       {isOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
@@ -432,7 +426,7 @@ export default function TOCPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-3">
                         <div className="text-lg font-semibold truncate">{ch.title}</div>
-                        <div className="text-xs text-slate-200/90 flex items-center gap-3 shrink-0">
+                        <div className="text-xs text-muted flex items-center gap-3 shrink-0">
                           <span className="flex items-center gap-1">
                             <FileText size={14} /> {words} words
                             {readTime > 0 && ` • ${readTime}m`}
@@ -445,14 +439,14 @@ export default function TOCPage() {
                           <div className="flex items-center gap-1">
                             <button
                               onClick={() => duplicateChapter(ch.id)}
-                              className="p-1 rounded hover:bg-slate-700/60"
+                              className="p-1 rounded hover:bg-white/70 border border-transparent"
                               title="Duplicate chapter"
                             >
                               <Copy size={14} />
                             </button>
                             <button
                               onClick={() => setShowConfirm(ch.id)}
-                              className="p-1 rounded hover:bg-red-500/20 text-red-300"
+                              className="p-1 rounded hover:bg-red-50 text-red-600"
                               title="Delete chapter"
                             >
                               <Trash2 size={14} />
@@ -460,43 +454,43 @@ export default function TOCPage() {
                             <button
                               onClick={() => generateOne(ch.id)}
                               disabled={loading}
-                              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-indigo-600/30 border border-indigo-400/30 hover:bg-indigo-600/40 text-indigo-100"
+                              className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-white/70 border border-border hover:bg-white text-ink"
                               title="Generate/regenerate AI synopsis"
                             >
                               {loading ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
-                              {loading ? "…" : "AI"}
+                              <span className="text-xs">{loading ? "…" : "AI"}</span>
                             </button>
                           </div>
                         </div>
                       </div>
 
                       {isOpen && (
-                        <div className="mt-3 text-sm text-slate-200/95">
+                        <div className="mt-3 text-sm text-ink">
                           {/* Editable title */}
                           <div className="mb-3">
-                            <div className="text-xs text-slate-300/90 mb-1">Chapter title</div>
+                            <div className="text-xs text-muted mb-1">Chapter title</div>
                             <input
                               value={ch.title}
                               onChange={(e) => updateChapter(ch.id, { title: e.target.value })}
-                              className="w-full px-3 py-2 rounded-lg bg-sky-800/30 border border-sky-600/40 text-sm outline-none backdrop-blur-sm font-serif"
+                              className="w-full px-3 py-2 rounded-lg bg-white/70 border border-border text-sm outline-none"
                             />
                           </div>
 
                           {/* AI Synopsis */}
                           <div className="mb-4">
-                            <div className="font-medium mb-1 text-slate-100">AI Synopsis</div>
-                            <div className="rounded-lg bg-sky-800/30 border border-sky-600/40 p-3 backdrop-blur-sm">
+                            <div className="font-medium mb-1">AI Synopsis</div>
+                            <div className="rounded-lg bg-white/70 border border-border p-3">
                               {ch.synopsis ? (
                                 ch.synopsis
                               ) : (
-                                <span className="opacity-70">No synopsis yet. Click "AI" to generate.</span>
+                                <span className="text-muted">No synopsis yet. Click “AI” to generate.</span>
                               )}
                             </div>
                           </div>
 
                           {/* Chapter content */}
                           <div>
-                            <div className="flex items-center gap-2 text-slate-300/90 text-xs mb-1">
+                            <div className="flex items-center gap-2 text-muted text-xs mb-1">
                               <ListTree size={14} />
                               <span>Chapter content</span>
                             </div>
@@ -504,7 +498,7 @@ export default function TOCPage() {
                               value={ch.content}
                               onChange={(e) => updateChapter(ch.id, { content: e.target.value })}
                               placeholder="Draft your chapter content here…"
-                              className="w-full min-h-[120px] rounded-lg bg-sky-800/30 border border-sky-600/40 px-3 py-2 text-sm outline-none placeholder:text-slate-300/70 resize-y backdrop-blur-sm font-serif"
+                              className="w-full min-h-[120px] rounded-lg bg-white/70 border border-border px-3 py-2 text-sm outline-none placeholder:text-muted resize-y"
                             />
                           </div>
                         </div>
@@ -519,20 +513,20 @@ export default function TOCPage() {
 
         {/* Delete confirmation modal */}
         {showConfirm && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-            <div className="bg-sky-950/90 backdrop-blur-xl rounded-3xl p-6 max-w-md w-full border border-sky-800/40 shadow-2xl">
+          <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
+            <div className="bg-white/90 backdrop-blur-xl rounded-3xl p-6 max-w-md w-full border border-border shadow-glass">
               <div className="flex items-center gap-3 mb-4">
-                <AlertCircle className="text-red-300" size={20} />
-                <div className="text-lg font-semibold text-white">Delete Chapter</div>
+                <AlertCircle className="text-red-600" size={20} />
+                <div className="text-lg font-semibold text-ink">Delete Chapter</div>
               </div>
-              <div className="text-slate-200 mb-6">
+              <div className="text-ink/80 mb-6">
                 Are you sure you want to delete "
                 {chapters.find((ch) => ch.id === showConfirm)?.title}"? This action cannot be undone.
               </div>
               <div className="flex gap-3">
                 <button
                   onClick={() => setShowConfirm(null)}
-                  className="flex-1 px-4 py-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-white"
+                  className="flex-1 px-4 py-2 rounded-xl bg-white border border-border hover:bg-white/90 text-ink"
                 >
                   Cancel
                 </button>
