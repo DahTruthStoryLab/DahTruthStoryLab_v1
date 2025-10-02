@@ -17,7 +17,9 @@ import {
   Settings,
   Moon,
   Sun
-} from "lucide-react";
+}
+  import { Map as MapIcon, /* rest... */ } from "lucide-react";
+
 
 /**
  * StoryLab Journey Landing
@@ -71,6 +73,21 @@ const MODULES = [
     icon: LayoutGrid,
     tint: "from-cyan-500/20 to-blue-500/20",
   },
+];
+const BASE = "/story-lab";
+
+const MODULES = [
+  { id: "prompts",    title: "Story Prompts",          blurb: "Context-aware sparks for stuck scenes.",   icon: Sparkles,  tint: "from-indigo-500/20 to-sky-500/20", route: `${BASE}/prompts` },
+  { id: "roadmap",    title: "Character Roadmap",      blurb: "Map growth arcs and pivotal beats.",       icon: MapIcon,   tint: "from-emerald-500/20 to-teal-500/20", route: `${BASE}/workshop/roadmap` },
+  { id: "hopes",      title: "Hopes • Fears • Legacy", blurb: "Surface motives that drive choices.",      icon: Heart,     tint: "from-rose-500/20 to-fuchsia-500/20", route: `${BASE}/workshop/hfl` },
+  { id: "priority",   title: "Priority Cards",         blurb: "Organize what matters most next.",         icon: Target,    tint: "from-amber-500/20 to-orange-500/20", route: `${BASE}/workshop/priorities` },
+  { id: "clothesline",title: "Clothesline",            blurb: "Org-style cast view at a glance.",         icon: LayoutGrid,tint: "from-cyan-500/20 to-blue-500/20",    route: `${BASE}/workshop/clothesline` },
+];
+
+const DEV_SECTIONS = [
+  { id: "profiles", title: "Character Profiles", blurb: "Detailed sheets for traits, wounds and wants.", icon: Brain,         route: `${BASE}/characters`,        tint: "from-purple-500/20 to-indigo-500/20" },
+  { id: "world",    title: "World Bible",        blurb: "Lore, locations, culture—organized.",          icon: BookOpenCheck,  route: `${BASE}/world`,             tint: "from-sky-500/20 to-cyan-500/20" },
+  { id: "manager",  title: "Character Manager",  blurb: "Create, link and reuse your cast.",             icon: FolderKanban,   route: `${BASE}/character-manager`, tint: "from-emerald-500/20 to-lime-500/20" },
 ];
 
 const DEV_SECTIONS = [
