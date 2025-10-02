@@ -3,30 +3,14 @@ frontend:
   phases:
     preBuild:
       commands:
-        # --- Use Node 20 (required by some transitive deps)
-        - nvm install 20.19.4
-        - nvm use 20.19.4
+        - nvm install 20
+        - nvm use 20
         - node -v
-        - npm -v
-
-        # --- Start clean to avoid "Missing: X from lock file"
-        - rm -f package-lock.json
-        - rm -rf node_modules
-        - npm cache clean --force
-
-        # --- Install (don’t use npm ci since we just removed the lock)
-        - npm install --no-audit --no-fund
-
-        # --- Show what got installed (helps debugging)
-        - npm ls --depth=0 || true
-        - ls -la
-
+        - npm ci --legacy-peer-deps
     build:
       commands:
-        # Prevent CRA from treating warnings as fatal in CI
-        - export CI=false
-        # Memory headroom for TypeScript / webpack
         - export NODE_OPTIONS="--max_old_space_size=4096"
+        - export CI=false
         - npm run build
   artifacts:
     baseDirectory: build
@@ -37,3 +21,4 @@ frontend:
       - node_modules/**/*
       - ~/.npm/**/*
       - ~/.cache/**/*
+
