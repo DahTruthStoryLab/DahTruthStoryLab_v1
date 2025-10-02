@@ -1,8 +1,8 @@
 import React from "react";
-import { useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
+import { useNavigate, Link, useLocation } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
 import {
-  Map as MapIcon, // ✅ alias Map to avoid conflicts
+  Map as MapIcon,
   Compass,
   Sparkles,
   BookOpenCheck,
@@ -16,103 +16,261 @@ import {
   Quote,
   Settings,
   Moon,
-  Sun
+  Sun,
+  Users,
+  MessageSquare,
+  ListChecks,
+  Menu,
+  X,
 } from "lucide-react";
+import BrandLogo from "../../components/BrandLogo"; // ← adjust if your path differs
 
 /**
- * StoryLab Journey Landing
- * -----------------------------------------------------------
- * Landing page for StoryLab with journey map + modules.
- * Tailwind CSS + Framer Motion required.
+ * StoryLab Journey Landing — Light theme + mobile/desktop sidebar
+ * Uses your Tailwind tokens:
+ *  - bg-base bg-radial-fade text-ink
+ *  - glass / glass-soft / glass-panel utilities
+ *  - primary, accent, border, gold
  */
 
 const BASE = "/story-lab";
 
 const MODULES = [
-  {
-    id: "prompts",
-    title: "Story Prompts",
-    blurb: "Context-aware sparks for stuck scenes.",
-    icon: Sparkles,
-    tint: "from-indigo-500/20 to-sky-500/20",
-    route: `${BASE}/prompts`,
-  },
-  {
-    id: "roadmap",
-    title: "Character Roadmap",
-    blurb: "Map growth arcs and pivotal beats.",
-    icon: MapIcon,
-    tint: "from-emerald-500/20 to-teal-500/20",
-    route: `${BASE}/workshop/roadmap`,
-  },
-  {
-    id: "hopes",
-    title: "Hopes • Fears • Legacy",
-    blurb: "Surface motives that drive choices.",
-    icon: Heart,
-    tint: "from-rose-500/20 to-fuchsia-500/20",
-    route: `${BASE}/workshop/hfl`,
-  },
-  {
-    id: "priority",
-    title: "Priority Cards",
-    blurb: "Organize what matters most next.",
-    icon: Target,
-    tint: "from-amber-500/20 to-orange-500/20",
-    route: `${BASE}/workshop/priorities`,
-  },
-  {
-    id: "clothesline",
-    title: "Clothesline",
-    blurb: "Org-style cast view at a glance.",
-    icon: LayoutGrid,
-    tint: "from-cyan-500/20 to-blue-500/20",
-    route: `${BASE}/workshop/clothesline`,
-  },
+  { id: "prompts",     title: "Story Prompts",          blurb: "Context-aware sparks for stuck scenes.",   icon: Sparkles,   tint: "from-indigo-500/20 to-sky-500/20",   route: `${BASE}/prompts` },
+  { id: "roadmap",     title: "Character Roadmap",      blurb: "Map growth arcs and pivotal beats.",       icon: MapIcon,    tint: "from-emerald-500/20 to-teal-500/20", route: `${BASE}/workshop/roadmap` },
+  { id: "hopes",       title: "Hopes • Fears • Legacy", blurb: "Surface motives that drive choices.",      icon: Heart,      tint: "from-rose-500/20 to-fuchsia-500/20", route: `${BASE}/workshop/hfl` },
+  { id: "priority",    title: "Priority Cards",         blurb: "Organize what matters most next.",         icon: Target,     tint: "from-amber-500/20 to-orange-500/20", route: `${BASE}/workshop/priorities` },
+  { id: "clothesline", title: "Clothesline",            blurb: "Org-style cast view at a glance.",         icon: LayoutGrid, tint: "from-cyan-500/20 to-blue-500/20",    route: `${BASE}/workshop/clothesline` },
 ];
 
 const DEV_SECTIONS = [
-  {
-    id: "profiles",
-    title: "Character Profiles",
-    blurb: "Detailed sheets to track traits, wounds, and wants.",
-    icon: Brain,
-    route: `${BASE}/characters`,
-    tint: "from-purple-500/20 to-indigo-500/20",
-  },
-  {
-    id: "world",
-    title: "World Bible",
-    blurb: "Lore, locations, culture—organized and searchable.",
-    icon: BookOpenCheck,
-    route: `${BASE}/world`,
-    tint: "from-sky-500/20 to-cyan-500/20",
-  },
-  {
-    id: "manager",
-    title: "Character Manager",
-    blurb: "Create, link, and reuse your cast.",
-    icon: FolderKanban,
-    route: `${BASE}/character-manager`,
-    tint: "from-emerald-500/20 to-lime-500/20",
-  },
+  { id: "profiles", title: "Character Profiles", blurb: "Detailed sheets to track traits, wounds, and wants.", icon: Brain,        route: `${BASE}/characters`,        tint: "from-purple-500/20 to-indigo-500/20" },
+  { id: "world",    title: "World Bible",        blurb: "Lore, locations, culture—organized and searchable.", icon: BookOpenCheck, route: `${BASE}/world`,             tint: "from-sky-500/20 to-cyan-500/20" },
+  { id: "manager",  title: "Character Manager",  blurb: "Create, link, and reuse your cast.",               icon: FolderKanban,  route: `${BASE}/character-manager`, tint: "from-emerald-500/20 to-lime-500/20" },
 ];
+
+const NAV_LINKS = [
+  { to: `${BASE}`,                      icon: Compass,    label: "Landing" },
+  { to: `${BASE}/prompts`,             icon: Sparkles,   label: "Story Prompts" },
+  { to: `${BASE}/workshop/roadmap`,    icon: MapIcon,    label: "Character Roadmap" },
+  { to: `${BASE}/workshop/hfl`,        icon: Heart,      label: "Hopes • Fears • Legacy" },
+  { to: `${BASE}/workshop/priorities`, icon: ListChecks, label: "Priority Cards" },
+  { to: `${BASE}/workshop/clothesline`,icon: LayoutGrid, label: "Clothesline" },
+  { to: `${BASE}/community`,           icon: Users,      label: "Workshop Community" },
+];
+
+/* ============ Dynamic Quote (from saved chapters) ============ */
+function useChapterSentences() {
+  const [line, setLine] = React.useState("");
+  const pick = React.useCallback(() => {
+    try {
+      const raw = localStorage.getItem("dahtruth-story-lab-toc-v3");
+      const parsed = raw ? JSON.parse(raw) : null;
+      const chapters = parsed?.chapters || [];
+      const text = chapters
+        .map((c) => c?.text || c?.content || c?.body || "")
+        .join(" ")
+        .replace(/\s+/g, " ");
+      const sentences = text.match(/[^.!?]+[.!?]/g) || [];
+      setLine(
+        sentences.length
+          ? sentences[Math.floor(Math.random() * sentences.length)].trim()
+          : "Start writing—your own words will appear here."
+      );
+    } catch {
+      setLine("Start writing—your own words will appear here.");
+    }
+  }, []);
+
+  React.useEffect(() => {
+    pick();
+    const onStorage = (e) => e.key === "dahtruth-story-lab-toc-v3" && pick();
+    window.addEventListener("storage", onStorage);
+    window.addEventListener("chapters:updated", pick); // dispatch this after saving chapters
+    return () => {
+      window.removeEventListener("storage", onStorage);
+      window.removeEventListener("chapters:updated", pick);
+    };
+  }, [pick]);
+
+  return { line, refresh: pick };
+}
+
+function QuoteBarTop() {
+  const { line, refresh } = useChapterSentences();
+  return (
+    <div className="mx-auto max-w-7xl px-4 pt-4">
+      <div className="glass-soft px-5 py-4 flex items-center justify-between">
+        <div className="italic text-ink">“{line}”</div>
+        <button
+          onClick={refresh}
+          className="ml-4 rounded-xl border border-border bg-white px-3 py-1.5 text-sm text-ink hover:shadow"
+          title="New quote from your story"
+        >
+          Refresh
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ============ Desktop Sidebar (md+) ============ */
+function DesktopSidebar() {
+  const { pathname } = useLocation();
+  const Item = ({ to, icon: Icon, label }) => (
+    <Link
+      to={to}
+      className={`group flex items-center gap-3 rounded-2xl px-3 py-2 border transition
+        ${pathname === to
+          ? "bg-white border-border text-ink shadow"
+          : "bg-white/70 border-border text-ink/80 hover:bg-white"}`}
+    >
+      <Icon className="size-5" />
+      <span className="truncate">{label}</span>
+    </Link>
+  );
+  return (
+    <aside className="hidden md:block fixed left-0 top-0 z-40 h-screen w-72 p-3 border-r border-border bg-white/80 backdrop-blur-md">
+      <div className="flex items-center gap-2 px-1 py-2">
+        <BrandLogo className="h-8 w-auto" />
+        <div className="leading-tight">
+          <div className="font-serif text-lg font-bold text-ink">DahTruth</div>
+          <div className="text-[11px] tracking-wide text-muted">Story Lab</div>
+        </div>
+      </div>
+      <div className="mt-2 grid gap-2">
+        {NAV_LINKS.map((l) => (
+          <Item key={l.to} to={l.to} icon={l.icon} label={l.label} />
+        ))}
+      </div>
+    </aside>
+  );
+}
+
+/* ============ Mobile Sidebar (slide-in sheet) ============ */
+function MobileSidebar({ open, setOpen }) {
+  const { pathname } = useLocation();
+  React.useEffect(() => {
+    document.body.style.overflow = open ? "hidden" : "";
+    return () => (document.body.style.overflow = "");
+  }, [open]);
+
+  const Item = ({ to, icon: Icon, label }) => (
+    <Link
+      to={to}
+      onClick={() => setOpen(false)}
+      className={`flex items-center gap-3 rounded-2xl px-3 py-2 border transition mb-1
+        ${pathname === to
+          ? "bg-white border-border text-ink shadow"
+          : "bg-white/80 border-border text-ink/80 hover:bg-white"}`}
+    >
+      <Icon className="size-5" />
+      <span>{label}</span>
+    </Link>
+  );
+
+  return (
+    <AnimatePresence>
+      {open && (
+        <>
+          <motion.div
+            className="fixed inset-0 z-50 bg-black/20"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setOpen(false)}
+          />
+          <motion.aside
+            className="fixed left-0 top-0 bottom-0 z-50 w-80 bg-base border-r border-border p-3"
+            initial={{ x: -320 }}
+            animate={{ x: 0 }}
+            exit={{ x: -320 }}
+            transition={{ type: "spring", stiffness: 260, damping: 24 }}
+          >
+            <div className="flex items-center justify-between px-1 py-2">
+              <div className="flex items-center gap-2">
+                <BrandLogo className="h-7 w-auto" />
+                <span className="font-serif text-lg font-bold text-ink">DahTruth</span>
+              </div>
+              <button
+                onClick={() => setOpen(false)}
+                className="rounded-xl border border-border bg-white px-2 py-1"
+                aria-label="Close menu"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+            <div className="mt-2">
+              {NAV_LINKS.map((l) => (
+                <Item key={l.to} to={l.to} icon={l.icon} label={l.label} />
+              ))}
+            </div>
+          </motion.aside>
+        </>
+      )}
+    </AnimatePresence>
+  );
+}
+
+/* ============ Community Quick Access ============ */
+function CommunityStrip() {
+  return (
+    <div className="grid gap-3 sm:grid-cols-3">
+      <Link to={`${BASE}/community`} className="glass-soft p-4 flex items-start gap-3">
+        <Users className="size-5 text-primary" />
+        <div>
+          <div className="font-semibold text-ink">Workshop Community</div>
+          <div className="text-sm text-muted">Sessions, pairings, critique hub.</div>
+        </div>
+      </Link>
+      <Link to={`${BASE}/workshop`} className="glass-soft p-4 flex items-start gap-3">
+        <Compass className="size-5 text-primary" />
+        <div>
+          <div className="font-semibold text-ink">Workshop Manager</div>
+          <div className="text-sm text-muted">Launch modules & manage flow.</div>
+        </div>
+      </Link>
+      <Link to={`${BASE}/community`} className="glass-soft p-4 flex items-start gap-3">
+        <MessageSquare className="size-5 text-primary" />
+        <div>
+          <div className="font-semibold text-ink">Critique Room</div>
+          <div className="text-sm text-muted">Open live critique.</div>
+        </div>
+      </Link>
+    </div>
+  );
+}
 
 export default function StoryLabLanding() {
   const navigate = useNavigate();
+  const [mobileOpen, setMobileOpen] = React.useState(false);
 
   return (
-    <div className="min-h-[100dvh] bg-gradient-to-b from-[#0b1220] via-[#0b1220] to-[#0b1220]/95 dark:from-[#0a0a0a] text-slate-100">
-      {/* Top bar */}
-      <div className="sticky top-0 z-40 backdrop-blur supports-[backdrop-filter]:bg-white/5 bg-white/0 border-b border-white/10">
+    <div className="min-h-[100dvh] bg-base bg-radial-fade text-ink">
+      {/* Sidebar */}
+      <DesktopSidebar />
+      <MobileSidebar open={mobileOpen} setOpen={setMobileOpen} />
+
+      {/* Top bar — brand */}
+      <div className="md:ml-72 sticky top-0 z-40 border-b border-border bg-white/70 backdrop-blur-md">
         <div className="mx-auto max-w-7xl px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Compass className="size-5" />
-            <span className="font-semibold tracking-wide">DahTruth • StoryLab</span>
+          <div className="flex items-center gap-3">
+            {/* Mobile hamburger */}
+            <button
+              className="md:hidden rounded-xl border border-border bg-white px-3 py-2"
+              onClick={() => setMobileOpen(true)}
+              aria-label="Open menu"
+            >
+              <Menu className="size-5 text-ink" />
+            </button>
+            <BrandLogo className="h-6 w-auto" />
+            <span className="font-semibold tracking-wide">
+              <span className="text-primary">DahTruth</span> • StoryLab
+            </span>
           </div>
           <div className="flex items-center gap-3">
             <button
-              className="inline-flex items-center gap-2 rounded-xl px-3 py-1.5 text-sm bg-white/10 hover:bg-white/15 border border-white/10"
+              className="hidden sm:inline-flex items-center gap-2 rounded-xl px-3 py-1.5 text-sm border border-border bg-white hover:shadow"
               onClick={() => navigate("/settings")}
             >
               <Settings className="size-4" /> Settings
@@ -122,23 +280,25 @@ export default function StoryLabLanding() {
         </div>
       </div>
 
+      {/* Top Quote */}
+      <QuoteBarTop />
+
       {/* Hero / Journey Map */}
-      <section className="relative">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,rgba(29,78,216,0.25),transparent_60%)]" />
-        <div className="mx-auto max-w-7xl px-4 pt-12 pb-8 relative">
+      <section className="relative md:ml-72">
+        <div className="mx-auto max-w-7xl px-4 pt-10 pb-6 relative">
           <motion.h1
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
             className="text-3xl md:text-5xl font-bold tracking-tight"
           >
-            Welcome to your <span className="text-sky-300">Story Journey</span>
+            Welcome to your <span className="text-primary">Story Journey</span>
           </motion.h1>
           <motion.p
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1, duration: 0.55 }}
-            className="mt-3 max-w-2xl text-slate-300"
+            className="mt-3 max-w-2xl text-muted"
           >
             Choose a path to begin. Each module is a step—prompts, roadmaps, priorities,
             and character views—designed to move your story forward with clarity and flow.
@@ -147,13 +307,13 @@ export default function StoryLabLanding() {
           <div className="mt-6 flex flex-wrap items-center gap-3">
             <button
               onClick={() => navigate("/journey")}
-              className="inline-flex items-center gap-2 rounded-2xl px-4 py-2 bg-sky-500/90 hover:bg-sky-400 text-slate-900 font-semibold shadow-lg shadow-sky-700/20"
+              className="inline-flex items-center gap-2 rounded-2xl px-4 py-2 bg-primary hover:bg-primary/90 text-white font-semibold shadow"
             >
               <MapIcon className="size-5" /> Open Journey Map
             </button>
             <button
               onClick={() => navigate(`${BASE}/prompts`)}
-              className="inline-flex items-center gap-2 rounded-2xl px-4 py-2 bg-white/10 hover:bg-white/15 border border-white/10"
+              className="inline-flex items-center gap-2 rounded-2xl px-4 py-2 glass"
             >
               <PenLine className="size-5" /> Quick Prompt
             </button>
@@ -162,13 +322,17 @@ export default function StoryLabLanding() {
         </div>
       </section>
 
+      {/* Community strip */}
+      <section className="md:ml-72 mx-auto max-w-7xl px-4 pb-4">
+        <CommunityStrip />
+      </section>
+
       {/* Toolbelt: Live Session Modules */}
-      <section className="mx-auto max-w-7xl px-4 py-8">
+      <section className="md:ml-72 mx-auto max-w-7xl px-4 py-6">
         <SectionHeader
           title="Live Session Modules"
           subtitle="Your facilitator toolkit—fast access during sessions."
         />
-
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {MODULES.map((m, i) => (
             <motion.button
@@ -178,19 +342,21 @@ export default function StoryLabLanding() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, amount: 0.2 }}
               transition={{ delay: i * 0.04 }}
-              className={`group relative overflow-hidden rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 p-4 text-left`}
+              className="group relative overflow-hidden glass-panel p-4 text-left"
             >
-              <div className={`absolute -top-10 -right-10 size-36 rounded-full bg-gradient-to-br ${m.tint} blur-2xl`} />
+              <div
+                className={`absolute -top-10 -right-10 size-36 rounded-full bg-gradient-to-br ${m.tint} blur-2xl`}
+              />
               <div className="flex items-start gap-3 relative">
-                <div className="shrink-0 rounded-xl bg-white/10 p-2 border border-white/10">
-                  <m.icon className="size-5" />
+                <div className="shrink-0 rounded-xl bg-white p-2 border border-border">
+                  <m.icon className="size-5 text-ink" />
                 </div>
                 <div>
-                  <div className="font-semibold">{m.title}</div>
-                  <div className="text-sm text-slate-300 mt-1">{m.blurb}</div>
+                  <div className="font-semibold text-ink">{m.title}</div>
+                  <div className="text-sm text-muted mt-1">{m.blurb}</div>
                 </div>
               </div>
-              <div className="mt-4 flex items-center gap-2 text-sky-300 text-sm opacity-0 group-hover:opacity-100 transition">
+              <div className="mt-4 flex items-center gap-2 text-primary text-sm opacity-0 group-hover:opacity-100 transition">
                 Continue <Compass className="size-4" />
               </div>
             </motion.button>
@@ -199,7 +365,7 @@ export default function StoryLabLanding() {
       </section>
 
       {/* Development: Character + World */}
-      <section className="mx-auto max-w-7xl px-4 pb-10">
+      <section className="md:ml-72 mx-auto max-w-7xl px-4 pb-16">
         <SectionHeader
           title="Character Development"
           subtitle="Deeper craft tools for focused work outside live sessions."
@@ -213,16 +379,18 @@ export default function StoryLabLanding() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, amount: 0.2 }}
               transition={{ delay: i * 0.05 }}
-              className={`relative overflow-hidden rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 p-4 text-left`}
+              className="relative overflow-hidden glass-panel p-4 text-left"
             >
-              <div className={`absolute -top-10 -right-10 size-36 rounded-full bg-gradient-to-br ${s.tint} blur-2xl`} />
+              <div
+                className={`absolute -top-10 -right-10 size-36 rounded-full bg-gradient-to-br ${s.tint} blur-2xl`}
+              />
               <div className="flex items-start gap-3 relative">
-                <div className="shrink-0 rounded-xl bg-white/10 p-2 border border-white/10">
-                  <s.icon className="size-5" />
+                <div className="shrink-0 rounded-xl bg-white p-2 border border-border">
+                  <s.icon className="size-5 text-ink" />
                 </div>
                 <div>
-                  <div className="font-semibold">{s.title}</div>
-                  <div className="text-sm text-slate-300 mt-1">{s.blurb}</div>
+                  <div className="font-semibold text-ink">{s.title}</div>
+                  <div className="text-sm text-muted mt-1">{s.blurb}</div>
                 </div>
               </div>
             </motion.button>
@@ -230,25 +398,24 @@ export default function StoryLabLanding() {
         </div>
       </section>
 
-      {/* Quote Banner */}
-      <section className="mx-auto max-w-7xl px-4 pb-16">
-        <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-slate-800/60 to-slate-900/60">
-          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(56,189,248,0.12),transparent_60%)]" />
+      {/* Quote Banner (secondary inspiration) */}
+      <section className="md:ml-72 mx-auto max-w-7xl px-4 pb-16">
+        <div className="glass-panel">
           <div className="p-6 md:p-8 relative">
-            <div className="flex items-center gap-3 text-sky-300">
+            <div className="flex items-center gap-3 text-primary">
               <Quote className="size-5" />
               <span className="uppercase tracking-wider text-xs">Today's Spark</span>
             </div>
-            <p className="mt-3 text-lg md:text-xl text-slate-200">
+            <p className="mt-3 text-lg md:text-xl text-ink">
               “There is no greater agony than bearing an untold story inside you.”
-              <span className="text-slate-400"> — Maya Angelou</span>
+              <span className="text-muted"> — Maya Angelou</span>
             </p>
           </div>
         </div>
       </section>
 
-      {/* Footer note */}
-      <footer className="mx-auto max-w-7xl px-4 pb-10 text-xs text-slate-400">
+      {/* Footer */}
+      <footer className="md:ml-72 mx-auto max-w-7xl px-4 pb-16 text-xs text-muted">
         © {new Date().getFullYear()} DahTruth • Where Truth is Written
       </footer>
     </div>
@@ -259,17 +426,16 @@ function SectionHeader({ title, subtitle }) {
   return (
     <div className="mb-4 flex items-end justify-between">
       <div>
-        <h2 className="text-xl md:text-2xl font-semibold text-slate-100">{title}</h2>
-        <p className="text-sm text-slate-400">{subtitle}</p>
+        <h2 className="text-xl md:text-2xl font-semibold text-ink">{title}</h2>
+        <p className="text-sm text-muted">{subtitle}</p>
       </div>
     </div>
   );
 }
 
 function CountdownStub() {
-  // This is a stylistic stub; wire to real data later.
   return (
-    <div className="inline-flex items-center gap-2 rounded-2xl px-3 py-1.5 border border-white/10 bg-white/5 text-slate-200">
+    <div className="inline-flex items-center gap-2 rounded-2xl px-3 py-1.5 border border-border bg-white/80 text-ink">
       <CalendarClock className="size-4" />
       <span className="text-sm">Next session in 2 days</span>
     </div>
@@ -280,19 +446,14 @@ function DarkModeToggle() {
   const [dark, setDark] = React.useState(
     typeof window !== "undefined" && document.documentElement.classList.contains("dark")
   );
-
   React.useEffect(() => {
-    if (dark) {
-      document.documentElement.classList.add("dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-    }
+    if (dark) document.documentElement.classList.add("dark");
+    else document.documentElement.classList.remove("dark");
   }, [dark]);
-
   return (
     <button
       onClick={() => setDark((d) => !d)}
-      className="inline-flex items-center gap-2 rounded-xl px-3 py-1.5 text-sm bg-white/10 hover:bg-white/15 border border-white/10"
+      className="inline-flex items-center gap-2 rounded-xl px-3 py-1.5 text-sm border border-border bg-white hover:shadow"
       aria-label="Toggle dark mode"
     >
       {dark ? <Sun className="size-4" /> : <Moon className="size-4" />} {dark ? "Light" : "Dark"}
