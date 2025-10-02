@@ -26,8 +26,8 @@ const WhoAmI               = lazy(() => import("./components/WhoAmI"));
 const WriteSection         = lazy(() => import("./components/WriteSection"));
 const Calendar             = lazy(() => import("./components/Calendar"));
 
-// StoryLab (overview) + Prompts (workshop prompts page)
-const StoryLab             = lazy(() => import("./lib/storylab/StoryLab"));
+// StoryLab Landing (new overview) + Prompts (workshop prompts page)
+const StoryLabLanding      = lazy(() => import("./components/storylab/StoryLabLanding"));
 const StoryPromptsWorkshop = lazy(() => import("./lib/storylab/StoryPromptsWorkshop"));
 
 // NEW: Workshop hub + modules (under /components/storylab)
@@ -75,11 +75,8 @@ function ScrollToTop() {
 /* =========================
    Auth gate (toggleable)
    ========================= */
-// Set to true while Auth is WIP; set to false when ready to enforce auth.
 const BYPASS_AUTH = true;
 
-// Very light "session" check that you can swap later for real auth.
-// If BYPASS_AUTH is false, we check a localStorage key.
 function ProtectedRoute({ children }) {
   if (BYPASS_AUTH) return children;
   const user = localStorage.getItem("dt_auth_user");
@@ -95,7 +92,6 @@ function TableOfContentsRouter() {
   const key = "tocVersion";
   const stored = localStorage.getItem(key);
 
-  // Decide version (URL param wins, then stored, default "2")
   const chosen = paramV || stored || "2";
   if (chosen !== stored) localStorage.setItem(key, chosen);
 
@@ -144,12 +140,12 @@ export default function App() {
             }
           />
 
-          {/* StoryLab (overview) */}
+          {/* StoryLab Landing (new overview) */}
           <Route
             path="/story-lab"
             element={
               <ProtectedRoute>
-                <StoryLab />
+                <StoryLabLanding />
               </ProtectedRoute>
             }
           />
@@ -297,15 +293,6 @@ export default function App() {
             element={
               <ProtectedRoute>
                 <Placeholder title="About" />
-              </ProtectedRoute>
-            }
-          />
-          
-          <Route
-            path="/story-lab/community"
-            element={
-              <ProtectedRoute>
-                <WorkshopCohort />
               </ProtectedRoute>
             }
           />
