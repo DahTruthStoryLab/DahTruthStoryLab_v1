@@ -1,139 +1,179 @@
 // src/components/storylab/HopesFearsLegacy.jsx
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Users, Heart } from "lucide-react";
+import { Heart } from "lucide-react";
 import { loadProject, saveProject, ensureWorkshopFields } from "../../lib/storylab/projectStore";
-
 import BackToLanding, { BackToLandingFab } from "./BackToLanding";
 
-export default function HopesFearsLegacy() {
-  return (
-    <div className="min-h-screen bg-base text-ink">
-      <BackToLanding title="Hopes • Fears • Legacy" />
-      {/* existing content */}
-      <BackToLandingFab />
-    </div>
-  );
-}
-
+/* ---------------------------
+   Page banner (light/glass)
+---------------------------- */
 const PageBanner = () => (
   <div className="mx-auto mb-8">
-    <div className="relative mx-auto max-w-3xl rounded-2xl border border-white/40 bg-white/20 backdrop-blur-xl px-6 py-6 text-center shadow overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-br from-purple-500/5 via-transparent to-amber-500/5 pointer-events-none" />
+    <div className="relative mx-auto max-w-3xl rounded-2xl border border-border bg-white/80 backdrop-blur-xl px-6 py-6 text-center shadow overflow-hidden">
+      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-gold/10 pointer-events-none" />
       <div className="relative z-10">
-        <div className="mx-auto mb-3 inline-flex items-center justify-center rounded-xl border border-white/50 bg-white/40 px-4 py-1.5">
-          <Heart size={14} className="mr-2 text-ink/70" />
-          <span className="text-xs font-semibold tracking-wide text-ink/80">DahTruth · StoryLab</span>
+        <div className="mx-auto mb-3 inline-flex items-center justify-center rounded-xl border border-border bg-white/70 px-4 py-1.5">
+          <Heart size={14} className="mr-2 text-muted" />
+          <span className="text-xs font-semibold tracking-wide text-muted">DahTruth · StoryLab</span>
         </div>
-        <h1 className="text-3xl font-extrabold text-ink mb-2">Hopes · Fears · Legacy</h1>
-        <p className="mt-1 text-sm text-ink/70 max-w-xl mx-auto">
-          Focused view for your Main Character, Protagonist, and Antagonist.
+        <h1 className="text-3xl font-extrabold text-ink mb-2">Hopes • Fears • Legacy</h1>
+        <p className="mt-1 text-sm text-muted max-w-xl mx-auto">
+          Clarify the inner engine of your main cast. Auto-saves as you type.
         </p>
       </div>
     </div>
   </div>
 );
 
+/* ---------------------------
+   Small “Saving…” indicator
+---------------------------- */
+function SavingBadge({ state }) {
+  const map = {
+    idle: { text: "Saved", cls: "text-emerald-700 bg-emerald-50 border-emerald-200" },
+    saving: { text: "Saving…", cls: "text-primary bg-white border-border" },
+  };
+  const m = map[state] || map.idle;
+  return (
+    <span className={`text-xs px-2 py-1 rounded-md border ${m.cls}`}>{m.text}</span>
+  );
+}
+
+/* ------------------------------------------------
+   HopesFearsLegacy (single export — no duplicates)
+------------------------------------------------- */
 export default function HopesFearsLegacy() {
   const [project, setProject] = useState(() => ensureWorkshopFields(loadProject()));
-  const names = project.hfl.names;
-  const notes = project.hfl.notes;
 
-  const commit = (mutator) => {
+  const DEFAULT = {
+    mc: { hopes: "", fears: "", legacy: "" },
+    protagonist: { hopes: "", fears: "", legacy: "" },
+    antagonist: { hopes: "", fears: "", legacy: "" },
+  };
+
+  // Local working copy
+  const [hfl, setHfl] = useState(() => ({ ...DEFAULT, ...(project.hfl || {}) }));
+  const [saving, setSaving] = useState("idle"); // "idle" | "saving"
+
+  // Helper to persist to shared store
+  const commit = (next) => {
     const copy = JSON.parse(JSON.stringify(project));
-    mutator(copy);
+    copy.hfl = next;
     ensureWorkshopFields(copy);
     saveProject(copy);
     setProject(copy);
+    try { window.dispatchEvent(new Event("project:change")); } catch {}
   };
 
-  const PersonBlock = ({ label, value, onChange }) => (
-    <div className="rounded-xl border border-white/60 bg-white p-3">
-      <div className="text-xs text-ink/60 mb-1">{label}</div>
-      <div className="flex items-center gap-2">
-        <Users className="h-4 w-4 text-ink/70" />
-        <input
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className="flex-1 bg-transparent border-b border-white/60 focus:border-violet-400 outline-none text-sm"
-          placeholder={label}
-        />
-      </div>
-    </div>
-  );
+  // Debounced auto-save
+  useEffect(() => {
+    setSaving("saving");
+    const id = setTimeout(() => {
+      commit(hfl);
+      setSaving("idle");
+    }, 350);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hfl]);
 
-  const Column = ({ title, value, onChange }) => (
-    <div className="rounded-xl border border-white/60 bg-white/80 p-4">
-      <div className="text-sm font-semibold mb-2">{title}</div>
-      <textarea
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="w-full h-28 rounded-lg border border-white/60 p-3 bg-white text-sm"
-        placeholder={`Notes for ${title.toLowerCase()}…`}
-      />
-    </div>
-  );
+  // Field change
+  const edit = (role, field, value) =>
+    setHfl((prev) => ({ ...prev, [role]: { ...prev[role], [field]: value } }));
 
-  const Trio = ({ whoKey, whoName }) => (
-    <div className="rounded-2xl border border-white/60 bg-white/70 p-4">
-      <div className="font-semibold mb-3">{whoName}</div>
-      <div className="grid gap-3 md:grid-cols-3">
-        <Column
-          title="Hopes"
-          value={notes[whoKey].hopes}
-          onChange={(v) => commit(p => { p.hfl.notes[whoKey].hopes = v; })}
-        />
-        <Column
-          title="Fears"
-          value={notes[whoKey].fears}
-          onChange={(v) => commit(p => { p.hfl.notes[whoKey].fears = v; })}
-        />
-        <Column
-          title="Legacy"
-          value={notes[whoKey].legacy}
-          onChange={(v) => commit(p => { p.hfl.notes[whoKey].legacy = v; })}
-        />
+  // Manual save (optional)
+  const saveNow = () => {
+    setSaving("saving");
+    commit(hfl);
+    setSaving("idle");
+  };
+
+  const RoleCard = ({ roleKey, label }) => {
+    const data = hfl[roleKey] || { hopes: "", fears: "", legacy: "" };
+    return (
+      <div className="rounded-2xl border border-border bg-white/80 backdrop-blur-xl p-4 shadow">
+        <div className="flex items-center justify-between mb-2">
+          <h3 className="text-lg font-semibold text-ink">{label}</h3>
+          <SavingBadge state={saving} />
+        </div>
+
+        <div className="grid gap-3 md:grid-cols-3">
+          <div className="flex flex-col">
+            <label className="text-xs text-muted mb-1">Hopes</label>
+            <textarea
+              value={data.hopes}
+              onChange={(e) => edit(roleKey, "hopes", e.target.value)}
+              placeholder="What are they reaching for — in this chapter, and in life?"
+              className="min-h-[120px] rounded-lg border border-border bg-white p-3 text-ink placeholder-muted focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+          </div>
+
+          <div className="flex flex-col">
+            <label className="text-xs text-muted mb-1">Fears</label>
+            <textarea
+              value={data.fears}
+              onChange={(e) => edit(roleKey, "fears", e.target.value)}
+              placeholder="What would they avoid at any cost? What’s the wound?"
+              className="min-h-[120px] rounded-lg border border-border bg-white p-3 text-ink placeholder-muted focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+          </div>
+
+          <div className="flex flex-col">
+            <label className="text-xs text-muted mb-1">Legacy</label>
+            <textarea
+              value={data.legacy}
+              onChange={(e) => edit(roleKey, "legacy", e.target.value)}
+              placeholder="If they win (or fail), what is left behind in the world of the story?"
+              className="min-h-[120px] rounded-lg border border-border bg-white p-3 text-ink placeholder-muted focus:outline-none focus:ring-2 focus:ring-primary"
+            />
+          </div>
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div className="min-h-screen bg-base text-ink">
-      <div className="mx-auto max-w-6xl px-6 py-8">
-        <div className="mb-4">
-          <Link to="/story-lab/workshop" className="inline-flex items-center gap-2 rounded-xl border border-white/60 bg-white/70 px-3 py-2 text-sm hover:bg-white backdrop-blur">
-            <ArrowLeft className="h-4 w-4" /> Back to Workshop
+      {/* Global back bar with quick jump to Workshop Hub */}
+      <BackToLanding
+        title="Hopes • Fears • Legacy"
+        rightSlot={
+          <Link
+            to="/story-lab/workshop"
+            className="inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium bg-white/70 border border-border hover:bg-white"
+            title="Open Workshop Hub"
+          >
+            Workshop Hub
           </Link>
-        </div>
+        }
+      />
 
+      <div className="mx-auto max-w-6xl px-6 py-8">
         <PageBanner />
 
-        {/* Names row */}
-        <div className="grid gap-3 md:grid-cols-3 mb-6">
-          <PersonBlock
-            label="Main Character"
-            value={names.mainCharacter}
-            onChange={(v) => commit(p => { p.hfl.names.mainCharacter = v; })}
-          />
-          <PersonBlock
-            label="Protagonist"
-            value={names.protagonist}
-            onChange={(v) => commit(p => { p.hfl.names.protagonist = v; })}
-          />
-          <PersonBlock
-            label="Antagonist"
-            value={names.antagonist}
-            onChange={(v) => commit(p => { p.hfl.names.antagonist = v; })}
-          />
+        {/* Roles grid */}
+        <div className="space-y-6">
+          <RoleCard roleKey="mc" label="Main Character (MC)" />
+          <RoleCard roleKey="protagonist" label="Protagonist" />
+          <RoleCard roleKey="antagonist" label="Antagonist" />
         </div>
 
-        {/* H · F · L sections */}
-        <div className="space-y-4">
-          <Trio whoKey="main"        whoName={names.mainCharacter} />
-          <Trio whoKey="protagonist" whoName={names.protagonist} />
-          <Trio whoKey="antagonist"  whoName={names.antagonist} />
+        {/* Actions row */}
+        <div className="mt-6 flex items-center justify-between">
+          <p className="text-sm text-muted">
+            Tip: keep these short and concrete. They’ll power prompts and the Character Roadmap.
+          </p>
+          <button
+            onClick={saveNow}
+            className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium bg-white/70 border border-border hover:bg-white"
+          >
+            Save now
+          </button>
         </div>
       </div>
+
+      {/* Mobile “Back to Landing” button */}
+      <BackToLandingFab />
     </div>
   );
 }
