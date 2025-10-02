@@ -27,7 +27,7 @@ const WriteSection         = lazy(() => import("./components/WriteSection"));
 const Calendar             = lazy(() => import("./components/Calendar"));
 
 // StoryLab Landing (new overview) + Prompts (workshop prompts page)
-const StoryLabLanding      = lazy(() => import("./components/storylab/StoryLabLanding"));
+const StoryLabLanding = lazy(() => import("./lib/storylab/StoryLabLanding"));
 const StoryPromptsWorkshop = lazy(() => import("./lib/storylab/StoryPromptsWorkshop"));
 
 // NEW: Workshop hub + modules (under /components/storylab)
