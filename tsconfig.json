@@ -1,17 +1,16 @@
 {
   "compilerOptions": {
     "target": "ES2021",
-    "lib": ["ES2021", "DOM", "DOM.Iterable"],
+    "lib": ["ES2021", "DOM"],
     "jsx": "react-jsx",
     "moduleResolution": "Node",
     "resolveJsonModule": true,
     "skipLibCheck": true,
     "strict": false,
-
     "baseUrl": "src",
+    "paths": { "@/*": ["*"] },
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
-
     "noEmit": true,
     "isolatedModules": true
   },
