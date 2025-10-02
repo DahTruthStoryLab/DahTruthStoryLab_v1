@@ -4,6 +4,18 @@ import { Link } from "react-router-dom";
 import { ArrowLeft, Plus, GripVertical, Trash2, Flag, Tag, CheckCircle, ListChecks } from "lucide-react";
 import { loadProject, saveProject, ensureWorkshopFields, uid } from "../../lib/storylab/projectStore";
 
+import BackToLanding, { BackToLandingFab } from "./BackToLanding";
+
+export default function PriorityCards() {
+  return (
+    <div className="min-h-screen bg-base text-ink">
+      <BackToLanding title="Priority Cards" />
+      {/* existing content */}
+      <BackToLandingFab />
+    </div>
+  );
+}
+
 const PageBanner = () => (
   <div className="mx-auto mb-8">
     <div className="relative mx-auto max-w-3xl rounded-2xl border border-white/40 bg-white/20 backdrop-blur-xl px-6 py-6 text-center shadow overflow-hidden">
