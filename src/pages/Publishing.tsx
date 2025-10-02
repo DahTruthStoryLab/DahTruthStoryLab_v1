@@ -1,6 +1,10 @@
-import React, { useMemo, useState } from "react";
+// BEFORE
 import PageShell from "@/components/layout/PageShell";
 import AeroBanner from "@/components/layout/AeroBanner";
+
+// AFTER (relative from src/pages → src/components)
+import PageShell from "../components/layout/PageShell";
+import AeroBanner from "../components/layout/AeroBanner";
 
 /**
  * Publishing Suite (StoryLab)
