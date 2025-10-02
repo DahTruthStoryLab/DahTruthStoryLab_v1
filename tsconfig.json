@@ -3,12 +3,17 @@
     "target": "ES2021",
     "lib": ["ES2021", "DOM"],
     "jsx": "react-jsx",
+
+    "module": "esnext",               // <-- add this
     "moduleResolution": "Node",
+
     "resolveJsonModule": true,
     "skipLibCheck": true,
     "strict": false,
+
     "baseUrl": "src",
     "paths": { "@/*": ["*"] },
+
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "noEmit": true,
