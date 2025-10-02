@@ -1,26 +1,15 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+// NOTE: useNavigate removed (not used anymore after adding BackToLanding)
 import {
   Copy, Check, Filter, Timer, User, TrendingUp, Feather, Globe, Star, X, Pin, Edit3,
-  Lightbulb, ArrowLeft, Save, Trash2, Send, FileText, Shuffle, Download
+  Lightbulb, Save, Trash2, Send, FileText, Shuffle
 } from "lucide-react";
 
 import BackToLanding, { BackToLandingFab } from "../../components/storylab/BackToLanding";
 
-export default function StoryPromptsWorkshop() {
-  return (
-    <div className="min-h-screen bg-base text-ink">
-      <BackToLanding title="Story Prompts" />
-      {/* existing content */}
-      <BackToLandingFab />
-    </div>
-  );
-}
-
 /* =========================================================
-   STORAGE HELPERS (updated to use shared store)
+   STORAGE HELPERS (using shared store)
 ========================================================= */
-// ⬇️ REPLACE your storage helpers with these imports + one helper
 import {
   loadProject as getProject,
   saveProject as setProject,
@@ -59,7 +48,7 @@ function loadChaptersFromLocalStorage() {
 }
 
 /* =========================================================
-   NLP HELPERS (unchanged)
+   NLP HELPERS
 ========================================================= */
 const splitSentences = (txt) =>
   (txt || "").replace(/\s+/g, " ").match(/[^.!?]+[.!?]?/g) || [];
@@ -117,7 +106,7 @@ function analyzeStoryStructure(chapters, selectedChapter) {
 }
 
 /* =========================================================
-   PROMPT CATEGORIES & GENERATION (unchanged logic)
+   PROMPT CATEGORIES & GENERATION
 ========================================================= */
 const PROMPT_CATEGORIES = {
   sprint: { label: "Quick Sprints", icon: Timer, color: "emerald", time: "5–15 min" },
@@ -212,7 +201,7 @@ function generateEnhancedPrompts(chapters, characters, selectedChapter) {
 }
 
 /* =========================================================
-   MODALS (converted to light / glass)
+   MODALS (light / glass)
 ========================================================= */
 function Scratchpad({ isOpen, onClose, content, onChange, onSave, onSendToChapter, onClear }) {
   if (!isOpen) return null;
@@ -295,7 +284,7 @@ function SavedPromptsMenu({ savedPrompts, isOpen, onClose, onLoadPrompt }) {
 }
 
 /* =========================================================
-   PROMPT CARD (light/glass)
+   PROMPT CARD
 ========================================================= */
 function PromptCard({ prompt, onPin, onUnpin, onUse, onMarkTried, isPinned, status }) {
   const cat = PROMPT_CATEGORIES[prompt.category];
@@ -421,10 +410,9 @@ function PromptCard({ prompt, onPin, onUnpin, onUse, onMarkTried, isPinned, stat
 }
 
 /* =========================================================
-   MAIN — light/glass layout with sidebar + grid
+   MAIN — light/glass layout
 ========================================================= */
 export default function StoryPromptsWorkshop() {
-  const navigate = useNavigate();
   const [chapters, setChapters] = useState([]);
   const [selectedChapter, setSelectedChapter] = useState(null);
   const [characters, setCharacters] = useState([]);
@@ -526,7 +514,6 @@ export default function StoryPromptsWorkshop() {
     updateChapterById(selectedChapter.id, (c) => {
       const existing = c.text || "";
       const sep = existing && !/\n$/.test(existing) ? "\n\n" : "";
-      // Add a bold marker so it's clearly a prompt-driven insert
       const block = `**[WRITING PROMPT]** ${currentPrompt || "Session Work"}\n\n${scratchpadContent}\n\n`;
       return {
         ...c,
@@ -606,41 +593,24 @@ export default function StoryPromptsWorkshop() {
 
   return (
     <div className="min-h-screen bg-base bg-radial-fade text-ink">
-      {/* Top glass bar */}
-      <div className="sticky top-0 z-50 bg-white/70 backdrop-blur-xl border-b border-white/60">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="h-16 flex items-center justify-between">
-            <div className="leading-tight">
-              <div className="text-lg font-bold bg-gradient-to-r from-accent via-primary to-gold bg-clip-text text-transparent">
-                Story Prompts Workshop
-              </div>
-              <div className="text-xs text-muted -mt-0.5">Collaborative session tool</div>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setSavedPromptsMenuOpen(true)}
-                className="inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium bg-white/70 border border-white/60 hover:bg-white"
-                title="Open Saved Work"
-              >
-                <FileText size={16} />
-                Saved Work
-              </button>
-              <button
-                onClick={() => navigate("/story-lab")}
-                className="inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium bg-white/70 border border-white/60 hover:bg-white"
-                title="Back to Story Lab"
-              >
-                <ArrowLeft size={16} />
-                Back
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
+      {/* Global back bar with Saved Work button on the right */}
+      <BackToLanding
+        title="Story Prompts"
+        rightSlot={
+          <button
+            onClick={() => setSavedPromptsMenuOpen(true)}
+            className="inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium bg-white/70 border border-white/60 hover:bg-white"
+            title="Open Saved Work"
+          >
+            <FileText size={16} />
+            Saved Work
+          </button>
+        }
+      />
 
       {/* Toast */}
       {toast && (
-        <div className="fixed right-4 top-20 z-50 px-3 py-1.5 text-xs rounded-md bg-emerald-600 text-white shadow">
+        <div className="fixed right-4 top-24 z-50 px-3 py-1.5 text-xs rounded-md bg-emerald-600 text-white shadow">
           {toast}
         </div>
       )}
@@ -897,6 +867,9 @@ export default function StoryPromptsWorkshop() {
         onClose={() => setSavedPromptsMenuOpen(false)}
         onLoadPrompt={loadSavedPrompt}
       />
+
+      {/* Mobile FAB back to landing */}
+      <BackToLandingFab />
     </div>
   );
 }
