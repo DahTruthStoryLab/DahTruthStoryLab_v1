@@ -10,6 +10,19 @@ import {
   ArrowLeft,
 } from "lucide-react";
 
+import BackToLanding, { BackToLandingFab } from "./BackToLanding";
+
+export default function StoryWorkshop() {
+  return (
+    <div className="min-h-screen bg-base text-ink">
+      <BackToLanding title="Workshop Hub" />
+      {/* existing content */}
+      <BackToLandingFab />
+    </div>
+  );
+}
+
+
 /* ---------------------------------------------------------
    PageBanner (enhanced aesthetic)
 --------------------------------------------------------- */
