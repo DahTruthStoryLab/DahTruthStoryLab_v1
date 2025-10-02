@@ -1,10 +1,6 @@
-// craco.config.js
-const path = require('path');
-
-module.exports = {
-  webpack: {
-    alias: {
-      '@': path.resolve(__dirname, 'src'), // "@/x" now resolves to "src/x"
-    },
-  },
-};
+"scripts": {
+  "start": "craco start",
+  "build": "craco build",
+  "test": "craco test",
+  "eject": "react-scripts eject"
+}
