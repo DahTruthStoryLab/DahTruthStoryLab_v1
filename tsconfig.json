@@ -7,10 +7,8 @@
     "resolveJsonModule": true,
     "skipLibCheck": true,
     "strict": false,
-
     "baseUrl": "src",
     "paths": { "@/*": ["*"] },
-
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
     "noEmit": true,
