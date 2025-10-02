@@ -1,13 +1,14 @@
 // src/components/Profile.jsx
 import React, { useEffect, useState } from "react";
+import { loadUser, saveUser } from "../lib/userStore";
 
 /** Simple toast notification - replaces API toasts temporarily */
 function toast({ title, description } = {}) {
   if (title || description) {
     console.log(`[toast] ${title || ""}${description ? " — " + description : ""}`);
-    // Simple browser notification
-    const toastEl = document.createElement('div');
-    toastEl.className = 'fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg text-white max-w-sm bg-green-600';
+    const toastEl = document.createElement("div");
+    toastEl.className =
+      "fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg text-white max-w-sm bg-green-600";
     toastEl.innerHTML = `
       <div class="font-semibold">${title || ""}</div>
       <div class="text-sm opacity-90">${description || ""}</div>
@@ -17,12 +18,13 @@ function toast({ title, description } = {}) {
   }
 }
 
-// Mock user data - replace with real API later
+// Fallback user (used only if nothing saved yet)
 const mockUser = {
   name: "Jacqueline Session",
   email: "jacqueline@dahtruth.com",
-  bio: "Founder of DahTruth.com and creator of DahTruth StoryLab. Passionate about empowering writers to discover and share their authentic stories through faith-based community and modern technology.",
-  avatar: null
+  bio:
+    "Founder of DahTruth.com and creator of DahTruth StoryLab. Passionate about empowering writers to discover and share their authentic stories through faith-based community and modern technology.",
+  avatar: null,
 };
 
 export default function Profile() {
@@ -40,58 +42,61 @@ export default function Profile() {
   const [avatarFile, setAvatarFile] = useState(null);
   const [avatarPreview, setAvatarPreview] = useState(null);
 
-  // Load mock user data - replace with real API call later
+  // Load user: prefer saved data, fall back to mock
   useEffect(() => {
     let isMounted = true;
-    
-    // Simulate API loading
+
     setTimeout(() => {
       if (!isMounted) return;
-      
       try {
-        setUser(mockUser);
-        setName(mockUser.name || "");
-        setEmail(mockUser.email || "");
-        setBio(mockUser.bio || "");
+        const stored = loadUser();
+        const base = stored || mockUser;
+        setUser(base);
+        setName(base.name || "");
+        setEmail(base.email || "");
+        setBio(base.bio || "");
       } catch (e) {
         console.error(e);
-        toast({ title: "Unable to load profile", description: "Please try refreshing the page." });
+        toast({
+          title: "Unable to load profile",
+          description: "Please try refreshing the page.",
+        });
       } finally {
         if (isMounted) setLoading(false);
       }
-    }, 500); // Simulate loading delay
+    }, 300);
 
-    return () => (isMounted = false);
+    return () => {
+      isMounted = false;
+      if (avatarPreview) URL.revokeObjectURL(avatarPreview);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Handle avatar change (validation + preview) - HEIC conversion removed for now
+  // Handle avatar change (validation + preview)
   const onAvatarChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // size check: 5MB
     if (file.size > 5 * 1024 * 1024) {
       toast({ title: "File too large", description: "Choose an image smaller than 5MB." });
       return;
     }
-
-    const lowerName = file.name.toLowerCase();
-    const isHeic = /\.(heic|heif)$/i.test(lowerName);
-
+    const isHeic = /\.(heic|heif)$/i.test(file.name);
     if (isHeic) {
-      toast({ title: "HEIC files not supported yet", description: "Please convert to JPEG or PNG first." });
+      toast({
+        title: "HEIC files not supported yet",
+        description: "Please convert to JPEG or PNG first.",
+      });
       return;
     }
-
     if (!file.type.startsWith("image/")) {
       toast({ title: "Invalid file type", description: "Please pick an image file." });
       return;
     }
 
     try {
-      // cleanup old preview url
       if (avatarPreview) URL.revokeObjectURL(avatarPreview);
-
       setAvatarFile(file);
       setAvatarPreview(URL.createObjectURL(file));
     } catch (err) {
@@ -100,49 +105,41 @@ export default function Profile() {
     }
   };
 
-  // Save profile - mock version, replace with real API later
+  // Save profile
   const onSubmit = async (e) => {
     e.preventDefault();
     if (!user) return;
 
     setSaving(true);
-    
     try {
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      await new Promise((r) => setTimeout(r, 600));
 
-      // Mock avatar upload
       let avatarUrl = user.avatar;
       if (avatarFile) {
-        // In real implementation, this would upload to server
-        avatarUrl = URL.createObjectURL(avatarFile);
+        avatarUrl = avatarPreview || URL.createObjectURL(avatarFile);
       }
 
-      // Mock profile update
       const updatedUser = {
         ...user,
         name: name.trim(),
         email: email.trim(),
-        bio: bio,
-        avatar: avatarUrl
+        bio,
+        avatar: avatarUrl,
       };
 
-      // Update local state
       setUser(updatedUser);
-      
-      if (avatarUrl && avatarFile) {
-        setAvatarPreview(null);
+      saveUser(updatedUser); // persist
+
+      if (avatarPreview && avatarFile) {
         setAvatarFile(null);
       }
 
-      // Notify rest of app that user changed (if needed)
       try {
         window.dispatchEvent(new CustomEvent("app:user-updated", { detail: updatedUser }));
       } catch {}
 
       setIsEditing(false);
       toast({ title: "Profile updated", description: "Your profile has been saved." });
-      
     } catch (err) {
       console.error(err);
       toast({
@@ -165,8 +162,6 @@ export default function Profile() {
     setAvatarPreview(null);
     setAvatarFile(null);
   };
-
-  /* ----------------- UI with your new color scheme ----------------- */
 
   if (loading) {
     return (
@@ -229,7 +224,7 @@ export default function Profile() {
 
           <div className="p-6 space-y-6">
             {!isEditing ? (
-              /* -------- Display Mode -------- */
+              // Display mode
               <div className="space-y-6">
                 <div className="flex items-center space-x-6">
                   <div className="relative">
@@ -238,7 +233,7 @@ export default function Profile() {
                         <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
                       ) : (
                         <div className="w-full h-full grid place-items-center text-ink/70 font-semibold">
-                          {user.name?.split(" ").map(n => n[0]).join("").toUpperCase()}
+                          {user.name?.split(" ").map((n) => n[0]).join("").toUpperCase()}
                         </div>
                       )}
                     </div>
@@ -264,7 +259,7 @@ export default function Profile() {
                 )}
               </div>
             ) : (
-              /* -------- Edit Mode -------- */
+              // Edit mode
               <form onSubmit={onSubmit} className="space-y-6">
                 <div className="flex items-center space-x-6">
                   <div className="relative">
@@ -277,7 +272,7 @@ export default function Profile() {
                         />
                       ) : (
                         <div className="w-full h-full grid place-items-center text-ink/70 font-semibold">
-                          {user.name?.split(" ").map(n => n[0]).join("").toUpperCase()}
+                          {user.name?.split(" ").map((n) => n[0]).join("").toUpperCase()}
                         </div>
                       )}
                     </div>
@@ -332,7 +327,7 @@ export default function Profile() {
                     rows={5}
                     value={bio}
                     onChange={(e) => setBio(e.target.value)}
-                    className="w-full glass-soft border-white/40 text-ink placeholder:text-ink/50 px-3 py-2 rounded-lg resize-none focus:outline-none focus:border-white/60"
+                    className="w-full glass-soft border-white/40 text-ink placeholder:text-ink/50 px-3 py-2 rounded-lg resize-none focus:outline-none focus;border-white/60"
                     placeholder="Tell your readers about yourself, your writing journey, and what inspires you..."
                     maxLength={500}
                   />
