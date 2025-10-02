@@ -5,6 +5,18 @@ import {
   Lightbulb, ArrowLeft, Save, Trash2, Send, FileText, Shuffle, Download
 } from "lucide-react";
 
+import BackToLanding, { BackToLandingFab } from "../../components/storylab/BackToLanding";
+
+export default function StoryPromptsWorkshop() {
+  return (
+    <div className="min-h-screen bg-base text-ink">
+      <BackToLanding title="Story Prompts" />
+      {/* existing content */}
+      <BackToLandingFab />
+    </div>
+  );
+}
+
 /* =========================================================
    STORAGE HELPERS (updated to use shared store)
 ========================================================= */
