@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState, useRef } from "react";
 import PageShell from "../components/layout/PageShell";
 import AeroBanner from "../components/layout/AeroBanner";
 
@@ -367,6 +367,23 @@ export default function Publishing(): JSX.Element {
     setStep(STEPS[Math.min(stepIndex + 1, STEPS.length - 1)].key);
   const goBack = () => setStep(STEPS[Math.max(stepIndex - 1, 0)].key);
 
+  // a11y tabs: refs + keyboard nav
+  const tabRefs = useRef<HTMLButtonElement[]>([]);
+  function onKeyDownTabs(e: React.KeyboardEvent<HTMLDivElement>) {
+    const current = STEPS.findIndex((s) => s.key === step);
+    if (current < 0) return;
+    let next = current;
+    if (e.key === "ArrowRight") next = (current + 1) % STEPS.length;
+    if (e.key === "ArrowLeft") next = (current - 1 + STEPS.length) % STEPS.length;
+    if (e.key === "Home") next = 0;
+    if (e.key === "End") next = STEPS.length - 1;
+    if (next !== current) {
+      e.preventDefault();
+      setStep(STEPS[next].key);
+      tabRefs.current[next]?.focus();
+    }
+  }
+
   const [meta, setMeta] = useState<Meta>({
     title: "Working Title",
     author: "Your Name",
@@ -442,7 +459,7 @@ export default function Publishing(): JSX.Element {
     }
 
     // Chapters
-    chapters.forEach((c, idx) => {
+    chapters.forEach((c) => {
       if (!c.included) return;
       const txt = ms.lineHeight >= 2 ? c.text.replaceAll(" ", "  ") : c.text;
       parts.push("\n\n" + c.title + "\n" + txt);
@@ -476,9 +493,7 @@ export default function Publishing(): JSX.Element {
       matter.epigraph && `Epigraph\n${matter.epigraph}`,
     ]
       .filter(Boolean)
-      .map((s) =>
-        `<p>${escape(String(s)).replaceAll("\n", "<br/>")}</p>`
-      )
+      .map((s) => `<p>${escape(String(s)).replaceAll("\n", "<br/>")}</p>`)
       .join("\n");
 
     // TOC
@@ -502,15 +517,12 @@ export default function Publishing(): JSX.Element {
         const body = escape(c.text)
           .replaceAll("\n\n", "</p><p>")
           .replaceAll("\n", "<br/>");
-        return `<h2 class="chapter">${
-          t
-        }</h2><p>${body}</p>`;
+        return `<h2 class="chapter">${t}</h2><p>${body}</p>`;
       })
       .join("\n");
 
     const back = [
-      matter.acknowledgments &&
-        `Acknowledgments\n${matter.acknowledgments}`,
+      matter.acknowledgments && `Acknowledgments\n${matter.acknowledgments}`,
       matter.aboutAuthor && `About the Author\n${matter.aboutAuthor}`,
       matter.notes && `Notes\n${matter.notes}`,
     ]
@@ -527,19 +539,13 @@ export default function Publishing(): JSX.Element {
       @page { margin: ${pf.margins.top}in ${pf.margins.right}in ${pf.margins.bottom}in ${pf.margins.left}in; }
       body { font-family: ${ms.fontFamily}; font-size: ${ms.fontSizePt}pt; margin: 0; line-height: ${ms.lineHeight}; color: #111; }
       p { orphans: 3; widows: 3; ${ms.align === "justify" ? "text-align: justify;" : ""} ${
-      ms.firstLineIndentInches
-        ? `text-indent: ${ms.firstLineIndentInches}in;`
-        : ""
+      ms.firstLineIndentInches ? `text-indent: ${ms.firstLineIndentInches}in;` : ""
     } ${ms.paragraphSpacingPt ? `margin: 0 0 ${ms.paragraphSpacingPt}pt 0;` : ""} }
-      h2.chapter { ${
-        ms.chapterStartsOnNewPage ? "page-break-before: always;" : ""
-      } text-align:center; margin: 0 0 1em 0; font-weight: bold; }
+      h2.chapter { ${ms.chapterStartsOnNewPage ? "page-break-before: always;" : ""} text-align:center; margin: 0 0 1em 0; font-weight: bold; }
     `;
 
     const titleBlock = `
-      <div style="text-align:center; font-size:${
-        ms.fontSizePt + 4
-      }pt; font-weight:bold; margin-bottom: 1.5em;">${meta.title}</div>
+      <div style="text-align:center; font-size:${ms.fontSizePt + 4}pt; font-weight:bold; margin-bottom: 1.5em;">${meta.title}</div>
       <div style="text-align:center; margin-bottom: 2em;">by ${meta.author} • ${meta.year}</div>
     `;
 
@@ -679,10 +685,7 @@ export default function Publishing(): JSX.Element {
       const href = "chap" + (i + 1) + ".xhtml";
       const content = makeXhtml(
         c.title,
-        '<h2 style="text-align:center">' +
-          esc(c.title) +
-          "</h2>" +
-          para(c.text)
+        '<h2 style="text-align:center">' + esc(c.title) + "</h2>" + para(c.text)
       );
       return { id, href, title: c.title, content };
     });
@@ -710,9 +713,7 @@ export default function Publishing(): JSX.Element {
       '  <li><a href="title.xhtml">Title</a></li>',
       '  <li><a href="front.xhtml">Front Matter</a></li>',
       chapterFiles
-        .map(
-          (cf) => '  <li><a href="' + cf.href + '">' + esc(cf.title) + "</a></li>"
-        )
+        .map((cf) => '  <li><a href="' + cf.href + '">' + esc(cf.title) + "</a></li>")
         .join("\n"),
       '  <li><a href="back.xhtml">Back Matter</a></li>',
       "</ol></nav>",
@@ -967,7 +968,6 @@ export default function Publishing(): JSX.Element {
     chapters
       .filter((c) => c.included)
       .forEach((c, idx) => {
-        // page break before each new chapter except first body after title page
         if (ms.chapterStartsOnNewPage || idx === 0) {
           sectionChildren.push(new Paragraph({}));
           if (idx > 0)
@@ -983,7 +983,6 @@ export default function Publishing(): JSX.Element {
           })
         );
 
-        // Body paragraphs
         c.text.split("\n\n").forEach((par) => {
           const runs = par
             .split("\n")
@@ -1022,7 +1021,6 @@ export default function Publishing(): JSX.Element {
       rest.forEach((line) => sectionChildren.push(new Paragraph({ text: line })));
     });
 
-    // Attach section children
     (doc as any).Sections[0].Properties = (doc as any).Sections[0].Properties;
     (doc as any).Sections[0].Children = sectionChildren;
 
@@ -1042,520 +1040,556 @@ export default function Publishing(): JSX.Element {
       <div style={{ ...styles.sectionShell }}>
         {/* Tabs */}
         <div
+          role="tablist"
+          aria-label="Publishing steps"
+          onKeyDown={onKeyDownTabs}
           style={{
             display: "flex",
             gap: 8,
             marginBottom: 20,
             overflowX: "auto",
+            paddingBottom: 2,
           }}
         >
-          {STEPS.map((s, i) => (
-            <button
-              key={s.key}
-              onClick={() => setStep(s.key)}
-              style={{
-                padding: "12px 18px",
-                borderRadius: 12,
-                border:
-                  s.key === step
+          {STEPS.map((s, i) => {
+            const isActive = s.key === step;
+            const id = `tab-${s.key}`;
+            const panelId = `panel-${s.key}`;
+            return (
+              <button
+                key={s.key}
+                id={id}
+                ref={(el) => {
+                  if (el) tabRefs.current[i] = el;
+                }}
+                role="tab"
+                aria-selected={isActive}
+                aria-controls={panelId}
+                tabIndex={isActive ? 0 : -1}
+                onClick={() => setStep(s.key)}
+                style={{
+                  padding: "12px 18px",
+                  borderRadius: 12,
+                  border: isActive
                     ? `2px solid ${theme.accent}`
                     : `2px solid ${theme.border}`,
-                background:
-                  s.key === step ? theme.highlight : theme.white,
-                color: s.key === step ? theme.primary : theme.subtext,
-                fontWeight: s.key === step ? 700 : 500,
-                cursor: "pointer",
-                whiteSpace: "nowrap",
-                fontSize: 14,
-              }}
-            >
-              <span style={{ marginRight: 8 }}>{i + 1}</span>
-              {s.label}
-            </button>
-          ))}
+                  background: isActive ? theme.highlight : theme.white,
+                  color: isActive ? theme.primary : theme.subtext,
+                  fontWeight: isActive ? 700 : 500,
+                  cursor: "pointer",
+                  whiteSpace: "nowrap",
+                  fontSize: 14,
+                  outline: "none",
+                  boxShadow: isActive
+                    ? "0 1px 0 rgba(0,0,0,0.04) inset"
+                    : "none",
+                }}
+                onFocus={(e) => {
+                  e.currentTarget.style.boxShadow =
+                    "0 0 0 3px rgba(31,58,95,0.25)";
+                }}
+                onBlur={(e) => {
+                  e.currentTarget.style.boxShadow = isActive
+                    ? "0 1px 0 rgba(0,0,0,0.04) inset"
+                    : "none";
+                }}
+              >
+                <span aria-hidden="true" style={{ marginRight: 8 }}>
+                  {i + 1}
+                </span>
+                {s.label}
+              </button>
+            );
+          })}
         </div>
 
-        {/* Meta */}
-        <div style={{ ...styles.glassCard, marginBottom: 20 }}>
-          <h3 style={{ margin: "0 0 16px 0", fontSize: 18, color: theme.text }}>
-            Manuscript Details
-          </h3>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-              gap: 16,
-            }}
-          >
-            <div>
-              <label style={{ ...styles.label, display: "block", marginBottom: 6 }}>
-                Title
-              </label>
-              <input
-                style={styles.input}
-                value={meta.title}
-                onChange={(e) => setMeta({ ...meta, title: e.target.value })}
-                placeholder="Enter your book title"
-              />
-            </div>
-            <div>
-              <label style={{ ...styles.label, display: "block", marginBottom: 6 }}>
-                Author
-              </label>
-              <input
-                style={styles.input}
-                value={meta.author}
-                onChange={(e) => setMeta({ ...meta, author: e.target.value })}
-                placeholder="Enter author name"
-              />
-            </div>
-            <div>
-              <label style={{ ...styles.label, display: "block", marginBottom: 6 }}>
-                Publication Year
-              </label>
-              <input
-                style={styles.input}
-                value={meta.year}
-                onChange={(e) => setMeta({ ...meta, year: e.target.value })}
-                placeholder="YYYY"
-              />
-            </div>
-            <div>
-              <label style={{ ...styles.label, display: "block", marginBottom: 6 }}>
-                Author Last Name (header)
-              </label>
-              <input
-                style={styles.input}
-                value={meta.authorLast || ""}
-                onChange={(e) => setMeta({ ...meta, authorLast: e.target.value })}
-                placeholder="For running header"
-              />
-            </div>
+        {/* Panel wrapper */}
+        <div
+          role="tabpanel"
+          id={`panel-${step}`}
+          aria-labelledby={`tab-${step}`}
+          style={{ outline: "none" }}
+        >
+          {/* Meta */}
+          <div style={{ ...styles.glassCard, marginBottom: 20 }}>
+            <h3 style={{ margin: "0 0 16px 0", fontSize: 18, color: theme.text }}>
+              Manuscript Details
+            </h3>
             <div
               style={{
-                display: "flex",
-                alignItems: "end",
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
                 gap: 16,
-                color: theme.subtext,
-                fontSize: 14,
               }}
             >
               <div>
-                Words: <strong>{wordCount.toLocaleString()}</strong>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Format & Presets */}
-        <div style={{ ...styles.glassCard, marginBottom: 20 }}>
-          <h3 style={{ margin: "0 0 16px 0", fontSize: 18, color: theme.text }}>
-            Format & Presets
-          </h3>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 16 }}>
-            <div style={{ minWidth: 260 }}>
-              <div style={styles.label}>Manuscript Preset</div>
-              <select
-                value={manuscriptPreset}
-                onChange={(e) =>
-                  setManuscriptPreset(e.target.value as ManuscriptPresetKey)
-                }
-                style={{ ...styles.input, height: 40 }}
-              >
-                {Object.entries(MANUSCRIPT_PRESETS).map(([k, v]) => (
-                  <option key={k} value={k}>
-                    {v.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div style={{ minWidth: 260 }}>
-              <div style={styles.label}>Platform Preset</div>
-              <select
-                value={platformPreset}
-                onChange={(e) =>
-                  setPlatformPreset(e.target.value as PlatformPresetKey)
-                }
-                style={{ ...styles.input, height: 40 }}
-              >
-                {Object.entries(PLATFORM_PRESETS).map(([k, v]) => (
-                  <option key={k} value={k}>
-                    {v.label}
-                  </option>
-                ))}
-              </select>
-              <div style={{ color: theme.subtext, fontSize: 12, marginTop: 6 }}>
-                {includeHeadersFooters
-                  ? "DOCX export will include headers/footers + page numbers."
-                  : "Headers/footers disabled for this platform (typical for eBooks)."}
-              </div>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <span style={styles.label}>Double Spacing</span>
-              <Toggle
-                checked={ms.lineHeight >= 2}
-                onChange={() => {
-                  // quick toggle between 2.0 and 1.5 (demo only)
-                  const alt = {
-                    ...MANUSCRIPT_PRESETS[manuscriptPreset],
-                    lineHeight: ms.lineHeight >= 2 ? 1.5 : 2.0,
-                  } as any;
-                  (MANUSCRIPT_PRESETS as any)[manuscriptPreset] = alt;
-                }}
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Step body */}
-        <div style={{ ...styles.glassCard, marginBottom: 20, minHeight: 400 }}>
-          {step === "builder" && (
-            <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 24 }}>
-              <div>
-                <h3 style={{ margin: "0 0 16px 0", fontSize: 18, color: theme.text }}>
-                  Live Preview
-                </h3>
-                <div style={styles.preview}>
-                  <iframe
-                    title="preview"
-                    style={{ width: "100%", height: 328, border: 0 }}
-                    srcDoc={compiledHTML}
-                  />
-                </div>
-              </div>
-              <div>
-                <h3 style={{ margin: "0 0 16px 0", fontSize: 18, color: theme.text }}>
-                  Front & Back Matter
-                </h3>
-                <div style={{ display: "grid", gap: 12 }}>
-                  <Field
-                    label="Title Page"
-                    value={matter.titlePage}
-                    onChange={(v) => setMatter({ ...matter, titlePage: v })}
-                  />
-                  <Field
-                    label="Copyright"
-                    value={matter.copyright}
-                    onChange={(v) => setMatter({ ...matter, copyright: v })}
-                  />
-                  <Field
-                    label="Dedication"
-                    value={matter.dedication}
-                    onChange={(v) => setMatter({ ...matter, dedication: v })}
-                  />
-                  <Field
-                    label="Epigraph"
-                    value={matter.epigraph}
-                    onChange={(v) => setMatter({ ...matter, epigraph: v })}
-                  />
-                  <label
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 8,
-                      marginTop: 8,
-                      fontSize: 14,
-                      color: theme.text,
-                    }}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={matter.toc}
-                      onChange={(e) =>
-                        setMatter({ ...matter, toc: e.target.checked })
-                      }
-                    />{" "}
-                    Include Table of Contents
-                  </label>
-                  <div
-                    style={{
-                      borderTop: `1px solid ${theme.border}`,
-                      margin: "8px 0",
-                    }}
-                  />
-                  <Field
-                    label="Acknowledgments"
-                    value={matter.acknowledgments}
-                    onChange={(v) =>
-                      setMatter({ ...matter, acknowledgments: v })
-                    }
-                  />
-                  <Field
-                    label="About the Author"
-                    value={matter.aboutAuthor}
-                    onChange={(v) =>
-                      setMatter({ ...matter, aboutAuthor: v })
-                    }
-                  />
-                  <Field
-                    label="Author Notes"
-                    value={matter.notes}
-                    onChange={(v) => setMatter({ ...matter, notes: v })}
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-
-          {step === "proof" && (
-            <div>
-              <h3 style={{ margin: "0 0 16px 0", fontSize: 18, color: theme.text }}>
-                Proof & Consistency
-              </h3>
-              <p style={{ color: theme.subtext, fontSize: 14 }}>
-                Local quick checks; wire to deeper services later.
-              </p>
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-                  gap: 12,
-                  marginTop: 16,
-                }}
-              >
-                <button style={styles.lightBtn} onClick={runGrammarChecks}>
-                  Grammar Check
-                </button>
-                <button style={styles.lightBtn} onClick={runGrammarChecks}>
-                  Style Analysis
-                </button>
-                <button style={styles.lightBtn} onClick={runGrammarChecks}>
-                  Character Consistency
-                </button>
-                <button style={styles.lightBtn} onClick={runGrammarChecks}>
-                  Timeline Validation
-                </button>
-                <button style={styles.primaryBtn} onClick={runGrammarChecks}>
-                  Run All Checks
-                </button>
-              </div>
-              {!!proofResults.length && (
-                <div style={{ marginTop: 16, ...styles.glassCard }}>
-                  <ul style={{ margin: 0, paddingLeft: 18, color: theme.text }}>
-                    {proofResults.map((r, i) => (
-                      <li key={i}>{r}</li>
-                    ))}
-                  </ul>
-                </div>
-              )}
-            </div>
-          )}
-
-          {step === "format" && (
-            <div>
-              <h3 style={{ margin: "0 0 16px 0", fontSize: 18, color: theme.text }}>
-                Format Preview
-              </h3>
-              <div style={styles.preview}>
-                <iframe
-                  title="format-preview"
-                  style={{ width: "100%", height: 328, border: 0 }}
-                  srcDoc={compiledHTML}
+                <label style={{ ...styles.label, display: "block", marginBottom: 6 }}>
+                  Title
+                </label>
+                <input
+                  style={styles.input}
+                  value={meta.title}
+                  onChange={(e) => setMeta({ ...meta, title: e.target.value })}
+                  placeholder="Enter your book title"
                 />
               </div>
-              <p style={{ color: theme.subtext, fontSize: 12, marginTop: 8 }}>
-                * For true headers/footers + page numbers, use the DOCX export and
-                finalize in Word/LibreOffice (then export PDF from there).
-              </p>
-            </div>
-          )}
-
-          {step === "export" && (
-            <div>
-              <h3 style={{ margin: "0 0 16px 0", fontSize: 18, color: theme.text }}>
-                Export
-              </h3>
-              <p style={{ color: theme.subtext, fontSize: 14 }}>
-                DOCX includes headers/footers and page numbers per selected presets.
-              </p>
+              <div>
+                <label style={{ ...styles.label, display: "block", marginBottom: 6 }}>
+                  Author
+                </label>
+                <input
+                  style={styles.input}
+                  value={meta.author}
+                  onChange={(e) => setMeta({ ...meta, author: e.target.value })}
+                  placeholder="Enter author name"
+                />
+              </div>
+              <div>
+                <label style={{ ...styles.label, display: "block", marginBottom: 6 }}>
+                  Publication Year
+                </label>
+                <input
+                  style={styles.input}
+                  value={meta.year}
+                  onChange={(e) => setMeta({ ...meta, year: e.target.value })}
+                  placeholder="YYYY"
+                />
+              </div>
+              <div>
+                <label style={{ ...styles.label, display: "block", marginBottom: 6 }}>
+                  Author Last Name (header)
+                </label>
+                <input
+                  style={styles.input}
+                  value={meta.authorLast || ""}
+                  onChange={(e) => setMeta({ ...meta, authorLast: e.target.value })}
+                  placeholder="For running header"
+                />
+              </div>
               <div
                 style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-                  gap: 12,
-                  marginTop: 16,
+                  display: "flex",
+                  alignItems: "end",
+                  gap: 16,
+                  color: theme.subtext,
+                  fontSize: 14,
                 }}
               >
-                <button style={styles.lightBtn} onClick={exportPDF}>
-                  📄 Export PDF
-                </button>
-                <button style={styles.lightBtn} onClick={exportDOCX}>
-                  📝 Export DOCX
-                </button>
-                <button style={styles.primaryBtn} onClick={exportEPUB}>
-                  📖 Export EPUB (.epub)
-                </button>
-                <button style={styles.darkBtn} onClick={exportEPUBXHTML}>
-                  📑 Export EPUB XHTML
-                </button>
+                <div>
+                  Words: <strong>{wordCount.toLocaleString()}</strong>
+                </div>
               </div>
             </div>
-          )}
-
-          {step === "prep" && (
-            <div>
-              <h3 style={{ margin: "0 0 16px 0", fontSize: 18, color: theme.text }}>
-                Publishing Preparation
-              </h3>
-              <p style={{ color: theme.subtext, fontSize: 14 }}>
-                Get your submission assets ready.
-              </p>
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-                  gap: 12,
-                  marginTop: 16,
-                }}
-              >
-                <button style={styles.lightBtn}>📝 Synopsis Generator</button>
-                <button style={styles.lightBtn}>✉️ Query Letter Builder</button>
-                <button style={styles.lightBtn}>✅ Self-Publishing Checklist</button>
-                <button style={styles.lightBtn}>📊 Marketing Kit</button>
-                <button style={styles.lightBtn}>🏷️ Genre Guidelines</button>
-                <button style={styles.lightBtn}>💰 Pricing Calculator</button>
-              </div>
-            </div>
-          )}
-        </div>
-
-        {/* Chapters */}
-        <div style={styles.glassCard}>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              marginBottom: 14,
-            }}
-          >
-            <h3 style={{ margin: 0, fontSize: 18, color: theme.text }}>
-              Chapter Management
-            </h3>
-            <button
-              style={styles.primaryBtn}
-              onClick={() =>
-                setChapters((prev) => [
-                  ...prev,
-                  {
-                    id:
-                      typeof crypto !== "undefined" &&
-                      "randomUUID" in crypto
-                        ? (crypto as any).randomUUID()
-                        : `c_${Date.now()}`,
-                    title: `Chapter ${prev.length + 1} – Untitled`,
-                    included: true,
-                    text: "New chapter text...",
-                  },
-                ])
-              }
-            >
-              + Add Chapter
-            </button>
           </div>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
-              gap: 12,
-            }}
-          >
-            {chapters.map((c, i) => (
-              <div
-                key={c.id}
-                style={{
-                  border: `1px solid ${theme.border}`,
-                  borderRadius: 12,
-                  padding: 14,
-                  background: c.included ? theme.white : "#F9FBFD",
-                }}
-              >
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "flex-start",
-                    marginBottom: 8,
-                  }}
+
+          {/* Format & Presets */}
+          <div style={{ ...styles.glassCard, marginBottom: 20 }}>
+            <h3 style={{ margin: "0 0 16px 0", fontSize: 18, color: theme.text }}>
+              Format & Presets
+            </h3>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 16 }}>
+              <div style={{ minWidth: 260 }}>
+                <div style={styles.label}>Manuscript Preset</div>
+                <select
+                  value={manuscriptPreset}
+                  onChange={(e) =>
+                    setManuscriptPreset(e.target.value as ManuscriptPresetKey)
+                  }
+                  style={{ ...styles.input, height: 40 }}
                 >
-                  <div style={{ flex: 1 }}>
-                    <div
+                  {Object.entries(MANUSCRIPT_PRESETS).map(([k, v]) => (
+                    <option key={k} value={k}>
+                      {v.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div style={{ minWidth: 260 }}>
+                <div style={styles.label}>Platform Preset</div>
+                <select
+                  value={platformPreset}
+                  onChange={(e) =>
+                    setPlatformPreset(e.target.value as PlatformPresetKey)
+                  }
+                  style={{ ...styles.input, height: 40 }}
+                >
+                  {Object.entries(PLATFORM_PRESETS).map(([k, v]) => (
+                    <option key={k} value={k}>
+                      {v.label}
+                    </option>
+                  ))}
+                </select>
+                <div style={{ color: theme.subtext, fontSize: 12, marginTop: 6 }}>
+                  {includeHeadersFooters
+                    ? "DOCX export will include headers/footers + page numbers."
+                    : "Headers/footers disabled for this platform (typical for eBooks)."}
+                </div>
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <span style={styles.label}>Double Spacing</span>
+                <Toggle
+                  checked={ms.lineHeight >= 2}
+                  onChange={() => {
+                    const alt = {
+                      ...MANUSCRIPT_PRESETS[manuscriptPreset],
+                      lineHeight: ms.lineHeight >= 2 ? 1.5 : 2.0,
+                    } as any;
+                    (MANUSCRIPT_PRESETS as any)[manuscriptPreset] = alt;
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Step body */}
+          <div style={{ ...styles.glassCard, marginBottom: 20, minHeight: 400 }}>
+            {step === "builder" && (
+              <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 24 }}>
+                <div>
+                  <h3 style={{ margin: "0 0 16px 0", fontSize: 18, color: theme.text }}>
+                    Live Preview
+                  </h3>
+                  <div style={styles.preview}>
+                    <iframe
+                      title="preview"
+                      style={{ width: "100%", height: 328, border: 0 }}
+                      srcDoc={compiledHTML}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <h3 style={{ margin: "0 0 16px 0", fontSize: 18, color: theme.text }}>
+                    Front & Back Matter
+                  </h3>
+                  <div style={{ display: "grid", gap: 12 }}>
+                    <Field
+                      label="Title Page"
+                      value={matter.titlePage}
+                      onChange={(v) => setMatter({ ...matter, titlePage: v })}
+                    />
+                    <Field
+                      label="Copyright"
+                      value={matter.copyright}
+                      onChange={(v) => setMatter({ ...matter, copyright: v })}
+                    />
+                    <Field
+                      label="Dedication"
+                      value={matter.dedication}
+                      onChange={(v) => setMatter({ ...matter, dedication: v })}
+                    />
+                    <Field
+                      label="Epigraph"
+                      value={matter.epigraph}
+                      onChange={(v) => setMatter({ ...matter, epigraph: v })}
+                    />
+                    <label
                       style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 8,
+                        marginTop: 8,
                         fontSize: 14,
-                        fontWeight: 700,
                         color: theme.text,
                       }}
                     >
-                      {c.title}
-                    </div>
+                      <input
+                        type="checkbox"
+                        checked={matter.toc}
+                        onChange={(e) =>
+                          setMatter({ ...matter, toc: e.target.checked })
+                        }
+                      />{" "}
+                      Include Table of Contents
+                    </label>
                     <div
                       style={{
-                        fontSize: 12,
-                        color: theme.subtext,
-                        marginTop: 4,
+                        borderTop: `1px solid ${theme.border}`,
+                        margin: "8px 0",
                       }}
-                    >
-                      {c.text.slice(0, 100)}…
-                    </div>
-                  </div>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                      <button
-                        style={{ ...styles.lightBtn, padding: "6px 8px" }}
-                        onClick={() =>
-                          setChapters((prev) => {
-                            const next = [...prev];
-                            const to = Math.max(0, Math.min(next.length - 1, i - 1));
-                            const [item] = next.splice(i, 1);
-                            next.splice(to, 0, item);
-                            return next;
-                          })
-                        }
-                      >
-                        ↑
-                      </button>
-                      <button
-                        style={{ ...styles.lightBtn, padding: "6px 8px" }}
-                        onClick={() =>
-                          setChapters((prev) => {
-                            const next = [...prev];
-                            const to = Math.max(0, Math.min(next.length - 1, i + 1));
-                            const [item] = next.splice(i, 1);
-                            next.splice(to, 0, item);
-                            return next;
-                          })
-                        }
-                      >
-                        ↓
-                      </button>
-                    </div>
-                    <Toggle
-                      checked={c.included}
+                    />
+                    <Field
+                      label="Acknowledgments"
+                      value={matter.acknowledgments}
                       onChange={(v) =>
-                        setChapters((prev) =>
-                          prev.map((x) => (x.id === c.id ? { ...x, included: v } : x))
-                        )
+                        setMatter({ ...matter, acknowledgments: v })
                       }
+                    />
+                    <Field
+                      label="About the Author"
+                      value={matter.aboutAuthor}
+                      onChange={(v) =>
+                        setMatter({ ...matter, aboutAuthor: v })
+                      }
+                    />
+                    <Field
+                      label="Author Notes"
+                      value={matter.notes}
+                      onChange={(v) => setMatter({ ...matter, notes: v })}
                     />
                   </div>
                 </div>
               </div>
-            ))}
-          </div>
-        </div>
+            )}
 
-        {/* Footer nav */}
-        <div style={{ display: "flex", justifyContent: "space-between", marginTop: 16 }}>
-          <button style={styles.lightBtn} onClick={goBack} disabled={stepIndex === 0}>
-            ← Back
-          </button>
-          <button
-            style={styles.primaryBtn}
-            onClick={goNext}
-            disabled={stepIndex === STEPS.length - 1}
-          >
-            Next →
-          </button>
+            {step === "proof" && (
+              <div>
+                <h3 style={{ margin: "0 0 16px 0", fontSize: 18, color: theme.text }}>
+                  Proof & Consistency
+                </h3>
+                <p style={{ color: theme.subtext, fontSize: 14 }}>
+                  Local quick checks; wire to deeper services later.
+                </p>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                    gap: 12,
+                    marginTop: 16,
+                  }}
+                >
+                  <button style={styles.lightBtn} onClick={runGrammarChecks}>
+                    Grammar Check
+                  </button>
+                  <button style={styles.lightBtn} onClick={runGrammarChecks}>
+                    Style Analysis
+                  </button>
+                  <button style={styles.lightBtn} onClick={runGrammarChecks}>
+                    Character Consistency
+                  </button>
+                  <button style={styles.lightBtn} onClick={runGrammarChecks}>
+                    Timeline Validation
+                  </button>
+                  <button style={styles.primaryBtn} onClick={runGrammarChecks}>
+                    Run All Checks
+                  </button>
+                </div>
+                {!!proofResults.length && (
+                  <div style={{ marginTop: 16, ...styles.glassCard }}>
+                    <ul style={{ margin: 0, paddingLeft: 18, color: theme.text }}>
+                      {proofResults.map((r, i) => (
+                        <li key={i}>{r}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {step === "format" && (
+              <div>
+                <h3 style={{ margin: "0 0 16px 0", fontSize: 18, color: theme.text }}>
+                  Format Preview
+                </h3>
+                <div style={styles.preview}>
+                  <iframe
+                    title="format-preview"
+                    style={{ width: "100%", height: 328, border: 0 }}
+                    srcDoc={compiledHTML}
+                  />
+                </div>
+                <p style={{ color: theme.subtext, fontSize: 12, marginTop: 8 }}>
+                  * For true headers/footers + page numbers, use the DOCX export and
+                  finalize in Word/LibreOffice (then export PDF from there).
+                </p>
+              </div>
+            )}
+
+            {step === "export" && (
+              <div>
+                <h3 style={{ margin: "0 0 16px 0", fontSize: 18, color: theme.text }}>
+                  Export
+                </h3>
+                <p style={{ color: theme.subtext, fontSize: 14 }}>
+                  DOCX includes headers/footers and page numbers per selected presets.
+                </p>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                    gap: 12,
+                    marginTop: 16,
+                  }}
+                >
+                  <button style={styles.lightBtn} onClick={exportPDF}>
+                    📄 Export PDF
+                  </button>
+                  <button style={styles.lightBtn} onClick={exportDOCX}>
+                    📝 Export DOCX
+                  </button>
+                  <button style={styles.primaryBtn} onClick={exportEPUB}>
+                    📖 Export EPUB (.epub)
+                  </button>
+                  <button style={styles.darkBtn} onClick={exportEPUBXHTML}>
+                    📑 Export EPUB XHTML
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {step === "prep" && (
+              <div>
+                <h3 style={{ margin: "0 0 16px 0", fontSize: 18, color: theme.text }}>
+                  Publishing Preparation
+                </h3>
+                <p style={{ color: theme.subtext, fontSize: 14 }}>
+                  Get your submission assets ready.
+                </p>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                    gap: 12,
+                    marginTop: 16,
+                  }}
+                >
+                  <button style={styles.lightBtn}>📝 Synopsis Generator</button>
+                  <button style={styles.lightBtn}>✉️ Query Letter Builder</button>
+                  <button style={styles.lightBtn}>✅ Self-Publishing Checklist</button>
+                  <button style={styles.lightBtn}>📊 Marketing Kit</button>
+                  <button style={styles.lightBtn}>🏷️ Genre Guidelines</button>
+                  <button style={styles.lightBtn}>💰 Pricing Calculator</button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Chapters */}
+          <div style={styles.glassCard}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "center",
+                marginBottom: 14,
+              }}
+            >
+              <h3 style={{ margin: 0, fontSize: 18, color: theme.text }}>
+                Chapter Management
+              </h3>
+              <button
+                style={styles.primaryBtn}
+                onClick={() =>
+                  setChapters((prev) => [
+                    ...prev,
+                    {
+                      id:
+                        typeof crypto !== "undefined" && "randomUUID" in crypto
+                          ? (crypto as any).randomUUID()
+                          : `c_${Date.now()}`,
+                      title: `Chapter ${prev.length + 1} – Untitled`,
+                      included: true,
+                      text: "New chapter text...",
+                    },
+                  ])
+                }
+              >
+                + Add Chapter
+              </button>
+            </div>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+                gap: 12,
+              }}
+            >
+              {chapters.map((c, i) => (
+                <div
+                  key={c.id}
+                  style={{
+                    border: `1px solid ${theme.border}`,
+                    borderRadius: 12,
+                    padding: 14,
+                    background: c.included ? theme.white : "#F9FBFD",
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "flex-start",
+                      marginBottom: 8,
+                    }}
+                  >
+                    <div style={{ flex: 1 }}>
+                      <div
+                        style={{
+                          fontSize: 14,
+                          fontWeight: 700,
+                          color: theme.text,
+                        }}
+                      >
+                        {c.title}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: 12,
+                          color: theme.subtext,
+                          marginTop: 4,
+                        }}
+                      >
+                        {c.text.slice(0, 100)}…
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                        <button
+                          style={{ ...styles.lightBtn, padding: "6px 8px" }}
+                          onClick={() =>
+                            setChapters((prev) => {
+                              const next = [...prev];
+                              const to = Math.max(0, Math.min(next.length - 1, i - 1));
+                              const [item] = next.splice(i, 1);
+                              next.splice(to, 0, item);
+                              return next;
+                            })
+                          }
+                        >
+                          ↑
+                        </button>
+                        <button
+                          style={{ ...styles.lightBtn, padding: "6px 8px" }}
+                          onClick={() =>
+                            setChapters((prev) => {
+                              const next = [...prev];
+                              const to = Math.max(0, Math.min(next.length - 1, i + 1));
+                              const [item] = next.splice(i, 1);
+                              next.splice(to, 0, item);
+                              return next;
+                            })
+                          }
+                        >
+                          ↓
+                        </button>
+                      </div>
+                      <Toggle
+                        checked={c.included}
+                        onChange={(v) =>
+                          setChapters((prev) =>
+                            prev.map((x) => (x.id === c.id ? { ...x, included: v } : x))
+                          )
+                        }
+                      />
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Footer nav */}
+          <div style={{ display: "flex", justifyContent: "space-between", marginTop: 16 }}>
+            <button style={styles.lightBtn} onClick={goBack} disabled={stepIndex === 0}>
+              ← Back
+            </button>
+            <button
+              style={styles.primaryBtn}
+              onClick={goNext}
+              disabled={stepIndex === STEPS.length - 1}
+            >
+              Next →
+            </button>
+          </div>
         </div>
       </div>
     </PageShell>
