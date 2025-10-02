@@ -44,7 +44,7 @@ const loadState = () => {
       book: { title: "Untitled", targetWords: 25000, ...(parsed.book || {}) },
       chapters: Array.isArray(parsed.chapters) ? parsed.chapters : [],
       daily: parsed.daily || { goal: 500, counts: {} },
-      settings: { theme: "dark", focusMode: false, ...(parsed.settings || {}) },
+      settings: { theme: "light", focusMode: false, ...(parsed.settings || {}) },
     };
   } catch {
     return null;
@@ -54,7 +54,6 @@ const loadState = () => {
 const saveState = (state) => {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    // notify Writer/Project/other tabs to live-sync
     window.dispatchEvent(new Event("project:change"));
   } catch {}
 };
@@ -191,14 +190,14 @@ const calculateStreak = (daily) => {
 };
 
 /* ──────────────────────────────────────────────────────────────
-   Animated Blobs
+   Light Decorative Blobs (subtle)
 ──────────────────────────────────────────────────────────────── */
 function DecorBlobs() {
   return (
-    <div className="absolute inset-0 opacity-15">
-      <div className="absolute top-20 left-10 w-72 h-72 bg-blue-500 rounded-full mix-blend-multiply filter blur-xl animate-pulse"></div>
-      <div className="absolute bottom-20 right-10 w-72 h-72 bg-teal-500 rounded-full mix-blend-multiply filter blur-xl animate-pulse delay-700"></div>
-      <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-72 h-72 bg-indigo-500 rounded-full mix-blend-multiply filter blur-xl animate-pulse delay-1000"></div>
+    <div className="absolute inset-0 pointer-events-none opacity-20">
+      <div className="absolute -top-10 -left-6 w-72 h-72 bg-primary/30 rounded-full blur-3xl" />
+      <div className="absolute bottom-10 -right-6 w-72 h-72 bg-gold/30 rounded-full blur-3xl" />
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 w-72 h-72 bg-accent/40 rounded-full blur-3xl" />
     </div>
   );
 }
@@ -243,7 +242,7 @@ export default function TOCPage2() {
       },
     ],
     daily: { goal: 500, counts: {} },
-    settings: { theme: "dark", focusMode: false },
+    settings: { theme: "light", focusMode: false },
   };
 
   const [book, setBook] = React.useState(initial.book);
@@ -299,7 +298,7 @@ export default function TOCPage2() {
       setBook(s.book || { title: "Untitled", targetWords: 25000 });
       setChapters(Array.isArray(s.chapters) ? s.chapters : []);
       setDaily(s.daily || { goal: 500, counts: {} });
-      setSettings(s.settings || { theme: "dark", focusMode: false });
+      setSettings(s.settings || { theme: "light", focusMode: false });
     };
     window.addEventListener("project:change", sync);
     window.addEventListener("storage", sync);
@@ -593,30 +592,28 @@ export default function TOCPage2() {
   const yesterdayCount = daily.counts[yesterday] || 0;
   const goalPct = progressPct(todayCount, daily.goal);
 
-  // Focus mode
+  // Focus mode — light/glass
   if (settings.focusMode) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-sky-950 via-blue-950 to-indigo-950 py-8 relative overflow-hidden">
+      <div className="min-h-screen bg-base bg-radial-fade text-ink relative overflow-hidden">
         <DecorBlobs />
         <div className="relative z-10 mx-auto max-w-4xl px-4">
-          <div className="rounded-3xl bg-blue-950/50 backdrop-blur-xl shadow-2xl border border-blue-800/40 p-8 mb-8">
+          <div className="rounded-3xl bg-white/85 backdrop-blur-xl shadow-glass border border-border p-6 mb-8">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-3">
                 <NavLink
                   to="/dashboard"
-                  className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-white/10 text-white border border-white/20 hover:bg-white/15"
+                  className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-white border border-border hover:bg-white/90 text-ink"
                   title="Back to Dashboard"
                 >
                   <ArrowLeft size={16} />
                   Back
                 </NavLink>
-                <h1 className="text-3xl font-bold text-white font-serif">
-                  {book.title}
-                </h1>
+                <h1 className="text-3xl font-bold">{book.title}</h1>
               </div>
               <button
                 onClick={() => setSettings((s) => ({ ...s, focusMode: false }))}
-                className="p-3 rounded-xl bg-blue-900/40 hover:bg-blue-900/60 text-blue-300 backdrop-blur-sm transition-all duration-300 hover:scale-105"
+                className="p-3 rounded-xl bg-white border border-border hover:bg-white/90 text-ink transition-all"
                 title="Exit focus mode (Ctrl/Cmd+F)"
               >
                 <Maximize2 size={20} />
@@ -628,22 +625,18 @@ export default function TOCPage2() {
             {chapters.map((ch) => (
               <div
                 key={ch.id}
-                className="rounded-3xl bg-blue-950/50 backdrop-blur-xl shadow-2xl border border-blue-800/40 p-8"
+                className="rounded-3xl bg-white/85 backdrop-blur-xl shadow-soft border border-border p-6"
               >
-                <div className="text-xl font-bold text-white font-serif mb-4">
-                  {ch.title}
-                </div>
+                <div className="text-xl font-bold mb-4">{ch.title}</div>
                 <textarea
                   value={ch.content}
                   onChange={(e) =>
                     updateChapter(ch.id, { content: e.target.value })
                   }
                   placeholder="Write your chapter content here..."
-                  className="w-full min-h-[200px] bg-blue-900/30 border border-blue-700/50 rounded-xl text-white placeholder-blue-300 backdrop-blur-sm focus:ring-2 focus:ring-blue-400 focus:border-blue-400 focus:bg-blue-900/40 transition-all duration-300 font-serif px-4 py-4 resize-y outline-none"
+                  className="w-full min-h-[200px] bg-white/70 border border-border rounded-xl text-ink placeholder:text-muted focus:ring-2 focus:ring-primary focus:border-primary transition-all px-4 py-4 resize-y outline-none"
                 />
-                <div className="mt-3 text-sm text-blue-200 font-serif">
-                  {countWords(ch.content)} words
-                </div>
+                <div className="mt-3 text-sm text-muted">{countWords(ch.content)} words</div>
               </div>
             ))}
           </div>
@@ -653,25 +646,22 @@ export default function TOCPage2() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-sky-950 via-blue-950 to-indigo-950 py-8 relative overflow-hidden">
+    <div className="min-h-screen bg-base bg-radial-fade text-ink relative overflow-hidden">
       <DecorBlobs />
       <div className="relative z-10 mx-auto max-w-5xl px-4">
         {/* Top banner */}
-        <div className="rounded-3xl bg-gradient-to-r from-slate-900/90 via-indigo-900/90 to-slate-900/90 backdrop-blur-xl text-white shadow-2xl border border-blue-800/40">
+        <div className="rounded-3xl bg-white/85 backdrop-blur-xl text-ink shadow-glass border border-border">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between px-8 py-6">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-blue-600/30 backdrop-blur-sm flex items-center justify-center border border-blue-400/30">
-                <BookOpen size={24} />
+              <div className="w-12 h-12 rounded-2xl bg-white/70 border border-border flex items-center justify-center">
+                <BookOpen className="text-muted" size={24} />
               </div>
-              <h1 className="text-4xl font-bold drop-shadow-lg font-serif">
-                Table of Contents
-              </h1>
+              <h1 className="text-4xl font-bold">Table of Contents</h1>
             </div>
             <div className="flex items-center gap-3 flex-wrap">
-              {/* Back to Dashboard */}
               <NavLink
                 to="/dashboard"
-                className="inline-flex items-center gap-2 px-4 py-3 rounded-xl bg-white/10 text-white border border-white/20 hover:bg-white/15"
+                className="inline-flex items-center gap-2 px-4 py-3 rounded-xl bg-white border border-border hover:bg-white/90 text-ink"
                 title="Back to Dashboard"
               >
                 <ArrowLeft size={16} />
@@ -680,14 +670,14 @@ export default function TOCPage2() {
 
               <button
                 onClick={() => setSettings((s) => ({ ...s, focusMode: true }))}
-                className="inline-flex items-center gap-2 px-4 py-3 rounded-xl bg-purple-600/30 border border-purple-400/30 hover:bg-purple-600/40 text-purple-100 text-sm font-serif backdrop-blur-sm transition-all duration-300 hover:scale-105"
+                className="inline-flex items-center gap-2 px-4 py-3 rounded-xl bg-white border border-border hover:bg-white/90 text-ink text-sm"
                 title="Focus mode (Ctrl/Cmd+F)"
               >
                 <Minimize2 size={16} /> Focus
               </button>
               <button
                 onClick={() => setShowAnalytics(!showAnalytics)}
-                className="inline-flex items-center gap-2 px-4 py-3 rounded-xl bg-teal-600/30 border border-teal-400/30 hover:bg-teal-600/40 text-teal-100 text-sm font-serif backdrop-blur-sm transition-all duration-300 hover:scale-105"
+                className="inline-flex items-center gap-2 px-4 py-3 rounded-xl bg-white border border-border hover:bg-white/90 text-ink text-sm"
                 title="Writing analytics"
               >
                 <TrendingUp size={16} /> Analytics
@@ -697,26 +687,26 @@ export default function TOCPage2() {
                   saveState({ book, chapters, daily, settings });
                   setLastSaved(Date.now());
                 }}
-                className="inline-flex items-center gap-2 px-4 py-3 rounded-xl bg-green-600/30 border border-green-400/30 hover:bg-green-600/40 text-green-100 text-sm font-serif backdrop-blur-sm transition-all duration-300 hover:scale-105"
+                className="inline-flex items-center gap-2 px-4 py-3 rounded-xl bg-white border border-border hover:bg-white/90 text-ink text-sm"
                 title="Save now (Ctrl/Cmd+S)"
               >
                 <Save size={16} /> Save
               </button>
               <button
                 onClick={() => exportText(book, chapters)}
-                className="inline-flex items-center gap-2 px-4 py-3 rounded-xl bg-blue-600/30 border border-blue-400/30 hover:bg-blue-600/40 text-blue-100 text-sm font-serif backdrop-blur-sm transition-all duration-300 hover:scale-105"
+                className="inline-flex items-center gap-2 px-4 py-3 rounded-xl bg-white border border-border hover:bg-white/90 text-ink text-sm"
                 title="Export as .txt"
               >
                 <Download size={16} /> Export
               </button>
               <button
                 onClick={() => exportJSON({ book, chapters, daily, settings })}
-                className="inline-flex items-center gap-2 px-4 py-3 rounded-xl bg-indigo-600/30 border border-indigo-400/30 hover:bg-indigo-600/40 text-indigo-100 text-sm font-serif backdrop-blur-sm transition-all duration-300 hover:scale-105"
+                className="inline-flex items-center gap-2 px-4 py-3 rounded-xl bg-white border border-border hover:bg-white/90 text-ink text-sm"
                 title="Export backup JSON"
               >
                 <Download size={16} /> Backup
               </button>
-              <label className="inline-flex items-center gap-2 px-4 py-3 rounded-xl bg-slate-600/30 border border-slate-400/30 hover:bg-slate-600/40 text-slate-100 text-sm font-serif cursor-pointer backdrop-blur-sm transition-all duration-300 hover:scale-105">
+              <label className="inline-flex items-center gap-2 px-4 py-3 rounded-xl bg-white border border-border hover:bg-white/90 text-ink text-sm cursor-pointer">
                 <Upload size={16} /> Import
                 <input
                   type="file"
@@ -731,14 +721,14 @@ export default function TOCPage2() {
               </label>
               <button
                 onClick={generateAll}
-                className="inline-flex items-center gap-2 px-4 py-3 rounded-xl bg-purple-600/30 border border-purple-400/30 hover:bg-purple-600/40 text-purple-100 text-sm font-serif backdrop-blur-sm transition-all duration-300 hover:scale-105"
+                className="inline-flex items-center gap-2 px-4 py-3 rounded-xl bg-white border border-border hover:bg-white/90 text-ink text-sm"
                 title="Generate AI synopses"
               >
                 <Sparkles size={16} /> AI Synopses
               </button>
               <button
                 onClick={() => addChapter()}
-                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-indigo-500 hover:bg-indigo-400 text-white text-sm font-serif shadow-xl backdrop-blur-sm transition-all duration-300 hover:scale-105 hover:shadow-2xl"
+                className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-primary hover:opacity-95 text-white text-sm shadow-soft"
                 title="New chapter (Ctrl/Cmd+N)"
               >
                 <Plus size={16} /> New Chapter
@@ -749,55 +739,37 @@ export default function TOCPage2() {
 
         {/* Analytics panel */}
         {showAnalytics && (
-          <div className="mt-6 rounded-3xl bg-blue-950/50 backdrop-blur-xl shadow-2xl border border-blue-800/40 p-8">
+          <div className="mt-6 rounded-3xl bg-white/85 backdrop-blur-xl shadow-soft border border-border p-8">
             <div className="flex items-center gap-3 mb-6">
-              <div className="w-10 h-10 rounded-xl bg-indigo-600/30 flex items-center justify-center">
-                <TrendingUp className="text-indigo-300" size={20} />
+              <div className="w-10 h-10 rounded-xl bg-white/70 border border-border flex items-center justify-center">
+                <TrendingUp className="text-muted" size={20} />
               </div>
-              <h2 className="text-2xl font-bold text-white font-serif">
-                Writing Analytics
-              </h2>
+              <h2 className="text-2xl font-bold">Writing Analytics</h2>
             </div>
             <div className="grid md:grid-cols-4 gap-6">
-              <div className="p-6 rounded-2xl bg-blue-900/30 border border-blue-700/50 backdrop-blur-sm">
-                <div className="text-3xl font-bold text-white font-serif">
-                  {streak}
-                </div>
-                <div className="text-sm text-blue-200 font-serif mt-1">
-                  Day streak
-                </div>
+              <div className="p-6 rounded-2xl bg-white/70 border border-border backdrop-blur-sm">
+                <div className="text-3xl font-bold">{streak}</div>
+                <div className="text-sm text-muted mt-1">Day streak</div>
                 {streak > 0 && (
                   <div className="flex items-center gap-1 mt-2">
-                    <Flame className="text-orange-400" size={16} />
-                    <span className="text-orange-300 text-xs font-serif">
-                      On fire!
-                    </span>
+                    <Flame className="text-amber-500" size={16} />
+                    <span className="text-amber-600 text-xs">On fire!</span>
                   </div>
                 )}
               </div>
-              <div className="p-6 rounded-2xl bg-blue-900/30 border border-blue-700/50 backdrop-blur-sm">
-                <div className="text-3xl font-bold text-white font-serif">
-                  {todayCount}
-                </div>
-                <div className="text-sm text-blue-200 font-serif mt-1">
-                  Words today
-                </div>
+              <div className="p-6 rounded-2xl bg-white/70 border border-border backdrop-blur-sm">
+                <div className="text-3xl font-bold">{todayCount}</div>
+                <div className="text-sm text-muted mt-1">Words today</div>
               </div>
-              <div className="p-6 rounded-2xl bg-blue-900/30 border border-blue-700/50 backdrop-blur-sm">
-                <div className="text-3xl font-bold text-white font-serif">
-                  {yesterdayCount}
-                </div>
-                <div className="text-sm text-blue-200 font-serif mt-1">
-                  Words yesterday
-                </div>
+              <div className="p-6 rounded-2xl bg-white/70 border border-border backdrop-blur-sm">
+                <div className="text-3xl font-bold">{yesterdayCount}</div>
+                <div className="text-sm text-muted mt-1">Words yesterday</div>
               </div>
-              <div className="p-6 rounded-2xl bg-blue-900/30 border border-blue-700/50 backdrop-blur-sm">
-                <div className="text-3xl font-bold text-white font-serif">
+              <div className="p-6 rounded-2xl bg-white/70 border border-border backdrop-blur-sm">
+                <div className="text-3xl font-bold">
                   {chapters.filter((c) => c.bookmarked).length}
                 </div>
-                <div className="text-sm text-blue-200 font-serif mt-1">
-                  Bookmarked
-                </div>
+                <div className="text-sm text-muted mt-1">Bookmarked</div>
               </div>
             </div>
           </div>
@@ -806,7 +778,7 @@ export default function TOCPage2() {
         {/* Book + goals */}
         <div className="mt-6 grid lg:grid-cols-2 gap-6">
           {/* Book banner */}
-          <div className="rounded-3xl bg-blue-950/50 backdrop-blur-xl shadow-2xl border border-blue-800/40 p-8">
+          <div className="rounded-3xl bg-white/85 backdrop-blur-xl shadow-soft border border-border p-8">
             <div className="flex items-start justify-between gap-6">
               <div className="flex-1 min-w-0">
                 <input
@@ -814,32 +786,30 @@ export default function TOCPage2() {
                   onChange={(e) =>
                     commitSnapshot({ book: { ...book, title: e.target.value } })
                   }
-                  className="w-full bg-transparent text-2xl font-bold text-white font-serif outline-none border-b border-transparent focus:border-blue-400/50 transition-colors"
+                  className="w-full bg-transparent text-2xl font-bold outline-none border-b border-transparent focus:border-primary/40"
                 />
-                <div className="text-blue-200 font-serif mt-3">
+                <div className="text-muted mt-3">
                   {totalWords.toLocaleString()} /{" "}
                   {book.targetWords.toLocaleString()} words
                   {readTime > 0 && ` • ~${readTime} min read`}
                 </div>
-                <div className="mt-4 w-full bg-blue-900/50 rounded-full h-3 backdrop-blur-sm">
+                <div className="mt-4 w-full bg-white border border-border rounded-full h-3">
                   <div
-                    className="bg-gradient-to-r from-indigo-500 to-teal-500 h-3 rounded-full transition-all duration-700 shadow-lg"
+                    className="bg-primary h-3 rounded-full transition-all duration-700"
                     style={{ width: `${pct}%` }}
-                  ></div>
+                  />
                 </div>
-                <div className="text-xs text-blue-300 font-serif mt-2">
+                <div className="text-xs text-muted mt-2">
                   {pct.toFixed(1)}% complete • Last saved{" "}
                   {Math.round((Date.now() - lastSaved) / 60000) || 0}m ago
                 </div>
               </div>
               <div className="text-right">
-                <div className="text-4xl font-bold text-white font-serif">
-                  {chapters.length}
-                </div>
-                <div className="text-xs uppercase tracking-wider text-blue-300 font-serif">
+                <div className="text-4xl font-bold">{chapters.length}</div>
+                <div className="text-xs uppercase tracking-wider text-muted">
                   Chapters
                 </div>
-                <div className="mt-4 text-xs text-blue-300 font-serif">
+                <div className="mt-4 text-xs text-muted">
                   Target words
                   <input
                     type="number"
@@ -853,7 +823,7 @@ export default function TOCPage2() {
                         },
                       })
                     }
-                    className="w-24 mt-2 rounded-xl bg-blue-900/60 border border-blue-700/50 px-3 py-2 text-right text-white font-serif backdrop-blur-sm outline-none focus:ring-2 focus:ring-blue-400 transition-all duration-300"
+                    className="w-24 mt-2 rounded-xl bg-white/70 border border-border px-3 py-2 text-right outline-none focus:ring-2 focus:ring-primary"
                   />
                 </div>
               </div>
@@ -861,38 +831,36 @@ export default function TOCPage2() {
           </div>
 
           {/* Daily goal + streak */}
-          <div className="rounded-3xl bg-blue-950/50 backdrop-blur-xl shadow-2xl border border-blue-800/40 p-8">
+          <div className="rounded-3xl bg-white/85 backdrop-blur-xl shadow-soft border border-border p-8">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-xl bg-indigo-600/30 flex items-center justify-center">
-                <Target className="text-indigo-300" size={20} />
+              <div className="w-10 h-10 rounded-xl bg-white/70 border border-border flex items-center justify-center">
+                <Target className="text-muted" size={20} />
               </div>
-              <div className="text-xl font-bold text-white font-serif">
-                Daily Goal
-              </div>
+              <div className="text-xl font-bold">Daily Goal</div>
               {streak > 0 && (
                 <div className="flex items-center gap-2 ml-auto">
-                  <Flame className="text-orange-400" size={20} />
-                  <span className="text-orange-300 font-serif font-medium">
+                  <Flame className="text-amber-500" size={20} />
+                  <span className="text-amber-700 font-medium">
                     {streak} day{streak !== 1 ? "s" : ""}
                   </span>
                 </div>
               )}
             </div>
-            <div className="text-blue-200 font-serif mb-4">
+            <div className="text-muted mb-4">
               Today:{" "}
-              <span className="font-bold text-white">
+              <span className="font-bold text-ink">
                 {todayCount.toLocaleString()}
               </span>{" "}
               / {daily.goal.toLocaleString()} words
             </div>
-            <div className="w-full bg-blue-900/50 rounded-full h-3 backdrop-blur-sm">
+            <div className="w-full bg-white border border-border rounded-full h-3">
               <div
-                className="bg-gradient-to-r from-teal-500 to-emerald-500 h-3 rounded-full transition-all duration-700 shadow-lg"
+                className="bg-emerald-500 h-3 rounded-full transition-all duration-700"
                 style={{ width: `${goalPct}%` }}
-              ></div>
+              />
             </div>
             <div className="mt-4 flex items-center gap-3">
-              <span className="text-xs text-blue-300 font-serif">Set goal:</span>
+              <span className="text-xs text-muted">Set goal:</span>
               <input
                 type="number"
                 min={100}
@@ -906,31 +874,31 @@ export default function TOCPage2() {
                     },
                   })
                 }
-                className="rounded-xl bg-blue-900/60 border border-blue-700/50 px-3 py-2 text-white font-serif backdrop-blur-sm outline-none focus:ring-2 focus:ring-blue-400 transition-all duration-300"
+                className="rounded-xl bg-white/70 border border-border px-3 py-2 outline-none focus:ring-2 focus:ring-primary"
               />
             </div>
           </div>
         </div>
 
         {/* Search / filters / quick add + template */}
-        <div className="mt-6 rounded-3xl bg-blue-950/50 backdrop-blur-xl shadow-2xl border border-blue-800/40 p-8">
+        <div className="mt-6 rounded-3xl bg-white/85 backdrop-blur-xl shadow-soft border border-border p-8">
           <div className="space-y-6">
             {/* Search row */}
             <div className="flex flex-col lg:flex-row gap-4 lg:items-center">
               <div className="relative flex-1">
-                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-blue-300">
+                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-muted">
                   <Search size={20} />
                 </div>
                 <input
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Search chapters by title, content, synopsis, or tags…"
-                  className="w-full pl-12 pr-6 py-4 rounded-xl bg-blue-900/30 border border-blue-700/50 text-white placeholder-blue-300 backdrop-blur-sm focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-all duration-300 font-serif outline-none"
+                  className="w-full pl-12 pr-6 py-4 rounded-xl bg-white/70 border border-border text-ink placeholder:text-muted focus:ring-2 focus:ring-primary outline-none"
                 />
                 {search && (
                   <button
                     onClick={() => setSearch("")}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 text-blue-300 hover:text-white transition-colors"
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-muted hover:text-ink"
                   >
                     <X size={20} />
                   </button>
@@ -941,7 +909,7 @@ export default function TOCPage2() {
                   <select
                     value={tagFilter}
                     onChange={(e) => setTagFilter(e.target.value)}
-                    className="rounded-xl bg-blue-900/30 border border-blue-700/50 px-4 py-4 text-white backdrop-blur-sm font-serif outline-none focus:ring-2 focus:ring-blue-400 transition-all duration-300"
+                    className="rounded-xl bg-white/70 border border-border px-4 py-4 text-ink placeholder:text-muted focus:ring-2 focus:ring-primary outline-none"
                   >
                     <option value="">All tags</option>
                     {allTags.map((tag) => (
@@ -951,12 +919,12 @@ export default function TOCPage2() {
                     ))}
                   </select>
                 )}
-                <label className="inline-flex items-center gap-3 text-blue-200 font-serif cursor-pointer">
+                <label className="inline-flex items-center gap-3 text-muted cursor-pointer">
                   <input
                     type="checkbox"
                     checked={onlyBookmarked}
                     onChange={(e) => setOnlyBookmarked(e.target.checked)}
-                    className="accent-indigo-500 w-4 h-4"
+                    className="accent-primary w-4 h-4"
                   />
                   Bookmarked
                 </label>
@@ -972,12 +940,12 @@ export default function TOCPage2() {
                   if (e.key === "Enter") addChapter();
                 }}
                 placeholder="Quick add: Chapter title…"
-                className="flex-1 rounded-xl bg-blue-900/30 border border-blue-700/50 px-4 py-4 text-white placeholder-blue-300 backdrop-blur-sm focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-all duration-300 font-serif outline-none"
+                className="flex-1 rounded-xl bg-white/70 border border-border px-4 py-4 text-ink placeholder:text-muted focus:ring-2 focus:ring-primary outline-none"
               />
               <select
                 value={templateKey}
                 onChange={(e) => setTemplateKey(e.target.value)}
-                className="rounded-xl bg-blue-900/30 border border-blue-700/50 px-4 py-4 text-white backdrop-blur-sm font-serif outline-none focus:ring-2 focus:ring-blue-400 transition-all duration-300"
+                className="rounded-xl bg-white/70 border border-border px-4 py-4 text-ink focus:ring-2 focus:ring-primary outline-none"
               >
                 {Object.keys(TEMPLATES).map((k) => (
                   <option key={k} value={k}>
@@ -987,20 +955,19 @@ export default function TOCPage2() {
               </select>
               <button
                 onClick={() => addChapter()}
-                className="px-8 py-4 rounded-xl bg-indigo-500 hover:bg-indigo-400 text-white font-serif font-bold shadow-xl transition-all duration-300 hover:scale-105 hover:shadow-2xl backdrop-blur-sm"
+                className="px-8 py-4 rounded-xl bg-primary hover:opacity-95 text-white font-bold shadow-soft"
               >
                 Add Chapter
               </button>
             </div>
 
-            <div className="text-xs text-blue-300 font-serif">
-              <span className="font-bold">Shortcuts:</span> Ctrl/Cmd+S save •
+            <div className="text-xs text-muted">
+              <span className="font-semibold">Shortcuts:</span> Ctrl/Cmd+S save •
               Ctrl/Cmd+N new • Ctrl/Cmd+Z undo • Ctrl/Cmd+Y redo • Ctrl/Cmd+F
               focus mode
               {search && (
                 <span>
-                  {" "}
-                  • Showing {filtered.length} of {chapters.length}
+                  {" "}• Showing {filtered.length} of {chapters.length}
                 </span>
               )}
             </div>
@@ -1010,14 +977,10 @@ export default function TOCPage2() {
         {/* Chapters */}
         <div className="mt-8 space-y-6">
           {filtered.length === 0 ? (
-            <div className="rounded-3xl bg-blue-950/50 backdrop-blur-xl shadow-2xl border border-blue-800/40 p-12 text-center">
-              <Search className="mx-auto mb-4 text-blue-300" size={48} />
-              <div className="text-xl font-bold text-white font-serif mb-2">
-                No chapters found
-              </div>
-              <div className="text-blue-200 font-serif">
-                Try clearing the search or changing filters.
-              </div>
+            <div className="rounded-3xl bg-white/85 backdrop-blur-xl shadow-soft border border-border p-12 text-center">
+              <Search className="mx-auto mb-4 text-muted" size={48} />
+              <div className="text-xl font-bold mb-2">No chapters found</div>
+              <div className="text-muted">Try clearing the search or changing filters.</div>
             </div>
           ) : (
             filtered.map((ch) => {
@@ -1030,27 +993,25 @@ export default function TOCPage2() {
               return (
                 <div
                   key={ch.id}
-                  className="rounded-3xl bg-blue-950/50 backdrop-blur-xl shadow-2xl border border-blue-800/40 overflow-hidden"
+                  className="rounded-3xl bg-white/85 backdrop-blur-xl shadow-soft border border-border overflow-hidden"
                 >
                   <div className="px-8 py-6 flex items-start gap-4">
                     <button
                       onClick={() => toggleOpen(ch.id)}
-                      className="mt-1 shrink-0 p-3 rounded-xl bg-blue-900/40 hover:bg-blue-900/60 backdrop-blur-sm transition-all duration-300 hover:scale-105"
+                      className="mt-1 shrink-0 p-3 rounded-xl bg-white/70 border border-border hover:bg-white transition"
                       title={open ? "Collapse" : "Expand"}
                     >
                       {open ? (
-                        <ChevronDown className="text-blue-300" size={20} />
+                        <ChevronDown className="text-muted" size={20} />
                       ) : (
-                        <ChevronRight className="text-blue-300" size={20} />
+                        <ChevronRight className="text-muted" size={20} />
                       )}
                     </button>
 
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-4">
-                        <div className="text-xl font-bold text-white font-serif truncate">
-                          {ch.title}
-                        </div>
-                        <div className="text-xs text-blue-200 flex items-center gap-4 shrink-0 font-serif">
+                        <div className="text-xl font-bold truncate">{ch.title}</div>
+                        <div className="text-xs text-muted flex items-center gap-4 shrink-0">
                           <span className="flex items-center gap-2">
                             <FileText size={16} /> {words} words
                             {mins ? ` • ${mins}m` : ""}
@@ -1063,39 +1024,39 @@ export default function TOCPage2() {
                           <div className="flex items-center gap-2">
                             <button
                               onClick={() => moveUp(ch.id)}
-                              className="p-2 rounded-lg hover:bg-blue-700/50 text-blue-300 transition-all duration-300"
+                              className="p-2 rounded-lg hover:bg-white/70 text-ink transition"
                               title="Move up"
                             >
                               <ArrowUp size={16} />
                             </button>
                             <button
                               onClick={() => moveDown(ch.id)}
-                              className="p-2 rounded-lg hover:bg-blue-700/50 text-blue-300 transition-all duration-300"
+                              className="p-2 rounded-lg hover:bg-white/70 text-ink transition"
                               title="Move down"
                             >
                               <ArrowDown size={16} />
                             </button>
                             <button
                               onClick={() => toggleBookmark(ch.id)}
-                              className="p-2 rounded-lg hover:bg-blue-700/50 text-blue-300 transition-all duration-300"
+                              className="p-2 rounded-lg hover:bg-white/70 text-ink transition"
                               title={ch.bookmarked ? "Remove bookmark" : "Bookmark"}
                             >
                               {ch.bookmarked ? (
-                                <Star className="text-yellow-400" size={16} />
+                                <Star className="text-amber-500" size={16} />
                               ) : (
                                 <StarOff size={16} />
                               )}
                             </button>
                             <button
                               onClick={() => duplicateChapter(ch.id)}
-                              className="p-2 rounded-lg hover:bg-blue-700/50 text-blue-300 transition-all duration-300"
+                              className="p-2 rounded-lg hover:bg-white/70 text-ink transition"
                               title="Duplicate"
                             >
                               <Copy size={16} />
                             </button>
                             <button
                               onClick={() => setConfirmDeleteId(ch.id)}
-                              className="p-2 rounded-lg hover:bg-red-500/20 text-red-400 transition-all duration-300"
+                              className="p-2 rounded-lg hover:bg-red-50 text-red-600 transition"
                               title="Delete"
                             >
                               <Trash2 size={16} />
@@ -1103,7 +1064,7 @@ export default function TOCPage2() {
                             <button
                               onClick={() => generateOne(ch.id)}
                               disabled={busy}
-                              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-indigo-600/30 border border-indigo-400/30 hover:bg-indigo-600/40 text-indigo-100 font-serif transition-all duration-300 backdrop-blur-sm"
+                              className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-white/70 border border-border hover:bg-white text-ink transition"
                               title="Generate/regenerate AI synopsis"
                             >
                               {busy ? (
@@ -1111,7 +1072,7 @@ export default function TOCPage2() {
                               ) : (
                                 <Sparkles size={16} />
                               )}
-                              {busy ? "Generating…" : "AI Synopsis"}
+                              <span className="text-xs">{busy ? "Generating…" : "AI Synopsis"}</span>
                             </button>
                           </div>
                         </div>
@@ -1123,7 +1084,7 @@ export default function TOCPage2() {
                           {(ch.tags || []).map((tag) => (
                             <span
                               key={tag}
-                              className="inline-flex items-center gap-2 px-3 py-1 rounded-lg text-xs bg-indigo-900/40 text-indigo-200 border border-indigo-700/50 backdrop-blur-sm font-serif"
+                              className="inline-flex items-center gap-2 px-3 py-1 rounded-lg text-xs bg-white/70 text-ink border border-border"
                             >
                               <Tag size={12} />
                               {tag}
@@ -1133,26 +1094,22 @@ export default function TOCPage2() {
                       )}
 
                       {open && (
-                        <div className="mt-6 text-blue-200 font-serif">
+                        <div className="mt-6">
                           {/* Title */}
                           <div className="mb-4">
-                            <div className="text-xs text-blue-300 mb-2 font-serif">
-                              Chapter title
-                            </div>
+                            <div className="text-xs text-muted mb-2">Chapter title</div>
                             <input
                               value={ch.title}
                               onChange={(e) =>
                                 updateChapter(ch.id, { title: e.target.value })
                               }
-                              className="w-full px-4 py-3 rounded-xl bg-blue-900/30 border border-blue-700/50 text-white backdrop-blur-sm outline-none focus:ring-2 focus:ring-blue-400 transition-all duration-300 font-serif"
+                              className="w-full px-4 py-3 rounded-xl bg-white/70 border border-border text-ink outline-none focus:ring-2 focus:ring-primary"
                             />
                           </div>
 
                           {/* Word goal */}
                           <div className="mb-4">
-                            <div className="text-xs text-blue-300 mb-2 font-serif">
-                              Word goal for this chapter
-                            </div>
+                            <div className="text-xs text-muted mb-2">Word goal for this chapter</div>
                             <div className="flex items-center gap-4">
                               <input
                                 type="number"
@@ -1164,15 +1121,15 @@ export default function TOCPage2() {
                                     wordGoal: Number(e.target.value) || 2000,
                                   })
                                 }
-                                className="w-32 rounded-xl bg-blue-900/60 border border-blue-700/50 px-3 py-2 text-white font-serif backdrop-blur-sm outline-none focus:ring-2 focus:ring-blue-400 transition-all duration-300"
+                                className="w-32 rounded-xl bg-white/70 border border-border px-3 py-2 text-ink outline-none focus:ring-2 focus:ring-primary"
                               />
-                              <div className="flex-1 bg-blue-900/50 rounded-full h-3 backdrop-blur-sm">
+                              <div className="flex-1 bg-white border border-border rounded-full h-3">
                                 <div
-                                  className="bg-gradient-to-r from-teal-500 to-emerald-500 h-3 rounded-full transition-all duration-700 shadow-lg"
+                                  className="bg-emerald-500 h-3 rounded-full transition-all duration-700"
                                   style={{ width: `${wordGoalPct}%` }}
-                                ></div>
+                                />
                               </div>
-                              <span className="text-xs text-blue-300 font-serif">
+                              <span className="text-xs text-muted">
                                 {wordGoalPct.toFixed(0)}%
                               </span>
                             </div>
@@ -1180,21 +1137,19 @@ export default function TOCPage2() {
 
                           {/* Tags editor */}
                           <div className="mb-4">
-                            <div className="text-xs text-blue-300 mb-2 font-serif">
-                              Tags
-                            </div>
+                            <div className="text-xs text-muted mb-2">Tags</div>
                             <div className="flex items-center gap-2 flex-wrap">
                               {(ch.tags || []).map((tag) => (
                                 <span
                                   key={tag}
-                                  className="inline-flex items-center gap-1 px-3 py-1 rounded-lg text-xs bg-indigo-900/40 text-indigo-200 border border-indigo-700/50 backdrop-blur-sm font-serif"
+                                  className="inline-flex items-center gap-1 px-3 py-1 rounded-lg text-xs bg-white/70 text-ink border border-border"
                                 >
                                   {tag}
                                   <button
                                     onClick={() =>
                                       removeTagFromChapter(ch.id, tag)
                                     }
-                                    className="hover:text-red-400 transition-colors"
+                                    className="hover:text-red-600 transition-colors"
                                   >
                                     <X size={12} />
                                   </button>
@@ -1207,7 +1162,7 @@ export default function TOCPage2() {
                                     e.target.value = "";
                                   }
                                 }}
-                                className="text-xs rounded-lg bg-blue-900/30 border border-blue-700/50 px-3 py-2 text-white backdrop-blur-sm outline-none font-serif"
+                                className="text-xs rounded-lg bg-white/70 border border-border px-3 py-2 text-ink outline-none focus:ring-2 focus:ring-primary"
                               >
                                 <option value="">Add tag...</option>
                                 {PREDEFINED_TAGS.filter(
@@ -1223,18 +1178,13 @@ export default function TOCPage2() {
 
                           {/* Synopsis */}
                           <div className="mb-6">
-                            <div className="font-bold mb-3 text-white font-serif text-lg">
-                              AI Synopsis
-                            </div>
-                            <div className="rounded-2xl bg-blue-900/40 border border-blue-700/30 p-4 backdrop-blur-sm">
+                            <div className="font-semibold mb-3">AI Synopsis</div>
+                            <div className="rounded-2xl bg-white/70 border border-border p-4">
                               {ch.synopsis ? (
-                                <p className="font-serif leading-relaxed">
-                                  {ch.synopsis}
-                                </p>
+                                <p className="leading-relaxed">{ch.synopsis}</p>
                               ) : (
-                                <span className="opacity-60 font-serif">
-                                  No synopsis yet. Click "AI Synopsis" to
-                                  generate.
+                                <span className="text-muted">
+                                  No synopsis yet. Click "AI Synopsis" to generate.
                                 </span>
                               )}
                             </div>
@@ -1242,16 +1192,14 @@ export default function TOCPage2() {
 
                           {/* Content */}
                           <div>
-                            <div className="text-xs text-blue-300 mb-2 font-serif">
-                              Chapter content
-                            </div>
+                            <div className="text-xs text-muted mb-2">Chapter content</div>
                             <textarea
                               value={ch.content}
                               onChange={(e) =>
                                 updateChapter(ch.id, { content: e.target.value })
                               }
                               placeholder="Draft your chapter content here…"
-                              className="w-full min-h-[200px] rounded-2xl bg-blue-900/30 border border-blue-700/50 px-4 py-4 text-white placeholder-blue-300 backdrop-blur-sm focus:ring-2 focus:ring-blue-400 focus:border-blue-400 transition-all duration-300 font-serif outline-none resize-y"
+                              className="w-full min-h-[200px] rounded-2xl bg-white/70 border border-border px-4 py-4 text-ink placeholder:text-muted focus:ring-2 focus:ring-primary outline-none resize-y"
                             />
                           </div>
                         </div>
@@ -1266,15 +1214,15 @@ export default function TOCPage2() {
 
         {/* Delete confirmation modal */}
         {confirmDeleteId && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-            <div className="bg-blue-950/90 backdrop-blur-xl rounded-3xl p-8 max-w-md w-full border border-blue-800/40 shadow-2xl">
+          <div className="fixed inset-0 bg-black/40 flex items-center justify-center p-4 z-50">
+            <div className="bg-white/90 backdrop-blur-xl rounded-3xl p-8 max-w-md w-full border border-border shadow-glass">
               <div className="flex items-center gap-3 mb-6">
-                <AlertCircle className="text-red-400" size={24} />
-                <div className="text-xl font-bold text-white font-serif">
+                <AlertCircle className="text-red-600" size={24} />
+                <div className="text-xl font-bold text-ink">
                   Delete Chapter
                 </div>
               </div>
-              <div className="text-blue-200 font-serif mb-8 leading-relaxed">
+              <div className="text-ink/80 mb-8 leading-relaxed">
                 Are you sure you want to delete "
                 {chapters.find((c) => c.id === confirmDeleteId)?.title}"? This
                 action cannot be undone.
@@ -1282,13 +1230,13 @@ export default function TOCPage2() {
               <div className="flex gap-4">
                 <button
                   onClick={() => setConfirmDeleteId(null)}
-                  className="flex-1 px-6 py-3 rounded-xl bg-blue-900/40 hover:bg-blue-900/60 text-white font-serif backdrop-blur-sm transition-all duration-300 hover:scale-105"
+                  className="flex-1 px-6 py-3 rounded-xl bg-white border border-border hover:bg-white/90 text-ink"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={() => deleteChapter(confirmDeleteId)}
-                  className="flex-1 px-6 py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white font-serif shadow-xl transition-all duration-300 hover:scale-105 hover:shadow-2xl"
+                  className="flex-1 px-6 py-3 rounded-xl bg-red-600 hover:bg-red-500 text-white shadow-soft"
                 >
                   Delete
                 </button>
