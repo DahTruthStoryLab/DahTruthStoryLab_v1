@@ -38,7 +38,7 @@ const Clothesline          = lazy(() => import("./components/storylab/Clotheslin
 const HopesFearsLegacy     = lazy(() => import("./components/storylab/HopesFearsLegacy"));
 
 // NEW: Workshop Community hub (all-in-one)
-const WorkshopCohort       = lazy(() => import("./components/storylab/WorkshopCohort.jsx"));
+const WorkshopCohort       = lazy(() => import("./components/storylab/WorkshopCohort"));
 
 /* =========================
    Global UI helpers
