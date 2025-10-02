@@ -2,7 +2,7 @@ import React from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
-  Map,
+  Map as MapIcon, // ✅ alias Map to avoid conflicts
   Compass,
   Sparkles,
   BookOpenCheck,
@@ -17,40 +17,33 @@ import {
   Settings,
   Moon,
   Sun
-}
-  import { Map as MapIcon, /* rest... */ } from "lucide-react";
-
+} from "lucide-react";
 
 /**
  * StoryLab Journey Landing
  * -----------------------------------------------------------
- * A warm, immersive landing page that frames the StoryLab as a journey.
- * - "Journey Map" hero with call-to-action
- * - Toolbelt carousel of live-session modules
- * - Character & World building section
- * - Countdown to next session (stub)
- * - Inspirational quote banner
- * - Dark-mode toggle (class="dark" support)
- *
- * Tailwind CSS required. Framer Motion for gentle animations.
- * Wire this component to "/story-lab" route and pass react-router's useNavigate
- * to deep-link into module routes like "/prompts", "/roadmap", etc.
+ * Landing page for StoryLab with journey map + modules.
+ * Tailwind CSS + Framer Motion required.
  */
+
+const BASE = "/story-lab";
 
 const MODULES = [
   {
     id: "prompts",
     title: "Story Prompts",
-    blurb: "Jumpstart a stuck scene with context-aware sparks.",
+    blurb: "Context-aware sparks for stuck scenes.",
     icon: Sparkles,
     tint: "from-indigo-500/20 to-sky-500/20",
+    route: `${BASE}/prompts`,
   },
   {
     id: "roadmap",
     title: "Character Roadmap",
     blurb: "Map growth arcs and pivotal beats.",
-    icon: Map,
+    icon: MapIcon,
     tint: "from-emerald-500/20 to-teal-500/20",
+    route: `${BASE}/workshop/roadmap`,
   },
   {
     id: "hopes",
@@ -58,36 +51,24 @@ const MODULES = [
     blurb: "Surface motives that drive choices.",
     icon: Heart,
     tint: "from-rose-500/20 to-fuchsia-500/20",
+    route: `${BASE}/workshop/hfl`,
   },
   {
     id: "priority",
     title: "Priority Cards",
-    blurb: "Organize what matters most for the next draft.",
+    blurb: "Organize what matters most next.",
     icon: Target,
     tint: "from-amber-500/20 to-orange-500/20",
+    route: `${BASE}/workshop/priorities`,
   },
   {
     id: "clothesline",
     title: "Clothesline",
-    blurb: "See your cast at a glance—org-style layout.",
+    blurb: "Org-style cast view at a glance.",
     icon: LayoutGrid,
     tint: "from-cyan-500/20 to-blue-500/20",
+    route: `${BASE}/workshop/clothesline`,
   },
-];
-const BASE = "/story-lab";
-
-const MODULES = [
-  { id: "prompts",    title: "Story Prompts",          blurb: "Context-aware sparks for stuck scenes.",   icon: Sparkles,  tint: "from-indigo-500/20 to-sky-500/20", route: `${BASE}/prompts` },
-  { id: "roadmap",    title: "Character Roadmap",      blurb: "Map growth arcs and pivotal beats.",       icon: MapIcon,   tint: "from-emerald-500/20 to-teal-500/20", route: `${BASE}/workshop/roadmap` },
-  { id: "hopes",      title: "Hopes • Fears • Legacy", blurb: "Surface motives that drive choices.",      icon: Heart,     tint: "from-rose-500/20 to-fuchsia-500/20", route: `${BASE}/workshop/hfl` },
-  { id: "priority",   title: "Priority Cards",         blurb: "Organize what matters most next.",         icon: Target,    tint: "from-amber-500/20 to-orange-500/20", route: `${BASE}/workshop/priorities` },
-  { id: "clothesline",title: "Clothesline",            blurb: "Org-style cast view at a glance.",         icon: LayoutGrid,tint: "from-cyan-500/20 to-blue-500/20",    route: `${BASE}/workshop/clothesline` },
-];
-
-const DEV_SECTIONS = [
-  { id: "profiles", title: "Character Profiles", blurb: "Detailed sheets for traits, wounds and wants.", icon: Brain,         route: `${BASE}/characters`,        tint: "from-purple-500/20 to-indigo-500/20" },
-  { id: "world",    title: "World Bible",        blurb: "Lore, locations, culture—organized.",          icon: BookOpenCheck,  route: `${BASE}/world`,             tint: "from-sky-500/20 to-cyan-500/20" },
-  { id: "manager",  title: "Character Manager",  blurb: "Create, link and reuse your cast.",             icon: FolderKanban,   route: `${BASE}/character-manager`, tint: "from-emerald-500/20 to-lime-500/20" },
 ];
 
 const DEV_SECTIONS = [
@@ -96,7 +77,7 @@ const DEV_SECTIONS = [
     title: "Character Profiles",
     blurb: "Detailed sheets to track traits, wounds, and wants.",
     icon: Brain,
-    route: "/characters",
+    route: `${BASE}/characters`,
     tint: "from-purple-500/20 to-indigo-500/20",
   },
   {
@@ -104,15 +85,15 @@ const DEV_SECTIONS = [
     title: "World Bible",
     blurb: "Lore, locations, culture—organized and searchable.",
     icon: BookOpenCheck,
-    route: "/world",
+    route: `${BASE}/world`,
     tint: "from-sky-500/20 to-cyan-500/20",
   },
   {
     id: "manager",
     title: "Character Manager",
-    blurb: "Create, link, and reuse characters across works.",
+    blurb: "Create, link, and reuse your cast.",
     icon: FolderKanban,
-    route: "/character-manager",
+    route: `${BASE}/character-manager`,
     tint: "from-emerald-500/20 to-lime-500/20",
   },
 ];
@@ -168,10 +149,10 @@ export default function StoryLabLanding() {
               onClick={() => navigate("/journey")}
               className="inline-flex items-center gap-2 rounded-2xl px-4 py-2 bg-sky-500/90 hover:bg-sky-400 text-slate-900 font-semibold shadow-lg shadow-sky-700/20"
             >
-              <Map className="size-5" /> Open Journey Map
+              <MapIcon className="size-5" /> Open Journey Map
             </button>
             <button
-              onClick={() => navigate("/prompts")}
+              onClick={() => navigate(`${BASE}/prompts`)}
               className="inline-flex items-center gap-2 rounded-2xl px-4 py-2 bg-white/10 hover:bg-white/15 border border-white/10"
             >
               <PenLine className="size-5" /> Quick Prompt
@@ -192,7 +173,7 @@ export default function StoryLabLanding() {
           {MODULES.map((m, i) => (
             <motion.button
               key={m.id}
-              onClick={() => navigate(`/${m.id}`)}
+              onClick={() => navigate(m.route)}
               initial={{ opacity: 0, y: 10 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, amount: 0.2 }}
