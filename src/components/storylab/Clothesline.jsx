@@ -4,6 +4,18 @@ import { Link } from "react-router-dom";
 import { ArrowLeft, Pin, Users } from "lucide-react";
 import { loadProject, saveProject, ensureWorkshopFields } from "../../lib/storylab/projectStore";
 
+import BackToLanding, { BackToLandingFab } from "./BackToLanding";
+
+export default function Clothesline() {
+  return (
+    <div className="min-h-screen bg-base text-ink">
+      <BackToLanding title="Clothesline" />
+      {/* existing content */}
+      <BackToLandingFab />
+    </div>
+  );
+}
+
 const PageBanner = () => (
   <div className="mx-auto mb-8">
     <div className="relative mx-auto max-w-3xl rounded-2xl border border-white/40 bg-white/20 backdrop-blur-xl px-6 py-6 text-center shadow overflow-hidden">
