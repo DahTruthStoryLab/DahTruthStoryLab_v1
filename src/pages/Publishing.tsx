@@ -379,155 +379,218 @@ export default function Publishing(): JSX.Element {
     setTimeout(() => { w.focus(); w.print(); }, 200);
   };
 
-  const exportEPUBXHTML = () => {
-    const xhtml = `<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE html>
-<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
-<head>
-  <meta charset="utf-8"/>
-  <title>${escapeXML(meta.title)}</title>
-  <meta name="author" content="${escapeXML(meta.author)}"/>
-  <style>body{font-family: serif; margin:1em; line-height:${MANUSCRIPT_PRESETS[manuscriptPreset].lineHeight};} p{margin:0 0 1em 0;}</style>
-</head>
-<body>
-  ${compiledHTMLBody(compiled)}
-</body>
-</html>`;
-    const blob = new Blob([xhtml], { type: "application/xhtml+xml;charset=utf-8" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `${safeFile(meta.title)}.xhtml`;
-    a.click();
-    URL.revokeObjectURL(a.href);
-  };
+ const exportEPUBXHTML = (): void => {
+  const xhtmlParts = [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<!DOCTYPE html>',
+    '<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">',
+    "<head>",
+    '  <meta charset="utf-8"/>',
+    "  <title>" + escapeXML(meta.title) + "</title>",
+    '  <meta name="author" content="' + escapeXML(meta.author) + '"/>',
+    "  <style>",
+    "    body { font-family: serif; margin:1em; line-height:" +
+      (doubleSpace ? 2 : 1.45) +
+      "; }",
+    "    p { margin: 0 0 1em 0; }",
+    "  </style>",
+    "</head>",
+    "<body>",
+    compiledHTMLBody(compiled),
+    "</body>",
+    "</html>",
+  ];
+
+  const xhtml = xhtmlParts.join("\n");
+  const blob = new Blob([xhtml], { type: "application/xhtml+xml;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `${safeFile(meta.title)}.xhtml`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+};
 
   // ---- True EPUB packager (.epub) ----
-  async function exportEPUB() {
-    const JSZip = (await import("jszip")).default;
+  // Replace your entire exportEPUB with this:
+async function exportEPUB(): Promise<void> {
+  const JSZip = (await import("jszip")).default;
 
-    const included = chapters.filter(c => c.included);
-    const esc = (s: string) => s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
-    const para = (t: string) => `<p>${esc(t).replaceAll("
+  const included = chapters.filter((c) => c.included);
 
-", "</p><p>").replaceAll("
-", "<br/>")}</p>`;
-    const makeXhtml = (title: string, body: string) => `<?xml version=\"1.0\" encoding=\"utf-8\"?>
-<!DOCTYPE html>
-<html xmlns=\"http://www.w3.org/1999/xhtml\" xml:lang=\"en\">
-<head>
-  <meta charset=\"utf-8\"/>
-  <title>${escapeXML(title)}</title>
-  <link rel=\"stylesheet\" type=\"text/css\" href=\"styles.css\"/>
-</head>
-<body>
-${body}
-</body>
-</html>`;
+  const esc = (s: string) =>
+    s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 
-    const titleXhtml = makeXhtml(meta.title, `<h1 style=\"text-align:center\">${esc(meta.title)}</h1><div style=\"text-align:center\">${esc(meta.author)} • ${esc(meta.year)}</div>`);
+  const para = (t: string) =>
+    "<p>" + esc(t).replaceAll("\n\n", "</p><p>").replaceAll("\n", "<br/>") + "</p>";
 
-    const frontBits: string[] = [];
-    frontBits.push(para(matter.titlePage.replaceAll("{title}", meta.title).replaceAll("{author}", meta.author)));
-    frontBits.push(para(matter.copyright.replaceAll("{year}", meta.year).replaceAll("{author}", meta.author)));
-    if (matter.dedication) frontBits.push(`<h2>Dedication</h2>${para(matter.dedication)}`);
-    if (matter.epigraph)   frontBits.push(`<h2>Epigraph</h2>${para(matter.epigraph)}`);
-    const frontXhtml = makeXhtml("Front Matter", frontBits.join("
-"));
+  const makeXhtml = (title: string, body: string) =>
+    [
+      '<?xml version="1.0" encoding="utf-8"?>',
+      "<!DOCTYPE html>",
+      '<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">',
+      "<head>",
+      '  <meta charset="utf-8"/>',
+      "  <title>" + escapeXML(title) + "</title>",
+      '  <link rel="stylesheet" type="text/css" href="styles.css"/>',
+      "</head>",
+      "<body>",
+      body,
+      "</body>",
+      "</html>",
+    ].join("\n");
 
-    const chapterFiles = included.map((c, i) => ({
-      id: `chap${i+1}`,
-      href: `chap${i+1}.xhtml`,
-      title: c.title,
-      content: makeXhtml(c.title, `<h2 style=\"text-align:center\">${esc(c.title)}</h2>${para(c.text)}`),
-    }));
+  // Title page
+  const titleXhtml = makeXhtml(
+    meta.title,
+    '<h1 style="text-align:center">' +
+      esc(meta.title) +
+      '</h1><div style="text-align:center">' +
+      esc(meta.author) +
+      " • " +
+      esc(meta.year) +
+      "</div>"
+  );
 
-    const backBits: string[] = [];
-    if (matter.acknowledgments) backBits.push(`<h2>Acknowledgments</h2>${para(matter.acknowledgments)}`);
-    if (matter.aboutAuthor)     backBits.push(`<h2>About the Author</h2>${para(matter.aboutAuthor.replaceAll("{author}", meta.author))}`);
-    if (matter.notes)           backBits.push(`<h2>Notes</h2>${para(matter.notes)}`);
-    const backXhtml = makeXhtml("Back Matter", backBits.join("
-"));
+  // Front matter
+  const frontBits: string[] = [];
+  frontBits.push(
+    para(matter.titlePage.replaceAll("{title}", meta.title).replaceAll("{author}", meta.author))
+  );
+  frontBits.push(
+    para(matter.copyright.replaceAll("{year}", meta.year).replaceAll("{author}", meta.author))
+  );
+  if (matter.dedication) frontBits.push("<h2>Dedication</h2>" + para(matter.dedication));
+  if (matter.epigraph) frontBits.push("<h2>Epigraph</h2>" + para(matter.epigraph));
+  const frontXhtml = makeXhtml("Front Matter", frontBits.join("\n"));
 
-    const navXhtml = `<?xml version=\"1.0\" encoding=\"utf-8\"?>
-<!DOCTYPE html>
-<html xmlns=\"http://www.w3.org/1999/xhtml\" xmlns:epub=\"http://www.idpf.org/2007/ops\" xml:lang=\"en\">
-<head><meta charset=\"utf-8\"/><title>Table of Contents</title></head>
-<body>
-<nav epub:type=\"toc\"><h1>Contents</h1><ol>
-  <li><a href=\"title.xhtml\">Title</a></li>
-  <li><a href=\"front.xhtml\">Front Matter</a></li>
-  ${chapterFiles.map(cf => `<li><a href=\"${cf.href}\">${esc(cf.title)}</a></li>`).join("
-  ")}
-  <li><a href=\"back.xhtml\">Back Matter</a></li>
-</ol></nav>
-</body>
-</html>`;
+  // Chapters
+  const chapterFiles = included.map((c, i) => {
+    const id = "chap" + (i + 1);
+    const href = "chap" + (i + 1) + ".xhtml";
+    const content = makeXhtml(
+      c.title,
+      '<h2 style="text-align:center">' + esc(c.title) + "</h2>" + para(c.text)
+    );
+    return { id, href, title: c.title, content };
+  });
 
-    const manifestItems = [
-      { id: "title", href: "title.xhtml", mediaType: "application/xhtml+xml" },
-      { id: "front", href: "front.xhtml", mediaType: "application/xhtml+xml" },
-      ...chapterFiles.map(cf => ({ id: cf.id, href: cf.href, mediaType: "application/xhtml+xml" })),
-      { id: "back", href: "back.xhtml", mediaType: "application/xhtml+xml" },
-      { id: "nav", href: "nav.xhtml", mediaType: "application/xhtml+xml", properties: "nav" },
-      { id: "css", href: "styles.css", mediaType: "text/css" },
-    ];
+  // Back matter
+  const backBits: string[] = [];
+  if (matter.acknowledgments)
+    backBits.push("<h2>Acknowledgments</h2>" + para(matter.acknowledgments));
+  if (matter.aboutAuthor)
+    backBits.push(
+      "<h2>About the Author</h2>" +
+        para(matter.aboutAuthor.replaceAll("{author}", meta.author))
+    );
+  if (matter.notes) backBits.push("<h2>Notes</h2>" + para(matter.notes));
+  const backXhtml = makeXhtml("Back Matter", backBits.join("\n"));
 
-    const spineItems = ["title", "front", ...chapterFiles.map(cf => cf.id), "back"];
+  // nav.xhtml (table of contents)
+  const navXhtml = [
+    '<?xml version="1.0" encoding="utf-8"?>',
+    "<!DOCTYPE html>",
+    '<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xml:lang="en">',
+    '<head><meta charset="utf-8"/><title>Table of Contents</title></head>',
+    "<body>",
+    '<nav epub:type="toc"><h1>Contents</h1><ol>',
+    '  <li><a href="title.xhtml">Title</a></li>',
+    '  <li><a href="front.xhtml">Front Matter</a></li>',
+    chapterFiles
+      .map((cf) => '  <li><a href="' + cf.href + '">' + esc(cf.title) + "</a></li>")
+      .join("\n"),
+    '  <li><a href="back.xhtml">Back Matter</a></li>',
+    "</ol></nav>",
+    "</body>",
+    "</html>",
+  ].join("\n");
 
-    const css = `body{font-family: serif; line-height:${MANUSCRIPT_PRESETS[manuscriptPreset].lineHeight}; margin:1em;} h1,h2{text-align:center} p{margin:0 0 1em 0;}`;
+  // OPF manifest & spine
+  const manifestItems = [
+    { id: "title", href: "title.xhtml", mediaType: "application/xhtml+xml" },
+    { id: "front", href: "front.xhtml", mediaType: "application/xhtml+xml" },
+    ...chapterFiles.map((cf) => ({ id: cf.id, href: cf.href, mediaType: "application/xhtml+xml" })),
+    { id: "back", href: "back.xhtml", mediaType: "application/xhtml+xml" },
+    { id: "nav", href: "nav.xhtml", mediaType: "application/xhtml+xml", properties: "nav" },
+    { id: "css", href: "styles.css", mediaType: "text/css" },
+  ];
 
-    const packageOpf = `<?xml version=\"1.0\" encoding=\"utf-8\"?>
-<package xmlns=\"http://www.idpf.org/2007/opf\" version=\"3.0\" unique-identifier=\"pub-id\">
-  <metadata xmlns:dc=\"http://purl.org/dc/elements/1.1/\">
-    <dc:identifier id=\"pub-id\">urn:uuid:${crypto?.randomUUID?.() || `storylab-${Date.now()}`}</dc:identifier>
-    <dc:title>${escapeXML(meta.title)}</dc:title>
-    <dc:creator>${escapeXML(meta.author)}</dc:creator>
-    <dc:language>en</dc:language>
-    <meta property=\"dcterms:modified\">${new Date().toISOString().replace(/\..*/, "")}Z</meta>
-  </metadata>
-  <manifest>
-    ${manifestItems.map(mi => `<item id=\"${mi.id}\" href=\"${mi.href}\" media-type=\"${mi.mediaType}\"${mi.properties ? ` properties=\"${mi.properties}\"` : ""}/>`).join("
-    ")}
-  </manifest>
-  <spine>
-    ${spineItems.map(id => `<itemref idref=\"${id}\"/>`).join("
-    ")}
-  </spine>
-</package>`;
+  const spineItems = ["title", "front", ...chapterFiles.map((cf) => cf.id), "back"];
 
-    const containerXml = `<?xml version=\"1.0\"?>
-<container version=\"1.0\" xmlns=\"urn:oasis:names:tc:opendocument:xmlns:container\">
-  <rootfiles>
-    <rootfile full-path=\"OEBPS/content.opf\" media-type=\"application/oebps-package+xml\"/>
-  </rootfiles>
-</container>`;
+  const css =
+    "body{font-family:serif;line-height:" +
+    (doubleSpace ? 2 : 1.45) +
+    ";margin:1em;} h1,h2{text-align:center} p{margin:0 0 1em 0;}";
 
-    const zip = new JSZip();
-    zip.file("mimetype", "application/epub+zip", { compression: "STORE" });
-    zip.folder("META-INF")!.file("container.xml", containerXml);
-    const oebps = zip.folder("OEBPS")!;
-    oebps.file("title.xhtml", titleXhtml);
-    oebps.file("front.xhtml", frontXhtml);
-    chapterFiles.forEach(cf => oebps.file(cf.href, cf.content));
-    oebps.file("back.xhtml", backXhtml);
-    oebps.file("nav.xhtml", navXhtml);
-    oebps.file("styles.css", css);
-    oebps.file("content.opf", packageOpf);
+  const uid =
+    (typeof crypto !== "undefined" && (crypto as any).randomUUID)
+      ? (crypto as any).randomUUID()
+      : "storylab-" + Date.now();
 
-    const blob = await zip.generateAsync({ type: "blob", mimeType: "application/epub+zip" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `${safeFile(meta.title)}.epub`;
-    a.click();
-    URL.revokeObjectURL(a.href);
-  }} p{margin:0 0 1em 0;}</style>\n</head>\n<body>\n  ${compiledHTMLBody(compiled)}\n</body>\n</html>`;
-    const blob = new Blob([xhtml], { type: "application/xhtml+xml;charset=utf-8" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = `${safeFile(meta.title)}.xhtml`;
-    a.click();
-    URL.revokeObjectURL(a.href);
-  };
+  const packageOpf = [
+    '<?xml version="1.0" encoding="utf-8"?>',
+    '<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="pub-id">',
+    '  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">',
+    '    <dc:identifier id="pub-id">urn:uuid:' + uid + "</dc:identifier>",
+    "    <dc:title>" + escapeXML(meta.title) + "</dc:title>",
+    "    <dc:creator>" + escapeXML(meta.author) + "</dc:creator>",
+    "    <dc:language>en</dc:language>",
+    '    <meta property="dcterms:modified">' +
+      new Date().toISOString().replace(/\..*/, "") +
+      "Z</meta>",
+    "  </metadata>",
+    "  <manifest>",
+    manifestItems
+      .map((mi: any) => {
+        return (
+          '<item id="' +
+          mi.id +
+          '" href="' +
+          mi.href +
+          '" media-type="' +
+          mi.mediaType +
+          '"' +
+          (mi.properties ? ' properties="' + mi.properties + '"/>' : '"/>')
+        );
+      })
+      .join("\n    "),
+    "  </manifest>",
+    "  <spine>",
+    spineItems.map((id) => '<itemref idref="' + id + '"/>').join("\n    "),
+    "  </spine>",
+    "</package>",
+  ].join("\n");
+
+  const containerXml = [
+    '<?xml version="1.0"?>',
+    '<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">',
+    "  <rootfiles>",
+    '    <rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/>',
+    "  </rootfiles>",
+    "</container>",
+  ].join("\n");
+
+  // Build EPUB zip
+  const zip = new JSZip();
+  zip.file("mimetype", "application/epub+zip", { compression: "STORE" });
+  zip.folder("META-INF")!.file("container.xml", containerXml);
+
+  const oebps = zip.folder("OEBPS")!;
+  oebps.file("title.xhtml", titleXhtml);
+  oebps.file("front.xhtml", frontXhtml);
+  chapterFiles.forEach((cf) => oebps.file(cf.href, cf.content));
+  oebps.file("back.xhtml", backXhtml);
+  oebps.file("nav.xhtml", navXhtml);
+  oebps.file("styles.css", css);
+  oebps.file("content.opf", packageOpf);
+
+  const blob = await zip.generateAsync({ type: "blob", mimeType: "application/epub+zip" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `${safeFile(meta.title)}.epub`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
 
   // ---- DOCX Export with headers/footers, page numbers, breaks ----
   async function exportDOCX() {
