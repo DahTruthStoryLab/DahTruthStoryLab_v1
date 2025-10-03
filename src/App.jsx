@@ -35,7 +35,7 @@ const WorkshopCohort       = lazy(() => import("./components/storylab/WorkshopCo
 
 // Add the routes you referenced but didn’t import before
 const Profile              = lazy(() => import("./components/Profile"));      // adjust path if needed
-const Publishing           = lazy(() => import("./pages/Publishing.jsx"));    // uses your page
+const Publishing = lazy(() => import("./pages/Publishing")); // no extension
 
 /* =========================
    Global UI helpers
