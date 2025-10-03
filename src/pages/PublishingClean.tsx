@@ -38,15 +38,16 @@ type PlatformPresetKey =
 
 /** ---------- Theme ---------- */
 const theme = {
-  bg: "#F6FAFF",
-  surface: "rgba(255,255,255,0.75)",
-  border: "rgba(10,37,64,0.10)",
-  text: "#0A2540",
-  subtext: "#5B6B7C",
-  accent: "#1F3A5F",
-  highlight: "#EAF2FB",
-  primary: "#0A2540",
-  white: "#FFFFFF",
+  bg: "var(--brand-bg)",
+  surface: "color-mix(in oklab, var(--brand-white) 85%, transparent)", // nice glassy look
+  border: "var(--brand-border)",
+  borderStrong: "var(--brand-border-strong)",
+  text: "var(--brand-text)",
+  subtext: "var(--brand-subtext)",
+  accent: "var(--brand-accent)",
+  highlight: "var(--brand-highlight)",
+  primary: "var(--brand-primary)",
+  white: "var(--brand-white)",
 };
 
 /** ---------- Small UI bits ---------- */
