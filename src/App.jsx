@@ -1,24 +1,15 @@
 // src/App.jsx
-import React, { Suspense, lazy, useEffect } from "react";
-import {
-  BrowserRouter as Router,
-  Routes,
-  Route,
-  useSearchParams,
-  useLocation,
-  Navigate,
-} from "react-router-dom";
-
+// src/App.jsx
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Home from "./pages/Home.jsx";            // whatever your home is
-import Publishing from "./pages/Publishing.jsx"; // <-- add this import
+import Home from "./pages/Home.jsx";
+import Publishing from "./pages/Publishing.jsx";
 
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Home />} />
-        <Route path="/publishing" element={<Publishing />} /> {/* <-- add this route */}
+        <Route path="/publishing" element={<Publishing />} />
         <Route path="*" element={<div>Not Found</div>} />
       </Routes>
     </BrowserRouter>
