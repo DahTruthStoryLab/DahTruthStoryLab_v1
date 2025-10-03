@@ -3,38 +3,21 @@ frontend:
   phases:
     preBuild:
       commands:
-        - set -euo pipefail
-        - echo "===> Node setup"
-        - nvm install 20.19.4
-        - nvm use 20.19.4
-        - node -v
-        - npm -v
-        - echo "===> Project sanity checks"
-        - pwd && ls -la
-        - test -f package.json || (echo "ERROR: package.json not found in working directory" && exit 1)
-        - node -e "const p=require('./package.json'); console.log('Build script =', p.scripts && p.scripts.build || 'MISSING')"
-        - echo "===> npm ci"
-        - npm ci --legacy-peer-deps --no-audit --no-fund || (echo 'npm ci failed; showing npm debug log' && (test -f /root/.npm/_logs/*-debug-0.log && tail -n +1 /root/.npm/_logs/*-debug-0.log || true) && exit 1)
-
+        - "nvm install 20.19.4"
+        - "nvm use 20.19.4"
+        - "node -v"
+        - "npm ci --legacy-peer-deps --no-audit --no-fund"
     build:
       commands:
-        - set -euo pipefail
-        - echo "===> Building app"
-        - export NODE_OPTIONS="--max-old-space-size=4096"
-        - export CI=false
-        - npm run build
-        - echo "===> Build contents"
-        - ls -la build || true
-        - ls -la dist || true
-
+        - "export NODE_OPTIONS=--max-old-space-size=4096"
+        - "export CI=false"
+        - "npm run build"
   artifacts:
-    # CRA outputs to build; Vite would be dist
     baseDirectory: build
     files:
-      - '**/*'
-
+      - "**/*"
   cache:
     paths:
-      - node_modules/**/*
-      - ~/.npm/**/*
-      - ~/.cache/**/*
+      - "node_modules/**/*"
+      - "~/.npm/**/*"
+      - "~/.cache/**/*"
