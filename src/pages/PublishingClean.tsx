@@ -1,9 +1,23 @@
 // src/pages/PublishingClean.tsx
-import { useMemo, useRef, useState } from "react";
-import type React from "react";
-import PageShell from "../components/layout/PageShell.tsx"; // adjust if your path differs
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import PageShell from "../components/layout/PageShell";
 
-/** ---------- Types ---------- */
+// ---------- Theme via CSS variables (from your brand.css) ----------
+const theme = {
+  bg: "var(--brand-bg)",
+  surface: "var(--brand-white)", // or a semi-transparent if you like glass
+  border: "var(--brand-border)",
+  borderStrong: "var(--brand-border-strong)",
+  text: "var(--brand-text)",
+  subtext: "var(--brand-subtext)",
+  accent: "var(--brand-accent)",
+  highlight: "var(--brand-highlight)",
+  primary: "var(--brand-primary)",
+  white: "var(--brand-white)",
+};
+
+// ---------- Types ----------
 type StepKey = "builder" | "proof" | "format" | "export" | "prep";
 
 type Chapter = { id: string; title: string; included: boolean; text: string };
@@ -36,121 +50,14 @@ type PlatformPresetKey =
   | "Draft2Digital_Ebook"
   | "Generic_Manuscript_Submission";
 
-/** ---------- Theme ---------- */
-const theme = {
-  bg: "var(--brand-bg)",
-  surface: "color-mix(in oklab, var(--brand-white) 85%, transparent)", // nice glassy look
-  border: "var(--brand-border)",
-  borderStrong: "var(--brand-border-strong)",
-  text: "var(--brand-text)",
-  subtext: "var(--brand-subtext)",
-  accent: "var(--brand-accent)",
-  highlight: "var(--brand-highlight)",
-  primary: "var(--brand-primary)",
-  white: "var(--brand-white)",
-};
-
-/** ---------- Small UI bits ---------- */
-function Toggle({
-  checked,
-  onChange,
-}: {
-  checked: boolean;
-  onChange: (v: boolean) => void;
-}) {
-  return (
-    <button
-      onClick={() => onChange(!checked)}
-      style={{
-        width: 48,
-        height: 24,
-        borderRadius: 999,
-        background: checked ? theme.accent : "#CBD5E1",
-        border: "none",
-        position: "relative",
-        cursor: "pointer",
-      }}
-      aria-pressed={checked}
-    >
-      <span
-        style={{
-          position: "absolute",
-          top: 2,
-          left: checked ? 26 : 2,
-          width: 20,
-          height: 20,
-          borderRadius: 999,
-          background: theme.white,
-          transition: "left .15s ease",
-        }}
-      />
-    </button>
-  );
-}
-
-function Field({
-  label,
-  value,
-  onChange,
-  placeholder,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-}) {
-  return (
-    <div>
-      <div style={{ color: theme.subtext, fontSize: 12 }}>{label}</div>
-      <textarea
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        rows={label.length > 12 ? 3 : 2}
-        placeholder={placeholder}
-        style={{
-          width: "100%",
-          marginTop: 6,
-          fontSize: 14,
-          padding: 10,
-          border: `1px solid ${theme.border}`,
-          borderRadius: 12,
-          background: theme.white,
-          color: theme.text,
-        }}
-      />
-    </div>
-  );
-}
-
-/** ---------- Helpers ---------- */
-function safeFile(name: string): string {
-  return (name || "manuscript").replace(/[^\w\-]+/g, "_");
-}
-function escapeXML(s: string): string {
-  return s
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&apos;");
-}
-function compiledHTMLBody(plain: string): string {
-  const esc = (t: string) =>
-    t.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
-  return plain
-    .split("\n\n")
-    .map((b) => `<p>${esc(b).replaceAll("\n", "<br/>")}</p>`)
-    .join("\n");
-}
-
-/** ---------- Presets ---------- */
+// ---------- Presets ----------
 const MANUSCRIPT_PRESETS: Record<
   ManuscriptPresetKey,
   {
     label: string;
     fontFamily: string;
     fontSizePt: number;
-    lineHeight: number;
+    lineHeight: number; // 2.0 = double, 1.5 = single-ish
     firstLineIndentInches: number;
     paragraphSpacingPt: number;
     align: "left" | "justify";
@@ -159,7 +66,7 @@ const MANUSCRIPT_PRESETS: Record<
   }
 > = {
   Agents_Standard_12pt_TNR_Double: {
-    label: "Agents: Standard (TNR 12, double)",
+    label: "Agents: Standard (TNR 12, Double)",
     fontFamily: "Times New Roman",
     fontSizePt: 12,
     lineHeight: 2.0,
@@ -181,22 +88,22 @@ const MANUSCRIPT_PRESETS: Record<
     chapterStartsOnNewPage: true,
   },
   Screenplay_Basic_Courier_12pt: {
-    label: "Screenplay (basic Courier)",
+    label: "Screenplay (Courier 12)",
     fontFamily: "Courier New",
     fontSizePt: 12,
     lineHeight: 1.0,
-    firstLineIndentInches: 0.0,
+    firstLineIndentInches: 0,
     paragraphSpacingPt: 0,
     align: "left",
     chapterTitleCase: "AsIs",
     chapterStartsOnNewPage: true,
   },
   Poetry_Minimal_12pt_Serif: {
-    label: "Poetry (minimal serif)",
+    label: "Poetry (Minimal Serif)",
     fontFamily: "Georgia, 'Times New Roman', serif",
     fontSizePt: 12,
     lineHeight: 1.5,
-    firstLineIndentInches: 0.0,
+    firstLineIndentInches: 0,
     paragraphSpacingPt: 0,
     align: "left",
     chapterTitleCase: "AsIs",
@@ -281,20 +188,25 @@ const PLATFORM_PRESETS: Record<
   },
 };
 
-/** ---------- Styles ---------- */
+// ---------- Styles ----------
 const styles = {
-  sectionShell: {
-    maxWidth: 1120,
-    margin: "0 auto",
-    padding: "20px 24px",
+  outer: {
+    maxWidth: 1200,
+    margin: "32px auto",
+    background: "var(--brand-white)",
+    border: `1px solid var(--brand-border-strong)`,
+    borderRadius: 16,
+    boxShadow: "0 12px 40px rgba(2,20,40,.08)",
+    overflow: "hidden",
   } as React.CSSProperties,
+  inner: { padding: "20px 24px" } as React.CSSProperties,
+  sectionShell: { maxWidth: 1120, margin: "0 auto" } as React.CSSProperties,
   glassCard: {
     background: theme.surface,
     border: `1px solid ${theme.border}`,
     borderRadius: 16,
     padding: 20,
-    boxShadow: "0 8px 30px rgba(2,20,40,.08)",
-    backdropFilter: "blur(6px)",
+    boxShadow: "0 8px 30px rgba(2,20,40,.06)",
   } as React.CSSProperties,
   label: { fontSize: 12, color: theme.subtext } as React.CSSProperties,
   input: {
@@ -306,7 +218,7 @@ const styles = {
     background: theme.white,
     color: theme.text,
   } as React.CSSProperties,
-  lightBtn: {
+  btn: {
     padding: "10px 14px",
     borderRadius: 12,
     border: `1px solid ${theme.border}`,
@@ -314,7 +226,7 @@ const styles = {
     color: theme.text,
     cursor: "pointer",
   } as React.CSSProperties,
-  primaryBtn: {
+  btnPrimary: {
     padding: "10px 14px",
     borderRadius: 12,
     border: "none",
@@ -322,7 +234,7 @@ const styles = {
     color: theme.white,
     cursor: "pointer",
   } as React.CSSProperties,
-  darkBtn: {
+  btnDark: {
     padding: "10px 14px",
     borderRadius: 12,
     border: "none",
@@ -340,7 +252,109 @@ const styles = {
   } as React.CSSProperties,
 };
 
-/** ---------- Steps ---------- */
+// ---------- Small UI helpers ----------
+function Toggle({
+  checked,
+  onChange,
+  label,
+}: {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  label?: string;
+}) {
+  return (
+    <button
+      onClick={() => onChange(!checked)}
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 10,
+        padding: "8px 12px",
+        borderRadius: 999,
+        border: `1px solid ${theme.border}`,
+        background: checked ? theme.highlight : theme.white,
+        color: theme.text,
+        cursor: "pointer",
+      }}
+      aria-pressed={checked}
+      title={label}
+    >
+      <span
+        style={{
+          width: 36,
+          height: 20,
+          borderRadius: 999,
+          background: checked ? theme.accent : "#CBD5E1",
+          position: "relative",
+          display: "inline-block",
+        }}
+      >
+        <span
+          style={{
+            position: "absolute",
+            top: 2,
+            left: checked ? 18 : 2,
+            width: 16,
+            height: 16,
+            borderRadius: 999,
+            background: theme.white,
+            transition: "left .15s ease",
+          }}
+        />
+      </span>
+      {label && <span style={{ fontSize: 14 }}>{label}</span>}
+    </button>
+  );
+}
+
+function Field({
+  label,
+  value,
+  onChange,
+  placeholder,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+}) {
+  return (
+    <div>
+      <div style={{ color: theme.subtext, fontSize: 12 }}>{label}</div>
+      <textarea
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        rows={label.length > 12 ? 3 : 2}
+        placeholder={placeholder}
+        style={{
+          width: "100%",
+          marginTop: 6,
+          fontSize: 14,
+          padding: 10,
+          border: `1px solid ${theme.border}`,
+          borderRadius: 12,
+          background: theme.white,
+          color: theme.text,
+        }}
+      />
+    </div>
+  );
+}
+
+// ---------- Helpers ----------
+function safeFile(name: string): string {
+  return (name || "manuscript").replace(/[^\w\-]+/g, "_");
+}
+function escapeXML(s: string): string {
+  return s
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&apos;");
+}
+
+// ---------- Component ----------
 const STEPS: { key: StepKey; label: string }[] = [
   { key: "builder", label: "Manuscript Builder" },
   { key: "proof", label: "Proof & Consistency" },
@@ -349,14 +363,12 @@ const STEPS: { key: StepKey; label: string }[] = [
   { key: "prep", label: "Publishing Prep" },
 ];
 
-/** ---------- Component (single default export) ---------- */
 export default function Publishing(): JSX.Element {
+  const navigate = useNavigate();
+
+  // nav tabs
   const [step, setStep] = useState<StepKey>("builder");
   const stepIndex = STEPS.findIndex((s) => s.key === step);
-  const goNext = () => setStep(STEPS[Math.min(stepIndex + 1, STEPS.length - 1)].key);
-  const goBack = () => setStep(STEPS[Math.max(stepIndex - 1, 0)].key);
-
-  // a11y tabs
   const tabRefs = useRef<HTMLButtonElement[]>([]);
   function onKeyDownTabs(e: React.KeyboardEvent<HTMLDivElement>) {
     const current = STEPS.findIndex((s) => s.key === step);
@@ -372,7 +384,10 @@ export default function Publishing(): JSX.Element {
       tabRefs.current[next]?.focus();
     }
   }
+  const goNext = () => setStep(STEPS[Math.min(stepIndex + 1, STEPS.length - 1)].key);
+  const goBack = () => setStep(STEPS[Math.max(stepIndex - 1, 0)].key);
 
+  // meta + content
   const [meta, setMeta] = useState<Meta>({
     title: "Working Title",
     author: "Your Name",
@@ -412,25 +427,31 @@ export default function Publishing(): JSX.Element {
     notes: "",
   });
 
+  // presets + overrides (so Single/Double buttons really work)
   const [manuscriptPreset, setManuscriptPreset] =
     useState<ManuscriptPresetKey>("Agents_Standard_12pt_TNR_Double");
   const [platformPreset, setPlatformPreset] =
     useState<PlatformPresetKey>("Generic_Manuscript_Submission");
+  const [msOverrides, setMsOverrides] = useState<Partial<(typeof MANUSCRIPT_PRESETS)[ManuscriptPresetKey]>>({});
 
-  const ms = MANUSCRIPT_PRESETS[manuscriptPreset];
+  // keep overrides sane when switching presets (e.g., reset lineHeight to chosen preset)
+  useEffect(() => {
+    setMsOverrides((prev) => ({
+      ...prev,
+      lineHeight: MANUSCRIPT_PRESETS[manuscriptPreset].lineHeight,
+    }));
+  }, [manuscriptPreset]);
+
+  const ms = { ...MANUSCRIPT_PRESETS[manuscriptPreset], ...msOverrides };
   const pf = PLATFORM_PRESETS[platformPreset];
   const includeHeadersFooters = pf.headers || pf.footers;
 
-  /** Compile plain text from state */
+  // compile plain text
   const compiled: string = useMemo(() => {
     const vars = (s: string) =>
-      s
-        .replaceAll("{title}", meta.title)
-        .replaceAll("{author}", meta.author)
-        .replaceAll("{year}", meta.year);
+      s.replaceAll("{title}", meta.title).replaceAll("{author}", meta.author).replaceAll("{year}", meta.year);
 
     const parts: string[] = [];
-    // Front matter
     parts.push(vars(matter.titlePage));
     parts.push("\n\n" + vars(matter.copyright));
     if (matter.dedication) parts.push("\n\nDedication\n" + matter.dedication);
@@ -444,17 +465,16 @@ export default function Publishing(): JSX.Element {
             .join("\n")
       );
     }
-    // Chapters
+
     chapters.forEach((c) => {
       if (!c.included) return;
-      const txt = ms.lineHeight >= 2 ? c.text.replaceAll(" ", "  ") : c.text;
+      // mimic visual density differences for double spacing
+      const txt = ms.lineHeight && ms.lineHeight >= 2 ? c.text.replaceAll(" ", "  ") : c.text;
       parts.push("\n\n" + c.title + "\n" + txt);
     });
-    // Back matter
-    if (matter.acknowledgments)
-      parts.push("\n\nAcknowledgments\n" + matter.acknowledgments);
-    if (matter.aboutAuthor)
-      parts.push("\n\nAbout the Author\n" + vars(matter.aboutAuthor));
+
+    if (matter.acknowledgments) parts.push("\n\nAcknowledgments\n" + matter.acknowledgments);
+    if (matter.aboutAuthor) parts.push("\n\nAbout the Author\n" + vars(matter.aboutAuthor));
     if (matter.notes) parts.push("\n\nNotes\n" + matter.notes);
 
     return parts.join("\n").trim();
@@ -465,12 +485,10 @@ export default function Publishing(): JSX.Element {
     [compiled]
   );
 
-  /** HTML Preview / Print CSS */
+  // HTML preview with print CSS
   const compiledHTML: string = useMemo(() => {
-    const escape = (s: string) =>
-      s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+    const esc = (s: string) => s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 
-    // Front matter blocks
     const front = [
       matter.titlePage,
       matter.copyright,
@@ -478,18 +496,16 @@ export default function Publishing(): JSX.Element {
       matter.epigraph && `Epigraph\n${matter.epigraph}`,
     ]
       .filter(Boolean)
-      .map((s) => `<p>${escape(String(s)).replaceAll("\n", "<br/>")}</p>`)
+      .map((s) => `<p>${esc(String(s)).replaceAll("\n", "<br/>")}</p>`)
       .join("\n");
 
-    // TOC
     const toc = matter.toc
       ? `<h2 class="chapter" style="page-break-before: always">Contents</h2><p>${chapters
           .filter((c) => c.included)
-          .map((c, i) => `${i + 1}. ${escape(c.title)}`)
+          .map((c, i) => `${i + 1}. ${esc(c.title)}`)
           .join("<br/>")}</p>`
       : "";
 
-    // Chapter bodies with page breaks
     const chapterized = chapters
       .filter((c) => c.included)
       .map((c) => {
@@ -499,9 +515,7 @@ export default function Publishing(): JSX.Element {
             : ms.chapterTitleCase === "Capitalize"
             ? c.title.replace(/\b(\w)/g, (m) => m.toUpperCase())
             : c.title;
-        const body = escape(c.text)
-          .replaceAll("\n\n", "</p><p>")
-          .replaceAll("\n", "<br/>");
+        const body = esc(c.text).replaceAll("\n\n", "</p><p>").replaceAll("\n", "<br/>");
         return `<h2 class="chapter">${t}</h2><p>${body}</p>`;
       })
       .join("\n");
@@ -514,9 +528,7 @@ export default function Publishing(): JSX.Element {
       .filter(Boolean)
       .map((s) => {
         const lines = String(s).split("\n");
-        return `<h2 class="chapter">${lines[0]}</h2><p>${escape(
-          lines.slice(1).join("\n")
-        ).replaceAll("\n", "<br/>")}</p>`;
+        return `<h2 class="chapter">${lines[0]}</h2><p>${esc(lines.slice(1).join("\n")).replaceAll("\n", "<br/>")}</p>`;
       })
       .join("\n");
 
@@ -535,26 +547,39 @@ export default function Publishing(): JSX.Element {
     `;
 
     return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${meta.title}</title><style>${css}</style></head><body>${titleBlock}${front}${toc}${chapterized}${back}</body></html>`;
-  }, [compiled, chapters, matter, meta, ms, pf]);
+  }, [chapters, matter, meta, ms, pf]);
 
-  /** Proof (basic) */
+  // ---------- Proof helpers ----------
   const [proofResults, setProofResults] = useState<string[]>([]);
-  function runGrammarChecks() {
+  const [aiBusy, setAiBusy] = useState(false);
+
+  function runLocalChecks() {
     const issues: string[] = [];
     if (compiled.match(/ {2,}/)) issues.push("Multiple consecutive spaces found.");
     if (compiled.match(/[“”]/) && !compiled.match(/[‘’]/))
-      issues.push("Smart quotes present; ensure consistency.");
-    if (compiled.match(/--/))
-      issues.push("Double hyphen found; consider an em dash or period.");
-    const longParas = compiled
-      .split("\n\n")
-      .filter((p) => p.split(/\s+/).length > 250).length;
-    if (longParas)
-      issues.push(`${longParas} very long paragraph(s); consider breaking up.`);
+      issues.push("Smart quotes present; ensure consistency of curly quotes.");
+    if (compiled.match(/--/)) issues.push("Double hyphen found; consider an em dash (—) or a period.");
+    const longParas = compiled.split("\n\n").filter((p) => p.split(/\s+/).length > 250).length;
+    if (longParas) issues.push(`${longParas} very long paragraph(s); consider breaking them up.`);
     setProofResults(issues.length ? issues : ["No basic issues found."]);
   }
 
-  /** Exports that require NO extra npm packages */
+  // "AI" placeholder (local heuristic now; swap to your API later)
+  async function runAIChecks() {
+    setAiBusy(true);
+    // Local quick suggestions (safe to run offline)
+    const suggestions: string[] = [];
+    if (compiled.match(/\bi\b(?![a-zA-Z])/g)) suggestions.push("Pronoun 'I' should be capitalized.");
+    if (compiled.match(/\s[,.!?;:]/g)) suggestions.push("Punctuation spacing: remove spaces before , . ! ? ; :");
+    if (compiled.match(/\bvery\b/gi)) suggestions.push("Style: Consider replacing 'very' with stronger wording.");
+    if (meta.title.length < 3) suggestions.push("Title seems short—consider something more descriptive.");
+    // Merge with local checks
+    runLocalChecks();
+    setProofResults((prev) => [...prev, ...suggestions]);
+    setAiBusy(false);
+  }
+
+  // ---------- Exports ----------
   const exportPDF = () => {
     const w = window.open("", "_blank");
     if (!w) return;
@@ -567,32 +592,74 @@ export default function Publishing(): JSX.Element {
     }, 200);
   };
 
+  const exportDOCX = async () => {
+    const { saveAs } = await import("file-saver");
+    const docx = await import("docx");
+    const { Document, Packer, Paragraph, HeadingLevel, AlignmentType, convertInchesToTwip } = docx as any;
+
+    const children: any[] = [
+      new Paragraph({ text: meta.title, heading: HeadingLevel.TITLE, alignment: AlignmentType.CENTER }),
+      new Paragraph({ text: `by ${meta.author}`, alignment: AlignmentType.CENTER }),
+      new Paragraph({ text: `${meta.year}`, alignment: AlignmentType.CENTER }),
+    ];
+
+    compiled.split("\n\n").forEach((block) => {
+      children.push(new Paragraph({ text: "" }));
+      block.split("\n").forEach((line) => {
+        children.push(new Paragraph({ text: line }));
+      });
+    });
+
+    const doc = new Document({
+      sections: [
+        {
+          properties: {
+            page: {
+              margin: {
+                top: convertInchesToTwip(pf.margins.top),
+                right: convertInchesToTwip(pf.margins.right),
+                bottom: convertInchesToTwip(pf.margins.bottom),
+                left: convertInchesToTwip((pf.margins.left || 1) + (pf.margins.gutter || 0)),
+                gutter: convertInchesToTwip(pf.margins.gutter || 0),
+              },
+              size: pf.trim
+                ? {
+                    width: convertInchesToTwip(pf.trim.widthInch),
+                    height: convertInchesToTwip(pf.trim.heightInch),
+                  }
+                : undefined,
+            },
+          },
+          children,
+        },
+      ],
+    });
+
+    const blob = await Packer.toBlob(doc);
+    saveAs(blob, `${safeFile(meta.title)}.docx`);
+  };
+
   const exportEPUBXHTML = (): void => {
-    const xhtmlParts = [
+    const esc = (t: string) => t.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+    const xhtml = [
       '<?xml version="1.0" encoding="UTF-8"?>',
       "<!DOCTYPE html>",
       '<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">',
       "<head>",
       '  <meta charset="utf-8"/>',
-      "  <title>" + escapeXML(meta.title) + "</title>",
-      '  <meta name="author" content="' + escapeXML(meta.author) + '"/>',
-      "  <style>",
-      "    body { font-family: serif; margin:1em; line-height:" +
-        (ms.lineHeight || 1.45) +
-        "; }",
-      "    p { margin: 0 0 1em 0; }",
-      "</style>",
+      `  <title>${esc(meta.title)}</title>`,
+      "  <style>body{font-family:serif;line-height:1.45;margin:1em;} p{margin:0 0 1em 0;}</style>",
       "</head>",
       "<body>",
-      compiledHTMLBody(compiled),
+      compiled
+        .split("\n\n")
+        .map((b) => "<p>" + esc(b).replaceAll("\n", "<br/>") + "</p>")
+        .join("\n"),
       "</body>",
       "</html>",
-    ];
+    ].join("\n");
 
-    const xhtml = xhtmlParts.join("\n");
-    const blob = new Blob([xhtml], {
-      type: "application/xhtml+xml;charset=utf-8",
-    });
+    const blob = new Blob([xhtml], { type: "application/xhtml+xml;charset=utf-8" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
     a.download = `${safeFile(meta.title)}.xhtml`;
@@ -600,93 +667,226 @@ export default function Publishing(): JSX.Element {
     URL.revokeObjectURL(a.href);
   };
 
-  /** ---------- UI ---------- */
+  const exportEPUB = async (): Promise<void> => {
+    const JSZip = (await import("jszip")).default;
+    const esc = (s: string) => s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+
+    const body = compiled
+      .split("\n\n")
+      .map((p) => "<p>" + esc(p).replaceAll("\n", "<br/>") + "</p>")
+      .join("\n");
+
+    const titleXhtml = [
+      '<?xml version="1.0" encoding="utf-8"?>',
+      "<!DOCTYPE html>",
+      '<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">',
+      "<head>",
+      '  <meta charset="utf-8"/>',
+      `  <title>${esc(meta.title)}</title>`,
+      '  <link rel="stylesheet" type="text/css" href="styles.css"/>',
+      "</head>",
+      "<body>",
+      `<h1 style="text-align:center">${esc(meta.title)}</h1>`,
+      `<div style="text-align:center">by ${esc(meta.author)} • ${esc(meta.year)}</div>`,
+      "<hr/>",
+      body,
+      "</body>",
+      "</html>",
+    ].join("\n");
+
+    const navXhtml = [
+      '<?xml version="1.0" encoding="utf-8"?>',
+      "<!DOCTYPE html>",
+      '<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" xml:lang="en">',
+      "<head><meta charset=\"utf-8\"/><title>Table of Contents</title></head>",
+      "<body>",
+      '<nav epub:type="toc"><h1>Contents</h1><ol>',
+      '  <li><a href="title.xhtml">Manuscript</a></li>',
+      "</ol></nav>",
+      "</body>",
+      "</html>",
+    ].join("\n");
+
+    const css = "body{font-family:serif;line-height:1.45;margin:1em;} h1{text-align:center} p{margin:0 0 1em 0;}";
+
+    const uid = "storylab-" + Date.now();
+
+    const packageOpf = [
+      '<?xml version="1.0" encoding="utf-8"?>',
+      '<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="pub-id">',
+      '  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">',
+      `    <dc:identifier id="pub-id">urn:uuid:${uid}</dc:identifier>`,
+      `    <dc:title>${esc(meta.title)}</dc:title>`,
+      `    <dc:creator>${esc(meta.author)}</dc:creator>`,
+      "    <dc:language>en</dc:language>",
+      `    <meta property="dcterms:modified">${new Date().toISOString().replace(/\..*/, "")}Z</meta>`,
+      "  </metadata>",
+      "  <manifest>",
+      '    <item id="title" href="title.xhtml" media-type="application/xhtml+xml"/>',
+      '    <item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>',
+      '    <item id="css" href="styles.css" media-type="text/css"/>',
+      "  </manifest>",
+      "  <spine>",
+      '    <itemref idref="title"/>',
+      "  </spine>",
+      "</package>",
+    ].join("\n");
+
+    const containerXml = [
+      '<?xml version="1.0"?>',
+      '<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">',
+      "  <rootfiles>",
+      '    <rootfile full-path="OEBPS/content.opf" media-type="application/oebps-package+xml"/>',
+      "  </rootfiles>",
+      "</container>",
+    ].join("\n");
+
+    const zip = new JSZip();
+    zip.file("mimetype", "application/epub+zip", { compression: "STORE" });
+    zip.folder("META-INF")!.file("container.xml", containerXml);
+
+    const oebps = zip.folder("OEBPS")!;
+    oebps.file("title.xhtml", titleXhtml);
+    oebps.file("nav.xhtml", navXhtml);
+    oebps.file("styles.css", css);
+    oebps.file("content.opf", packageOpf);
+
+    const blob = await zip.generateAsync({ type: "blob", mimeType: "application/epub+zip" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `${safeFile(meta.title)}.epub`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+
+  // ---------- UI ----------
   return (
     <PageShell style={{ background: theme.bg, minHeight: "100vh" }}>
-      <div
-        style={{
-          background: "linear-gradient(135deg, rgba(10,37,64,.95), rgba(31,58,95,.85))",
-          color: "white",
-          padding: 20,
-          borderRadius: 12,
-          boxShadow: "0 8px 32px rgba(10, 37, 64, .30)",
-          margin: "0 24px 20px",
-        }}
-        aria-label="Publishing banner"
-      >
-        <h1 style={{ margin: 0 }}>Publishing Suite</h1>
-        <div style={{ opacity: 0.9 }}>Presets • Page Breaks • Headers & Footers</div>
-      </div>
-
-      <div style={{ ...styles.sectionShell }}>
-        {/* Tabs */}
+      <div style={styles.outer}>
+        {/* Header Bar (gradient) */}
         <div
-          role="tablist"
-          aria-label="Publishing steps"
-          onKeyDown={onKeyDownTabs}
           style={{
-            display: "flex",
-            gap: 8,
-            marginBottom: 20,
-            overflowX: "auto",
-            paddingBottom: 2,
+            background: `linear-gradient(135deg, var(--brand-primary), var(--brand-accent))`,
+            color: theme.white,
+            padding: "14px 18px",
           }}
+          aria-label="Publishing banner"
         >
-          {STEPS.map((s, i) => {
-            const isActive = s.key === step;
-            const id = `tab-${s.key}`;
-            const panelId = `panel-${s.key}`;
-            return (
+          <div
+            style={{
+              maxWidth: 1120,
+              margin: "0 auto",
+              display: "grid",
+              gridTemplateColumns: "1fr auto 1fr",
+              alignItems: "center",
+              gap: 12,
+            }}
+          >
+            {/* Back */}
+            <div>
               <button
-                key={s.key}
-                id={id}
-                ref={(el) => {
-                  if (el) tabRefs.current[i] = el;
-                }}
-                role="tab"
-                aria-selected={isActive}
-                aria-controls={panelId}
-                tabIndex={isActive ? 0 : -1}
-                onClick={() => setStep(s.key)}
+                onClick={() => navigate(-1)}
                 style={{
-                  padding: "12px 18px",
-                  borderRadius: 12,
-                  border: isActive
-                    ? `2px solid ${theme.accent}`
-                    : `2px solid ${theme.border}`,
-                  background: isActive ? theme.highlight : theme.white,
-                  color: isActive ? theme.primary : theme.subtext,
-                  fontWeight: isActive ? 700 : 500,
-                  cursor: "pointer",
-                  whiteSpace: "nowrap",
-                  fontSize: 14,
-                  outline: "none",
-                  boxShadow: isActive
-                    ? "0 1px 0 rgba(0,0,0,0.04) inset"
-                    : "none",
+                  ...styles.btn,
+                  border: "none",
+                  background: "rgba(255,255,255,0.15)",
+                  color: theme.white,
                 }}
+                aria-label="Go back"
               >
-                <span aria-hidden="true" style={{ marginRight: 8 }}>
-                  {i + 1}
-                </span>
-                {s.label}
+                ← Back
               </button>
-            );
-          })}
+            </div>
+
+            {/* Center title with icons */}
+            <div style={{ textAlign: "center", display: "flex", gap: 10, justifyContent: "center", alignItems: "center" }}>
+              {/* Book icon */}
+              <svg
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                aria-hidden="true"
+                focusable="false"
+              >
+                <path d="M6 2h9a3 3 0 0 1 3 3v12.5a1.5 1.5 0 0 1-1.5 1.5H7a3 3 0 0 0-3 3V5a3 3 0 0 1 3-3zm0 2a1 1 0 0 0-1 1v13.764A4.99 4.99 0 0 1 7 18h9V5a1 1 0 0 0-1-1H6z" />
+              </svg>
+              <h1 style={{ margin: 0, fontSize: 18, letterSpacing: 0.2 }}>Publishing Suite</h1>
+              {/* Site icon (falls back to favicon) */}
+              <img
+                src="/favicon.ico"
+                alt="Site icon"
+                width={20}
+                height={20}
+                style={{ borderRadius: 4, opacity: 0.95 }}
+                onError={(e) => {
+                  (e.target as HTMLImageElement).style.display = "none";
+                }}
+              />
+            </div>
+
+            {/* Right spacer */}
+            <div />
+          </div>
         </div>
 
-        {/* Panel wrapper */}
-        <div
-          role="tabpanel"
-          id={`panel-${step}`}
-          aria-labelledby={`tab-${step}`}
-          style={{ outline: "none" }}
-        >
+        {/* Page body */}
+        <div style={{ ...styles.inner, ...styles.sectionShell }}>
+          {/* Tabs */}
+          <div
+            role="tablist"
+            aria-label="Publishing steps"
+            onKeyDown={onKeyDownTabs}
+            style={{
+              display: "flex",
+              gap: 8,
+              marginBottom: 20,
+              overflowX: "auto",
+              paddingBottom: 2,
+            }}
+          >
+            {STEPS.map((s, i) => {
+              const isActive = s.key === step;
+              const id = `tab-${s.key}`;
+              const panelId = `panel-${s.key}`;
+              return (
+                <button
+                  key={s.key}
+                  id={id}
+                  ref={(el) => {
+                    if (el) tabRefs.current[i] = el;
+                  }}
+                  role="tab"
+                  aria-selected={isActive}
+                  aria-controls={panelId}
+                  tabIndex={isActive ? 0 : -1}
+                  onClick={() => setStep(s.key)}
+                  style={{
+                    padding: "12px 18px",
+                    borderRadius: 12,
+                    border: isActive ? `2px solid ${theme.accent}` : `2px solid ${theme.border}`,
+                    background: isActive ? theme.highlight : theme.white,
+                    color: isActive ? theme.primary : theme.subtext,
+                    fontWeight: isActive ? 700 : 500,
+                    cursor: "pointer",
+                    whiteSpace: "nowrap",
+                    fontSize: 14,
+                    outline: "none",
+                    boxShadow: isActive ? "0 1px 0 rgba(0,0,0,0.04) inset" : "none",
+                  }}
+                >
+                  <span aria-hidden="true" style={{ marginRight: 8 }}>
+                    {i + 1}
+                  </span>
+                  {s.label}
+                </button>
+              );
+            })}
+          </div>
+
           {/* Meta */}
           <div style={{ ...styles.glassCard, marginBottom: 20 }}>
-            <h3 style={{ margin: "0 0 16px 0", fontSize: 18, color: theme.text }}>
-              Manuscript Details
-            </h3>
+            <h3 style={{ margin: "0 0 16px 0", fontSize: 18, color: theme.text }}>Manuscript Details</h3>
             <div
               style={{
                 display: "grid",
@@ -695,9 +895,7 @@ export default function Publishing(): JSX.Element {
               }}
             >
               <div>
-                <label style={{ ...styles.label, display: "block", marginBottom: 6 }}>
-                  Title
-                </label>
+                <label style={{ ...styles.label, display: "block", marginBottom: 6 }}>Title</label>
                 <input
                   style={styles.input}
                   value={meta.title}
@@ -706,9 +904,7 @@ export default function Publishing(): JSX.Element {
                 />
               </div>
               <div>
-                <label style={{ ...styles.label, display: "block", marginBottom: 6 }}>
-                  Author
-                </label>
+                <label style={{ ...styles.label, display: "block", marginBottom: 6 }}>Author</label>
                 <input
                   style={styles.input}
                   value={meta.author}
@@ -717,9 +913,7 @@ export default function Publishing(): JSX.Element {
                 />
               </div>
               <div>
-                <label style={{ ...styles.label, display: "block", marginBottom: 6 }}>
-                  Publication Year
-                </label>
+                <label style={{ ...styles.label, display: "block", marginBottom: 6 }}>Publication Year</label>
                 <input
                   style={styles.input}
                   value={meta.year}
@@ -728,9 +922,7 @@ export default function Publishing(): JSX.Element {
                 />
               </div>
               <div>
-                <label style={{ ...styles.label, display: "block", marginBottom: 6 }}>
-                  Author Last Name (header)
-                </label>
+                <label style={{ ...styles.label, display: "block", marginBottom: 6 }}>Author Last Name (header)</label>
                 <input
                   style={styles.input}
                   value={meta.authorLast || ""}
@@ -738,15 +930,7 @@ export default function Publishing(): JSX.Element {
                   placeholder="For running header"
                 />
               </div>
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "end",
-                  gap: 16,
-                  color: theme.subtext,
-                  fontSize: 14,
-                }}
-              >
+              <div style={{ display: "flex", alignItems: "end", gap: 16, color: theme.subtext, fontSize: 14 }}>
                 <div>
                   Words: <strong>{wordCount.toLocaleString()}</strong>
                 </div>
@@ -756,17 +940,13 @@ export default function Publishing(): JSX.Element {
 
           {/* Format & Presets */}
           <div style={{ ...styles.glassCard, marginBottom: 20 }}>
-            <h3 style={{ margin: "0 0 16px 0", fontSize: 18, color: theme.text }}>
-              Format & Presets
-            </h3>
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 16 }}>
+            <h3 style={{ margin: "0 0 16px 0", fontSize: 18, color: theme.text }}>Format & Presets</h3>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 16, alignItems: "center" }}>
               <div style={{ minWidth: 260 }}>
                 <div style={styles.label}>Manuscript Preset</div>
                 <select
                   value={manuscriptPreset}
-                  onChange={(e) =>
-                    setManuscriptPreset(e.target.value as ManuscriptPresetKey)
-                  }
+                  onChange={(e) => setManuscriptPreset(e.target.value as ManuscriptPresetKey)}
                   style={{ ...styles.input, height: 40 }}
                 >
                   {Object.entries(MANUSCRIPT_PRESETS).map(([k, v]) => (
@@ -776,6 +956,7 @@ export default function Publishing(): JSX.Element {
                   ))}
                 </select>
               </div>
+
               <div style={{ minWidth: 260 }}>
                 <div style={styles.label}>Platform Preset</div>
                 <select
@@ -791,22 +972,32 @@ export default function Publishing(): JSX.Element {
                 </select>
                 <div style={{ color: theme.subtext, fontSize: 12, marginTop: 6 }}>
                   {includeHeadersFooters
-                    ? "DOCX export will include headers/footers + page numbers."
+                    ? "DOCX export will include page-level margins (headers/footers typical for print)."
                     : "Headers/footers disabled for this platform (typical for eBooks)."}
                 </div>
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <span style={styles.label}>Double Spacing</span>
-                <Toggle
-                  checked={ms.lineHeight >= 2}
-                  onChange={() => {
-                    const alt = {
-                      ...MANUSCRIPT_PRESETS[manuscriptPreset],
-                      lineHeight: ms.lineHeight >= 2 ? 1.5 : 2.0,
-                    } as any;
-                    (MANUSCRIPT_PRESETS as any)[manuscriptPreset] = alt;
+
+              {/* Single / Double buttons – these actually update lineHeight */}
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <span style={styles.label}>Line Spacing</span>
+                <button
+                  style={{
+                    ...styles.btn,
+                    ...(ms.lineHeight && ms.lineHeight < 2 ? { background: theme.highlight, borderColor: theme.accent } : {}),
                   }}
-                />
+                  onClick={() => setMsOverrides((o) => ({ ...o, lineHeight: 1.5 }))}
+                >
+                  Single (1.5)
+                </button>
+                <button
+                  style={{
+                    ...styles.btn,
+                    ...(ms.lineHeight && ms.lineHeight >= 2 ? { background: theme.highlight, borderColor: theme.accent } : {}),
+                  }}
+                  onClick={() => setMsOverrides((o) => ({ ...o, lineHeight: 2.0 }))}
+                >
+                  Double (2.0)
+                </button>
               </div>
             </div>
           </div>
@@ -816,86 +1007,40 @@ export default function Publishing(): JSX.Element {
             {step === "builder" && (
               <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 24 }}>
                 <div>
-                  <h3 style={{ margin: "0 0 16px 0", fontSize: 18, color: theme.text }}>
-                    Live Preview
-                  </h3>
+                  <h3 style={{ margin: "0 0 16px 0", fontSize: 18, color: theme.text }}>Live Preview</h3>
                   <div style={styles.preview}>
-                    <iframe
-                      title="preview"
-                      style={{ width: "100%", height: 328, border: 0 }}
-                      srcDoc={compiledHTML}
-                    />
+                    <iframe title="preview" style={{ width: "100%", height: 328, border: 0 }} srcDoc={compiledHTML} />
                   </div>
                 </div>
                 <div>
-                  <h3 style={{ margin: "0 0 16px 0", fontSize: 18, color: theme.text }}>
-                    Front & Back Matter
-                  </h3>
+                  <h3 style={{ margin: "0 0 16px 0", fontSize: 18, color: theme.text }}>Front & Back Matter</h3>
                   <div style={{ display: "grid", gap: 12 }}>
-                    <Field
-                      label="Title Page"
-                      value={matter.titlePage}
-                      onChange={(v) => setMatter({ ...matter, titlePage: v })}
-                    />
-                    <Field
-                      label="Copyright"
-                      value={matter.copyright}
-                      onChange={(v) => setMatter({ ...matter, copyright: v })}
-                    />
-                    <Field
-                      label="Dedication"
-                      value={matter.dedication}
-                      onChange={(v) => setMatter({ ...matter, dedication: v })}
-                    />
-                    <Field
-                      label="Epigraph"
-                      value={matter.epigraph}
-                      onChange={(v) => setMatter({ ...matter, epigraph: v })}
-                    />
+                    <Field label="Title Page" value={matter.titlePage} onChange={(v) => setMatter({ ...matter, titlePage: v })} />
+                    <Field label="Copyright" value={matter.copyright} onChange={(v) => setMatter({ ...matter, copyright: v })} />
+                    <Field label="Dedication" value={matter.dedication} onChange={(v) => setMatter({ ...matter, dedication: v })} />
+                    <Field label="Epigraph" value={matter.epigraph} onChange={(v) => setMatter({ ...matter, epigraph: v })} />
                     <label
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 8,
-                        marginTop: 8,
-                        fontSize: 14,
-                        color: theme.text,
-                      }}
+                      style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 8, fontSize: 14, color: theme.text }}
                     >
                       <input
                         type="checkbox"
                         checked={matter.toc}
-                        onChange={(e) =>
-                          setMatter({ ...matter, toc: e.target.checked })
-                        }
+                        onChange={(e) => setMatter({ ...matter, toc: e.target.checked })}
                       />{" "}
                       Include Table of Contents
                     </label>
-                    <div
-                      style={{
-                        borderTop: `1px solid ${theme.border}`,
-                        margin: "8px 0",
-                      }}
-                    />
+                    <div style={{ borderTop: `1px solid ${theme.border}`, margin: "8px 0" }} />
                     <Field
                       label="Acknowledgments"
                       value={matter.acknowledgments}
-                      onChange={(v) =>
-                        setMatter({ ...matter, acknowledgments: v })
-                      }
+                      onChange={(v) => setMatter({ ...matter, acknowledgments: v })}
                     />
                     <Field
                       label="About the Author"
                       value={matter.aboutAuthor}
-                      onChange={(v) =>
-                        setMatter({ ...matter, aboutAuthor: v })
-                      }
+                      onChange={(v) => setMatter({ ...matter, aboutAuthor: v })}
                     />
-                    <Field
-                      label="Author Notes"
-                      value={matter.notes}
-                      onChange={(v) => setMatter({ ...matter, notes: v })}
-                    />
+                    <Field label="Author Notes" value={matter.notes} onChange={(v) => setMatter({ ...matter, notes: v })} />
                   </div>
                 </div>
               </div>
@@ -903,11 +1048,9 @@ export default function Publishing(): JSX.Element {
 
             {step === "proof" && (
               <div>
-                <h3 style={{ margin: "0 0 16px 0", fontSize: 18, color: theme.text }}>
-                  Proof & Consistency
-                </h3>
-                <p style={{ color: theme.subtext, fontSize: 14 }}>
-                  Local quick checks; wire to deeper services later.
+                <h3 style={{ margin: "0 0 8px 0", fontSize: 18, color: theme.text }}>Proof & Consistency</h3>
+                <p style={{ color: theme.subtext, fontSize: 14, marginTop: 0 }}>
+                  Local quick checks now. You can wire these buttons to your server-side AI later.
                 </p>
                 <div
                   style={{
@@ -917,20 +1060,20 @@ export default function Publishing(): JSX.Element {
                     marginTop: 16,
                   }}
                 >
-                  <button style={styles.lightBtn} onClick={runGrammarChecks}>
-                    Grammar Check
+                  <button style={styles.btn} onClick={runLocalChecks}>
+                    Grammar Check (Local)
                   </button>
-                  <button style={styles.lightBtn} onClick={runGrammarChecks}>
-                    Style Analysis
+                  <button style={styles.btn} onClick={runLocalChecks}>
+                    Style Analysis (Local)
                   </button>
-                  <button style={styles.lightBtn} onClick={runGrammarChecks}>
-                    Character Consistency
+                  <button style={styles.btn} onClick={runLocalChecks}>
+                    Character Consistency (Local)
                   </button>
-                  <button style={styles.lightBtn} onClick={runGrammarChecks}>
-                    Timeline Validation
+                  <button style={styles.btn} onClick={runLocalChecks}>
+                    Timeline Validation (Local)
                   </button>
-                  <button style={styles.primaryBtn} onClick={runGrammarChecks}>
-                    Run All Checks
+                  <button style={styles.btnPrimary} onClick={runAIChecks} disabled={aiBusy}>
+                    {aiBusy ? "AI Proof… " : "AI Proof (Local Suggestions)"}
                   </button>
                 </div>
                 {!!proofResults.length && (
@@ -947,29 +1090,21 @@ export default function Publishing(): JSX.Element {
 
             {step === "format" && (
               <div>
-                <h3 style={{ margin: "0 0 16px 0", fontSize: 18, color: theme.text }}>
-                  Format Preview
-                </h3>
+                <h3 style={{ margin: "0 0 16px 0", fontSize: 18, color: theme.text }}>Format Preview</h3>
                 <div style={styles.preview}>
-                  <iframe
-                    title="format-preview"
-                    style={{ width: "100%", height: 328, border: 0 }}
-                    srcDoc={compiledHTML}
-                  />
+                  <iframe title="format-preview" style={{ width: "100%", height: 328, border: 0 }} srcDoc={compiledHTML} />
                 </div>
                 <p style={{ color: theme.subtext, fontSize: 12, marginTop: 8 }}>
-                  * For true headers/footers + page numbers, implement DOCX export later.
+                  * For true headers/footers + page numbers, export DOCX and finalize in Word/LibreOffice (then save as PDF).
                 </p>
               </div>
             )}
 
             {step === "export" && (
               <div>
-                <h3 style={{ margin: "0 0 16px 0", fontSize: 18, color: theme.text }}>
-                  Export
-                </h3>
+                <h3 style={{ margin: "0 0 16px 0", fontSize: 18, color: theme.text }}>Export</h3>
                 <p style={{ color: theme.subtext, fontSize: 14 }}>
-                  These exports do not require extra npm packages.
+                  DOCX includes page margins; EPUB is packaged, and XHTML is a simple ePub-friendly HTML.
                 </p>
                 <div
                   style={{
@@ -979,29 +1114,26 @@ export default function Publishing(): JSX.Element {
                     marginTop: 16,
                   }}
                 >
-                  <button style={styles.lightBtn} onClick={exportPDF}>
+                  <button style={styles.btn} onClick={exportPDF}>
                     📄 Export PDF (Print dialog)
                   </button>
-                  <button style={styles.primaryBtn} onClick={exportEPUBXHTML}>
+                  <button style={styles.btn} onClick={exportDOCX}>
+                    📝 Export DOCX
+                  </button>
+                  <button style={styles.btnPrimary} onClick={exportEPUB}>
+                    📖 Export EPUB (.epub)
+                  </button>
+                  <button style={styles.btnDark} onClick={exportEPUBXHTML}>
                     📑 Export EPUB XHTML
                   </button>
-
-                  {/* When you're ready to add real DOCX/EPUB packaging:
-                      - npm i docx file-saver jszip
-                      - reintroduce the exportDOCX / exportEPUB functions and buttons
-                  */}
                 </div>
               </div>
             )}
 
             {step === "prep" && (
               <div>
-                <h3 style={{ margin: "0 0 16px 0", fontSize: 18, color: theme.text }}>
-                  Publishing Preparation
-                </h3>
-                <p style={{ color: theme.subtext, fontSize: 14 }}>
-                  Get your submission assets ready.
-                </p>
+                <h3 style={{ margin: "0 0 16px 0", fontSize: 18, color: theme.text }}>Publishing Preparation</h3>
+                <p style={{ color: theme.subtext, fontSize: 14 }}>Get your submission assets ready.</p>
                 <div
                   style={{
                     display: "grid",
@@ -1010,12 +1142,12 @@ export default function Publishing(): JSX.Element {
                     marginTop: 16,
                   }}
                 >
-                  <button style={styles.lightBtn}>📝 Synopsis Generator</button>
-                  <button style={styles.lightBtn}>✉️ Query Letter Builder</button>
-                  <button style={styles.lightBtn}>✅ Self-Publishing Checklist</button>
-                  <button style={styles.lightBtn}>📊 Marketing Kit</button>
-                  <button style={styles.lightBtn}>🏷️ Genre Guidelines</button>
-                  <button style={styles.lightBtn}>💰 Pricing Calculator</button>
+                  <button style={styles.btn}>📝 Synopsis Generator</button>
+                  <button style={styles.btn}>✉️ Query Letter Builder</button>
+                  <button style={styles.btn}>✅ Self-Publishing Checklist</button>
+                  <button style={styles.btn}>📊 Marketing Kit</button>
+                  <button style={styles.btn}>🏷️ Genre Guidelines</button>
+                  <button style={styles.btn}>💰 Pricing Calculator</button>
                 </div>
               </div>
             )}
@@ -1031,19 +1163,14 @@ export default function Publishing(): JSX.Element {
                 marginBottom: 14,
               }}
             >
-              <h3 style={{ margin: 0, fontSize: 18, color: theme.text }}>
-                Chapter Management
-              </h3>
+              <h3 style={{ margin: 0, fontSize: 18, color: theme.text }}>Chapter Management</h3>
               <button
-                style={styles.primaryBtn}
+                style={styles.btnPrimary}
                 onClick={() =>
                   setChapters((prev) => [
                     ...prev,
                     {
-                      id:
-                        typeof crypto !== "undefined" && "randomUUID" in crypto
-                          ? (crypto as any).randomUUID()
-                          : `c_${Date.now()}`,
+                      id: crypto && "randomUUID" in crypto ? (crypto as any).randomUUID() : `c_${Date.now()}`,
                       title: `Chapter ${prev.length + 1} – Untitled`,
                       included: true,
                       text: "New chapter text...",
@@ -1081,29 +1208,15 @@ export default function Publishing(): JSX.Element {
                     }}
                   >
                     <div style={{ flex: 1 }}>
-                      <div
-                        style={{
-                          fontSize: 14,
-                          fontWeight: 700,
-                          color: theme.text,
-                        }}
-                      >
-                        {c.title}
-                      </div>
-                      <div
-                        style={{
-                          fontSize: 12,
-                          color: theme.subtext,
-                          marginTop: 4,
-                        }}
-                      >
+                      <div style={{ fontSize: 14, fontWeight: 700, color: theme.text }}>{c.title}</div>
+                      <div style={{ fontSize: 12, color: theme.subtext, marginTop: 4 }}>
                         {c.text.slice(0, 100)}…
                       </div>
                     </div>
                     <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                       <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                         <button
-                          style={{ ...styles.lightBtn, padding: "6px 8px" }}
+                          style={{ ...styles.btn, padding: "6px 8px" }}
                           onClick={() =>
                             setChapters((prev) => {
                               const next = [...prev];
@@ -1113,11 +1226,12 @@ export default function Publishing(): JSX.Element {
                               return next;
                             })
                           }
+                          title="Move up"
                         >
                           ↑
                         </button>
                         <button
-                          style={{ ...styles.lightBtn, padding: "6px 8px" }}
+                          style={{ ...styles.btn, padding: "6px 8px" }}
                           onClick={() =>
                             setChapters((prev) => {
                               const next = [...prev];
@@ -1127,6 +1241,7 @@ export default function Publishing(): JSX.Element {
                               return next;
                             })
                           }
+                          title="Move down"
                         >
                           ↓
                         </button>
@@ -1134,10 +1249,9 @@ export default function Publishing(): JSX.Element {
                       <Toggle
                         checked={c.included}
                         onChange={(v) =>
-                          setChapters((prev) =>
-                            prev.map((x) => (x.id === c.id ? { ...x, included: v } : x))
-                          )
+                          setChapters((prev) => prev.map((x) => (x.id === c.id ? { ...x, included: v } : x)))
                         }
+                        label={c.included ? "Included" : "Excluded"}
                       />
                     </div>
                   </div>
@@ -1148,14 +1262,10 @@ export default function Publishing(): JSX.Element {
 
           {/* Footer nav */}
           <div style={{ display: "flex", justifyContent: "space-between", marginTop: 16 }}>
-            <button style={styles.lightBtn} onClick={goBack} disabled={stepIndex === 0}>
+            <button style={styles.btn} onClick={goBack} disabled={stepIndex === 0}>
               ← Back
             </button>
-            <button
-              style={styles.primaryBtn}
-              onClick={goNext}
-              disabled={stepIndex === STEPS.length - 1}
-            >
+            <button style={styles.btnPrimary} onClick={goNext} disabled={stepIndex === STEPS.length - 1}>
               Next →
             </button>
           </div>
@@ -1164,4 +1274,3 @@ export default function Publishing(): JSX.Element {
     </PageShell>
   );
 }
-
