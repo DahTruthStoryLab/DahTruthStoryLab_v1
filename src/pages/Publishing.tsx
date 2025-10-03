@@ -1,9 +1,7 @@
-// src/pages/Publishing.jsx
-import React, { useMemo, useState, useRef } from "react";
+// src/pages/Publishing.tsx
+import { useMemo, useRef, useState } from "react";
 import PageShell from "../components/layout/PageShell";
 import AeroBanner from "../components/layout/AeroBanner";
-
-import { useState } from "react";
 
 // (stub your steps or import them)
 const STEPS = [{ key: "builder" }, { key: "review" }, { key: "publish" }];
