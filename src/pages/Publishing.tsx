@@ -1,9 +1,27 @@
+// src/pages/Publishing.jsx
 import React, { useMemo, useState, useRef } from "react";
 import PageShell from "../components/layout/PageShell";
 import AeroBanner from "../components/layout/AeroBanner";
 
+import { useState } from "react";
+
+// (stub your steps or import them)
+const STEPS = [{ key: "builder" }, { key: "review" }, { key: "publish" }];
+
 export default function Publishing() {
-  return <div>Publishing works ✅</div>;
+  const [step, setStep] = useState("builder");
+  const stepIndex = STEPS.findIndex((s) => s.key === step);
+  const goNext = () => setStep(STEPS[Math.min(stepIndex + 1, STEPS.length - 1)].key);
+  const goBack = () => setStep(STEPS[Math.max(stepIndex - 1, 0)].key);
+
+  return (
+    <div>
+      <h1>Publishing</h1>
+      <p>Step: {step}</p>
+      <button onClick={goBack} disabled={stepIndex === 0}>Back</button>
+      <button onClick={goNext} disabled={stepIndex === STEPS.length - 1}>Next</button>
+    </div>
+  );
 }
 
 /**
