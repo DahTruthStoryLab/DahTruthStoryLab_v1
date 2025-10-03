@@ -257,15 +257,26 @@ export default function App() {
           />
           */}
 
-          {/* Publishing (uses the clean page) */}
-          <Route
-            path="/publishing"
-            element={
-              <ProtectedRoute>
-                <Publishing />
-              </ProtectedRoute>
+         {/* Main Publishing route */}
+         <Route
+           path="/publishing"
+           element={
+             <ProtectedRoute>
+               <Publishing />
+             </ProtectedRoute>
             }
           />
+
+      {/* Redirects (short/legacy paths) */}
+      <Route path="/publish" element={<Navigate to="/publishing" replace />} />
+      <Route path="/publishing-suite" element={<Navigate to="/publishing" replace />} />
+      <Route path="/storylab/publishing" element={<Navigate to="/publishing" replace />} />
+      
+      {/* (Optional) catch subpaths like /publish/foo */}
+      <Route path="/publish/*" element={<Navigate to="/publishing" replace />} />
+      <Route path="/publishing-suite/*" element={<Navigate to="/publishing" replace />} />
+      <Route path="/storylab/publishing/*" element={<Navigate to="/publishing" replace />} />
+
 
           {/* Misc */}
           <Route
