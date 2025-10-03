@@ -9,8 +9,21 @@ import {
   Navigate,
 } from "react-router-dom";
 
-// ✅ Keep this direct import (not lazy)
-import Profile from "./components/Profile.jsx";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import Home from "./pages/Home.jsx";            // whatever your home is
+import Publishing from "./pages/Publishing.jsx"; // <-- add this import
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Home />} />
+        <Route path="/publishing" element={<Publishing />} /> {/* <-- add this route */}
+        <Route path="*" element={<div>Not Found</div>} />
+      </Routes>
+    </BrowserRouter>
+  );
+}
 
 /* =========================
    Lazy-loaded pages (faster)
