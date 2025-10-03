@@ -2,6 +2,10 @@ import React, { useMemo, useState, useRef } from "react";
 import PageShell from "../components/layout/PageShell";
 import AeroBanner from "../components/layout/AeroBanner";
 
+export default function Publishing() {
+  return <div>Publishing works ✅</div>;
+}
+
 /**
  * Publishing Suite (StoryLab)
  * - Page breaks per chapter in preview/print (browser)
