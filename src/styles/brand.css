@@ -1,0 +1,27 @@
+:root {
+  /* tweak these to YOUR palette */
+  --brand-bg:            #F2F5F9;
+  --brand-white:         #FFFFFF;
+  --brand-text:          #0A2540;
+  --brand-subtext:       #5B6B7C;
+  --brand-border:        rgba(10,37,64,0.10);
+  --brand-border-strong: rgba(10,37,64,0.18);
+  --brand-primary:       #0A2540;
+  --brand-accent:        #335D92;
+  --brand-highlight:     #EAF2FB;
+}
+
+/* Optional dark mode — adjust or remove if you don’t use it */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --brand-bg:            #0B1220;
+    --brand-white:         #111827;
+    --brand-text:          #E5E7EB;
+    --brand-subtext:       #9CA3AF;
+    --brand-border:        rgba(229,231,235,0.12);
+    --brand-border-strong: rgba(229,231,235,0.2);
+    --brand-primary:       #9AB6F4;
+    --brand-accent:        #6B9CE8;
+    --brand-highlight:     rgba(107,156,232,0.12);
+  }
+}
