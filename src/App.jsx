@@ -33,14 +33,16 @@ const Clothesline          = lazy(() => import("./components/storylab/Clotheslin
 const HopesFearsLegacy     = lazy(() => import("./components/storylab/HopesFearsLegacy"));
 const WorkshopCohort       = lazy(() => import("./components/storylab/WorkshopCohort.jsx"));
 
-// Add the routes you referenced but didn’t import before
-const Profile              = lazy(() => import("./components/Profile"));      // adjust path if needed
-const Publishing           = React.lazy(() => import("./pages/Publishing.tsx"));
+// Adjust this path if your file lives elsewhere;
+// make sure src/pages/Publishing.tsx exists and default-exports a component.
+const Publishing           = lazy(() => import("./pages/Publishing.tsx"));
+
+// If ./components/Profile doesn’t exist, comment the next two lines (import + route).
+const Profile              = lazy(() => import("./components/Profile"));
 
 /* =========================
    Global UI helpers
    ========================= */
-// Minimal loading UI for lazy routes
 const Fallback = () => (
   <div className="min-h-[60vh] grid place-items-center text-slate-200">
     <div className="text-center">
@@ -50,7 +52,6 @@ const Fallback = () => (
   </div>
 );
 
-// Simple placeholder page
 const Placeholder = ({ title = "Coming soon" }) => (
   <div className="min-h-[60vh] flex items-center justify-center text-slate-200">
     <div className="text-center">
@@ -60,7 +61,6 @@ const Placeholder = ({ title = "Coming soon" }) => (
   </div>
 );
 
-// Auto-scroll to top on route change
 function ScrollToTop() {
   const { pathname, search, hash } = useLocation();
   useEffect(() => {
@@ -248,7 +248,7 @@ export default function App() {
             }
           />
 
-          {/* Profile */}
+          {/* Profile (comment this route if ./components/Profile does not exist) */}
           <Route
             path="/profile"
             element={
