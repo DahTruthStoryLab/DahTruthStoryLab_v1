@@ -33,12 +33,11 @@ const Clothesline          = lazy(() => import("./components/storylab/Clotheslin
 const HopesFearsLegacy     = lazy(() => import("./components/storylab/HopesFearsLegacy"));
 const WorkshopCohort       = lazy(() => import("./components/storylab/WorkshopCohort.jsx"));
 
-// Adjust this path if your file lives elsewhere;
-// make sure src/pages/Publishing.tsx exists and default-exports a component.
-const Publishing           = lazy(() => import("./pages/Publishing.tsx"));
+// Publishing (use the clean page)
+const Publishing           = lazy(() => import("./pages/PublishingClean.tsx"));
 
-// If ./components/Profile doesn’t exist, comment the next two lines (import + route).
-const Profile              = lazy(() => import("./components/Profile"));
+// Profile (commented out to avoid build break if file is missing)
+// const Profile              = lazy(() => import("./components/Profile"));
 
 /* =========================
    Global UI helpers
@@ -87,10 +86,8 @@ function TableOfContentsRouter() {
   const paramV = params.get("v");
   const key = "tocVersion";
   const stored = localStorage.getItem(key);
-
   const chosen = paramV || stored || "2";
   if (chosen !== stored) localStorage.setItem(key, chosen);
-
   return chosen === "1" ? <TOCPage /> : <TOCPage2 />;
 }
 
@@ -248,7 +245,8 @@ export default function App() {
             }
           />
 
-          {/* Profile (comment this route if ./components/Profile does not exist) */}
+          {/* Profile — uncomment if ./components/Profile exists */}
+          {/*
           <Route
             path="/profile"
             element={
@@ -257,8 +255,9 @@ export default function App() {
               </ProtectedRoute>
             }
           />
+          */}
 
-          {/* Publishing */}
+          {/* Publishing (uses the clean page) */}
           <Route
             path="/publishing"
             element={
