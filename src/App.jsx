@@ -1,22 +1,16 @@
 // src/App.jsx
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Home from "./pages/Home.jsx";
-import Publishing from "./pages/Publishing.jsx";
-
-export default function App() {
-  return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/publishing" element={<Publishing />} />
-        <Route path="*" element={<div>Not Found</div>} />
-      </Routes>
-    </BrowserRouter>
-  );
-}
+import React, { Suspense, lazy, useEffect } from "react";
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  useSearchParams,
+  useLocation,
+  Navigate,
+} from "react-router-dom";
 
 /* =========================
-   Lazy-loaded pages (faster)
+   Lazy-loaded pages
    ========================= */
 const LandingPage          = lazy(() => import("./components/LandingPage"));
 const RegistrationPage     = lazy(() => import("./components/RegistrationPage"));
@@ -29,19 +23,19 @@ const WhoAmI               = lazy(() => import("./components/WhoAmI"));
 const WriteSection         = lazy(() => import("./components/WriteSection"));
 const Calendar             = lazy(() => import("./components/Calendar"));
 
-// StoryLab Landing (new overview) + Prompts (workshop prompts page)
-const StoryLabLanding = lazy(() => import("./lib/storylab/StoryLabLanding"));
+// StoryLab
+const StoryLabLanding      = lazy(() => import("./lib/storylab/StoryLabLanding"));
 const StoryPromptsWorkshop = lazy(() => import("./lib/storylab/StoryPromptsWorkshop"));
-
-// NEW: Workshop hub + modules (under /components/storylab)
 const StoryWorkshop        = lazy(() => import("./components/storylab/StoryWorkshop"));
 const PriorityCards        = lazy(() => import("./components/storylab/PriorityCards"));
 const CharacterRoadmap     = lazy(() => import("./components/storylab/CharacterRoadmap"));
 const Clothesline          = lazy(() => import("./components/storylab/Clothesline"));
 const HopesFearsLegacy     = lazy(() => import("./components/storylab/HopesFearsLegacy"));
-
-// NEW: Workshop Community hub (all-in-one)
 const WorkshopCohort       = lazy(() => import("./components/storylab/WorkshopCohort.jsx"));
+
+// Add the routes you referenced but didn’t import before
+const Profile              = lazy(() => import("./components/Profile"));      // adjust path if needed
+const Publishing           = lazy(() => import("./pages/Publishing.jsx"));    // uses your page
 
 /* =========================
    Global UI helpers
@@ -79,7 +73,6 @@ function ScrollToTop() {
    Auth gate (toggleable)
    ========================= */
 const BYPASS_AUTH = true;
-
 function ProtectedRoute({ children }) {
   if (BYPASS_AUTH) return children;
   const user = localStorage.getItem("dt_auth_user");
@@ -102,7 +95,7 @@ function TableOfContentsRouter() {
 }
 
 /* =========================
-   App
+   App (single export)
    ========================= */
 export default function App() {
   return (
@@ -143,7 +136,7 @@ export default function App() {
             }
           />
 
-          {/* StoryLab Landing (new overview) */}
+          {/* StoryLab */}
           <Route
             path="/story-lab"
             element={
@@ -152,8 +145,6 @@ export default function App() {
               </ProtectedRoute>
             }
           />
-
-          {/* Story Prompts (workshop prompts page) */}
           <Route
             path="/story-lab/prompts"
             element={
@@ -162,8 +153,6 @@ export default function App() {
               </ProtectedRoute>
             }
           />
-
-          {/* Workshop Community (Schedule + Breakouts + Critique) */}
           <Route
             path="/story-lab/community"
             element={
@@ -172,8 +161,6 @@ export default function App() {
               </ProtectedRoute>
             }
           />
-
-          {/* Workshop hub (launcher) */}
           <Route
             path="/story-lab/workshop"
             element={
@@ -182,8 +169,6 @@ export default function App() {
               </ProtectedRoute>
             }
           />
-
-          {/* Workshop modules (direct routes) */}
           <Route
             path="/story-lab/workshop/priorities"
             element={
@@ -217,7 +202,7 @@ export default function App() {
             }
           />
 
-          {/* Table of Contents (selector + direct) */}
+          {/* Table of Contents */}
           <Route
             path="/toc"
             element={
@@ -273,16 +258,17 @@ export default function App() {
             }
           />
 
-          {/* Misc */}
-          <Route path="/whoami" element={<WhoAmI />} />
+          {/* Publishing */}
           <Route
             path="/publishing"
             element={
               <ProtectedRoute>
-                <Placeholder title="Publishing" />
+                <Publishing />
               </ProtectedRoute>
             }
           />
+
+          {/* Misc */}
           <Route
             path="/store"
             element={
