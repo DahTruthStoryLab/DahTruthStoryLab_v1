@@ -34,7 +34,8 @@ const HopesFearsLegacy     = lazy(() => import("./components/storylab/HopesFears
 const WorkshopCohort       = lazy(() => import("./components/storylab/WorkshopCohort.jsx"));
 
 // Publishing (use the clean page)
-const Publishing           = React.lazy(() => import("./pages/Publishing"));
+const Publishing           = lazy(() => import("./pages/Publishing.tsx"));
+
 
 
 // Profile (commented out to avoid build break if file is missing)
