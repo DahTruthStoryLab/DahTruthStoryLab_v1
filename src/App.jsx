@@ -34,10 +34,12 @@ const HopesFearsLegacy     = lazy(() => import("./components/storylab/HopesFears
 const WorkshopCohort       = lazy(() => import("./components/storylab/WorkshopCohort.jsx"));
 
 // Publishing (use the clean page)
-const Publishing           = lazy(() => import("./pages/Publishing.tsx"));
+const Publishing           = React.lazy(() => import("./pages/Publishing"));
+
 
 // Profile (commented out to avoid build break if file is missing)
-// const Profile              = lazy(() => import("./components/Profile"));
+const Profile = lazy(() => import("./components/Profile"));
+
 
 /* =========================
    Global UI helpers
