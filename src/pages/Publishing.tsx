@@ -1,6 +1,5 @@
-/// src/pages/Publishing.tsx
+// src/pages/Publishing.tsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import PageShell from "../components/layout/PageShell";
 
 /**
  * Publishing Suite (StoryLab)
@@ -44,9 +43,9 @@ type PlatformPresetKey =
   | "Draft2Digital_Ebook"
   | "Generic_Manuscript_Submission";
 
-// ---- Theme (neutral; you can swap these to match your brand) ----
+// ---- Theme (neutral; tune to your palette later) ----
 const theme = {
-  bg: "#0b1220",             // deep page background
+  bg: "#0b1220",
   surface: "rgba(255,255,255,0.06)",
   border: "rgba(255,255,255,0.12)",
   text: "#E6EDF7",
@@ -157,7 +156,7 @@ const MANUSCRIPT_PRESETS: Record<
     label: string;
     fontFamily: string;
     fontSizePt: number;
-    lineHeight: number; // default for preset (we can override)
+    lineHeight: number;
     firstLineIndentInches: number;
     paragraphSpacingPt: number;
     align: "left" | "justify";
@@ -440,7 +439,7 @@ export default function Publishing(): JSX.Element {
   const ms = MANUSCRIPT_PRESETS[manuscriptPreset];
   const pf = PLATFORM_PRESETS[platformPreset];
   const [lineHeight, setLineHeight] = useState<number>(ms.lineHeight);
-  useEffect(() => setLineHeight(ms.lineHeight), [manuscriptPreset]); // reset when preset changes
+  useEffect(() => setLineHeight(ms.lineHeight), [manuscriptPreset]);
 
   const includeHeadersFooters = pf.headers || pf.footers;
 
@@ -495,7 +494,6 @@ export default function Publishing(): JSX.Element {
     const escape = (s: string) =>
       s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 
-    // Front matter blocks
     const front = [
       matter.titlePage,
       matter.copyright,
@@ -506,7 +504,6 @@ export default function Publishing(): JSX.Element {
       .map((s) => `<p>${escape(String(s)).replaceAll("\n", "<br/>")}</p>`)
       .join("\n");
 
-    // TOC
     const toc = matter.toc
       ? `<h2 class="chapter" style="page-break-before: always">Contents</h2><p>${chapters
           .filter((c) => c.included)
@@ -514,7 +511,6 @@ export default function Publishing(): JSX.Element {
           .join("<br/>")}</p>`
       : "";
 
-    // Chapter bodies with page breaks
     const chapterized = chapters
       .filter((c) => c.included)
       .map((c) => {
@@ -550,7 +546,7 @@ export default function Publishing(): JSX.Element {
       body { font-family: ${ms.fontFamily}; font-size: ${ms.fontSizePt}pt; margin: 0; line-height: ${lineHeight}; color: #E5E7EB; background:#0b1220;}
       p { orphans: 3; widows: 3; ${ms.align === "justify" ? "text-align: justify;" : ""} ${
       ms.firstLineIndentInches ? `text-indent: ${ms.firstLineIndentInches}in;` : ""
-    } ${ms.paragraphSpacingPt ? `margin: 0 0 ${ms.paragraphSpacingPt}pt 0;` : ""} }
+    } ${MANUSCRIPT_PRESETS[manuscriptPreset].paragraphSpacingPt ? `margin: 0 0 ${MANUSCRIPT_PRESETS[manuscriptPreset].paragraphSpacingPt}pt 0;` : ""} }
       h2.chapter { ${ms.chapterStartsOnNewPage ? "page-break-before: always;" : ""} text-align:center; margin: 0 0 1em 0; font-weight: bold; color:#fff; }
     `;
 
@@ -560,7 +556,7 @@ export default function Publishing(): JSX.Element {
     `;
 
     return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${meta.title}</title><style>${css}</style></head><body>${titleBlock}${front}${toc}${chapterized}${back}</body></html>`;
-  }, [chapters, matter, meta, ms, pf, lineHeight]);
+  }, [chapters, matter, meta, ms, pf, lineHeight, manuscriptPreset]);
 
   // ---- Proof (basic heuristics) ----
   const [proofResults, setProofResults] = useState<string[]>([]);
@@ -596,7 +592,6 @@ export default function Publishing(): JSX.Element {
     }, 250);
   };
 
-  // XHTML (EPUB-readable) export
   const exportEPUBXHTML = (): void => {
     const xhtmlParts = [
       '<?xml version="1.0" encoding="UTF-8"?>',
@@ -628,7 +623,6 @@ export default function Publishing(): JSX.Element {
     URL.revokeObjectURL(a.href);
   };
 
-  // True .epub packager (requires jszip in deps)
   async function exportEPUB(): Promise<void> {
     const JSZip = (await import("jszip")).default;
 
@@ -919,7 +913,6 @@ export default function Publishing(): JSX.Element {
 
     const sectionChildren: any[] = [];
 
-    // Title page
     sectionChildren.push(
       new Paragraph({
         text: meta.title,
@@ -934,7 +927,6 @@ export default function Publishing(): JSX.Element {
       new Paragraph({ text: `${meta.year}`, alignment: AlignmentType.CENTER })
     );
 
-    // Front matter simple blocks
     const fmBlocks = [
       `© ${meta.year} ${meta.author}. All rights reserved.`,
       matter.dedication && `Dedication\n${matter.dedication}`,
@@ -950,7 +942,6 @@ export default function Publishing(): JSX.Element {
         });
     });
 
-    // TOC (plain text for docx)
     if (matter.toc && pf.showTOCInEbook) {
       sectionChildren.push(new Paragraph({ text: "" }));
       sectionChildren.push(
@@ -974,7 +965,6 @@ export default function Publishing(): JSX.Element {
       return t;
     }
 
-    // Chapters with page breaks
     chapters
       .filter((c) => c.included)
       .forEach((c, idx) => {
@@ -1009,7 +999,6 @@ export default function Publishing(): JSX.Element {
         });
       });
 
-    // Back matter
     const bmBlocks = [
       matter.acknowledgments && `Acknowledgments\n${matter.acknowledgments}`,
       matter.aboutAuthor && `About the Author\n${matter.aboutAuthor}`,
@@ -1038,8 +1027,8 @@ export default function Publishing(): JSX.Element {
 
   // ---- UI ----
   return (
-    <PageShell style={styles.page}>
-      {/* Header bar (gradient + logo + back + title + book icon) */}
+    <div style={styles.page}>
+      {/* Header bar (gradient + back + favicon + title + book icon) */}
       <div
         style={{
           background:
@@ -1057,9 +1046,10 @@ export default function Publishing(): JSX.Element {
             paddingBottom: 16,
           }}
         >
-          {/* Back */}
           <button
-            onClick={() => (window.history.length > 1 ? window.history.back() : (window.location.href = "/"))}
+            onClick={() =>
+              window.history.length > 1 ? window.history.back() : (window.location.href = "/")
+            }
             style={{ ...styles.lightBtn, padding: "8px 10px" }}
             aria-label="Go back"
             title="Go back"
@@ -1067,7 +1057,6 @@ export default function Publishing(): JSX.Element {
             ◀ Back
           </button>
 
-          {/* Icon (tries favicon, falls back to emoji) */}
           <img
             src="/favicon.ico"
             alt="site icon"
@@ -1080,7 +1069,6 @@ export default function Publishing(): JSX.Element {
           />
           <div aria-hidden style={{ fontSize: 20, marginLeft: -8 }}>📚</div>
 
-          {/* Title */}
           <div style={{ flex: 1 }}>
             <div style={{ color: theme.text, fontSize: 18, fontWeight: 700 }}>
               Publishing Suite
@@ -1269,7 +1257,7 @@ export default function Publishing(): JSX.Element {
                 </div>
               </div>
 
-              {/* Line spacing buttons (works!) */}
+              {/* Line spacing buttons */}
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 <span style={styles.label}>Line Spacing</span>
                 <div style={{ display: "flex", gap: 8 }}>
@@ -1661,6 +1649,6 @@ export default function Publishing(): JSX.Element {
           </div>
         </div>
       </div>
-    </PageShell>
+    </div>
   );
 }
