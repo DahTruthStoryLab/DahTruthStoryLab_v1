@@ -1,4 +1,4 @@
-// src/pages/PublishingClean.tsx
+// src/pages/Publishing.tsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import PageShell from "../components/layout/PageShell";
