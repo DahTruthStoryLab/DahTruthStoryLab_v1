@@ -1,32 +1,14 @@
-// src/pages/Publishing.tsx
-import { useMemo, useRef, useState } from "react";
+/// src/pages/Publishing.tsx
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import PageShell from "../components/layout/PageShell";
-import AeroBanner from "../components/layout/AeroBanner";
-
-// (stub your steps or import them)
-const STEPS = [{ key: "builder" }, { key: "review" }, { key: "publish" }];
-
-export default function Publishing() {
-  const [step, setStep] = useState("builder");
-  const stepIndex = STEPS.findIndex((s) => s.key === step);
-  const goNext = () => setStep(STEPS[Math.min(stepIndex + 1, STEPS.length - 1)].key);
-  const goBack = () => setStep(STEPS[Math.max(stepIndex - 1, 0)].key);
-
-  return (
-    <div>
-      <h1>Publishing</h1>
-      <p>Step: {step}</p>
-      <button onClick={goBack} disabled={stepIndex === 0}>Back</button>
-      <button onClick={goNext} disabled={stepIndex === STEPS.length - 1}>Next</button>
-    </div>
-  );
-}
 
 /**
  * Publishing Suite (StoryLab)
- * - Page breaks per chapter in preview/print (browser)
- * - True headers/footers + page numbers in DOCX export
- * - Presets for manuscript standards and platforms
+ * - Live HTML preview with chapter page breaks
+ * - DOCX export with headers/footers + page numbers
+ * - EPUB and XHTML exports
+ * - Basic “AI-ish” proof checks (local heuristics)
+ * - Presets for manuscript & platform
  */
 
 // ---- Types ----
@@ -62,16 +44,16 @@ type PlatformPresetKey =
   | "Draft2Digital_Ebook"
   | "Generic_Manuscript_Submission";
 
-// ---- Theme ----
+// ---- Theme (neutral; you can swap these to match your brand) ----
 const theme = {
-  bg: "#F6FAFF",
-  surface: "rgba(255,255,255,0.75)",
-  border: "rgba(10,37,64,0.10)",
-  text: "#0A2540",
-  subtext: "#5B6B7C",
-  accent: "#1F3A5F",
-  highlight: "#EAF2FB",
-  primary: "#0A2540",
+  bg: "#0b1220",             // deep page background
+  surface: "rgba(255,255,255,0.06)",
+  border: "rgba(255,255,255,0.12)",
+  text: "#E6EDF7",
+  subtext: "#9FB0C3",
+  accent: "#94A3B8",
+  highlight: "rgba(148,163,184,0.18)",
+  primary: "#E6EDF7",
   white: "#FFFFFF",
 };
 
@@ -90,8 +72,8 @@ function Toggle({
         width: 48,
         height: 24,
         borderRadius: 999,
-        background: checked ? theme.accent : "#CBD5E1",
-        border: "none",
+        background: checked ? theme.accent : "#233044",
+        border: `1px solid ${theme.border}`,
         position: "relative",
         cursor: "pointer",
       }}
@@ -139,7 +121,7 @@ function Field({
           padding: 10,
           border: `1px solid ${theme.border}`,
           borderRadius: 12,
-          background: theme.white,
+          background: "rgba(10,16,28,0.6)",
           color: theme.text,
         }}
       />
@@ -175,9 +157,9 @@ const MANUSCRIPT_PRESETS: Record<
     label: string;
     fontFamily: string;
     fontSizePt: number;
-    lineHeight: number; // 2.0 double, 1.5 etc.
-    firstLineIndentInches: number; // 0.5 typical
-    paragraphSpacingPt: number; // space after paragraph
+    lineHeight: number; // default for preset (we can override)
+    firstLineIndentInches: number;
+    paragraphSpacingPt: number;
     align: "left" | "justify";
     chapterTitleCase: "UPPER" | "Capitalize" | "AsIs";
     chapterStartsOnNewPage: boolean;
@@ -235,13 +217,7 @@ const PLATFORM_PRESETS: Record<
   {
     label: string;
     trim?: { widthInch: number; heightInch: number } | null;
-    margins: {
-      top: number;
-      right: number;
-      bottom: number;
-      left: number;
-      gutter?: number;
-    };
+    margins: { top: number; right: number; bottom: number; left: number; gutter?: number };
     headers: boolean;
     footers: boolean;
     pageNumbers: boolean;
@@ -314,64 +290,75 @@ const PLATFORM_PRESETS: Record<
 };
 
 // ---- Styles ----
+type CSS = React.CSSProperties;
 const styles = {
+  page: { background: theme.bg, minHeight: "100vh" } as CSS,
+
   sectionShell: {
     maxWidth: 1120,
     margin: "0 auto",
     padding: "20px 24px",
-  } as React.CSSProperties,
+  } as CSS,
+
   glassCard: {
     background: theme.surface,
     border: `1px solid ${theme.border}`,
     borderRadius: 16,
     padding: 20,
-    boxShadow: "0 8px 30px rgba(2,20,40,.08)",
-    backdropFilter: "blur(6px)",
-  } as React.CSSProperties,
-  label: { fontSize: 12, color: theme.subtext } as React.CSSProperties,
+    boxShadow: "0 8px 30px rgba(2,20,40,.25)",
+    backdropFilter: "blur(8px)",
+  } as CSS,
+
+  label: { fontSize: 12, color: theme.subtext } as CSS,
+
   input: {
     border: `1px solid ${theme.border}`,
     borderRadius: 12,
     padding: "10px 12px",
     fontSize: 14,
     width: "100%",
-    background: theme.white,
+    background: "rgba(10,16,28,0.6)",
     color: theme.text,
-  } as React.CSSProperties,
+  } as CSS,
+
   lightBtn: {
     padding: "10px 14px",
     borderRadius: 12,
     border: `1px solid ${theme.border}`,
-    background: theme.white,
+    background: "rgba(17,24,39,0.6)",
     color: theme.text,
     cursor: "pointer",
-  } as React.CSSProperties,
+  } as CSS,
+
   primaryBtn: {
     padding: "10px 14px",
     borderRadius: 12,
     border: "none",
-    background: theme.accent,
+    background: "#3B82F6",
     color: theme.white,
     cursor: "pointer",
-  } as React.CSSProperties,
+  } as CSS,
+
   darkBtn: {
     padding: "10px 14px",
     borderRadius: 12,
     border: "none",
-    background: theme.primary,
+    background: "#111827",
     color: theme.white,
     cursor: "pointer",
-  } as React.CSSProperties,
+  } as CSS,
+
   preview: {
     border: `1px solid ${theme.border}`,
     borderRadius: 12,
     padding: 16,
-    background: theme.bg,
+    background: "rgba(8,12,22,0.5)",
     height: 360,
     overflow: "auto",
-  } as React.CSSProperties,
+  } as CSS,
 };
 
+// ---- Steps ----
 const STEPS: { key: StepKey; label: string }[] = [
   { key: "builder", label: "Manuscript Builder" },
   { key: "proof", label: "Proof & Consistency" },
@@ -383,11 +370,10 @@ const STEPS: { key: StepKey; label: string }[] = [
 export default function Publishing(): JSX.Element {
   const [step, setStep] = useState<StepKey>("builder");
   const stepIndex = STEPS.findIndex((s) => s.key === step);
-  const goNext = () =>
-    setStep(STEPS[Math.min(stepIndex + 1, STEPS.length - 1)].key);
+  const goNext = () => setStep(STEPS[Math.min(stepIndex + 1, STEPS.length - 1)].key);
   const goBack = () => setStep(STEPS[Math.max(stepIndex - 1, 0)].key);
 
-  // a11y tabs: refs + keyboard nav
+  // a11y tabs
   const tabRefs = useRef<HTMLButtonElement[]>([]);
   function onKeyDownTabs(e: React.KeyboardEvent<HTMLDivElement>) {
     const current = STEPS.findIndex((s) => s.key === step);
@@ -404,6 +390,7 @@ export default function Publishing(): JSX.Element {
     }
   }
 
+  // Meta + sample content
   const [meta, setMeta] = useState<Meta>({
     title: "Working Title",
     author: "Your Name",
@@ -449,9 +436,12 @@ export default function Publishing(): JSX.Element {
   const [platformPreset, setPlatformPreset] =
     useState<PlatformPresetKey>("Generic_Manuscript_Submission");
 
-  // Derived preset objects
+  // Derived preset objects + line-height override that actually re-renders
   const ms = MANUSCRIPT_PRESETS[manuscriptPreset];
   const pf = PLATFORM_PRESETS[platformPreset];
+  const [lineHeight, setLineHeight] = useState<number>(ms.lineHeight);
+  useEffect(() => setLineHeight(ms.lineHeight), [manuscriptPreset]); // reset when preset changes
+
   const includeHeadersFooters = pf.headers || pf.footers;
 
   // Compile plain text
@@ -481,7 +471,7 @@ export default function Publishing(): JSX.Element {
     // Chapters
     chapters.forEach((c) => {
       if (!c.included) return;
-      const txt = ms.lineHeight >= 2 ? c.text.replaceAll(" ", "  ") : c.text;
+      const txt = lineHeight >= 2 ? c.text.replaceAll(" ", "  ") : c.text;
       parts.push("\n\n" + c.title + "\n" + txt);
     });
 
@@ -493,7 +483,7 @@ export default function Publishing(): JSX.Element {
     if (matter.notes) parts.push("\n\nNotes\n" + matter.notes);
 
     return parts.join("\n").trim();
-  }, [chapters, matter, meta, ms.lineHeight]);
+  }, [chapters, matter, meta, lineHeight]);
 
   const wordCount = useMemo(
     () => compiled.split(/\s+/).filter(Boolean).length,
@@ -557,22 +547,22 @@ export default function Publishing(): JSX.Element {
 
     const css = `
       @page { margin: ${pf.margins.top}in ${pf.margins.right}in ${pf.margins.bottom}in ${pf.margins.left}in; }
-      body { font-family: ${ms.fontFamily}; font-size: ${ms.fontSizePt}pt; margin: 0; line-height: ${ms.lineHeight}; color: #111; }
+      body { font-family: ${ms.fontFamily}; font-size: ${ms.fontSizePt}pt; margin: 0; line-height: ${lineHeight}; color: #E5E7EB; background:#0b1220;}
       p { orphans: 3; widows: 3; ${ms.align === "justify" ? "text-align: justify;" : ""} ${
       ms.firstLineIndentInches ? `text-indent: ${ms.firstLineIndentInches}in;` : ""
     } ${ms.paragraphSpacingPt ? `margin: 0 0 ${ms.paragraphSpacingPt}pt 0;` : ""} }
-      h2.chapter { ${ms.chapterStartsOnNewPage ? "page-break-before: always;" : ""} text-align:center; margin: 0 0 1em 0; font-weight: bold; }
+      h2.chapter { ${ms.chapterStartsOnNewPage ? "page-break-before: always;" : ""} text-align:center; margin: 0 0 1em 0; font-weight: bold; color:#fff; }
     `;
 
     const titleBlock = `
-      <div style="text-align:center; font-size:${ms.fontSizePt + 4}pt; font-weight:bold; margin-bottom: 1.5em;">${meta.title}</div>
-      <div style="text-align:center; margin-bottom: 2em;">by ${meta.author} • ${meta.year}</div>
+      <div style="text-align:center; font-size:${ms.fontSizePt + 4}pt; font-weight:bold; margin-bottom: 1.5em; color:#fff;">${meta.title}</div>
+      <div style="text-align:center; margin-bottom: 2em; color:#CBD5E1;">by ${meta.author} • ${meta.year}</div>
     `;
 
     return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${meta.title}</title><style>${css}</style></head><body>${titleBlock}${front}${toc}${chapterized}${back}</body></html>`;
-  }, [compiled, chapters, matter, meta, ms, pf]);
+  }, [chapters, matter, meta, ms, pf, lineHeight]);
 
-  // ---- Proof (basic) ----
+  // ---- Proof (basic heuristics) ----
   const [proofResults, setProofResults] = useState<string[]>([]);
   function runGrammarChecks() {
     const issues: string[] = [];
@@ -586,6 +576,10 @@ export default function Publishing(): JSX.Element {
       .filter((p) => p.split(/\s+/).length > 250).length;
     if (longParas)
       issues.push(`${longParas} very long paragraph(s); consider breaking up.`);
+    // “AI-ish” extra checks
+    const repeated = (compiled.match(/\b(\w+)\b(?=.*\b\1\b)/gi) || [])
+      .map((w) => w.toLowerCase());
+    if (new Set(repeated).size > 20) issues.push("Many repeated words; review variety.");
     setProofResults(issues.length ? issues : ["No basic issues found."]);
   }
 
@@ -599,7 +593,7 @@ export default function Publishing(): JSX.Element {
     setTimeout(() => {
       w.focus();
       w.print();
-    }, 200);
+    }, 250);
   };
 
   // XHTML (EPUB-readable) export
@@ -613,9 +607,7 @@ export default function Publishing(): JSX.Element {
       "  <title>" + escapeXML(meta.title) + "</title>",
       '  <meta name="author" content="' + escapeXML(meta.author) + '"/>',
       "  <style>",
-      "    body { font-family: serif; margin:1em; line-height:" +
-        (ms.lineHeight || 1.45) +
-        "; }",
+      "    body { font-family: serif; margin:1em; line-height:" + (lineHeight || 1.45) + "; }",
       "    p { margin: 0 0 1em 0; }",
       "  </style>",
       "</head>",
@@ -636,7 +628,7 @@ export default function Publishing(): JSX.Element {
     URL.revokeObjectURL(a.href);
   };
 
-  // True .epub packager
+  // True .epub packager (requires jszip in deps)
   async function exportEPUB(): Promise<void> {
     const JSZip = (await import("jszip")).default;
 
@@ -722,7 +714,7 @@ export default function Publishing(): JSX.Element {
     if (matter.notes) backBits.push("<h2>Notes</h2>" + para(matter.notes));
     const backXhtml = makeXhtml("Back Matter", backBits.join("\n"));
 
-    // nav.xhtml (TOC)
+    // nav.xhtml
     const navXhtml = [
       '<?xml version="1.0" encoding="utf-8"?>',
       "<!DOCTYPE html>",
@@ -741,7 +733,7 @@ export default function Publishing(): JSX.Element {
       "</html>",
     ].join("\n");
 
-    // OPF manifest & spine
+    // OPF
     const manifestItems = [
       { id: "title", href: "title.xhtml", mediaType: "application/xhtml+xml" },
       { id: "front", href: "front.xhtml", mediaType: "application/xhtml+xml" },
@@ -764,7 +756,7 @@ export default function Publishing(): JSX.Element {
 
     const css =
       "body{font-family:serif;line-height:" +
-      (ms.lineHeight || 1.45) +
+      (lineHeight || 1.45) +
       ";margin:1em;} h1,h2{text-align:center} p{margin:0 0 1em 0;}";
 
     const uid =
@@ -840,7 +832,7 @@ export default function Publishing(): JSX.Element {
     URL.revokeObjectURL(a.href);
   }
 
-  // DOCX with headers/footers & page numbers
+  // DOCX with headers/footers & page numbers (requires docx + file-saver)
   async function exportDOCX() {
     const { saveAs } = await import("file-saver");
     const docx = await import("docx");
@@ -866,9 +858,7 @@ export default function Publishing(): JSX.Element {
             top: convertInchesToTwip(pf.margins.top),
             right: convertInchesToTwip(pf.margins.right),
             bottom: convertInchesToTwip(pf.margins.bottom),
-            left: convertInchesToTwip(
-              (pf.margins.left || 1) + (pf.margins.gutter || 0)
-            ),
+            left: convertInchesToTwip((pf.margins.left || 1) + (pf.margins.gutter || 0)),
             gutter: convertInchesToTwip(pf.margins.gutter || 0),
           },
           size: pf.trim
@@ -921,7 +911,7 @@ export default function Publishing(): JSX.Element {
         default: {
           document: {
             run: { font: ms.fontFamily, size: ms.fontSizePt * 2 },
-            paragraph: { spacing: { line: Math.round(ms.lineHeight * 240) } },
+            paragraph: { spacing: { line: Math.round(lineHeight * 240) } },
           },
         },
       },
@@ -960,7 +950,7 @@ export default function Publishing(): JSX.Element {
         });
     });
 
-    // TOC (plain text)
+    // TOC (plain text for docx)
     if (matter.toc && pf.showTOCInEbook) {
       sectionChildren.push(new Paragraph({ text: "" }));
       sectionChildren.push(
@@ -991,9 +981,7 @@ export default function Publishing(): JSX.Element {
         if (ms.chapterStartsOnNewPage || idx === 0) {
           sectionChildren.push(new Paragraph({}));
           if (idx > 0)
-            sectionChildren.push(
-              new Paragraph({ children: [], pageBreakBefore: true })
-            );
+            sectionChildren.push(new Paragraph({ children: [], pageBreakBefore: true }));
         }
         sectionChildren.push(
           new Paragraph({
@@ -1015,7 +1003,7 @@ export default function Publishing(): JSX.Element {
                   ? convertInchesToTwip(ms.firstLineIndentInches)
                   : 0,
               },
-              spacing: { after: ms.paragraphSpacingPt * 20 },
+              spacing: { after: MANUSCRIPT_PRESETS[manuscriptPreset].paragraphSpacingPt * 20 },
             })
           );
         });
@@ -1050,12 +1038,59 @@ export default function Publishing(): JSX.Element {
 
   // ---- UI ----
   return (
-    <PageShell style={{ background: theme.bg, minHeight: "100vh" }}>
-      <AeroBanner
-        size="md"
-        title="Publishing Suite"
-        subtitle="Presets • Page Breaks • Headers & Footers"
-      />
+    <PageShell style={styles.page}>
+      {/* Header bar (gradient + logo + back + title + book icon) */}
+      <div
+        style={{
+          background:
+            "linear-gradient(135deg, rgba(2,6,23,0.9) 0%, rgba(15,23,42,0.9) 60%, rgba(2,6,23,0.9) 100%)",
+          borderBottom: `1px solid ${theme.border}`,
+        }}
+      >
+        <div
+          style={{
+            ...styles.sectionShell,
+            display: "flex",
+            alignItems: "center",
+            gap: 16,
+            paddingTop: 16,
+            paddingBottom: 16,
+          }}
+        >
+          {/* Back */}
+          <button
+            onClick={() => (window.history.length > 1 ? window.history.back() : (window.location.href = "/"))}
+            style={{ ...styles.lightBtn, padding: "8px 10px" }}
+            aria-label="Go back"
+            title="Go back"
+          >
+            ◀ Back
+          </button>
+
+          {/* Icon (tries favicon, falls back to emoji) */}
+          <img
+            src="/favicon.ico"
+            alt="site icon"
+            width={24}
+            height={24}
+            onError={(e) => {
+              (e.currentTarget as HTMLImageElement).style.display = "none";
+            }}
+            style={{ borderRadius: 6 }}
+          />
+          <div aria-hidden style={{ fontSize: 20, marginLeft: -8 }}>📚</div>
+
+          {/* Title */}
+          <div style={{ flex: 1 }}>
+            <div style={{ color: theme.text, fontSize: 18, fontWeight: 700 }}>
+              Publishing Suite
+            </div>
+            <div style={{ color: theme.subtext, fontSize: 13 }}>
+              Presets • Page Breaks • Headers & Footers
+            </div>
+          </div>
+        </div>
+      </div>
 
       <div style={{ ...styles.sectionShell }}>
         {/* Tabs */}
@@ -1093,25 +1128,14 @@ export default function Publishing(): JSX.Element {
                   border: isActive
                     ? `2px solid ${theme.accent}`
                     : `2px solid ${theme.border}`,
-                  background: isActive ? theme.highlight : theme.white,
+                  background: isActive ? theme.highlight : "rgba(14,21,34,0.6)",
                   color: isActive ? theme.primary : theme.subtext,
                   fontWeight: isActive ? 700 : 500,
                   cursor: "pointer",
                   whiteSpace: "nowrap",
                   fontSize: 14,
                   outline: "none",
-                  boxShadow: isActive
-                    ? "0 1px 0 rgba(0,0,0,0.04) inset"
-                    : "none",
-                }}
-                onFocus={(e) => {
-                  e.currentTarget.style.boxShadow =
-                    "0 0 0 3px rgba(31,58,95,0.25)";
-                }}
-                onBlur={(e) => {
-                  e.currentTarget.style.boxShadow = isActive
-                    ? "0 1px 0 rgba(0,0,0,0.04) inset"
-                    : "none";
+                  boxShadow: isActive ? "0 1px 0 rgba(0,0,0,0.04) inset" : "none",
                 }}
               >
                 <span aria-hidden="true" style={{ marginRight: 8 }}>
@@ -1224,13 +1248,12 @@ export default function Publishing(): JSX.Element {
                   ))}
                 </select>
               </div>
+
               <div style={{ minWidth: 260 }}>
                 <div style={styles.label}>Platform Preset</div>
                 <select
                   value={platformPreset}
-                  onChange={(e) =>
-                    setPlatformPreset(e.target.value as PlatformPresetKey)
-                  }
+                  onChange={(e) => setPlatformPreset(e.target.value as PlatformPresetKey)}
                   style={{ ...styles.input, height: 40 }}
                 >
                   {Object.entries(PLATFORM_PRESETS).map(([k, v]) => (
@@ -1245,18 +1268,40 @@ export default function Publishing(): JSX.Element {
                     : "Headers/footers disabled for this platform (typical for eBooks)."}
                 </div>
               </div>
+
+              {/* Line spacing buttons (works!) */}
               <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                <span style={styles.label}>Double Spacing</span>
-                <Toggle
-                  checked={ms.lineHeight >= 2}
-                  onChange={() => {
-                    const alt = {
-                      ...MANUSCRIPT_PRESETS[manuscriptPreset],
-                      lineHeight: ms.lineHeight >= 2 ? 1.5 : 2.0,
-                    } as any;
-                    (MANUSCRIPT_PRESETS as any)[manuscriptPreset] = alt;
-                  }}
-                />
+                <span style={styles.label}>Line Spacing</span>
+                <div style={{ display: "flex", gap: 8 }}>
+                  <button
+                    style={{
+                      ...styles.lightBtn,
+                      padding: "8px 10px",
+                      border:
+                        lineHeight < 2
+                          ? "2px solid #3B82F6"
+                          : `1px solid ${theme.border}`,
+                    }}
+                    onClick={() => setLineHeight(1.5)}
+                    aria-pressed={lineHeight < 2}
+                  >
+                    Single (1.5)
+                  </button>
+                  <button
+                    style={{
+                      ...styles.lightBtn,
+                      padding: "8px 10px",
+                      border:
+                        lineHeight >= 2
+                          ? "2px solid #3B82F6"
+                          : `1px solid ${theme.border}`,
+                    }}
+                    onClick={() => setLineHeight(2.0)}
+                    aria-pressed={lineHeight >= 2}
+                  >
+                    Double (2.0)
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -1357,7 +1402,7 @@ export default function Publishing(): JSX.Element {
                   Proof & Consistency
                 </h3>
                 <p style={{ color: theme.subtext, fontSize: 14 }}>
-                  Local quick checks; wire to deeper services later.
+                  Local quick checks; deeper AI checks can be wired later.
                 </p>
                 <div
                   style={{
@@ -1371,13 +1416,13 @@ export default function Publishing(): JSX.Element {
                     Grammar Check
                   </button>
                   <button style={styles.lightBtn} onClick={runGrammarChecks}>
-                    Style Analysis
+                    Style Analysis (beta)
                   </button>
                   <button style={styles.lightBtn} onClick={runGrammarChecks}>
-                    Character Consistency
+                    Character Consistency (beta)
                   </button>
                   <button style={styles.lightBtn} onClick={runGrammarChecks}>
-                    Timeline Validation
+                    Timeline Validation (beta)
                   </button>
                   <button style={styles.primaryBtn} onClick={runGrammarChecks}>
                     Run All Checks
@@ -1431,7 +1476,7 @@ export default function Publishing(): JSX.Element {
                   }}
                 >
                   <button style={styles.lightBtn} onClick={exportPDF}>
-                    📄 Export PDF
+                    📄 Export PDF (Print Dialog)
                   </button>
                   <button style={styles.lightBtn} onClick={exportDOCX}>
                     📝 Export DOCX
@@ -1520,7 +1565,7 @@ export default function Publishing(): JSX.Element {
                     border: `1px solid ${theme.border}`,
                     borderRadius: 12,
                     padding: 14,
-                    background: c.included ? theme.white : "#F9FBFD",
+                    background: c.included ? "rgba(12,18,32,0.6)" : "#0E1726",
                   }}
                 >
                   <div
@@ -1564,6 +1609,8 @@ export default function Publishing(): JSX.Element {
                               return next;
                             })
                           }
+                          title="Move up"
+                          aria-label="Move chapter up"
                         >
                           ↑
                         </button>
@@ -1578,6 +1625,8 @@ export default function Publishing(): JSX.Element {
                               return next;
                             })
                           }
+                          title="Move down"
+                          aria-label="Move chapter down"
                         >
                           ↓
                         </button>
