@@ -2,6 +2,8 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import PageShell from "../components/layout/PageShell";
+import AeroBanner from "../components/layout/AeroBanner";
+
 
 // ---------- Theme via CSS variables (from your brand.css) ----------
 const theme = {
