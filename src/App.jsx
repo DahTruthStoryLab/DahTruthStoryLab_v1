@@ -8,7 +8,7 @@ import {
   useLocation,
   Navigate,
 } from "react-router-dom";
- 
+
 /* =========================
    Lazy-loaded pages
    ========================= */
@@ -33,14 +33,11 @@ const Clothesline          = lazy(() => import("./components/storylab/Clotheslin
 const HopesFearsLegacy     = lazy(() => import("./components/storylab/HopesFearsLegacy"));
 const WorkshopCohort       = lazy(() => import("./components/storylab/WorkshopCohort.jsx"));
 
-// Publishing (use the clean page)
+// Publishing (keep the .tsx path since your page is TSX)
 const Publishing           = lazy(() => import("./pages/Publishing.tsx"));
 
-
-
-// Profile (commented out to avoid build break if file is missing)
-const Profile = lazy(() => import("./components/Profile"));
-
+// Profile — leave commented out unless the file definitely exists
+// const Profile = lazy(() => import("./components/Profile"));
 
 /* =========================
    Global UI helpers
@@ -118,7 +115,7 @@ export default function App() {
             }
           />
 
-          {/* Writer */}
+          {/* Writer/Writing (all point to WriteSection) */}
           <Route
             path="/writer"
             element={
@@ -129,6 +126,14 @@ export default function App() {
           />
           <Route
             path="/write"
+            element={
+              <ProtectedRoute>
+                <WriteSection />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/writing"
             element={
               <ProtectedRoute>
                 <WriteSection />
@@ -248,7 +253,7 @@ export default function App() {
             }
           />
 
-          {/* Profile — uncomment if ./components/Profile exists */}
+          {/* Profile — uncomment route + import only if the file exists */}
           {/*
           <Route
             path="/profile"
@@ -260,26 +265,24 @@ export default function App() {
           />
           */}
 
-         {/* Main Publishing route */}
-         <Route
-           path="/publishing"
-           element={
-             <ProtectedRoute>
-               <Publishing />
-             </ProtectedRoute>
+          {/* Main Publishing route */}
+          <Route
+            path="/publishing"
+            element={
+              <ProtectedRoute>
+                <Publishing />
+              </ProtectedRoute>
             }
           />
 
-      {/* Redirects (short/legacy paths) */}
-      <Route path="/publish" element={<Navigate to="/publishing" replace />} />
-      <Route path="/publishing-suite" element={<Navigate to="/publishing" replace />} />
-      <Route path="/storylab/publishing" element={<Navigate to="/publishing" replace />} />
-      
-      {/* (Optional) catch subpaths like /publish/foo */}
-      <Route path="/publish/*" element={<Navigate to="/publishing" replace />} />
-      <Route path="/publishing-suite/*" element={<Navigate to="/publishing" replace />} />
-      <Route path="/storylab/publishing/*" element={<Navigate to="/publishing" replace />} />
-
+          {/* Redirects (short/legacy paths) */}
+          <Route path="/publish" element={<Navigate to="/publishing" replace />} />
+          <Route path="/publishing-suite" element={<Navigate to="/publishing" replace />} />
+          <Route path="/storylab/publishing" element={<Navigate to="/publishing" replace />} />
+          {/* (Optional) catch subpaths like /publish/foo */}
+          <Route path="/publish/*" element={<Navigate to="/publishing" replace />} />
+          <Route path="/publishing-suite/*" element={<Navigate to="/publishing" replace />} />
+          <Route path="/storylab/publishing/*" element={<Navigate to="/publishing" replace />} />
 
           {/* Misc */}
           <Route
