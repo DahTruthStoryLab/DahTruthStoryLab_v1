@@ -4,12 +4,10 @@ import { useNavigate } from "react-router-dom";
 import PageShell from "../components/layout/PageShell.tsx";
 import AeroBanner from "../components/layout/AeroBanner.tsx";
 
-
-
-// ---------- Theme via CSS variables (from your brand.css) ----------
+/* ---------- Theme via CSS variables (from your brand.css) ---------- */
 const theme = {
   bg: "var(--brand-bg)",
-  surface: "var(--brand-white)", // or a semi-transparent if you like glass
+  surface: "var(--brand-white)",
   border: "var(--brand-border)",
   borderStrong: "var(--brand-border-strong)",
   text: "var(--brand-text)",
@@ -20,7 +18,7 @@ const theme = {
   white: "var(--brand-white)",
 };
 
-// ---------- Types ----------
+/* ---------- Types ---------- */
 type StepKey = "builder" | "proof" | "format" | "export" | "prep";
 
 type Chapter = { id: string; title: string; included: boolean; text: string };
@@ -53,7 +51,7 @@ type PlatformPresetKey =
   | "Draft2Digital_Ebook"
   | "Generic_Manuscript_Submission";
 
-// ---------- Presets ----------
+/* ---------- Presets ---------- */
 const MANUSCRIPT_PRESETS: Record<
   ManuscriptPresetKey,
   {
@@ -191,7 +189,7 @@ const PLATFORM_PRESETS: Record<
   },
 };
 
-// ---------- Styles ----------
+/* ---------- Styles ---------- */
 const styles = {
   outer: {
     maxWidth: 1200,
@@ -255,7 +253,7 @@ const styles = {
   } as React.CSSProperties,
 };
 
-// ---------- Small UI helpers ----------
+/* ---------- Small UI helpers ---------- */
 function Toggle({
   checked,
   onChange,
@@ -344,20 +342,12 @@ function Field({
   );
 }
 
-// ---------- Helpers ----------
+/* ---------- Helpers ---------- */
 function safeFile(name: string): string {
   return (name || "manuscript").replace(/[^\w\-]+/g, "_");
 }
-function escapeXML(s: string): string {
-  return s
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&apos;");
-}
 
-// ---------- Component ----------
+/* ---------- Component ---------- */
 const STEPS: { key: StepKey; label: string }[] = [
   { key: "builder", label: "Manuscript Builder" },
   { key: "proof", label: "Proof & Consistency" },
@@ -435,9 +425,11 @@ export default function Publishing(): JSX.Element {
     useState<ManuscriptPresetKey>("Agents_Standard_12pt_TNR_Double");
   const [platformPreset, setPlatformPreset] =
     useState<PlatformPresetKey>("Generic_Manuscript_Submission");
-  const [msOverrides, setMsOverrides] = useState<Partial<(typeof MANUSCRIPT_PRESETS)[ManuscriptPresetKey]>>({});
+  const [msOverrides, setMsOverrides] = useState<
+    Partial<(typeof MANUSCRIPT_PRESETS)[ManuscriptPresetKey]>
+  >({});
 
-  // keep overrides sane when switching presets (e.g., reset lineHeight to chosen preset)
+  // keep overrides sane when switching presets (reset lineHeight to chosen preset)
   useEffect(() => {
     setMsOverrides((prev) => ({
       ...prev,
@@ -552,7 +544,7 @@ export default function Publishing(): JSX.Element {
     return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${meta.title}</title><style>${css}</style></head><body>${titleBlock}${front}${toc}${chapterized}${back}</body></html>`;
   }, [chapters, matter, meta, ms, pf]);
 
-  // ---------- Proof helpers ----------
+  /* ---------- Proof helpers ---------- */
   const [proofResults, setProofResults] = useState<string[]>([]);
   const [aiBusy, setAiBusy] = useState(false);
 
@@ -570,19 +562,17 @@ export default function Publishing(): JSX.Element {
   // "AI" placeholder (local heuristic now; swap to your API later)
   async function runAIChecks() {
     setAiBusy(true);
-    // Local quick suggestions (safe to run offline)
     const suggestions: string[] = [];
     if (compiled.match(/\bi\b(?![a-zA-Z])/g)) suggestions.push("Pronoun 'I' should be capitalized.");
     if (compiled.match(/\s[,.!?;:]/g)) suggestions.push("Punctuation spacing: remove spaces before , . ! ? ; :");
     if (compiled.match(/\bvery\b/gi)) suggestions.push("Style: Consider replacing 'very' with stronger wording.");
     if (meta.title.length < 3) suggestions.push("Title seems short—consider something more descriptive.");
-    // Merge with local checks
     runLocalChecks();
     setProofResults((prev) => [...prev, ...suggestions]);
     setAiBusy(false);
   }
 
-  // ---------- Exports ----------
+  /* ---------- Exports ---------- */
   const exportPDF = () => {
     const w = window.open("", "_blank");
     if (!w) return;
@@ -762,7 +752,7 @@ export default function Publishing(): JSX.Element {
     URL.revokeObjectURL(a.href);
   };
 
-  // ---------- UI ----------
+  /* ---------- UI ---------- */
   return (
     <PageShell style={{ background: theme.bg, minHeight: "100vh" }}>
       <div style={styles.outer}>
@@ -832,6 +822,13 @@ export default function Publishing(): JSX.Element {
             <div />
           </div>
         </div>
+
+        {/* Optional house banner just below header */}
+        <AeroBanner
+          size="md"
+          title="Publishing Suite"
+          subtitle="Presets • Page Breaks • Headers & Footers"
+        />
 
         {/* Page body */}
         <div style={{ ...styles.inner, ...styles.sectionShell }}>
@@ -980,7 +977,7 @@ export default function Publishing(): JSX.Element {
                 </div>
               </div>
 
-              {/* Single / Double buttons – these actually update lineHeight */}
+              {/* Single / Double buttons – actually update lineHeight */}
               <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                 <span style={styles.label}>Line Spacing</span>
                 <button
