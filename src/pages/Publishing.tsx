@@ -1,8 +1,9 @@
 // src/pages/Publishing.tsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import PageShell from "../components/layout/PageShell";
-import AeroBanner from "../components/layout/AeroBanner";
+import PageShell from "../components/layout/PageShell.tsx";
+import AeroBanner from "../components/layout/AeroBanner.tsx";
+
 
 
 // ---------- Theme via CSS variables (from your brand.css) ----------
