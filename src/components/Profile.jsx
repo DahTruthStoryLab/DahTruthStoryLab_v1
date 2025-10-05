@@ -1,360 +1,326 @@
-// src/components/Profile.jsx
+// src/components/Profile.js
 import React, { useEffect, useState } from "react";
-import { loadUser, saveUser } from "../lib/userStore";
+import { useNavigate, useLocation } from "react-router-dom";
+import { User, Save, BookOpen, LogOut, Mail, Image, ArrowLeft, Home, PencilLine, BookOpen as BookIcon, Calendar as CalIcon, Layers, Store, Info } from "lucide-react";
 
-/** Simple toast notification - replaces API toasts temporarily */
-function toast({ title, description } = {}) {
-  if (title || description) {
-    console.log(`[toast] ${title || ""}${description ? " — " + description : ""}`);
-    const toastEl = document.createElement("div");
-    toastEl.className =
-      "fixed top-4 right-4 z-50 p-4 rounded-lg shadow-lg text-white max-w-sm bg-green-600";
-    toastEl.innerHTML = `
-      <div class="font-semibold">${title || ""}</div>
-      <div class="text-sm opacity-90">${description || ""}</div>
-    `;
-    document.body.appendChild(toastEl);
-    setTimeout(() => document.body.removeChild(toastEl), 3000);
+let useUserSafe = null;
+try {
+  // Works if <UserProvider> is mounted
+  // eslint-disable-next-line global-require
+  useUserSafe = require("../lib/state/userStore").useUser;
+} catch {}
+
+/* ---------- Helpers ---------- */
+const STORAGE_KEY = "dt_profile";
+
+function readProfile() {
+  try {
+    const raw =
+      localStorage.getItem(STORAGE_KEY) ||
+      localStorage.getItem("userProfile") ||
+      localStorage.getItem("profile") ||
+      localStorage.getItem("currentUser");
+    return raw ? JSON.parse(raw) : { displayName: "", email: "", bio: "", avatar: "" };
+  } catch {
+    return { displayName: "", email: "", bio: "", avatar: "" };
   }
 }
 
-// Fallback user (used only if nothing saved yet)
-const mockUser = {
-  name: "Jacqueline Session",
-  email: "jacqueline@dahtruth.com",
-  bio:
-    "Founder of DahTruth.com and creator of DahTruth StoryLab. Passionate about empowering writers to discover and share their authentic stories through faith-based community and modern technology.",
-  avatar: null,
-};
+function writeProfile(p) {
+  try {
+    const payload = JSON.stringify(p);
+    localStorage.setItem("dt_profile", payload);
+    localStorage.setItem("userProfile", payload);
+    localStorage.setItem("profile", payload);
+    localStorage.setItem("currentUser", payload);
+    window.dispatchEvent(new Event("profile:updated"));
+  } catch {}
+}
 
+/* ---------- Inline Sidebar (optional) ---------- */
+function ProfileSidebar({ onNavigate }) {
+  const { pathname } = useLocation();
+  const items = [
+    { label: "Dashboard", icon: Home, path: "/dashboard" },
+    { label: "Writer", icon: PencilLine, path: "/writer" },
+    { label: "Table of Contents", icon: BookIcon, path: "/toc" },
+    { label: "Project", icon: Layers, path: "/project" },
+    { label: "Calendar", icon: CalIcon, path: "/calendar" },
+    { label: "Store", icon: Store, path: "/store" },
+    { label: "About", icon: Info, path: "/about" },
+  ];
+
+  return (
+    <aside className="hidden lg:block w-72 flex-shrink-0">
+      <div className="glass-panel p-4 sticky top-4">
+        <div className="flex items-center gap-3 mb-4">
+          <img
+            src="/DahTruthLogo.png"
+            alt="DahTruth"
+            className="w-10 h-10 rounded-full border border-white/40"
+            onError={(e) => { e.currentTarget.style.display = "none"; }}
+          />
+          <div>
+            <div className="heading-serif text-xl">DahTruth</div>
+            <div className="text-xs text-muted -mt-0.5">StoryLab</div>
+          </div>
+        </div>
+        <nav className="space-y-1.5">
+          {items.map((it) => {
+            const active = pathname === it.path;
+            return (
+              <button
+                key={it.path}
+                onClick={() => onNavigate(it.path)}
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg border transition
+                  ${active
+                    ? "bg-[color:var(--color-primary)] border-[hsl(var(--border))] font-medium"
+                    : "bg-transparent border-transparent hover:bg-[color:var(--color-primary)]/60 hover:border-[hsl(var(--border))]"}`}
+              >
+                <it.icon size={18} className="text-[color:var(--color-ink)]/80" />
+                <span>{it.label}</span>
+              </button>
+            );
+          })}
+        </nav>
+      </div>
+    </aside>
+  );
+}
+
+/* ---------- Component ---------- */
 export default function Profile() {
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [user, setUser] = useState(null);
+  const navigate = useNavigate();
 
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [bio, setBio] = useState("");
+  // Prefer store if present
+  const store = (() => {
+    try { return useUserSafe ? useUserSafe() : null; } catch { return null; }
+  })();
 
-  const [isEditing, setIsEditing] = useState(false);
+  const initial = store?.user ?? readProfile();
 
-  // Avatar state
-  const [avatarFile, setAvatarFile] = useState(null);
-  const [avatarPreview, setAvatarPreview] = useState(null);
+  const [displayName, setDisplayName] = useState(initial.displayName || "");
+  const [email, setEmail] = useState(initial.email || "");
+  const [bio, setBio] = useState(initial.bio || "");
+  const [avatar, setAvatar] = useState(initial.avatar || ""); // base64 (optional)
+  const [lastSaved, setLastSaved] = useState(Date.now());
 
-  // Load user: prefer saved data, fall back to mock
   useEffect(() => {
-    let isMounted = true;
+    if (store?.user) {
+      setDisplayName(store.user.displayName || "");
+      setEmail(store.user.email || "");
+      setBio(store.user.bio || "");
+      setAvatar(store.user.avatar || "");
+    }
+  }, [store?.user?.displayName, store?.user?.email, store?.user?.bio, store?.user?.avatar]);
 
-    setTimeout(() => {
-      if (!isMounted) return;
-      try {
-        const stored = loadUser();
-        const base = stored || mockUser;
-        setUser(base);
-        setName(base.name || "");
-        setEmail(base.email || "");
-        setBio(base.bio || "");
-      } catch (e) {
-        console.error(e);
-        toast({
-          title: "Unable to load profile",
-          description: "Please try refreshing the page.",
-        });
-      } finally {
-        if (isMounted) setLoading(false);
-      }
-    }, 300);
-
-    return () => {
-      isMounted = false;
-      if (avatarPreview) URL.revokeObjectURL(avatarPreview);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Handle avatar change (validation + preview)
-  const onAvatarChange = async (e) => {
-    const file = e.target.files?.[0];
+  const onPickAvatar = (file) => {
     if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => setAvatar(String(reader.result || ""));
+    reader.readAsDataURL(file);
+  };
+  const removeAvatar = () => setAvatar("");
 
-    if (file.size > 5 * 1024 * 1024) {
-      toast({ title: "File too large", description: "Choose an image smaller than 5MB." });
-      return;
-    }
-    const isHeic = /\.(heic|heif)$/i.test(file.name);
-    if (isHeic) {
-      toast({
-        title: "HEIC files not supported yet",
-        description: "Please convert to JPEG or PNG first.",
-      });
-      return;
-    }
-    if (!file.type.startsWith("image/")) {
-      toast({ title: "Invalid file type", description: "Please pick an image file." });
-      return;
-    }
-
-    try {
-      if (avatarPreview) URL.revokeObjectURL(avatarPreview);
-      setAvatarFile(file);
-      setAvatarPreview(URL.createObjectURL(file));
-    } catch (err) {
-      console.error("Image processing error:", err);
-      toast({ title: "Image processing failed", description: "Try a different photo." });
-    }
+  const save = () => {
+    const next = {
+      ...(store?.user || {}),
+      displayName: displayName.trim(),
+      email: email.trim(),
+      bio,
+      avatar,
+    };
+    if (store?.setUser) store.setUser(next);
+    writeProfile(next);
+    setLastSaved(Date.now());
   };
 
-  // Save profile
-  const onSubmit = async (e) => {
-    e.preventDefault();
-    if (!user) return;
+  const authorInitial = (displayName || "A").charAt(0).toUpperCase();
 
-    setSaving(true);
-    try {
-      await new Promise((r) => setTimeout(r, 600));
-
-      let avatarUrl = user.avatar;
-      if (avatarFile) {
-        avatarUrl = avatarPreview || URL.createObjectURL(avatarFile);
-      }
-
-      const updatedUser = {
-        ...user,
-        name: name.trim(),
-        email: email.trim(),
-        bio,
-        avatar: avatarUrl,
-      };
-
-      setUser(updatedUser);
-      saveUser(updatedUser); // persist
-
-      if (avatarPreview && avatarFile) {
-        setAvatarFile(null);
-      }
-
-      try {
-        window.dispatchEvent(new CustomEvent("app:user-updated", { detail: updatedUser }));
-      } catch {}
-
-      setIsEditing(false);
-      toast({ title: "Profile updated", description: "Your profile has been saved." });
-    } catch (err) {
-      console.error(err);
-      toast({
-        title: "Error updating profile",
-        description: err instanceof Error ? err.message : "Please try again.",
-      });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const onCancel = () => {
-    if (user) {
-      setName(user.name || "");
-      setEmail(user.email || "");
-      setBio(user.bio || "");
-    }
-    setIsEditing(false);
-    if (avatarPreview) URL.revokeObjectURL(avatarPreview);
-    setAvatarPreview(null);
-    setAvatarFile(null);
-  };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-base">
-        <div className="p-6 max-w-4xl mx-auto">
-          <div className="animate-pulse space-y-6">
-            <div className="h-8 bg-black/5 rounded-lg w-1/4"></div>
-            <div className="glass-panel p-6 space-y-4">
-              <div className="flex items-center space-x-4">
-                <div className="w-20 h-20 bg-black/5 rounded-full"></div>
-                <div className="space-y-2">
-                  <div className="h-6 bg-black/5 rounded w-32"></div>
-                  <div className="h-4 bg-black/5 rounded w-48"></div>
+  return (
+    <div className="min-h-screen text-[color:var(--color-ink)] bg-[color:var(--color-base)] bg-radial-fade">
+      <div className="mx-auto max-w-7xl px-4 py-6">
+        {/* Top header with Back button */}
+        <div className="glass-panel">
+          <div className="flex items-center justify-between px-6 py-4">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => navigate("/dashboard")}
+                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-white border border-[hsl(var(--border))] hover:opacity-90"
+                title="Back to Dashboard"
+              >
+                <ArrowLeft size={16} /> Back
+              </button>
+              <div className="w-10 h-10 rounded-lg grid place-items-center bg-[color:var(--color-primary)]">
+                <User size={18} className="text-[color:var(--color-ink)]/80" />
+              </div>
+              <div>
+                <h1 className="heading-serif text-2xl">Profile</h1>
+                <div className="text-sm text-muted">
+                  {displayName ? `Signed in as ${displayName}` : "Set your author details"}
                 </div>
               </div>
             </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-base flex items-center justify-center">
-        <div className="glass-panel p-8 text-center">
-          <p className="text-muted">Unable to load profile. Please try refreshing the page.</p>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen bg-base bg-radial-fade">
-      <div className="max-w-4xl mx-auto px-6 py-10 space-y-6">
-        {/* Header */}
-        <div className="glass-panel p-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-2xl font-bold text-ink font-serif">Author Profile</h2>
-              <p className="text-muted">Manage your writing identity and personal information</p>
-            </div>
-            {!isEditing && (
-              <button
-                onClick={() => setIsEditing(true)}
-                className="btn-primary font-semibold shadow-lg px-4 py-2 rounded-lg"
-              >
-                Edit Profile
+            <div className="flex items-center gap-2">
+              <button onClick={save} className="btn-gold inline-flex items-center gap-2">
+                <Save size={16} /> Save
               </button>
-            )}
+              <button
+                onClick={() => navigate("/toc")}
+                className="btn-primary inline-flex items-center gap-2"
+              >
+                <BookOpen size={16} /> Go to TOC
+              </button>
+              <span className="text-xs text-muted hidden sm:inline">
+                Last saved {Math.round((Date.now() - lastSaved) / 60000) || 0}m ago
+              </span>
+            </div>
           </div>
         </div>
 
-        {/* Card */}
-        <div className="glass-panel rounded-2xl">
-          <div className="glass-soft rounded-t-2xl p-6 border-0">
-            <div className="text-xl text-ink font-semibold">Personal Information</div>
-            <div className="text-muted">Manage your author profile and personal information</div>
-          </div>
+        {/* Main layout with optional sidebar */}
+        <div className="mt-6 flex gap-6">
+          {/* Sidebar (shown on lg+) */}
+          <ProfileSidebar onNavigate={navigate} />
 
-          <div className="p-6 space-y-6">
-            {!isEditing ? (
-              // Display mode
-              <div className="space-y-6">
-                <div className="flex items-center space-x-6">
-                  <div className="relative">
-                    <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-white/40 ring-4 ring-white/20 shadow-xl bg-white/60">
-                      {user.avatar ? (
-                        <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <div className="w-full h-full grid place-items-center text-ink/70 font-semibold">
-                          {user.name?.split(" ").map((n) => n[0]).join("").toUpperCase()}
-                        </div>
-                      )}
-                    </div>
-                    <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-accent/30 to-primary/30 pointer-events-none"></div>
-                  </div>
-                  <div className="space-y-2">
-                    <h3 className="text-2xl font-semibold text-ink font-serif">{user.name}</h3>
-                    <p className="text-muted text-lg">{user.email}</p>
-                  </div>
-                </div>
+          {/* Content */}
+          <div className="flex-1 space-y-6">
+            {/* Avatar Card */}
+            <div className="glass-panel p-6">
+              <div className="text-lg font-semibold mb-4 heading-serif">Profile Photo</div>
 
-                {user.bio ? (
-                  <div className="glass-soft p-4">
-                    <h4 className="text-sm font-medium text-ink/80 mb-2">Bio</h4>
-                    <p className="text-ink/80 leading-relaxed whitespace-pre-wrap">{user.bio}</p>
-                  </div>
+              <div className="rounded-2xl overflow-hidden border border-[hsl(var(--border))] bg-[color:var(--color-primary)]/40 aspect-square max-w-sm flex items-center justify-center mb-4">
+                {avatar ? (
+                  <img src={avatar} alt="Avatar" className="w-full h-full object-cover" />
                 ) : (
-                  <div className="glass-soft p-4 border-dashed">
-                    <div className="text-muted italic text-center">
-                      No bio added yet. Click "Edit Profile" to add your author biography.
+                  <div className="w-full h-full grid place-items-center">
+                    <div className="w-24 h-24 rounded-full bg-[color:var(--color-accent)] grid place-items-center shadow">
+                      <span className="text-[color:var(--color-ink)] font-black text-3xl">{authorInitial}</span>
                     </div>
                   </div>
                 )}
               </div>
-            ) : (
-              // Edit mode
-              <form onSubmit={onSubmit} className="space-y-6">
-                <div className="flex items-center space-x-6">
+
+              <div className="flex gap-2">
+                <label className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-[color:var(--color-primary)] border border-[hsl(var(--border))] hover:opacity-90 text-sm cursor-pointer">
+                  <Image size={16} /> Upload
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => e.target.files?.[0] && onPickAvatar(e.target.files[0])}
+                  />
+                </label>
+                {avatar && (
+                  <button
+                    onClick={removeAvatar}
+                    className="px-3 py-2 rounded-lg bg-white border border-[hsl(var(--border))] hover:opacity-90 text-sm"
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Author Details */}
+            <div className="glass-panel p-6">
+              <div className="text-lg font-semibold mb-4 heading-serif">Author Details</div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="md:col-span-2">
+                  <label className="text-xs text-muted mb-1 block">Display Name</label>
+                  <input
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
+                    placeholder="e.g., Jacqueline Session Ausby"
+                    className="w-full rounded-lg bg-white border border-[hsl(var(--border))] px-4 py-3 text-lg font-semibold outline-none"
+                    style={{ fontFamily: "Playfair Display, ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif" }}
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs text-muted mb-1 block">Email</label>
                   <div className="relative">
-                    <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-white/40 ring-4 ring-white/20 shadow-xl bg-white/60">
-                      {avatarPreview || user.avatar ? (
-                        <img
-                          src={avatarPreview || user.avatar}
-                          alt={user.name}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full grid place-items-center text-ink/70 font-semibold">
-                          {user.name?.split(" ").map((n) => n[0]).join("").toUpperCase()}
-                        </div>
-                      )}
-                    </div>
-                    <label
-                      htmlFor="avatar-upload"
-                      className="absolute -bottom-2 -right-2 bg-primary hover:opacity-90 text-ink rounded-full px-3 py-2 cursor-pointer shadow-xl border border-white/40 text-sm"
-                      title="Change avatar"
-                    >
-                      Change
-                    </label>
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-muted)]" size={16} />
                     <input
-                      id="avatar-upload"
-                      type="file"
-                      accept="image/*"
-                      onChange={onAvatarChange}
-                      className="hidden"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="you@example.com"
+                      className="w-full rounded-lg bg-white border border-[hsl(var(--border))] pl-9 pr-4 py-3 text-sm outline-none"
                     />
-                    <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-accent/30 to-primary/30 pointer-events-none"></div>
-                  </div>
-
-                  <div className="text-xs text-muted">
-                    Max 5MB. JPG/PNG/WebP recommended. HEIC support coming with backend APIs.
                   </div>
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-ink/90 text-sm">Full Name</label>
+                <div>
+                  <label className="text-xs text-muted mb-1 block">Website (optional)</label>
                   <input
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    className="w-full glass-soft border-white/40 text-ink placeholder:text-ink/50 px-3 py-2 rounded-lg focus:outline-none focus:border-white/60"
-                    placeholder="Your full name"
-                    required
+                    placeholder="https://DahTruth.com"
+                    className="w-full rounded-lg bg-white border border-[hsl(var(--border))] px-4 py-3 text-sm outline-none"
                   />
                 </div>
 
-                <div className="space-y-1">
-                  <label className="text-ink/90 text-sm">Email Address</label>
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="w-full glass-soft border-white/40 text-ink placeholder:text-ink/50 px-3 py-2 rounded-lg focus:outline-none focus:border-white/60"
-                    placeholder="you@example.com"
-                    required
-                  />
-                </div>
-
-                <div className="space-y-1">
-                  <label className="text-ink/90 text-sm">Author Bio</label>
+                <div className="md:col-span-2">
+                  <label className="text-xs text-muted mb-1 block">Bio</label>
                   <textarea
-                    rows={5}
                     value={bio}
                     onChange={(e) => setBio(e.target.value)}
-                    className="w-full glass-soft border-white/40 text-ink placeholder:text-ink/50 px-3 py-2 rounded-lg resize-none focus:outline-none focus;border-white/60"
-                    placeholder="Tell your readers about yourself, your writing journey, and what inspires you..."
-                    maxLength={500}
+                    placeholder="A brief author bio for your profile and manuscripts…"
+                    className="w-full min-h-[140px] rounded-lg bg-white border border-[hsl(var(--border))] px-4 py-3 text-sm outline-none resize-vertical"
                   />
-                  <div className="text-xs text-muted text-right glass-soft px-2 py-1 rounded-lg">
-                    {(bio || "").length}/500 characters
-                  </div>
                 </div>
+              </div>
 
-                <div className="flex items-center justify-end gap-3 pt-2">
-                  <button
-                    type="button"
-                    onClick={onCancel}
-                    disabled={saving}
-                    className="glass-soft hover:bg-white/60 px-4 py-2 rounded-lg disabled:opacity-50"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={saving}
-                    className="btn-primary shadow-xl px-4 py-2 rounded-lg disabled:opacity-50"
-                  >
-                    {saving ? "Saving..." : "Save Changes"}
-                  </button>
+              <div className="mt-6 flex items-center gap-2">
+                <button onClick={save} className="btn-gold inline-flex items-center gap-2">
+                  <Save size={16} /> Save Profile
+                </button>
+                <button
+                  onClick={() => navigate("/dashboard")}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-white border border-[hsl(var(--border))] hover:opacity-90 font-semibold"
+                >
+                  <Home size={16} /> Back to Dashboard
+                </button>
+              </div>
+            </div>
+
+            {/* Quick Actions */}
+            <div className="glass-panel p-6">
+              <div className="text-lg font-semibold mb-4 heading-serif">Quick Actions</div>
+              <div className="flex flex-wrap gap-2">
+                <button onClick={save} className="btn-primary">Save changes</button>
+                <button
+                  onClick={() => navigate("/")}
+                  className="px-4 py-2 rounded-lg bg-white border border-[hsl(var(--border))] hover:opacity-90 inline-flex items-center gap-2"
+                >
+                  <LogOut size={14} /> Sign out
+                </button>
+              </div>
+              <div className="text-xs text-muted mt-3">
+                Last saved {Math.round((Date.now() - lastSaved) / 60000) || 0}m ago
+              </div>
+            </div>
+
+            {/* Preview */}
+            <div className="glass-panel p-6">
+              <div className="text-lg font-semibold mb-4 heading-serif">Preview</div>
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-full bg-[color:var(--color-accent)] grid place-items-center shadow">
+                  <span className="text-[color:var(--color-ink)] font-black">{authorInitial}</span>
                 </div>
-              </form>
-            )}
+                <div className="min-w-0">
+                  <div
+                    className="font-bold text-lg truncate"
+                    style={{ fontFamily: "Playfair Display, ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif" }}
+                  >
+                    {displayName || "Your Name"}
+                  </div>
+                  <div className="text-sm text-muted truncate">{email || "you@example.com"}</div>
+                </div>
+              </div>
+              {bio?.trim() && (
+                <p className="mt-4 text-[color:var(--color-ink)]/80 leading-relaxed">{bio}</p>
+              )}
+            </div>
           </div>
         </div>
       </div>
