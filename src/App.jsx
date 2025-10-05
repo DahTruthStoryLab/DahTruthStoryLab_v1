@@ -38,7 +38,11 @@ const WorkshopCohort       = lazy(() => import("./components/storylab/WorkshopCo
 const Publishing           = lazy(() => import("./pages/Publishing.tsx"));
 
 // Profile (now enabled)
-const Profile              = lazy(() => import("./components/Profile"));
+const Profile              = lazy(() => import("./components/Profile")); 
+
+// add imports near the top with your other lazy imports
+const PlansPage = lazy(() => import("./components/PlansPage"));
+const BillingSuccess = lazy(() => import("./pages/BillingSuccess.jsx"));
 
 /* =========================
    Global UI helpers
@@ -289,7 +293,16 @@ export default function App() {
               path="/store"
               element={
                 <ProtectedRoute>
-                  <Placeholder title="Store" />
+                  <PlansPage />
+                </ProtectedRoute>
+              }
+            />
+            
+            <Route
+              path="/billing/success"
+              element={
+                <ProtectedRoute>
+                  <BillingSuccess />
                 </ProtectedRoute>
               }
             />
@@ -310,3 +323,4 @@ export default function App() {
     </UserProvider>
   );
 }
+
