@@ -1,16 +1,19 @@
 // src/components/WriteSection.jsx
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   Plus, Save, Eye, FileText, Edit3, Trash2,
   Menu, X, Target, Clock, RotateCcw, Download,
   CheckCircle, AlertCircle, Lightbulb, Zap, Brain, MessageSquare,
-  RefreshCw, Wand2, Users, BookOpen, MapPin, ArrowLeft, Maximize, Minimize, Moon, Sun
+  RefreshCw, Wand2, Users, BookOpen, MapPin, ArrowLeft, Maximize, Minimize, Moon, Sun,
+  Bold, Italic, Underline, Heading1, Heading2, Heading3,
+  List as ListBullets, ListOrdered, AlignLeft, AlignCenter, AlignRight,
+  Eraser, Upload
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
 
 /* ──────────────────────────────────────────────────────────────
    Shared storage helpers (same key as Project/TOC)
-──────────────────────────────────────────────────────────────── */
+───────────────────────────────────────────────────────────── */
 const STORAGE_KEY = "dahtruth-story-lab-toc-v3";
 
 const loadState = () => {
@@ -52,8 +55,9 @@ const getInitialState = () => {
         {
           id: 1,
           title: "Chapter 1: First Chord",
+          // content can be HTML; we seed with simple paragraphs
           content:
-            "Jacque's fingers trembled as they touched the guitar strings for the first time on stage...",
+            "<h1>Chapter 1: First Chord</h1><p>Jacque's fingers trembled as they touched the guitar strings for the first time on stage...</p>",
           wordCount: 1205,
           lastEdited: "2 hours ago",
           status: "draft",
@@ -67,7 +71,7 @@ const getInitialState = () => {
           id: 2,
           title: "Chapter 2: Backstage Revelations",
           content:
-            "The dressing room smelled of stale coffee and nervous energy...",
+            "<h1>Chapter 2: Backstage Revelations</h1><p>The dressing room smelled of stale coffee and nervous energy...</p>",
           wordCount: 892,
           lastEdited: "Yesterday",
           status: "draft",
@@ -80,13 +84,14 @@ const getInitialState = () => {
       ],
       daily: { goal: 500, counts: {} },
       settings: { theme: "dark", focusMode: false },
+      toc: [] // where we’ll store pushed table of contents
     }
   );
 };
 
 /* ──────────────────────────────────────────────────────────────
    Top banner (light glass, brand buttons)
-──────────────────────────────────────────────────────────────── */
+───────────────────────────────────────────────────────────── */
 const TopBanner = ({ bookTitle, onNewChapter, onExport }) => {
   return (
     <div className="sticky top-0 z-50 bg-white/70 backdrop-blur-xl border-b border-white/60 text-ink">
@@ -112,7 +117,7 @@ const TopBanner = ({ bookTitle, onNewChapter, onExport }) => {
               onClick={onExport}
               className="inline-flex items-center gap-2 rounded-xl bg-primary text-white px-3 py-2 text-sm font-medium hover:opacity-90"
             >
-              <FileText size={16} /> Export
+              <FileText size={16} /> Export JSON
             </button>
           </div>
         </div>
@@ -123,7 +128,7 @@ const TopBanner = ({ bookTitle, onNewChapter, onExport }) => {
 
 /* ──────────────────────────────────────────────────────────────
    RIGHT: Chapter rail (collapsible on mobile, static on xl)
-──────────────────────────────────────────────────────────────── */
+───────────────────────────────────────────────────────────── */
 const ChapterRail = ({
   chapters, selectedId, onSelect, onAdd, onDelete, open, setOpen, side = "right"
 }) => {
@@ -240,7 +245,7 @@ const RailInner = ({ chapters, selectedId, onSelect, onAdd, onDelete }) => (
 
 /* ──────────────────────────────────────────────────────────────
    Compact AI Assistant (raised above editor)
-──────────────────────────────────────────────────────────────── */
+───────────────────────────────────────────────────────────── */
 const AIAssistant = ({ chapter, onApply }) => {
   const [tab, setTab] = useState("suggestions");
   const [busy, setBusy] = useState(false);
@@ -357,6 +362,504 @@ const AIAssistant = ({ chapter, onApply }) => {
 };
 
 /* ──────────────────────────────────────────────────────────────
+   Small helpers for the rich editor
+───────────────────────────────────────────────────────────── */
+const sanitizeBasic = (html) => {
+  // very light whitelist; enough for our editor use
+  const allowed = /<(\/)?(p|br|h1|h2|h3|strong|b|em|i|u|ul|ol|li|hr|span)(\s+[^>]*)?>/gi;
+  const tmp = document.createElement("div");
+  tmp.innerHTML = html || "";
+  // strip scripts and event handlers
+  tmp.querySelectorAll("script, style").forEach((n) => n.remove());
+  tmp.querySelectorAll("*").forEach((el) => {
+    [...el.attributes].forEach((a) => {
+      if (/^on/i.test(a.name)) el.removeAttribute(a.name);
+    });
+  });
+  // remove disallowed tags but keep text
+  const walker = (node) => {
+    [...node.childNodes].forEach((child) => {
+      if (child.nodeType === 1) {
+        const tag = child.nodeName.toLowerCase();
+        if (!allowed.test(`<${tag}>`)) {
+          const frag = document.createDocumentFragment();
+          while (child.firstChild) frag.appendChild(child.firstChild);
+          child.replaceWith(frag);
+        } else {
+          walker(child);
+        }
+      }
+    });
+  };
+  walker(tmp);
+  return tmp.innerHTML;
+};
+
+const htmlToText = (html) => {
+  const tmp = document.createElement("div");
+  tmp.innerHTML = html || "";
+  return (tmp.textContent || "").replace(/\s+/g, " ").trim();
+};
+
+/* ──────────────────────────────────────────────────────────────
+   Writing Editor (Word-like page) + fullscreen + toolbar + imports
+───────────────────────────────────────────────────────────── */
+const WritingEditor = ({
+  chapter, onSave, onUpdate, onCreateNew, onPushTOC,
+  chapters = [], onSelectChapter
+}) => {
+  const [title, setTitle] = useState(chapter?.title || "");
+  const [content, setContent] = useState(chapter?.content || "");
+  const [count, setCount] = useState(0);
+  const [preview, setPreview] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [fullscreenTheme, setFullscreenTheme] = useState("light"); // light, dark, sepia
+  const editorRef = useRef(null);
+  const importDocxInputRef = useRef(null);
+  const importHtmlInputRef = useRef(null);
+
+  // Only update when switching between different chapters
+  useEffect(() => {
+    if (chapter) {
+      setTitle(chapter.title || "");
+      setContent(chapter.content || "");
+    } else {
+      setTitle("");
+      setContent("");
+    }
+  }, [chapter?.id]);
+
+  // Update word count from HTML text content
+  useEffect(() => {
+    const words = htmlToText(content).split(/\s+/).filter(Boolean).length;
+    setCount(words);
+  }, [content]);
+
+  // Handle escape key to exit fullscreen
+  useEffect(() => {
+    const handleEscape = (e) => {
+      if (e.key === 'Escape' && isFullscreen) {
+        setIsFullscreen(false);
+      }
+    };
+    if (isFullscreen) {
+      document.addEventListener('keydown', handleEscape);
+      document.body.style.overflow = 'hidden';
+    }
+    return () => {
+      document.removeEventListener('keydown', handleEscape);
+      document.body.style.overflow = 'unset';
+    };
+  }, [isFullscreen]);
+
+  const handleSave = () => {
+    if (!chapter) return;
+    onUpdate({
+      ...chapter,
+      title,
+      content, // HTML
+      wordCount: count,
+      lastEdited: "Just now",
+    });
+    onSave?.();
+  };
+
+  const toggleFullscreen = () => setIsFullscreen((v) => !v);
+
+  const getFullscreenTheme = () => {
+    switch (fullscreenTheme) {
+      case 'dark': return 'bg-slate-900 text-slate-100';
+      case 'sepia': return 'bg-amber-50 text-amber-900';
+      default: return 'bg-white text-ink';
+    }
+  };
+
+  const getPageColors = () => {
+    // outer desk is gray, page is bright white
+    return {
+      desk: "bg-slate-100",
+      page: fullscreenTheme === "dark" ? "bg-white/95" : "bg-white"
+    };
+  };
+
+  // basic rich commands
+  const exec = (cmd, val = null) => {
+    editorRef.current?.focus();
+    document.execCommand(cmd, false, val);
+    setContent(editorRef.current?.innerHTML || "");
+  };
+
+  const insertPageBreak = () => {
+    editorRef.current?.focus();
+    const el = document.createElement("hr");
+    el.className = "page-break";
+    const sel = window.getSelection();
+    if (!sel || !sel.rangeCount) return;
+    const range = sel.getRangeAt(0);
+    range.insertNode(el);
+    range.setStartAfter(el);
+    range.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(range);
+    setContent(editorRef.current?.innerHTML || "");
+  };
+
+  // imports
+  const handleImportDocx = async (file) => {
+    if (!file) return;
+    const { default: JSZip } = await import("jszip");
+    const ab = await file.arrayBuffer();
+    const zip = await JSZip.loadAsync(ab);
+    const doc = await zip.file("word/document.xml")?.async("string");
+    if (!doc) {
+      alert("Could not read the .docx (missing document.xml).");
+      return;
+    }
+    // minimal .docx XML → HTML
+    const xml = new DOMParser().parseFromString(doc, "text/xml");
+    const paras = [...xml.getElementsByTagName("w:p")];
+    let html = "";
+    paras.forEach((p) => {
+      const pStyle = p.querySelector("w:pStyle")?.getAttribute("w:val");
+      const runs = [...p.getElementsByTagName("w:t")].map((t) => t.textContent).join("");
+      if (!runs) { html += "<p><br/></p>"; return; }
+      if (pStyle === "Heading1") html += `<h1>${runs}</h1>`;
+      else if (pStyle === "Heading2") html += `<h2>${runs}</h2>`;
+      else if (pStyle === "Heading3") html += `<h3>${runs}</h3>`;
+      else html += `<p>${runs}</p>`;
+    });
+    const clean = sanitizeBasic(html);
+    setContent(clean);
+    // reflect in editor box
+    if (editorRef.current) editorRef.current.innerHTML = clean;
+  };
+
+  const handleImportHtml = async (file) => {
+    if (!file) return;
+    const text = await file.text();
+    const clean = sanitizeBasic(text);
+    setContent(clean);
+    if (editorRef.current) editorRef.current.innerHTML = clean;
+  };
+
+  // Fullscreen Mode Component (with chapter picker)
+  const [fsRailOpen, setFsRailOpen] = useState(false);
+
+  const FullscreenEditor = () => (
+    <div className={`fixed inset-0 z-[9999] ${getFullscreenTheme()} transition-colors duration-200`}>
+      <style>{`
+        .page-break { border: 0; border-top: 2px dashed #cbd5e1; margin: 24px 0; page-break-before: always; }
+      `}</style>
+
+      {/* Fullscreen Header */}
+      <div className="absolute top-0 left-0 right-0 p-4 flex items-center justify-between border-b border-current border-opacity-10 bg-opacity-90 backdrop-blur-sm">
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => setFsRailOpen((v) => !v)}
+            className="p-2 rounded-lg hover:bg-current/10"
+            title="Chapters"
+          >
+            <Menu size={18} />
+          </button>
+          <input
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            className="text-xl font-semibold bg-transparent outline-none border-b border-transparent hover:border-current focus:border-current transition-colors"
+            placeholder="Chapter title"
+          />
+          <div className="text-sm opacity-70">
+            {count} words
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          {/* Theme Switcher */}
+          <div className="flex rounded-lg border border-current border-opacity-20 overflow-hidden">
+            {[
+              { key: 'light', icon: Sun, label: 'Light' },
+              { key: 'sepia', icon: '📄', label: 'Sepia' },
+              { key: 'dark', icon: Moon, label: 'Dark' }
+            ].map(({ key, icon: Icon, label }) => (
+              <button
+                key={key}
+                onClick={() => setFullscreenTheme(key)}
+                className={`px-3 py-2 text-sm transition-colors ${fullscreenTheme === key ? 'bg-current bg-opacity-10' : 'hover:bg-current hover:bg-opacity-5'}`}
+                title={label}
+              >
+                {typeof Icon === 'string' ? Icon : <Icon size={16} />}
+              </button>
+            ))}
+          </div>
+
+          <button
+            onClick={handleSave}
+            className="px-4 py-2 rounded-lg bg-primary text-white hover:opacity-90 transition-colors"
+          >
+            <Save size={16} />
+          </button>
+
+          <button
+            onClick={toggleFullscreen}
+            className="p-2 rounded-lg hover:bg-current hover:bg-opacity-10 transition-colors"
+            title="Exit Fullscreen (Esc)"
+          >
+            <Minimize size={20} />
+          </button>
+        </div>
+      </div>
+
+      {/* Chapter drawer */}
+      {fsRailOpen && (
+        <aside className="absolute top-16 left-0 bottom-0 w-72 bg-white/90 backdrop-blur border-r border-current/10 overflow-auto p-3">
+          <div className="text-xs font-semibold text-ink mb-2">Chapters</div>
+          <div className="space-y-1">
+            {chapters.map((c) => (
+              <button
+                key={c.id}
+                onClick={() => {
+                  onSelectChapter?.(c.id);
+                  setFsRailOpen(false);
+                }}
+                className="w-full text-left px-3 py-2 rounded-lg border border-gray-200 bg-white hover:bg-gray-50 text-ink"
+              >
+                <div className="text-sm font-medium truncate">{c.title}</div>
+                <div className="text-[11px] text-muted">{c.wordCount || 0} words</div>
+              </button>
+            ))}
+          </div>
+        </aside>
+      )}
+
+      {/* Fullscreen Content */}
+      <div className={`pt-20 pb-8 px-8 h-full flex items-center justify-center ${getPageColors().desk}`}>
+        <div className="w-full max-w-4xl h-full">
+          <div className={`mx-auto ${getPageColors().page} shadow-2xl border border-slate-300 rounded-xl`}>
+            {/* Page-like padding + editable area */}
+            <div className="px-10 py-8">
+              <div
+                ref={editorRef}
+                contentEditable
+                suppressContentEditableWarning
+                onInput={() => setContent(editorRef.current?.innerHTML || "")}
+                className="min-h-[60vh] outline-none text-lg leading-relaxed"
+                dangerouslySetInnerHTML={{ __html: content || "<p><br/></p>" }}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Fullscreen Footer */}
+      <div className="absolute bottom-0 left-0 right-0 p-4 text-center text-sm opacity-50">
+        <div className="flex items-center justify-center gap-4">
+          <span>Last saved: {chapter?.lastEdited || 'Never'}</span>
+          <span>•</span>
+          <span>Auto-save enabled</span>
+          <span>•</span>
+          <span>Press Esc to exit</span>
+        </div>
+      </div>
+    </div>
+  );
+
+  // toolbar for normal mode
+  const Toolbar = () => (
+    <>
+      <style>{`
+        .page-break { border: 0; border-top: 2px dashed #e2e8f0; margin: 24px 0; page-break-before: always; }
+      `}</style>
+      <div className="flex flex-wrap items-center gap-1 p-2 border-b border-border bg-white/70 backdrop-blur">
+        {/* formatting */}
+        <button className="px-2 py-1 rounded hover:bg-white" title="Bold" onClick={() => exec("bold")}><Bold size={16} /></button>
+        <button className="px-2 py-1 rounded hover:bg-white" title="Italic" onClick={() => exec("italic")}><Italic size={16} /></button>
+        <button className="px-2 py-1 rounded hover:bg-white" title="Underline" onClick={() => exec("underline")}><Underline size={16} /></button>
+        <span className="mx-1 w-px h-5 bg-border" />
+        <button className="px-2 py-1 rounded hover:bg-white" title="Heading 1" onClick={() => exec("formatBlock", "H1")}><Heading1 size={16} /></button>
+        <button className="px-2 py-1 rounded hover:bg-white" title="Heading 2" onClick={() => exec("formatBlock", "H2")}><Heading2 size={16} /></button>
+        <button className="px-2 py-1 rounded hover:bg-white" title="Heading 3" onClick={() => exec("formatBlock", "H3")}><Heading3 size={16} /></button>
+        <span className="mx-1 w-px h-5 bg-border" />
+        <button className="px-2 py-1 rounded hover:bg-white" title="Bulleted list" onClick={() => exec("insertUnorderedList")}><ListBullets size={16} /></button>
+        <button className="px-2 py-1 rounded hover:bg-white" title="Numbered list" onClick={() => exec("insertOrderedList")}><ListOrdered size={16} /></button>
+        <span className="mx-1 w-px h-5 bg-border" />
+        <button className="px-2 py-1 rounded hover:bg-white" title="Align left" onClick={() => exec("justifyLeft")}><AlignLeft size={16} /></button>
+        <button className="px-2 py-1 rounded hover:bg-white" title="Align center" onClick={() => exec("justifyCenter")}><AlignCenter size={16} /></button>
+        <button className="px-2 py-1 rounded hover:bg-white" title="Align right" onClick={() => exec("justifyRight")}><AlignRight size={16} /></button>
+        <span className="mx-1 w-px h-5 bg-border" />
+        <button className="px-2 py-1 rounded hover:bg-white" title="Clear formatting" onClick={() => exec("removeFormat")}><Eraser size={16} /></button>
+        <button className="px-2 py-1 rounded hover:bg-white" title="Insert page break" onClick={insertPageBreak}>⧉</button>
+
+        {/* importers */}
+        <span className="mx-1 w-px h-5 bg-border" />
+        <button className="px-2 py-1 rounded hover:bg-white" title="Import Word (.docx)" onClick={() => importDocxInputRef.current?.click()}>
+          <Upload size={16} /> <span className="ml-1 text-xs">DOCX</span>
+        </button>
+        <input type="file" accept=".docx" className="hidden" ref={importDocxInputRef}
+               onChange={(e) => handleImportDocx(e.target.files?.[0])} />
+        <button className="px-2 py-1 rounded hover:bg-white" title="Import HTML" onClick={() => importHtmlInputRef.current?.click()}>
+          <Upload size={16} /> <span className="ml-1 text-xs">HTML</span>
+        </button>
+        <input type="file" accept=".html,.htm,text/html" className="hidden" ref={importHtmlInputRef}
+               onChange={(e) => handleImportHtml(e.target.files?.[0])} />
+
+        {/* actions right */}
+        <div className="ml-auto flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setPreview((v) => !v)}
+            className={[
+              "px-3 py-2 rounded-md text-sm border",
+              preview
+                ? "bg-primary/10 text-primary border-primary/30"
+                : "bg-white text-ink border-border hover:bg-white/80",
+            ].join(" ")}
+            title="Preview"
+          >
+            <Eye size={16} />
+          </button>
+          <button
+            type="button"
+            onClick={toggleFullscreen}
+            className="px-3 py-2 rounded-md text-sm border bg-white text-ink border-border hover:bg-white/80 transition-colors"
+            title="Fullscreen Writing Mode"
+          >
+            <Maximize size={16} />
+          </button>
+          <button
+            type="button"
+            onClick={onPushTOC}
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-md border bg-white text-ink border-border hover:bg-white/80"
+            title="Build and push TOC from H1/H2/H3"
+          >
+            <BookOpen size={16} />
+            <span className="text-sm">Push TOC</span>
+          </button>
+          <button
+            type="button"
+            onClick={handleSave}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-primary text-white hover:opacity-90"
+          >
+            <Save size={16} />
+            Save
+          </button>
+        </div>
+      </div>
+    </>
+  );
+
+  if (!chapter) {
+    return (
+      <div className="flex-1 grid place-items-center">
+        <div className="text-center">
+          <div className="w-16 h-16 bg-white/70 rounded-full grid place-items-center mx-auto mb-4 border border-border">
+            <Edit3 size={24} className="text-muted" />
+          </div>
+          <h3 className="text-xl font-bold text-ink mb-2">Start writing</h3>
+          <p className="text-muted mb-4">Create your first chapter to begin.</p>
+          <button
+            onClick={onCreateNew}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-white hover:opacity-90"
+          >
+            <Plus size={16} />
+            New Chapter
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className="flex-1 flex flex-col gap-4">
+        {/* raised AI assistant */}
+        <AIAssistant
+          chapter={chapter}
+          onApply={(s) => {
+            // append suggestion as a new paragraph
+            const add = `<p>${s}</p>`;
+            const next = (content || "<p><br/></p>") + add;
+            setContent(next);
+            if (editorRef.current) editorRef.current.innerHTML = next;
+          }}
+        />
+
+        {/* Word-like page on desk */}
+        <div className="rounded-3xl shadow-2xl border border-border overflow-hidden flex-1 flex flex-col bg-slate-100">
+          {/* toolbar */}
+          <Toolbar />
+
+          {/* White page */}
+          <div className="flex-1 overflow-auto p-6">
+            <div className="max-w-3xl mx-auto bg-white rounded-xl shadow border border-slate-300">
+              {/* Title row above the page */}
+              <div className="px-6 pt-4 pb-2 flex items-center justify-between">
+                <input
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className="text-lg font-semibold bg-transparent text-ink outline-none w-full"
+                  placeholder="Chapter title"
+                />
+                <div className="hidden sm:flex items-center gap-2 text-sm text-muted ml-4">
+                  <Target size={14} />
+                  <span>{count} words</span>
+                </div>
+              </div>
+
+              {/* Editable page body */}
+              <div className="px-10 pb-8">
+                {preview ? (
+                  <div className="prose max-w-none text-ink py-4" dangerouslySetInnerHTML={{ __html: content || "<p><br/></p>" }} />
+                ) : (
+                  <div
+                    ref={editorRef}
+                    contentEditable
+                    suppressContentEditableWarning
+                    onInput={() => setContent(editorRef.current?.innerHTML || "")}
+                    className="min-h-[60vh] outline-none text-lg leading-relaxed py-4"
+                    dangerouslySetInnerHTML={{ __html: content || "<p><br/></p>" }}
+                  />
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* footer strip */}
+          <div className="px-5 py-3 border-t border-border bg-white/70 text-sm text-muted flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <Clock size={14} />
+                <span>Last saved: {chapter.lastEdited}</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <RotateCcw size={14} />
+                <span>Auto-save enabled</span>
+              </div>
+            </div>
+            <button className="hover:text-ink" title="Download raw HTML"
+              onClick={() => {
+                const blob = new Blob([content || ""], { type: "text/html" });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `${(title || "chapter").replace(/[^\w\-]+/g, "_")}.html`;
+                a.click();
+                URL.revokeObjectURL(url);
+              }}
+            >
+              <Download size={14} />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Render Fullscreen Mode */}
+      {isFullscreen && <FullscreenEditor />}
+    </>
+  );
+};
+
+/* ──────────────────────────────────────────────────────────────
    LEFT: Story Meta sidebar (+ Quick Nav)
 ───────────────────────────────────────────────────────────── */
 const MetaSidebar = ({ book, chapterWordCount, totalWords }) => {
@@ -442,298 +945,6 @@ const MetaSidebar = ({ book, chapterWordCount, totalWords }) => {
 };
 
 /* ──────────────────────────────────────────────────────────────
-   Writing Editor (light canvas) with fullscreen mode
-───────────────────────────────────────────────────────────── */
-const WritingEditor = ({ chapter, onSave, onUpdate, onCreateNew }) => {
-  const [title, setTitle] = useState(chapter?.title || "");
-  const [content, setContent] = useState(chapter?.content || "");
-  const [count, setCount] = useState(0);
-  const [preview, setPreview] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const [fullscreenTheme, setFullscreenTheme] = useState("light"); // light, dark, sepia
-
-  // Only update when switching between different chapters
-  useEffect(() => {
-    if (chapter) {
-      setTitle(chapter.title || "");
-      setContent(chapter.content || "");
-    } else {
-      setTitle("");
-      setContent("");
-    }
-  }, [chapter?.id]);
-
-  useEffect(() => {
-    const words = content.trim().split(/\s+/).filter(Boolean).length;
-    setCount(words);
-  }, [content]);
-
-  // Handle escape key to exit fullscreen
-  useEffect(() => {
-    const handleEscape = (e) => {
-      if (e.key === 'Escape' && isFullscreen) {
-        setIsFullscreen(false);
-      }
-    };
-
-    if (isFullscreen) {
-      document.addEventListener('keydown', handleEscape);
-      document.body.style.overflow = 'hidden';
-    }
-
-    return () => {
-      document.removeEventListener('keydown', handleEscape);
-      document.body.style.overflow = 'unset';
-    };
-  }, [isFullscreen]);
-
-  const handleSave = () => {
-    if (!chapter) return;
-    onUpdate({
-      ...chapter,
-      title,
-      content,
-      wordCount: count,
-      lastEdited: "Just now",
-    });
-    onSave?.();
-  };
-
-  const toggleFullscreen = () => {
-    setIsFullscreen(!isFullscreen);
-  };
-
-  const getFullscreenTheme = () => {
-    switch (fullscreenTheme) {
-      case 'dark':
-        return 'bg-slate-900 text-slate-100';
-      case 'sepia':
-        return 'bg-amber-50 text-amber-900';
-      default:
-        return 'bg-white text-ink';
-    }
-  };
-
-  const getTextareaTheme = () => {
-    switch (fullscreenTheme) {
-      case 'dark':
-        return 'bg-slate-900 text-slate-100 placeholder-slate-400';
-      case 'sepia':
-        return 'bg-amber-50 text-amber-900 placeholder-amber-600';
-      default:
-        return 'bg-white text-ink placeholder-slate-400';
-    }
-  };
-
-  // Fullscreen Mode Component
-  const FullscreenEditor = () => (
-    <div className={`fixed inset-0 z-[9999] ${getFullscreenTheme()} transition-colors duration-200`}>
-      {/* Fullscreen Header */}
-      <div className="absolute top-0 left-0 right-0 p-4 flex items-center justify-between border-b border-current border-opacity-10 bg-opacity-90 backdrop-blur-sm">
-        <div className="flex items-center gap-4">
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            className="text-xl font-semibold bg-transparent outline-none border-b border-transparent hover:border-current focus:border-current transition-colors"
-            placeholder="Chapter title"
-          />
-          <div className="text-sm opacity-70">
-            {count} words
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          {/* Theme Switcher */}
-          <div className="flex rounded-lg border border-current border-opacity-20 overflow-hidden">
-            {[
-              { key: 'light', icon: Sun, label: 'Light' },
-              { key: 'sepia', icon: '📄', label: 'Sepia' },
-              { key: 'dark', icon: Moon, label: 'Dark' }
-            ].map(({ key, icon: Icon, label }) => (
-              <button
-                key={key}
-                onClick={() => setFullscreenTheme(key)}
-                className={`px-3 py-2 text-sm transition-colors ${
-                  fullscreenTheme === key
-                    ? 'bg-current bg-opacity-10'
-                    : 'hover:bg-current hover:bg-opacity-5'
-                }`}
-                title={label}
-              >
-                {typeof Icon === 'string' ? Icon : <Icon size={16} />}
-              </button>
-            ))}
-          </div>
-
-          <button
-            onClick={handleSave}
-            className="px-4 py-2 rounded-lg bg-primary text-white hover:opacity-90 transition-colors"
-          >
-            <Save size={16} />
-          </button>
-
-          <button
-            onClick={toggleFullscreen}
-            className="p-2 rounded-lg hover:bg-current hover:bg-opacity-10 transition-colors"
-            title="Exit Fullscreen (Esc)"
-          >
-            <Minimize size={20} />
-          </button>
-        </div>
-      </div>
-
-      {/* Fullscreen Content */}
-      <div className="pt-20 pb-8 px-8 h-full flex items-center justify-center">
-        <div className="w-full max-w-4xl h-full flex flex-col">
-          <textarea
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            className={`w-full flex-1 resize-none outline-none text-lg leading-relaxed ${getTextareaTheme()}`}
-            placeholder="Start writing your story here... Press Esc to exit fullscreen."
-            autoFocus
-          />
-        </div>
-      </div>
-
-      {/* Fullscreen Footer */}
-      <div className="absolute bottom-0 left-0 right-0 p-4 text-center text-sm opacity-50">
-        <div className="flex items-center justify-center gap-4">
-          <span>Last saved: {chapter?.lastEdited || 'Never'}</span>
-          <span>•</span>
-          <span>Auto-save enabled</span>
-          <span>•</span>
-          <span>Press Esc to exit</span>
-        </div>
-      </div>
-    </div>
-  );
-
-  if (!chapter) {
-    return (
-      <div className="flex-1 grid place-items-center">
-        <div className="text-center">
-          <div className="w-16 h-16 bg-white/70 rounded-full grid place-items-center mx-auto mb-4 border border-border">
-            <Edit3 size={24} className="text-muted" />
-          </div>
-          <h3 className="text-xl font-bold text-ink mb-2">Start writing</h3>
-          <p className="text-muted mb-4">Create your first chapter to begin.</p>
-          <button
-            onClick={onCreateNew}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-primary text-white hover:opacity-90"
-          >
-            <Plus size={16} />
-            New Chapter
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <>
-      <div className="flex-1 flex flex-col gap-4">
-        {/* raised AI assistant */}
-        <AIAssistant
-          chapter={chapter}
-          onApply={(s) => setContent((c) => c + (c.endsWith("\n") ? "" : "\n\n") + s)}
-        />
-
-        {/* white canvas */}
-        <div className="rounded-3xl bg-white shadow-2xl border border-border overflow-hidden flex-1 flex flex-col">
-          <div className="px-5 py-3 border-b border-border bg-white/70 backdrop-blur flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <input
-                type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                className="text-lg font-semibold bg-transparent text-ink outline-none"
-                placeholder="Chapter title"
-              />
-              <div className="hidden sm:flex items-center gap-2 text-sm text-muted">
-                <Target size={14} />
-                <span>{count} words</span>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={toggleFullscreen}
-                className="px-3 py-2 rounded-md text-sm border bg-white text-ink border-border hover:bg-white/80 transition-colors"
-                title="Fullscreen Writing Mode"
-              >
-                <Maximize size={16} />
-              </button>
-              <button
-                type="button"
-                onClick={() => setPreview(!preview)}
-                className={[
-                  "px-3 py-2 rounded-md text-sm border",
-                  preview
-                    ? "bg-primary/10 text-primary border-primary/30"
-                    : "bg-white text-ink border-border hover:bg-white/80",
-                ].join(" ")}
-                title="Preview"
-              >
-                <Eye size={16} />
-              </button>
-              <button
-                type="button"
-                onClick={handleSave}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-primary text-white hover:opacity-90"
-              >
-                <Save size={16} />
-                Save
-              </button>
-            </div>
-          </div>
-
-          <div className="flex-1 p-6 overflow-auto">
-            {preview ? (
-              <div className="max-w-3xl">
-                <h1 className="text-3xl font-bold text-ink mb-6">{title}</h1>
-                <div className="prose max-w-none text-ink">
-                  {content.split("\n").map((p, i) => (
-                    <p key={i}>{p}</p>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <textarea
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                className="w-full h-[60vh] min-h-[420px] resize-none outline-none text-lg leading-7 text-ink"
-                placeholder="Start writing your story here..."
-              />
-            )}
-          </div>
-
-          <div className="px-5 py-3 border-t border-border bg-white/70 text-sm text-muted flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <Clock size={14} />
-                <span>Last saved: {chapter.lastEdited}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <RotateCcw size={14} />
-                <span>Auto-save enabled</span>
-              </div>
-            </div>
-            <button className="hover:text-ink" title="Download">
-              <Download size={14} />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Render Fullscreen Mode */}
-      {isFullscreen && <FullscreenEditor />}
-    </>
-  );
-};
-
-/* ──────────────────────────────────────────────────────────────
    Main
 ───────────────────────────────────────────────────────────── */
 export default function WriteSection() {
@@ -753,10 +964,12 @@ export default function WriteSection() {
     const t = setTimeout(() => {
       const current = loadState() || {};
       saveState({
+        ...current,
         book,
         chapters,
         daily: current.daily || { goal: 500, counts: {} },
         settings: current.settings || { theme: "dark", focusMode: false },
+        toc: current.toc || []
       });
     }, 500);
     return () => clearTimeout(t);
@@ -788,7 +1001,7 @@ export default function WriteSection() {
     const ch = {
       id,
       title: `Chapter ${chapters.length + 1}: Untitled`,
-      content: "",
+      content: "<h1>Untitled</h1><p><br/></p>",
       wordCount: 0,
       lastEdited: "Just now",
       status: "draft",
@@ -822,6 +1035,40 @@ export default function WriteSection() {
     URL.revokeObjectURL(url);
   };
 
+  // Build a TOC from chapter HTML (looks for H1/H2/H3)
+  const buildTOC = React.useCallback(() => {
+    const toItems = (html) => {
+      try {
+        const doc = new DOMParser().parseFromString(html || "", "text/html");
+        const hs = Array.from(doc.querySelectorAll("h1,h2,h3"));
+        return hs.map((h) => ({
+          level: Number(h.tagName[1]),      // 1, 2, 3
+          text: (h.textContent || "").trim()
+        }));
+      } catch {
+        return [];
+      }
+    };
+    return chapters.map((ch) => ({
+      chapterId: ch.id,
+      chapterTitle: ch.title,
+      items: toItems(ch.content || "")
+    }));
+  }, [chapters]);
+
+  // Save TOC into localStorage and notify other pages
+  const pushTOC = React.useCallback(() => {
+    const existing = loadState() || {};
+    const toc = buildTOC();
+    saveState({
+      ...existing,
+      book,
+      chapters,
+      toc, // <— TOC lives here
+    });
+    alert("Table of Contents updated from chapter headings (H1/H2/H3). Open the TOC page to see it.");
+  }, [book, chapters, buildTOC]);
+
   return (
     <div className="min-h-screen bg-base bg-radial-fade text-ink">
       <TopBanner
@@ -846,6 +1093,9 @@ export default function WriteSection() {
             onSave={() => {}}
             onUpdate={updateChapter}
             onCreateNew={addChapter}
+            onPushTOC={pushTOC}
+            chapters={chapters}
+            onSelectChapter={setSelectedId}
           />
 
           {/* right chapters (static on xl, drawer on mobile) */}
