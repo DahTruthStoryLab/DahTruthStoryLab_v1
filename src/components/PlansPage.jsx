@@ -4,6 +4,9 @@ import {
   PenLine, Users, Building2, Crown, Infinity, BookOpen
 } from "lucide-react";
 
+// 👉 Add this: read API base from env (set in Amplify) or fallback to "" for dev proxy
+const API_BASE = process.env.REACT_APP_API_BASE || "";
+
 const FEATURE_LIST = [
   "Cloud sync & backups",
   "Distraction-free writing",
@@ -92,11 +95,13 @@ export default function PlansPage() {
               email: JSON.parse(localStorage.getItem("dt_profile") || "{}").email || undefined,
             };
 
-      const res = await fetch("/api/checkout-session", {
+      // 👇 Updated to use API_BASE (handles prod + dev seamlessly)
+      const res = await fetch(`${API_BASE}/api/checkout-session`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
       });
+
       const data = await res.json();
       if (data?.url) window.location.href = data.url;
       else alert(data?.error || "Unable to start checkout");
