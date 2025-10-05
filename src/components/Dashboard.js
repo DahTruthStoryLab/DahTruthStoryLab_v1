@@ -44,18 +44,39 @@ const Progress = ({ value }) => (
   </div>
 );
 
+// --------- Profile name helper (pull from multiple keys; live-updates) ---------
+function readAuthorName() {
+  try {
+    const keys = ["userProfile", "profile", "dt_profile", "currentUser"];
+    for (const key of keys) {
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      const obj = JSON.parse(raw);
+      if (obj.displayName) return obj.displayName;
+      const fn = obj.firstName || obj.given_name;
+      const ln = obj.lastName || obj.family_name;
+      if (fn || ln) return [fn, ln].filter(Boolean).join(" ");
+      if (obj.username) return obj.username;
+    }
+  } catch {}
+  return "New Author";
+}
+
 // --------- Sidebar ---------
 const Sidebar = ({ isOpen, onClose, authorName, navigate, userNovels = [] }) => {
   const { pathname } = useLocation();
+
+  // 🔹 Added Project to the menu, and kept Profile link
   const menuItems = [
     { icon: Home,       label: "Dashboard",         path: "/dashboard" },
     { icon: PencilLine, label: "Write",             path: "/writer" },
     { icon: BookOpen,   label: "Table of Contents", path: "/toc" },
+    { icon: Layers,     label: "Project",           path: "/project" }, // ✅ ADDED
     { icon: Calendar,   label: "Calendar",          path: "/calendar" },
     { icon: Layers,     label: "Story Lab",         path: "/story-lab" },
     { icon: UploadCloud,label: "Publishing",        path: "/publishing" },
     { icon: Store,      label: "Store",             path: "/store" },
-    { icon: User,       label: "Profile",           path: "/profile" },
+    { icon: User,       label: "Profile",           path: "/profile" }, // ✅ PROFILE
     { icon: Info,       label: "About",             path: "/about" },
   ];
 
@@ -181,9 +202,14 @@ const Sidebar = ({ isOpen, onClose, authorName, navigate, userNovels = [] }) => 
           </div>
         </div>
 
-        {/* Author info */}
+        {/* Author info (now the whole card opens Profile too) */}
         <div className="p-4 border-t border-white/60 flex-shrink-0">
-          <div className="p-4 glass-soft rounded-xl hover:bg-white/80 transition-colors">
+          <div
+            className="p-4 glass-soft rounded-xl hover:bg-white/80 transition-colors cursor-pointer"
+            onClick={() => navigate("/profile")}
+            role="button"
+            aria-label="Open profile"
+          >
             <div className="flex items-center gap-3 mb-3">
               <div className="w-8 h-8 rounded-full bg-gradient-to-br from-accent via-primary to-gold grid place-items-center shadow-md">
                 <span className="text-ink font-bold text-xs">{authorName?.charAt(0)?.toUpperCase?.() || "A"}</span>
@@ -193,7 +219,7 @@ const Sidebar = ({ isOpen, onClose, authorName, navigate, userNovels = [] }) => 
                 <p className="text-xs text-muted">Author</p>
               </div>
               <button
-                onClick={() => navigate("/profile")}
+                onClick={(e) => { e.stopPropagation(); navigate("/profile"); }}
                 className="text-muted hover:text-ink p-1 rounded-lg hover:bg-white/70 transition-colors"
                 aria-label="Open profile settings"
               >
@@ -202,13 +228,13 @@ const Sidebar = ({ isOpen, onClose, authorName, navigate, userNovels = [] }) => 
             </div>
             <div className="space-y-2">
               <button
-                onClick={() => navigate("/profile")}
+                onClick={(e) => { e.stopPropagation(); navigate("/profile"); }}
                 className="w-full text-left px-3 py-2 text-xs text-muted hover:text-ink hover:bg-white/70 rounded-lg transition-colors"
               >
                 Account Settings
               </button>
               <button
-                onClick={() => navigate("/")}
+                onClick={(e) => { e.stopPropagation(); navigate("/"); }}
                 className="w-full text-left px-3 py-2 text-xs text-muted hover:text-ink hover:bg-white/70 rounded-lg transition-colors"
               >
                 Sign Out
@@ -220,24 +246,6 @@ const Sidebar = ({ isOpen, onClose, authorName, navigate, userNovels = [] }) => 
     </>
   );
 };
-
-// --------- Profile name helper (pull from multiple keys; live-updates) ---------
-function readAuthorName() {
-  try {
-    const keys = ["userProfile", "profile", "dt_profile", "currentUser"];
-    for (const key of keys) {
-      const raw = localStorage.getItem(key);
-      if (!raw) continue;
-      const obj = JSON.parse(raw);
-      if (obj.displayName) return obj.displayName;
-      const fn = obj.firstName || obj.given_name;
-      const ln = obj.lastName || obj.family_name;
-      if (fn || ln) return [fn, ln].filter(Boolean).join(" ");
-      if (obj.username) return obj.username;
-    }
-  } catch {}
-  return "New Author";
-}
 
 // --------- Main Dashboard ---------
 export default function Dashboard() {
@@ -324,7 +332,7 @@ export default function Dashboard() {
                   <div>
                     <h1 className="text-2xl md:text-3xl font-extrabold text-ink">
                       <span className="mr-2">📝</span>
-                      {greeting}, Ready to Write?
+                      {greeting}{authorName ? `, ${authorName}` : ""} — Ready to Write?
                     </h1>
                     <div className="mt-1 flex items-center gap-4">
                       <p className="font-medium text-sm text-ink/80">Start your writing journey today</p>
