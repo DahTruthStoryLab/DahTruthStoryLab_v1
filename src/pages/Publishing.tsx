@@ -260,6 +260,87 @@ const styles = {
     overflow: "auto",
   } as React.CSSProperties,
 };
+/* ---------- Small UI helpers (restored) ---------- */
+type ToggleProps = {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  label?: string;
+};
+const Toggle: React.FC<ToggleProps> = ({ checked, onChange, label }) => {
+  return (
+    <button
+      onClick={() => onChange(!checked)}
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 10,
+        padding: "8px 12px",
+        borderRadius: 999,
+        border: `1px solid ${theme.border}`,
+        background: checked ? theme.highlight : theme.white,
+        color: theme.text,
+        cursor: "pointer",
+      }}
+      aria-pressed={checked}
+      title={label}
+    >
+      <span
+        style={{
+          width: 36,
+          height: 20,
+          borderRadius: 999,
+          background: checked ? theme.accent : "#CBD5E1",
+          position: "relative",
+          display: "inline-block",
+        }}
+      >
+        <span
+          style={{
+            position: "absolute",
+            top: 2,
+            left: checked ? 18 : 2,
+            width: 16,
+            height: 16,
+            borderRadius: 999,
+            background: theme.white,
+            transition: "left .15s ease",
+          }}
+        />
+      </span>
+      {label && <span style={{ fontSize: 14 }}>{label}</span>}
+    </button>
+  );
+};
+
+type FieldProps = {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+};
+const Field: React.FC<FieldProps> = ({ label, value, onChange, placeholder }) => {
+  return (
+    <div>
+      <div style={{ color: theme.subtext, fontSize: 12 }}>{label}</div>
+      <textarea
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        rows={label.length > 12 ? 3 : 2}
+        placeholder={placeholder}
+        style={{
+          width: "100%",
+          marginTop: 6,
+          fontSize: 14,
+          padding: 10,
+          border: `1px solid ${theme.border}`,
+          borderRadius: 12,
+          background: theme.white,
+          color: theme.text,
+        }}
+      />
+    </div>
+  );
+};
 
 /* ---------- Tiny helpers ---------- */
 const htmlEscape = (s: string) =>
