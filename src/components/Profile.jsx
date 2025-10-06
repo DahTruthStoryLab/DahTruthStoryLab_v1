@@ -23,7 +23,10 @@ try {
   // Works if <UserProvider> is mounted
   // eslint-disable-next-line global-require
   useUserSafe = require("../lib/state/userStore").useUser;
-} catch {}
+} catch {
+  // Fallback if `useUserSafe` is not available
+  useUserSafe = () => null;
+}
 
 /* ---------- Helpers ---------- */
 const STORAGE_KEY = "dt_profile";
@@ -113,8 +116,8 @@ function ProfileSidebar({ onNavigate }) {
 export default function Profile() {
   const navigate = useNavigate();
 
-  // ✅ Always call the hook without conditions to comply with rules of hooks
-  const store = useUserSafe ? useUserSafe() : null;
+  // ✅ Always call the hook unconditionally
+  const store = useUserSafe();
 
   // Initialization logic
   const initial = store?.user ?? readProfile();
@@ -209,9 +212,7 @@ export default function Profile() {
           <div className="flex-1 space-y-6">
             {/* Avatar Card */}
             <div className="glass-panel p-6">
-              <div className="text-lg font-semibold mb-4 heading-serif">
-                Profile Photo
-              </div>
+              <div className="text-lg font-semibold mb-4 heading-serif">Profile Photo</div>
 
               <div className="rounded-2xl overflow-hidden border border-[hsl(var(--border))] bg-[color:var(--color-primary)]/40 aspect-square max-w-sm flex items-center justify-center mb-4">
                 {avatar ? (
@@ -219,9 +220,7 @@ export default function Profile() {
                 ) : (
                   <div className="w-full h-full grid place-items-center">
                     <div className="w-24 h-24 rounded-full bg-[color:var(--color-accent)] grid place-items-center shadow">
-                      <span className="text-[color:var(--color-ink)] font-black text-3xl">
-                        {authorInitial}
-                      </span>
+                      <span className="text-[color:var(--color-ink)] font-black text-3xl">{authorInitial}</span>
                     </div>
                   </div>
                 )}
@@ -234,9 +233,7 @@ export default function Profile() {
                     type="file"
                     accept="image/*"
                     className="hidden"
-                    onChange={(e) =>
-                      e.target.files?.[0] && onPickAvatar(e.target.files[0])
-                    }
+                    onChange={(e) => e.target.files?.[0] && onPickAvatar(e.target.files[0])}
                   />
                 </label>
                 {avatar && (
@@ -252,15 +249,11 @@ export default function Profile() {
 
             {/* Author Details */}
             <div className="glass-panel p-6">
-              <div className="text-lg font-semibold mb-4 heading-serif">
-                Author Details
-              </div>
+              <div className="text-lg font-semibold mb-4 heading-serif">Author Details</div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="md:col-span-2">
-                  <label className="text-xs text-muted mb-1 block">
-                    Display Name
-                  </label>
+                  <label className="text-xs text-muted mb-1 block">Display Name</label>
                   <input
                     value={displayName}
                     onChange={(e) => setDisplayName(e.target.value)}
@@ -290,9 +283,7 @@ export default function Profile() {
                 </div>
 
                 <div>
-                  <label className="text-xs text-muted mb-1 block">
-                    Website (optional)
-                  </label>
+                  <label className="text-xs text-muted mb-1 block">Website (optional)</label>
                   <input
                     placeholder="https://DahTruth.com"
                     className="w-full rounded-lg bg-white border border-[hsl(var(--border))] px-4 py-3 text-sm outline-none"
@@ -325,13 +316,9 @@ export default function Profile() {
 
             {/* Quick Actions */}
             <div className="glass-panel p-6">
-              <div className="text-lg font-semibold mb-4 heading-serif">
-                Quick Actions
-              </div>
+              <div className="text-lg font-semibold mb-4 heading-serif">Quick Actions</div>
               <div className="flex flex-wrap gap-2">
-                <button onClick={save} className="btn-primary">
-                  Save changes
-                </button>
+                <button onClick={save} className="btn-primary">Save changes</button>
                 <button
                   onClick={() => navigate("/")}
                   className="px-4 py-2 rounded-lg bg-white border border-[hsl(var(--border))] hover:opacity-90 inline-flex items-center gap-2"
@@ -340,16 +327,13 @@ export default function Profile() {
                 </button>
               </div>
               <div className="text-xs text-muted mt-3">
-                Last saved {Math.round((Date.now() - lastSaved) / 60000) || 0}m
-                ago
+                Last saved {Math.round((Date.now() - lastSaved) / 60000) || 0}m ago
               </div>
             </div>
 
             {/* Preview */}
             <div className="glass-panel p-6">
-              <div className="text-lg font-semibold mb-4 heading-serif">
-                Preview
-              </div>
+              <div className="text-lg font-semibold mb-4 heading-serif">Preview</div>
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 rounded-full bg-[color:var(--color-accent)] grid place-items-center shadow">
                   <span className="text-[color:var(--color-ink)] font-black">
