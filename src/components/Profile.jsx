@@ -1,7 +1,22 @@
 // src/components/Profile.js
 import React, { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { User, Save, BookOpen, LogOut, Mail, Image, ArrowLeft, Home, PencilLine, BookOpen as BookIcon, Calendar as CalIcon, Layers, Store, Info } from "lucide-react";
+import {
+  User,
+  Save,
+  BookOpen,
+  LogOut,
+  Mail,
+  Image,
+  ArrowLeft,
+  Home,
+  PencilLine,
+  BookOpen as BookIcon,
+  Calendar as CalIcon,
+  Layers,
+  Store,
+  Info,
+} from "lucide-react";
 
 let useUserSafe = null;
 try {
@@ -20,7 +35,9 @@ function readProfile() {
       localStorage.getItem("userProfile") ||
       localStorage.getItem("profile") ||
       localStorage.getItem("currentUser");
-    return raw ? JSON.parse(raw) : { displayName: "", email: "", bio: "", avatar: "" };
+    return raw
+      ? JSON.parse(raw)
+      : { displayName: "", email: "", bio: "", avatar: "" };
   } catch {
     return { displayName: "", email: "", bio: "", avatar: "" };
   }
@@ -58,7 +75,9 @@ function ProfileSidebar({ onNavigate }) {
             src="/DahTruthLogo.png"
             alt="DahTruth"
             className="w-10 h-10 rounded-full border border-white/40"
-            onError={(e) => { e.currentTarget.style.display = "none"; }}
+            onError={(e) => {
+              e.currentTarget.style.display = "none";
+            }}
           />
           <div>
             <div className="heading-serif text-xl">DahTruth</div>
@@ -73,9 +92,11 @@ function ProfileSidebar({ onNavigate }) {
                 key={it.path}
                 onClick={() => onNavigate(it.path)}
                 className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg border transition
-                  ${active
-                    ? "bg-[color:var(--color-primary)] border-[hsl(var(--border))] font-medium"
-                    : "bg-transparent border-transparent hover:bg-[color:var(--color-primary)]/60 hover:border-[hsl(var(--border))]"}`}
+                  ${
+                    active
+                      ? "bg-[color:var(--color-primary)] border-[hsl(var(--border))] font-medium"
+                      : "bg-transparent border-transparent hover:bg-[color:var(--color-primary)]/60 hover:border-[hsl(var(--border))]"
+                  }`}
               >
                 <it.icon size={18} className="text-[color:var(--color-ink)]/80" />
                 <span>{it.label}</span>
@@ -100,9 +121,7 @@ export default function Profile() {
     store = null;
   }
 
-  // ...rest of your code (JSX, event handlers, etc.)
-}
-
+  // Move initialization logic inside the function
   const initial = store?.user ?? readProfile();
 
   const [displayName, setDisplayName] = useState(initial.displayName || "");
@@ -163,7 +182,9 @@ export default function Profile() {
               <div>
                 <h1 className="heading-serif text-2xl">Profile</h1>
                 <div className="text-sm text-muted">
-                  {displayName ? `Signed in as ${displayName}` : "Set your author details"}
+                  {displayName
+                    ? `Signed in as ${displayName}`
+                    : "Set your author details"}
                 </div>
               </div>
             </div>
@@ -193,7 +214,9 @@ export default function Profile() {
           <div className="flex-1 space-y-6">
             {/* Avatar Card */}
             <div className="glass-panel p-6">
-              <div className="text-lg font-semibold mb-4 heading-serif">Profile Photo</div>
+              <div className="text-lg font-semibold mb-4 heading-serif">
+                Profile Photo
+              </div>
 
               <div className="rounded-2xl overflow-hidden border border-[hsl(var(--border))] bg-[color:var(--color-primary)]/40 aspect-square max-w-sm flex items-center justify-center mb-4">
                 {avatar ? (
@@ -201,7 +224,9 @@ export default function Profile() {
                 ) : (
                   <div className="w-full h-full grid place-items-center">
                     <div className="w-24 h-24 rounded-full bg-[color:var(--color-accent)] grid place-items-center shadow">
-                      <span className="text-[color:var(--color-ink)] font-black text-3xl">{authorInitial}</span>
+                      <span className="text-[color:var(--color-ink)] font-black text-3xl">
+                        {authorInitial}
+                      </span>
                     </div>
                   </div>
                 )}
@@ -214,7 +239,9 @@ export default function Profile() {
                     type="file"
                     accept="image/*"
                     className="hidden"
-                    onChange={(e) => e.target.files?.[0] && onPickAvatar(e.target.files[0])}
+                    onChange={(e) =>
+                      e.target.files?.[0] && onPickAvatar(e.target.files[0])
+                    }
                   />
                 </label>
                 {avatar && (
@@ -230,24 +257,34 @@ export default function Profile() {
 
             {/* Author Details */}
             <div className="glass-panel p-6">
-              <div className="text-lg font-semibold mb-4 heading-serif">Author Details</div>
+              <div className="text-lg font-semibold mb-4 heading-serif">
+                Author Details
+              </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="md:col-span-2">
-                  <label className="text-xs text-muted mb-1 block">Display Name</label>
+                  <label className="text-xs text-muted mb-1 block">
+                    Display Name
+                  </label>
                   <input
                     value={displayName}
                     onChange={(e) => setDisplayName(e.target.value)}
                     placeholder="e.g., Jacqueline Session Ausby"
                     className="w-full rounded-lg bg-white border border-[hsl(var(--border))] px-4 py-3 text-lg font-semibold outline-none"
-                    style={{ fontFamily: "Playfair Display, ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif" }}
+                    style={{
+                      fontFamily:
+                        "Playfair Display, ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif",
+                    }}
                   />
                 </div>
 
                 <div>
                   <label className="text-xs text-muted mb-1 block">Email</label>
                   <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-muted)]" size={16} />
+                    <Mail
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-muted)]"
+                      size={16}
+                    />
                     <input
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
@@ -258,7 +295,9 @@ export default function Profile() {
                 </div>
 
                 <div>
-                  <label className="text-xs text-muted mb-1 block">Website (optional)</label>
+                  <label className="text-xs text-muted mb-1 block">
+                    Website (optional)
+                  </label>
                   <input
                     placeholder="https://DahTruth.com"
                     className="w-full rounded-lg bg-white border border-[hsl(var(--border))] px-4 py-3 text-sm outline-none"
@@ -291,9 +330,13 @@ export default function Profile() {
 
             {/* Quick Actions */}
             <div className="glass-panel p-6">
-              <div className="text-lg font-semibold mb-4 heading-serif">Quick Actions</div>
+              <div className="text-lg font-semibold mb-4 heading-serif">
+                Quick Actions
+              </div>
               <div className="flex flex-wrap gap-2">
-                <button onClick={save} className="btn-primary">Save changes</button>
+                <button onClick={save} className="btn-primary">
+                  Save changes
+                </button>
                 <button
                   onClick={() => navigate("/")}
                   className="px-4 py-2 rounded-lg bg-white border border-[hsl(var(--border))] hover:opacity-90 inline-flex items-center gap-2"
@@ -302,29 +345,41 @@ export default function Profile() {
                 </button>
               </div>
               <div className="text-xs text-muted mt-3">
-                Last saved {Math.round((Date.now() - lastSaved) / 60000) || 0}m ago
+                Last saved {Math.round((Date.now() - lastSaved) / 60000) || 0}m
+                ago
               </div>
             </div>
 
             {/* Preview */}
             <div className="glass-panel p-6">
-              <div className="text-lg font-semibold mb-4 heading-serif">Preview</div>
+              <div className="text-lg font-semibold mb-4 heading-serif">
+                Preview
+              </div>
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 rounded-full bg-[color:var(--color-accent)] grid place-items-center shadow">
-                  <span className="text-[color:var(--color-ink)] font-black">{authorInitial}</span>
+                  <span className="text-[color:var(--color-ink)] font-black">
+                    {authorInitial}
+                  </span>
                 </div>
                 <div className="min-w-0">
                   <div
                     className="font-bold text-lg truncate"
-                    style={{ fontFamily: "Playfair Display, ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif" }}
+                    style={{
+                      fontFamily:
+                        "Playfair Display, ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif",
+                    }}
                   >
                     {displayName || "Your Name"}
                   </div>
-                  <div className="text-sm text-muted truncate">{email || "you@example.com"}</div>
+                  <div className="text-sm text-muted truncate">
+                    {email || "you@example.com"}
+                  </div>
                 </div>
               </div>
               {bio?.trim() && (
-                <p className="mt-4 text-[color:var(--color-ink)]/80 leading-relaxed">{bio}</p>
+                <p className="mt-4 text-[color:var(--color-ink)]/80 leading-relaxed">
+                  {bio}
+                </p>
               )}
             </div>
           </div>
