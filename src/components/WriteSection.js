@@ -1,16 +1,17 @@
 // src/components/WriteSection.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import ReactQuill from "react-quill";
 import {
   Plus, Save, Eye, FileText, Edit3, Trash2, Menu, X, Target, Clock, RotateCcw, Download,
-  CheckCircle, AlertCircle, Lightbulb, Zap, Brain, MessageSquare, RefreshCw, Wand2, Users,
-  BookOpen, MapPin, ArrowLeft, Maximize, Minimize, Moon, Sun, AlignLeft, AlignCenter,
-  AlignRight, List, ListOrdered, Heading1, Heading2, Heading3, Underline, Italic, Bold,
-  Quote, Upload, Bot, SlidersHorizontal
+  CheckCircle, Bot, SlidersHorizontal, BookOpen, MapPin, ArrowLeft,
+  Maximize as MaximizeIcon, Minimize as MinimizeIcon,
+  AlignLeft, AlignCenter, AlignRight, List, ListOrdered, Heading1, Heading2, Heading3, Underline, Italic, Bold, Quote, Upload
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
+import "react-quill/dist/quill.snow.css"; // toolbar styling
 
 /* ──────────────────────────────────────────────────────────────
-   Shared storage helpers
+   Storage (kept compatible with your app-wide key)
 ───────────────────────────────────────────────────────────── */
 const STORAGE_KEY = "dahtruth-story-lab-toc-v3";
 
@@ -31,98 +32,108 @@ const saveState = (state) => {
 
 const getInitialState = () => {
   const existing = loadState();
-  return (
-    existing || {
-      book: {
-        title: "Untitled Book",
-        subtitle: "",
-        author: "",
-        genre: "",
-        tags: [],
-        targetWords: 50000,
-        deadline: "",
-        status: "Draft",
-        logline: "",
-        synopsis: "",
-        cover: "",
+  return existing || {
+    book: {
+      title: "Untitled Book",
+      subtitle: "",
+      author: "",
+      genre: "",
+      tags: [],
+      targetWords: 50000,
+      deadline: "",
+      status: "Draft",
+      logline: "",
+      synopsis: "",
+      cover: "",
+    },
+    chapters: [
+      {
+        id: 1,
+        title: "Chapter 1: First Chord",
+        content:
+          "<p>Jacque's fingers trembled as they touched the guitar strings for the first time on stage…</p><h1>Scene One</h1><p>The room hummed.</p><h2>Beat A</h2><p>It grew quiet.</p>",
+        wordCount: 1205,
+        lastEdited: "2 hours ago",
+        status: "draft",
       },
-      chapters: [
-        {
-          id: 1,
-          title: "Chapter 1: First Chord",
-          content:
-            "Jacque's fingers trembled as they touched the guitar strings for the first time on stage...\n\n# Scene One\nThe room hummed.\n\n## Beat A\nIt grew quiet.",
-          wordCount: 1205,
-          lastEdited: "2 hours ago",
-          status: "draft",
-        },
-        {
-          id: 2,
-          title: "Chapter 2: Backstage Revelations",
-          content:
-            "The dressing room smelled of stale coffee and nervous energy...\n\n# Interlude\nWhispers and light.",
-          wordCount: 892,
-          lastEdited: "Yesterday",
-          status: "draft",
-        },
-      ],
-      daily: { goal: 500, counts: {} },
-      settings: { theme: "light", focusMode: false },
-      tocOutline: [] // will be filled by Push TOC
-    }
-  );
+      {
+        id: 2,
+        title: "Chapter 2: Backstage Revelations",
+        content:
+          "<p>The dressing room smelled of stale coffee and nervous energy…</p><h1>Interlude</h1><p>Whispers and light.</p>",
+        wordCount: 892,
+        lastEdited: "Yesterday",
+        status: "draft",
+      },
+    ],
+    daily: { goal: 500, counts: {} },
+    settings: { theme: "light", focusMode: false },
+    tocOutline: []
+  };
 };
 
 /* ──────────────────────────────────────────────────────────────
    Utilities
 ───────────────────────────────────────────────────────────── */
-const countWords = (text) => text.trim().split(/\s+/).filter(Boolean).length;
-
-const computeReadability = (text) => {
-  const words = text.trim().match(/\b[\w’'-]+\b/g)?.length || 0;
-  const sentences = text.split(/[.!?]+["')\]]*\s+/).filter((s) => s.trim().length > 0).length || 1;
-  const syllables = (text.match(/[aeiouy]{1,2}/gi) || []).length; // crude but ok for UI hint
-  const WPS = words / sentences;
-  // Flesch Reading Ease
-  const FRE = 206.835 - 1.015 * (words / sentences) - 84.6 * (syllables / Math.max(words, 1));
-  // Grade estimate with FKGL
-  const FKGL = 0.39 * (words / sentences) + 11.8 * (syllables / Math.max(words, 1)) - 15.59;
-  return {
-    words, sentences, avgSentence: Math.round(WPS * 10) / 10,
-    fleschEase: Math.round(FRE), grade: Math.max(1, Math.round(FKGL))
-  };
+const countWords = (html = "") => {
+  const text = html
+    .replace(/<br\s*\/?>/gi, " ")
+    .replace(/<\/p>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/\u00A0/g, " ")
+    .trim();
+  return text ? text.split(/\s+/).length : 0;
 };
 
-const findHeadings = (text) => {
-  // Headings are lines starting with #, ##, ###
-  const lines = text.split(/\r?\n/);
+const computeReadability = (html) => {
+  const text = html
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/\u00A0/g, " ")
+    .trim();
+  const words = (text.match(/\b[\w’'-]+\b/g) || []).length;
+  const sentences = (text.split(/[.!?]+["')\]]*\s+/).filter(s => s.trim().length > 0).length) || 1;
+  const syllables = (text.match(/[aeiouy]{1,2}/gi) || []).length;
+  const WPS = words / sentences;
+  const FRE = Math.round(206.835 - 1.015 * (words / sentences) - 84.6 * (syllables / Math.max(words, 1)));
+  const FKGL = Math.max(1, Math.round(0.39 * (words / sentences) + 11.8 * (syllables / Math.max(words, 1)) - 15.59));
+  return { words, sentences, avgSentence: Math.round(WPS * 10) / 10, fleschEase: FRE, grade: FKGL };
+};
+
+const findHeadings = (html) => {
+  // Look for <h1>, <h2>, <h3>
   const out = [];
-  lines.forEach((line, idx) => {
-    const m = line.match(/^(#{1,3})\s+(.*)$/);
-    if (m) {
-      out.push({ level: m[1].length, title: m[2].trim(), line: idx + 1 });
-    }
-  });
+  const re = /<(h[1-3])[^>]*>(.*?)<\/\1>/gi;
+  let m;
+  while ((m = re.exec(html)) !== null) {
+    const level = Number(m[1].slice(1));
+    const title = m[2].replace(/<[^>]+>/g, "").trim();
+    out.push({ level, title, line: out.length + 1 });
+  }
   return out;
 };
 
-const applyQuickFixes = (text) => {
-  let t = text;
-  t = t.replace(/\s+([,.;:!?])/g, "$1");        // remove space before punctuation
-  t = t.replace(/ {2,}/g, " ");                 // condense spaces
-  t = t.replace(/\bi\b(?=\b)/g, "I");           // capitalize solitary i
-  t = t.replace(/--/g, "—");                    // double hyphen to em dash
-  t = t.replace(/\s+(\n)/g, "$1");              // trim trailing spaces before newlines
+const applyQuickFixes = (html) => {
+  // Light HTML-aware fixes
+  let t = html;
+  // remove spaces before punctuation (in text, naively)
+  t = t.replace(/\s+([,.;:!?])/g, "$1");
+  // condense double spaces (avoid in tags)
+  t = t.replace(/(>[^<]*) {2,}([^<]*<)/g, (_, a, b) => a.replace(/ {2,}/g, " ") + b);
+  // Lone i -> I (safe-ish inside word boundaries)
+  t = t.replace(/(^|[^\w'])i(\b)/g, "$1I$2");
+  // Replace double hyphen with a period + space (no em dashes per your preference)
+  t = t.replace(/--/g, ". ");
   return t;
 };
 
-const applyModeHints = (mode, text) => {
-  // Add very light-touch suggestions or shaping based on mode (non-destructive)
-  if (mode === "Screenplay") {
-    // ensure blank lines between paragraphs (helps screenplay readability)
-    return text.replace(/\n{2,}/g, "\n\n");
-  }
-  return text;
+const debounce = (fn, ms = 500) => {
+  let t = null;
+  return (...args) => {
+    clearTimeout(t);
+    t = setTimeout(() => fn(...args), ms);
+  };
 };
 
 /* ──────────────────────────────────────────────────────────────
@@ -188,7 +199,7 @@ const ChapterRail = ({
       <aside
         className={[
           "xl:hidden fixed top-16", fixedSide,
-          "h:[calc(100vh-4rem)] w-72 z-30",
+          "h-[calc(100vh-4rem)] w-72 z-30",
           "bg-white/70 backdrop-blur-xl", borderSide, "border-white/60",
           "transition-transform duration-300",
           open ? "translate-x-0" : hiddenX,
@@ -332,7 +343,7 @@ const MetaSidebar = ({
           </div>
         </div>
 
-        {/* AI Coach */}
+        {/* AI Coach (local checks; no backend yet) */}
         <div className="rounded-2xl bg-white/80 backdrop-blur border border-border p-4">
           <div className="flex items-center gap-2 text-ink font-semibold mb-2">
             <Bot size={16} className="text-primary" /> AI Coach
@@ -387,12 +398,12 @@ const MetaSidebar = ({
               onClick={() => onRunAI({ grammar: true, clarity: true, style: true, consistency: true })}
               className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-primary text-white text-sm hover:opacity-90"
             >
-              <Wand2 size={16} /> Run All
+              Run All
             </button>
             <button
               onClick={onApplyFixes}
               className="text-sm px-3 py-1.5 rounded-md border border-emerald-300 text-emerald-700 bg-emerald-50 hover:bg-emerald-100"
-              title="Apply safe quick fixes (spacing, em dashes, lone i, etc.)"
+              title="Apply safe quick fixes (spacing, hyphens, lone i, etc.)"
             >
               Apply Quick Fixes
             </button>
@@ -401,15 +412,15 @@ const MetaSidebar = ({
           {/* Results */}
           {aiResults && (
             <div className="mt-3 space-y-3">
-              {stats && (
+              {aiResults.stats && (
                 <div className="rounded-lg border border-white/60 bg-white/70 p-2 text-xs text-ink">
                   <div className="font-medium mb-1">Readability</div>
                   <div className="grid grid-cols-2 gap-1">
-                    <div>Words: <b>{stats.words.toLocaleString()}</b></div>
-                    <div>Sentences: <b>{stats.sentences}</b></div>
-                    <div>Avg sent.: <b>{stats.avgSentence}</b></div>
-                    <div>Flesch Ease: <b>{stats.fleschEase}</b></div>
-                    <div>Grade: <b>{stats.grade}</b></div>
+                    <div>Words: <b>{aiResults.stats.words.toLocaleString()}</b></div>
+                    <div>Sentences: <b>{aiResults.stats.sentences}</b></div>
+                    <div>Avg sent.: <b>{aiResults.stats.avgSentence}</b></div>
+                    <div>Flesch Ease: <b>{aiResults.stats.fleschEase}</b></div>
+                    <div>Grade: <b>{aiResults.stats.grade}</b></div>
                   </div>
                 </div>
               )}
@@ -444,7 +455,7 @@ const MetaSidebar = ({
         {/* Characters */}
         <div className="rounded-2xl bg-white/80 backdrop-blur border border-border p-4">
           <div className="flex items-center gap-2 text-ink font-semibold mb-2">
-            <Users size={16} className="text-primary" /> Characters
+            <UsersIcon /> Characters
           </div>
           <div className="text-sm text-muted">Add/track your key characters here.</div>
         </div>
@@ -461,209 +472,87 @@ const MetaSidebar = ({
   );
 };
 
-/* ──────────────────────────────────────────────────────────────
-   Editor Toolbar helpers (textarea-based)
-───────────────────────────────────────────────────────────── */
-const surroundSelection = (ta, left, right = left) => {
-  const start = ta.selectionStart ?? 0;
-  const end = ta.selectionEnd ?? 0;
-  const before = ta.value.slice(0, start);
-  const sel = ta.value.slice(start, end);
-  const after = ta.value.slice(end);
-  const next = before + left + sel + right + after;
-  const newPos = start + left.length + sel.length + right.length;
-  return { next, cursor: newPos };
-};
-
-const prefixLines = (ta, prefix) => {
-  const start = ta.selectionStart ?? 0;
-  const end = ta.selectionEnd ?? 0;
-  const before = ta.value.slice(0, start);
-  const sel = ta.value.slice(start, end);
-  const after = ta.value.slice(end);
-  const block = sel || "";
-  const nextBlock = block.split("\n").map((l) => (l.trim() ? `${prefix}${l}` : l)).join("\n");
-  const next = before + nextBlock + after;
-  const newPos = before.length + nextBlock.length;
-  return { next, cursor: newPos };
-};
-
-const insertAtCursor = (ta, text) => {
-  const start = ta.selectionStart ?? 0;
-  const end = ta.selectionEnd ?? 0;
-  const before = ta.value.slice(0, start);
-  const after = ta.value.slice(end);
-  const next = before + text + after;
-  const cursor = start + text.length;
-  return { next, cursor };
-};
+// simple icon to avoid another import
+const UsersIcon = (props) => <svg {...props} width="16" height="16" viewBox="0 0 24 24" className="text-primary"><path fill="currentColor" d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5s-3 1.34-3 3s1.34 3 3 3m-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5S5 6.34 5 8s1.34 3 3 3m0 2c-2.33 0-7 1.17-7 3.5V19h10v-2.5C11 14.17 6.33 13 4 13m12 0c-.29 0-.62.02-.97.05c1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5"/></svg>;
 
 /* ──────────────────────────────────────────────────────────────
-   Writing Editor (Word-like canvas + toolbar + imports)
+   Writing Editor (ReactQuill + toolbar + fullscreen)
 ───────────────────────────────────────────────────────────── */
 const WritingEditor = ({
   chapter, onSave, onUpdate, onCreateNew,
   onPushTOC, onImportDocx, onImportHtml
 }) => {
   const [title, setTitle] = useState(chapter?.title || "");
-  const [content, setContent] = useState(chapter?.content || "");
+  const [html, setHtml] = useState(chapter?.content || "");
   const [count, setCount] = useState(0);
-  const [preview, setPreview] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [fullscreenTheme, setFullscreenTheme] = useState("light"); // light, dark, sepia
-  const textareaRef = useRef(null);
+  const [showPreview, setShowPreview] = useState(false);
+  const containerRef = useRef(null);
 
+  // Force LTR to stop reversed typing
+  useEffect(() => {
+    const root = containerRef.current;
+    if (root) {
+      root.setAttribute("dir", "ltr");
+      root.style.direction = "ltr";
+    }
+    const htmlEl = document.documentElement;
+    if (htmlEl && htmlEl.getAttribute("dir") === "rtl") htmlEl.setAttribute("dir", "ltr");
+  }, []);
+
+  // Update local state when selection changes
   useEffect(() => {
     if (chapter) {
       setTitle(chapter.title || "");
-      setContent(chapter.content || "");
+      setHtml(chapter.content || "");
     } else {
       setTitle("");
-      setContent("");
+      setHtml("");
     }
   }, [chapter?.id]);
 
-  useEffect(() => setCount(countWords(content)), [content]);
+  useEffect(() => setCount(countWords(html)), [html]);
+
+  // Debounced propagate to parent (autosave)
+  const pushUpdate = useMemo(
+    () => debounce((next) => onUpdate(next), 500),
+    [onUpdate]
+  );
 
   useEffect(() => {
-    const handleEscape = (e) => {
-      if (e.key === "Escape" && isFullscreen) setIsFullscreen(false);
+    if (!chapter) return;
+    const next = {
+      ...chapter,
+      title,
+      content: html,
+      wordCount: countWords(html),
+      lastEdited: "Just now",
     };
-    if (isFullscreen) {
-      document.addEventListener("keydown", handleEscape);
-      document.body.style.overflow = "hidden";
-    }
-    return () => {
-      document.removeEventListener("keydown", handleEscape);
-      document.body.style.overflow = "unset";
-    };
-  }, [isFullscreen]);
+    pushUpdate(next);
+  }, [title, html]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSave = () => {
     if (!chapter) return;
-    onUpdate({
-      ...chapter,
-      title,
-      content,
-      wordCount: count,
-      lastEdited: "Just now",
-    });
     onSave?.();
   };
-  const toggleFullscreen = () => setIsFullscreen(!isFullscreen);
+  const toggleFullscreen = () => setIsFullscreen((v) => !v);
 
-  const applyToolbar = (action) => {
-    const ta = textareaRef.current;
-    if (!ta) return;
-    let r = null;
-    switch (action) {
-      case "bold": r = surroundSelection(ta, "**"); break;
-      case "italic": r = surroundSelection(ta, "*"); break;
-      case "underline": r = surroundSelection(ta, "__"); break;
-      case "h1": r = prefixLines(ta, "# "); break;
-      case "h2": r = prefixLines(ta, "## "); break;
-      case "h3": r = prefixLines(ta, "### "); break;
-      case "ul": r = prefixLines(ta, "- "); break;
-      case "ol": {
-        // naive: each line becomes "1. ", "2. ", etc.
-        const start = ta.selectionStart ?? 0;
-        const end = ta.selectionEnd ?? 0;
-        const block = (ta.value.slice(start, end) || "").split("\n");
-        let i = 1;
-        const transformed = block.map((l) => (l.trim() ? `${i++}. ${l}` : l)).join("\n");
-        const before = ta.value.slice(0, start);
-        const after = ta.value.slice(end);
-        r = { next: before + transformed + after, cursor: (before + transformed).length };
-        break;
-      }
-      case "quote": r = prefixLines(ta, "> "); break;
-      case "center": r = surroundSelection(ta, '<div style="text-align:center">', "</div>"); break;
-      case "left": r = surroundSelection(ta, '<div style="text-align:left">', "</div>"); break;
-      case "right": r = surroundSelection(ta, '<div style="text-align:right">', "</div>"); break;
-      case "pagebreak": r = insertAtCursor(ta, "\n\n---PAGE BREAK---\n\n"); break;
-      default: break;
-    }
-    if (r) {
-      setContent(r.next);
-      requestAnimationFrame(() => ta.setSelectionRange(r.cursor, r.cursor));
-    }
-  };
+  // Quill toolbar
+  const quillModules = useMemo(() => ({
+    toolbar: [
+      [{ header: [1, 2, 3, false] }],
+      ["bold", "italic", "underline", "strike"],
+      [{ list: "ordered" }, { list: "bullet" }],
+      [{ align: [] }],
+      ["blockquote", "code-block"],
+      ["link", "image"],
+      ["clean"],
+    ],
+  }), []);
 
-  const FullscreenEditor = () => (
-    <div className={`fixed inset-0 z-[9999] ${fullscreenTheme === "dark"
-        ? "bg-slate-900 text-slate-100"
-        : fullscreenTheme === "sepia"
-        ? "bg-amber-50 text-amber-900"
-        : "bg-white text-ink"} transition-colors duration-200`}
-    >
-      {/* FS Header */}
-      <div className="absolute top-0 left-0 right-0 p-4 flex items-center justify-between border-b border-current/10 bg-opacity-90 backdrop-blur-sm">
-        <div className="flex items-center gap-4">
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            className="text-xl font-semibold bg-transparent outline-none border-b border-transparent hover:border-current focus:border-current transition-colors"
-            placeholder="Chapter title"
-          />
-          <div className="text-sm opacity-70">{count} words</div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <div className="flex rounded-lg border border-current/20 overflow-hidden">
-            {[
-              { key: "light", icon: Sun, label: "Light" },
-              { key: "sepia", icon: () => <>📄</>, label: "Sepia" },
-              { key: "dark", icon: Moon, label: "Dark" },
-            ].map(({ key, icon: Icon, label }) => (
-              <button
-                key={key}
-                onClick={() => setFullscreenTheme(key)}
-                className={`px-3 py-2 text-sm ${fullscreenTheme === key ? "bg-current/10" : "hover:bg-current/5"}`}
-                title={label}
-              >
-                {typeof Icon === "function" ? <Icon /> : <Icon size={16} />}
-              </button>
-            ))}
-          </div>
-
-          <button onClick={handleSave} className="px-4 py-2 rounded-lg bg-primary text-white hover:opacity-90">
-            <Save size={16} />
-          </button>
-          <button onClick={toggleFullscreen} className="p-2 rounded-lg hover:bg-current/10" title="Exit Fullscreen (Esc)">
-            <Minimize size={20} />
-          </button>
-        </div>
-      </div>
-
-      {/* FS Content */}
-      <div className="pt-20 pb-8 px-8 h-full flex items-center justify-center">
-        <div className="w-full max-w-4xl h-full flex flex-col">
-          <textarea
-            ref={textareaRef}
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            className={`w-full flex-1 resize-none outline-none text-lg leading-relaxed ${
-              fullscreenTheme === "dark" ? "bg-slate-900 text-slate-100 placeholder-slate-400"
-              : fullscreenTheme === "sepia" ? "bg-amber-50 text-amber-900 placeholder-amber-600"
-              : "bg-white text-ink placeholder-slate-400"
-            }`}
-            placeholder="Start writing your story here... Press Esc to exit fullscreen."
-            autoFocus
-          />
-        </div>
-      </div>
-
-      {/* FS Footer */}
-      <div className="absolute bottom-0 left-0 right-0 p-4 text-center text-sm opacity-50">
-        <div className="flex items-center justify-center gap-4">
-          <span>Last saved: {chapter?.lastEdited || "Never"}</span>
-          <span>•</span>
-          <span>Auto-save enabled</span>
-          <span>•</span>
-          <span>Press Esc to exit</span>
-        </div>
-      </div>
+  const PageShell = ({ children }) => (
+    <div className="flex-1 p-6 overflow-auto grid place-items-center">
+      <div className="w-full max-w-3xl">{children}</div>
     </div>
   );
 
@@ -688,139 +577,175 @@ const WritingEditor = ({
     );
   }
 
-  // Word-like desk + bright page with gray border
   return (
     <>
-      <div className="flex-1 flex flex-col gap-4">
-        {/* Toolbar */}
-        <div className="rounded-2xl bg-white/80 backdrop-blur border border-border p-2 shadow-sm">
-          <div className="flex flex-wrap items-center gap-1">
-            <button onClick={() => applyToolbar("bold")} className="btn-icon"><Bold size={16} /></button>
-            <button onClick={() => applyToolbar("italic")} className="btn-icon"><Italic size={16} /></button>
-            <button onClick={() => applyToolbar("underline")} className="btn-icon"><Underline size={16} /></button>
-            <span className="mx-1 h-5 w-px bg-border" />
-            <button onClick={() => applyToolbar("h1")} className="btn-chip"><Heading1 size={16} /> H1</button>
-            <button onClick={() => applyToolbar("h2")} className="btn-chip"><Heading2 size={16} /> H2</button>
-            <button onClick={() => applyToolbar("h3")} className="btn-chip"><Heading3 size={16} /> H3</button>
-            <span className="mx-1 h-5 w-px bg-border" />
-            <button onClick={() => applyToolbar("ul")} className="btn-icon"><List size={16} /></button>
-            <button onClick={() => applyToolbar("ol")} className="btn-icon"><ListOrdered size={16} /></button>
-            <button onClick={() => applyToolbar("quote")} className="btn-icon"><Quote size={16} /></button>
-            <span className="mx-1 h-5 w-px bg-border" />
-            <button onClick={() => applyToolbar("left")} className="btn-icon" title="Align left"><AlignLeft size={16} /></button>
-            <button onClick={() => applyToolbar("center")} className="btn-icon" title="Align center"><AlignCenter size={16} /></button>
-            <button onClick={() => applyToolbar("right")} className="btn-icon" title="Align right"><AlignRight size={16} /></button>
-            <span className="mx-1 h-5 w-px bg-border" />
-            <button onClick={() => applyToolbar("pagebreak")} className="btn-chip">Page Break</button>
-            <span className="mx-1 h-5 w-px bg-border" />
-            <label className="btn-chip cursor-pointer">
-              <Upload size={16} /> DOCX
-              <input type="file" accept=".docx" className="hidden" onChange={(e) => onImportDocx(e, setContent)} />
-            </label>
-            <label className="btn-chip cursor-pointer">
-              <Upload size={16} /> HTML
-              <input type="file" accept=".html,.htm,.xhtml" className="hidden" onChange={(e) => onImportHtml(e, setContent)} />
-            </label>
-            <button onClick={() => onPushTOC()} className="btn-chip">
-              <BookOpen size={16} /> Push TOC
-            </button>
-            <span className="mx-1 h-5 w-px bg-border" />
+      {/* Toolbar header */}
+      <div className="rounded-2xl bg-white/80 backdrop-blur border border-border p-2 shadow-sm">
+        <div className="flex flex-wrap items-center gap-1">
+          {/* These align buttons wrap selected block inside <div style="text-align:..."> by inserting HTML; Quill already supports align, so we just show icons for familiarity */}
+          <button className="btn-icon" title="Align left"><AlignLeft size={16} /></button>
+          <button className="btn-icon" title="Align center"><AlignCenter size={16} /></button>
+          <button className="btn-icon" title="Align right"><AlignRight size={16} /></button>
+          <span className="mx-1 h-5 w-px bg-border" />
+          <button className="btn-icon" title="Bold"><Bold size={16} /></button>
+          <button className="btn-icon" title="Italic"><Italic size={16} /></button>
+          <button className="btn-icon" title="Underline"><Underline size={16} /></button>
+          <span className="mx-1 h-5 w-px bg-border" />
+          <button className="btn-chip"><Heading1 size={16} /> H1</button>
+          <button className="btn-chip"><Heading2 size={16} /> H2</button>
+          <button className="btn-chip"><Heading3 size={16} /> H3</button>
+          <span className="mx-1 h-5 w-px bg-border" />
+          <button className="btn-icon" title="Bulleted list"><List size={16} /></button>
+          <button className="btn-icon" title="Numbered list"><ListOrdered size={16} /></button>
+          <button className="btn-icon" title="Quote block"><Quote size={16} /></button>
+          <span className="mx-1 h-5 w-px bg-border" />
+
+          {/* Imports */}
+          <label className="btn-chip cursor-pointer" title="Import DOCX">
+            <Upload size={16} /> DOCX
+            <input type="file" accept=".docx" className="hidden" onChange={(e) => onImportDocx(e, setHtml)} />
+          </label>
+          <label className="btn-chip cursor-pointer" title="Import HTML">
+            <Upload size={16} /> HTML
+            <input type="file" accept=".html,.htm,.xhtml" className="hidden" onChange={(e) => onImportHtml(e, setHtml)} />
+          </label>
+
+          <button onClick={() => onPushTOC()} className="btn-chip" title="Update TOC from headings">
+            <BookOpen size={16} /> Push TOC
+          </button>
+
+          <span className="mx-1 h-5 w-px bg-border" />
+          <button
+            type="button"
+            onClick={toggleFullscreen}
+            className="btn-chip"
+            title="Fullscreen Writing Mode"
+          >
+            <MaximizeIcon size={16} /> Fullscreen
+          </button>
+
+          <div className="ml-auto flex items-center gap-2">
             <button
               type="button"
-              onClick={toggleFullscreen}
-              className="btn-chip"
-              title="Fullscreen Writing Mode"
+              onClick={() => setShowPreview((v) => !v)}
+              className={`px-3 py-2 rounded-md text-sm border ${
+                showPreview
+                  ? "bg-primary/10 text-primary border-primary/30"
+                  : "bg-white text-ink border-border hover:bg-white/80"
+              }`}
+              title="Preview"
             >
-              <Maximize size={16} /> Fullscreen
+              <Eye size={16} />
             </button>
-
-            <div className="ml-auto flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setPreview(!preview)}
-                className={[
-                  "px-3 py-2 rounded-md text-sm border",
-                  preview
-                    ? "bg-primary/10 text-primary border-primary/30"
-                    : "bg-white text-ink border-border hover:bg-white/80",
-                ].join(" ")}
-                title="Preview"
-              >
-                <Eye size={16} />
-              </button>
-              <button
-                type="button"
-                onClick={handleSave}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-primary text-white hover:opacity-90"
-              >
-                <Save size={16} />
-                Save
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* White canvas (page) on gray desk */}
-        <div className="rounded-3xl bg-[rgb(244,247,250)] shadow-2xl border border-border overflow-hidden flex-1 flex flex-col">
-          <div className="px-5 py-3 border-b border-border bg-white/70 backdrop-blur flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <input
-                type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                className="text-lg font-semibold bg-transparent text-ink outline-none"
-                placeholder="Chapter title"
-              />
-              <div className="hidden sm:flex items-center gap-2 text-sm text-muted">
-                <Target size={14} />
-                <span>{count} words</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="flex-1 p-6 overflow-auto grid place-items-center">
-            <div className="w-full max-w-3xl">
-              {preview ? (
-                <div className="max-w-3xl">
-                  <h1 className="text-3xl font-bold text-ink mb-6">{title}</h1>
-                  <div className="prose max-w-none text-ink">
-                    {content.split("\n").map((p, i) => (
-                      <p key={i}>{p}</p>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <textarea
-                  ref={textareaRef}
-                  value={content}
-                  onChange={(e) => setContent(e.target.value)}
-                  className="w-full h-[60vh] min-h-[520px] resize-none outline-none text-lg leading-7 text-ink bg-white rounded-[20px] border border-slate-200 p-6 shadow-sm"
-                  placeholder="Bright white page. Use the toolbar above for H1/H2/H3, lists, alignment, page breaks, and imports."
-                />
-              )}
-            </div>
-          </div>
-
-          <div className="px-5 py-3 border-t border-border bg-white/70 text-sm text-muted flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <Clock size={14} />
-                <span>Last saved: {chapter.lastEdited || "—"}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <RotateCcw size={14} />
-                <span>Auto-save enabled</span>
-              </div>
-            </div>
-            <button className="hover:text-ink" title="Download (JSON export in top bar)">
-              <Download size={14} />
+            <button
+              type="button"
+              onClick={handleSave}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-primary text-white hover:opacity-90"
+            >
+              <Save size={16} />
+              Save
             </button>
           </div>
         </div>
       </div>
 
-      {/* Fullscreen Mode */}
-      {isFullscreen && <FullscreenEditor />}
+      {/* Desk + page */}
+      <div className="rounded-3xl bg-[rgb(244,247,250)] shadow-2xl border border-border overflow-hidden flex-1 flex flex-col" ref={containerRef}>
+        <div className="px-5 py-3 border-b border-border bg-white/70 backdrop-blur flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <input
+              type="text"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              className="text-lg font-semibold bg-transparent text-ink outline-none"
+              placeholder="Chapter title"
+            />
+            <div className="hidden sm:flex items-center gap-2 text-sm text-muted">
+              <Target size={14} />
+              <span>{count.toLocaleString()} words</span>
+            </div>
+          </div>
+        </div>
+
+        <PageShell>
+          {/* Preview just renders the HTML; otherwise show Quill editor */}
+          {showPreview ? (
+            <div className="prose max-w-none text-ink">
+              <div dangerouslySetInnerHTML={{ __html: `<h1>${title || ""}</h1>${html || ""}` }} />
+            </div>
+          ) : (
+            <div className="rounded-[20px] border border-slate-200 shadow-sm overflow-hidden">
+              {/* Quill toolbar shows automatically via theme 'snow' */}
+              <ReactQuill
+                theme="snow"
+                value={html || ""}
+                onChange={setHtml}
+                placeholder="Start writing your story here…"
+                modules={quillModules}
+              />
+            </div>
+          )}
+        </PageShell>
+
+        <div className="px-5 py-3 border-t border-border bg-white/70 text-sm text-muted flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <Clock size={14} />
+              <span>Last saved: {chapter.lastEdited || "—"}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <RotateCcw size={14} />
+              <span>Auto-save enabled</span>
+            </div>
+          </div>
+          <button className="hover:text-ink" title="Download (use Export in top bar)">
+            <Download size={14} />
+          </button>
+        </div>
+      </div>
+
+      {/* Fullscreen overlay: pale pink background + white page */}
+      {isFullscreen && (
+        <div className="fixed inset-0 z-[9999]" style={{ background: "#fdecef" }}>
+          {/* Header */}
+          <div className="absolute top-0 left-0 right-0 p-3 flex items-center justify-end">
+            <button onClick={handleSave} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-white hover:opacity-90 mr-2">
+              <Save size={16} /> Save
+            </button>
+            <button onClick={toggleFullscreen} className="px-3 py-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-50">
+              <MinimizeIcon size={18} />
+            </button>
+          </div>
+
+          {/* Page */}
+          <div className="pt-14 pb-8 px-6 h-full flex items-start justify-center overflow-auto">
+            <div
+              className="w-[92%] max-w-[1100px] bg-white border border-slate-200 rounded-[14px] shadow-2xl p-3"
+              dir="ltr"
+            >
+              <div className="px-3 py-2 border-b border-slate-200 flex items-center justify-between">
+                <input
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className="text-xl font-semibold bg-transparent outline-none"
+                  placeholder="Chapter title"
+                />
+                <span className="text-sm text-muted">{count.toLocaleString()} words</span>
+              </div>
+              <div className="p-3">
+                <ReactQuill
+                  theme="snow"
+                  value={html || ""}
+                  onChange={setHtml}
+                  placeholder="Write in fullscreen…"
+                  modules={quillModules}
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   );
 };
@@ -857,7 +782,7 @@ export default function WriteSection() {
     return () => clearTimeout(t);
   }, [book, chapters]);
 
-  // live sync
+  // live sync across tabs/windows
   useEffect(() => {
     const sync = () => {
       const s = loadState();
@@ -917,7 +842,6 @@ export default function WriteSection() {
 
   /* ---------- Push TOC ---------- */
   const pushTOC = () => {
-    // Build across all chapters from H1/H2/H3
     const outline = [];
     chapters.forEach((ch, idx) => {
       findHeadings(ch.content || "").forEach((h) => {
@@ -938,14 +862,15 @@ export default function WriteSection() {
   };
 
   /* ---------- Imports ---------- */
-  const importDocx = async (e, setContent) => {
+  const importDocx = async (e, setHtml) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const JSZip = (await import("jszip")).default;
     const buf = await file.arrayBuffer();
     const zip = await JSZip.loadAsync(buf);
     const xml = await zip.file("word/document.xml").async("text");
-    // Very light extraction: remove tags, treat </w:p> as newline
+
+    // Naive extraction to text, then wrap paragraphs to HTML
     const text = xml
       .replace(/<w:p[^>]*>/g, "\n")
       .replace(/<\/w:p>/g, "\n")
@@ -954,80 +879,69 @@ export default function WriteSection() {
       .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
       .replace(/\n{3,}/g, "\n\n")
       .trim();
-    setContent((prev) => (prev ? prev + "\n\n" + text : text));
+
+    const html = text
+      .split(/\n{2,}/)
+      .map(p => `<p>${escapeHtml(p)}</p>`)
+      .join("\n");
+
+    setHtml((prev) => (prev ? prev + "\n" + html : html));
     e.target.value = "";
   };
 
-  const importHtml = async (e, setContent) => {
+  const importHtml = async (e, setHtml) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const txt = await file.text();
-    // Convert common headings to markdown, then strip tags
-    let t = txt
-      .replace(/<h1[^>]*>(.*?)<\/h1>/gi, (_m, p1) => `\n# ${p1}\n`)
-      .replace(/<h2[^>]*>(.*?)<\/h2>/gi, (_m, p1) => `\n## ${p1}\n`)
-      .replace(/<h3[^>]*>(.*?)<\/h3>/gi, (_m, p1) => `\n### ${p1}\n`)
-      .replace(/<li[^>]*>(.*?)<\/li>/gi, (_m, p1) => `- ${p1}\n`)
-      .replace(/<br\s*\/?>/gi, "\n")
-      .replace(/<\/p>/gi, "\n\n")
-      .replace(/<[^>]+>/g, "")
-      .replace(/&nbsp;/g, " ")
-      .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
-      .replace(/\n{3,}/g, "\n\n")
-      .trim();
-    setContent((prev) => (prev ? prev + "\n\n" + t : t));
+    // Keep basic structure but normalize common tags
+    let clean = txt
+      .replace(/<h1[^>]*>(.*?)<\/h1>/gi, (_m, p1) => `<h1>${p1}</h1>`)
+      .replace(/<h2[^>]*>(.*?)<\/h2>/gi, (_m, p1) => `<h2>${p1}</h2>`)
+      .replace(/<h3[^>]*>(.*?)<\/h3>/gi, (_m, p1) => `<h3>${p1}</h3>`)
+      .replace(/<li[^>]*>(.*?)<\/li>/gi, (_m, p1) => `<p>• ${p1}</p>`)
+      .replace(/<br\s*\/?>/gi, "<br/>")
+      .replace(/\u00A0/g, " ");
+    setHtml((prev) => (prev ? prev + "\n" + clean : clean));
     e.target.value = "";
   };
 
   /* ---------- AI (local quick checks + mode-aware hints) ---------- */
   const runAI = ({ grammar, clarity, style, consistency }) => {
     if (!selected) return;
-    const text = applyModeHints(aiMode, selected.content || "");
+    const html = selected.content || "";
     const issues = [];
 
     if (grammar) {
-      if (/\s[,.!?;:]/.test(text)) {
+      if (/\s[,.!?;:]/.test(html)) {
         issues.push({ type: "grammar", title: "Spacing before punctuation", message: "Remove spaces before , . ! ? ; :", example: "Hello , world → Hello, world" });
       }
-      if (/\bi\b(?=\b)/.test(text)) {
+      if (/(^|[^\w'])i(\b)/.test(html.replace(/<[^>]+>/g, " "))) {
         issues.push({ type: "grammar", title: "Lowercase 'i'", message: "Capitalize the pronoun 'I' when used alone." });
       }
-      if (/--/.test(text)) {
-        issues.push({ type: "grammar", title: "Double hyphen", message: "Use an em dash (—) or revise punctuation." });
+      if (/--/.test(html)) {
+        issues.push({ type: "grammar", title: "Double hyphen", message: "Replace with period + space or revise punctuation." });
       }
-      if (/ {2,}/.test(text)) {
+      if (/ {2,}/.test(html.replace(/<[^>]+>/g, " "))) {
         issues.push({ type: "grammar", title: "Double spaces", message: "Condense multiple spaces to one." });
-      }
-      if (/\brecieve\b/i.test(text)) {
-        issues.push({ type: "grammar", title: "Common misspelling: 'recieve'", message: "Replace with 'receive'." });
-      }
-      if (/\bteh\b/i.test(text)) {
-        issues.push({ type: "grammar", title: "Common misspelling: 'teh'", message: "Replace with 'the'." });
       }
     }
 
     if (clarity) {
+      const text = html.replace(/<br\s*\/?>/gi, "\n").replace(/<\/p>/gi, "\n\n").replace(/<[^>]+>/g, "").trim();
       const sentences = text.split(/(?<=[.!?]["')\]]*)\s+/).filter(Boolean);
       const long = sentences.filter((s) => s.split(/\s+/).length > 30);
       if (long.length) {
-        issues.push({
-          type: "clarity",
-          title: "Long sentences",
-          message: `${long.length} sentence(s) exceed 30 words—consider splitting.`,
-        });
+        issues.push({ type: "clarity", title: "Long sentences", message: `${long.length} sentence(s) exceed 30 words—consider splitting.` });
       }
       const par = text.split(/\n{2,}/).filter(Boolean);
       const longp = par.filter((p) => p.split(/\s+/).length > 250);
       if (longp.length) {
-        issues.push({
-          type: "clarity",
-          title: "Very long paragraphs",
-          message: `${longp.length} very long paragraph(s)—consider paragraph breaks.`,
-        });
+        issues.push({ type: "clarity", title: "Very long paragraphs", message: `${longp.length} very long paragraph(s)—consider paragraph breaks.` });
       }
     }
 
     if (style) {
+      const text = html.replace(/<[^>]+>/g, " ");
       const very = (text.match(/\bvery\b/gi) || []).length;
       if (very > 2) {
         issues.push({ type: "style", title: "Weak intensifier 'very'", message: "Replace 'very' with stronger wording." });
@@ -1036,40 +950,21 @@ export default function WriteSection() {
       if (adverbs > 15) {
         issues.push({ type: "style", title: "Adverb overuse", message: "Reduce -ly adverbs for tighter prose." });
       }
-      const repeats = (text.match(/\b(\w+)\b(?:\W+\1\b){2,}/gi) || []);
-      if (repeats.length) {
-        issues.push({ type: "style", title: "Word repetition", message: "Repeated words found close together." });
-      }
-      if (aiMode === "Screenplay") {
-        issues.push({
-          type: "style",
-          title: "Screenplay format (basic)",
-          message: "Consider ALL CAPS character names and clear scene headings (INT./EXT.).",
-        });
-      }
-      if (aiMode === "Poetry") {
-        issues.push({
-          type: "style",
-          title: "Poetry line shape",
-          message: "Vary line length and consider line breaks for emphasis.",
-        });
-      }
     }
 
     if (consistency) {
-      const smartQuotesOpen = (text.match(/[“‘]/g) || []).length;
-      const smartQuotesClose = (text.match(/[”’]/g) || []).length;
-      if (Math.abs(smartQuotesOpen - smartQuotesClose) > 0) {
+      const text = html;
+      const openSmart = (text.match(/[“‘]/g) || []).length;
+      const closeSmart = (text.match(/[”’]/g) || []).length;
+      if (Math.abs(openSmart - closeSmart) > 0) {
         issues.push({ type: "style", title: "Mismatched smart quotes", message: "Balance opening/closing quotes." });
       }
-      if (/\b(Email|email|e-mail)\b/i.test(text)) {
-        issues.push({
-          type: "style", title: "Term consistency", message: "Ensure consistent variants (e.g., email vs e-mail)."
-        });
+      if (/\b(Email|email|e-mail)\b/.test(text)) {
+        issues.push({ type: "style", title: "Term consistency", message: "Ensure consistent variants (e.g., email vs e-mail)." });
       }
     }
 
-    const stats = computeReadability(text);
+    const stats = computeReadability(html);
     setAiResults({ issues, stats, mode: aiMode });
   };
 
@@ -1132,13 +1027,26 @@ export default function WriteSection() {
 }
 
 /* ──────────────────────────────────────────────────────────────
-   Tiny button styles (Tailwind utility aliases)
+   Tiny button styles (inject once)
 ───────────────────────────────────────────────────────────── */
-const style = document.createElement("style");
-style.innerHTML = `
+const styleTag = document.createElement("style");
+styleTag.innerHTML = `
 .btn-icon{display:inline-flex;align-items:center;gap:.25rem;padding:.4rem;border-radius:.5rem;border:1px solid var(--brand-border,#e5e7eb);background:#fff;color:#0f172a}
 .btn-icon:hover{background:#fff;opacity:.9}
 .btn-chip{display:inline-flex;align-items:center;gap:.4rem;padding:.35rem .6rem;border-radius:.6rem;border:1px solid var(--brand-border,#e5e7eb);background:#fff;color:#0f172a;font-size:.85rem}
 .btn-chip:hover{background:#fff;opacity:.9}
 `;
-document.head.appendChild(style);
+if (typeof document !== "undefined") document.head.appendChild(styleTag);
+
+/* ──────────────────────────────────────────────────────────────
+   Helper for import
+───────────────────────────────────────────────────────────── */
+function escapeHtml(s = "") {
+  return s.replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
+}
+
+/* OPTIONAL: Add these CSS rules once in src/styles/editor-fixes.css and import in src/main.jsx or src/index.jsx:
+.ql-container .ql-editor { direction: ltr !important; unicode-bidi: plaintext !important; }
+.ql-container.ql-snow { border: 1px solid rgba(0,0,0,.08) !important; border-radius: 12px !important; }
+.ql-toolbar.ql-snow { border: 1px solid rgba(0,0,0,.08) !important; border-top-left-radius: 12px !important; border-top-right-radius: 12px !important; }
+*/
