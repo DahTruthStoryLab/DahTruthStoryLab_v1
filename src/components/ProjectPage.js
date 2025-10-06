@@ -7,12 +7,13 @@ import {
 } from "lucide-react";
 
 /* ──────────────────────────────────────────────────────────────
-   Optional store (works if <UserProvider> is mounted)
+   Optional store hook (safe shim). Always call at top-level.
+   If userStore exists, we'll use its hook; otherwise this returns null.
 ─────────────────────────────────────────────────────────────── */
-let useUserSafe = null;
+let useUser = () => null;
 try {
   // eslint-disable-next-line global-require
-  useUserSafe = require("../lib/state/userStore").useUser;
+  useUser = require("../lib/state/userStore").useUser;
 } catch {}
 
 /* ──────────────────────────────────────────────────────────────
@@ -52,7 +53,6 @@ function readProfileObject() {
   } catch {}
   return null;
 }
-
 function extractDisplayName(obj) {
   if (!obj || typeof obj !== "object") return "";
   if (obj.displayName) return obj.displayName;
@@ -67,14 +67,12 @@ function extractDisplayName(obj) {
    Small helpers
 ─────────────────────────────────────────────────────────────── */
 const countWords = (s = "") => s.trim().split(/\s+/).filter(Boolean).length;
-
 const daysUntil = (yyyy_mm_dd) => {
   if (!yyyy_mm_dd) return null;
   const today = new Date();
   const d = new Date(yyyy_mm_dd + "T00:00:00");
   return Math.ceil((d - today) / 86400000);
 };
-
 const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
 const progressPct = (cur, tgt) => Math.min((cur / Math.max(tgt || 1, 1)) * 100, 100);
 const getReadingTime = (wordCount) => Math.ceil(wordCount / 200);
@@ -100,10 +98,8 @@ const getStatusColor = (status) => {
 export default function ProjectPage() {
   const navigate = useNavigate();
 
-  // Optional user store
-  const store = (() => {
-    try { return useUserSafe ? useUserSafe() : null; } catch { return null; }
-  })();
+  // ✅ Call hook unconditionally at top-level (lint-safe)
+  const store = useUser();
 
   // Load existing app state (book/chapters/daily/settings)
   const existing =
@@ -376,7 +372,7 @@ export default function ProjectPage() {
           </div>
 
           {/* Status Badge */}
-        <div className="glass-panel p-4">
+          <div className="glass-panel p-4">
             <div className="flex items-center gap-2 mb-2">
               <Star size={16} className="text-[color:var(--color-ink)]/70" />
               <div className="text-sm text-muted">Status</div>
