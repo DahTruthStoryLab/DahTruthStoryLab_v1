@@ -1,4 +1,4 @@
-// src/components/Profile.js
+// src/components/Profile.jsx
 import React, { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
@@ -109,19 +109,14 @@ function ProfileSidebar({ onNavigate }) {
   );
 }
 
-/* ---------- Component ---------- */
+/* ---------- Main Component ---------- */
 export default function Profile() {
   const navigate = useNavigate();
 
-  // ✅ Call hook at the top level — not inside a function or try/catch
-  let store = null;
-  try {
-    store = useUserSafe ? useUserSafe() : null;
-  } catch {
-    store = null;
-  }
+  // ✅ Always call the hook without conditions to comply with rules of hooks
+  const store = useUserSafe ? useUserSafe() : null;
 
-  // Move initialization logic inside the function
+  // Initialization logic
   const initial = store?.user ?? readProfile();
 
   const [displayName, setDisplayName] = useState(initial.displayName || "");
