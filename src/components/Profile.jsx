@@ -92,10 +92,16 @@ function ProfileSidebar({ onNavigate }) {
 export default function Profile() {
   const navigate = useNavigate();
 
-  // Prefer store if present
-  const store = (() => {
-    try { return useUserSafe ? useUserSafe() : null; } catch { return null; }
-  })();
+  // ✅ Call hook at the top level — not inside a function or try/catch
+  let store = null;
+  try {
+    store = useUserSafe ? useUserSafe() : null;
+  } catch {
+    store = null;
+  }
+
+  // ...rest of your code (JSX, event handlers, etc.)
+}
 
   const initial = store?.user ?? readProfile();
 
