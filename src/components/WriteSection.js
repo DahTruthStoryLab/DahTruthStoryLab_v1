@@ -8,7 +8,12 @@ import {
   AlignLeft, AlignCenter, AlignRight, List, ListOrdered, Heading1, Heading2, Heading3, Underline, Italic, Bold, Quote, Upload
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
-import "react-quill/dist/quill.snow.css"; // toolbar styling
+import "react-quill/dist/quill.snow.css"; // toolbar styling 
+
+// --- AI endpoint (use your Function URL, or '/api/ai/rewrite' if you set the Amplify rewrite)
+const AI_URL = 'https://https://ho4bjspvcvydhc6ufic6k3nl2a0zthfn.lambda-url.us-east-1.on.aws/'; // <-- replace with your exact URL
+const [aiBusy, setAiBusy] = useState(false);
+async function runAI(mode="proofread"){ /* ...as we added earlier... */ }
 
 /* ──────────────────────────────────────────────────────────────
    Storage (kept compatible with your app-wide key)
@@ -597,7 +602,32 @@ const WritingEditor = ({
           <span className="mx-1 h-5 w-px bg-border" />
           <button className="btn-icon" title="Bulleted list"><List size={16} /></button>
           <button className="btn-icon" title="Numbered list"><ListOrdered size={16} /></button>
-          <button className="btn-icon" title="Quote block"><Quote size={16} /></button>
+          <button className="btn-icon" title="Quote block"><Quote size={16} /></button> 
+          <button className="btn-icon" title="Quote block">
+          <button className="btn-icon" title="Quote block">
+            <Quote size={16} />
+          </button>  
+      
+      {/* ⬇️ Add AI buttons here */}
+          <button
+            onClick={() => runAI("proofread")}
+            className="btn-chip disabled:opacity-60"
+            disabled={aiBusy}
+            title="AI Proofread (grammar/clarity)"
+        >
+            {aiBusy ? "AI…working" : "AI: Proofread"}
+          </button>
+      
+          <button
+            onClick={() => runAI("clarify")}
+            className="btn-chip disabled:opacity-60"
+            disabled={aiBusy}
+            title="AI Clarify (tighten sentences)"
+        >
+            {aiBusy ? "AI…working" : "AI: Clarify"}
+          </button>
+          {/* ⬆️ End AI buttons */}
+
           <span className="mx-1 h-5 w-px bg-border" />
 
           {/* Imports */}
@@ -839,7 +869,46 @@ export default function WriteSection() {
     a.click();
     URL.revokeObjectURL(url);
   };
+  const [aiBusy, setAiBusy] = useState(false);
 
+  async function runAI(mode = "proofread") {
+    try {
+      setAiBusy(true);
+
+      // Grab the current HTML from the editor
+      const htmlToEdit = html || "";
+
+      const res = await fetch(AI_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mode,                     // "proofread" | "clarify"
+          content: htmlToEdit,
+          constraints: {
+            preserveVoice: true,
+            noEmDashes: true
+          }
+        }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data?.error || `AI error (${res.status})`);
+      }
+
+      // Replace the editor contents with the edited HTML
+      setHtml(data.editedHtml || "");
+      // persist immediately so it survives refresh
+      writeJSON(KEY, data.editedHtml || "");
+      setSavedAt(new Date());
+    } catch (e) {
+      alert(e.message || "AI request failed");
+      // optional: console.error(e);
+    } finally {
+      setAiBusy(false);
+    }
+  }
+  
   /* ---------- Push TOC ---------- */
   const pushTOC = () => {
     const outline = [];
