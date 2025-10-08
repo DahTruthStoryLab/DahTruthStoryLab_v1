@@ -8,14 +8,19 @@ import {
   AlignLeft, AlignCenter, AlignRight, List, ListOrdered, Heading1, Heading2, Heading3, Underline, Italic, Bold, Quote, Upload
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
-import "react-quill/dist/quill.snow.css"; // toolbar styling 
+import { DndProvider, useDrag, useDrop } from "react-dnd";
+import { HTML5Backend } from "react-dnd-html5-backend";
+import "react-quill/dist/quill.snow.css"; // toolbar styling
 
-// --- AI endpoint (use your Function URL, or '/api/ai/rewrite' if you set the Amplify rewrite)
-const AI_URL = 'https://ho4bjspvcvydhc6ufic6k3nl2a0zthfn.lambda-url.us-east-1.on.aws/'; // <-- replace with your exact URL
+/* ──────────────────────────────────────────────────────────────
+   Backend AI endpoint
+   - Replace with your exact Lambda Function URL or "/api/ai/rewrite"
+────────────────────────────────────────────────────────────── */
+const AI_URL = "https://ho4bjspvcvydhc6ufic6k3nl2a0zthfn.lambda-url.us-east-1.on.aws/";
 
 /* ──────────────────────────────────────────────────────────────
    Storage (kept compatible with your app-wide key)
-───────────────────────────────────────────────────────────── */
+────────────────────────────────────────────────────────────── */
 const STORAGE_KEY = "dahtruth-story-lab-toc-v3";
 
 const loadState = () => {
@@ -23,7 +28,9 @@ const loadState = () => {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
     return JSON.parse(raw);
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 };
 
 const saveState = (state) => {
@@ -71,13 +78,13 @@ const getInitialState = () => {
     ],
     daily: { goal: 500, counts: {} },
     settings: { theme: "light", focusMode: false },
-    tocOutline: []
+    tocOutline: [],
   };
 };
 
 /* ──────────────────────────────────────────────────────────────
    Utilities
-───────────────────────────────────────────────────────────── */
+────────────────────────────────────────────────────────────── */
 const countWords = (html = "") => {
   const text = html
     .replace(/<br\s*\/?>/gi, " ")
@@ -95,17 +102,24 @@ const computeReadability = (html) => {
     .replace(/<[^>]+>/g, "")
     .replace(/\u00A0/g, " ")
     .trim();
-  const words = (text.match(/\b[\w''-]+\b/g) || []).length;
-  const sentences = (text.split(/[.!?]+["')\]]*\s+/).filter(s => s.trim().length > 0).length) || 1;
+  const words = (text.match(/\b[\w’'-]+\b/g) || []).length;
+  const sentences =
+    text.split(/[.!?]+["')\]]*\s+/).filter((s) => s.trim().length > 0).length || 1;
   const syllables = (text.match(/[aeiouy]{1,2}/gi) || []).length;
   const WPS = words / sentences;
-  const FRE = Math.round(206.835 - 1.015 * (words / sentences) - 84.6 * (syllables / Math.max(words, 1)));
-  const FKGL = Math.max(1, Math.round(0.39 * (words / sentences) + 11.8 * (syllables / Math.max(words, 1)) - 15.59));
+  const FRE = Math.round(
+    206.835 - 1.015 * (words / sentences) - 84.6 * (syllables / Math.max(words, 1))
+  );
+  const FKGL = Math.max(
+    1,
+    Math.round(
+      0.39 * (words / sentences) + 11.8 * (syllables / Math.max(words, 1)) - 15.59
+    )
+  );
   return { words, sentences, avgSentence: Math.round(WPS * 10) / 10, fleschEase: FRE, grade: FKGL };
 };
 
 const findHeadings = (html) => {
-  // Look for <h1>, <h2>, <h3>
   const out = [];
   const re = /<(h[1-3])[^>]*>(.*?)<\/\1>/gi;
   let m;
@@ -118,15 +132,10 @@ const findHeadings = (html) => {
 };
 
 const applyQuickFixes = (html) => {
-  // Light HTML-aware fixes
   let t = html;
-  // remove spaces before punctuation (in text, naively)
   t = t.replace(/\s+([,.;:!?])/g, "$1");
-  // condense double spaces (avoid in tags)
   t = t.replace(/(>[^<]*) {2,}([^<]*<)/g, (_, a, b) => a.replace(/ {2,}/g, " ") + b);
-  // Lone i -> I (safe-ish inside word boundaries)
   t = t.replace(/(^|[^\w'])i(\b)/g, "$1I$2");
-  // Replace double hyphen with a period + space (no em dashes per your preference)
   t = t.replace(/--/g, ". ");
   return t;
 };
@@ -141,7 +150,7 @@ const debounce = (fn, ms = 500) => {
 
 /* ──────────────────────────────────────────────────────────────
    Top banner
-───────────────────────────────────────────────────────────── */
+────────────────────────────────────────────────────────────── */
 const TopBanner = ({ bookTitle, onNewChapter, onExport }) => {
   return (
     <div className="sticky top-0 z-50 bg-white/70 backdrop-blur-xl border-b border-white/60 text-ink">
@@ -175,10 +184,57 @@ const TopBanner = ({ bookTitle, onNewChapter, onExport }) => {
 };
 
 /* ──────────────────────────────────────────────────────────────
-   RIGHT: Chapter rail
-───────────────────────────────────────────────────────────── */
+   Draggable Chapter (react-dnd)
+────────────────────────────────────────────────────────────── */
+function DraggableChapter({ chapter, index, isSelected, onSelect, onMove }) {
+  const ref = useRef(null);
+
+  const [, drop] = useDrop({
+    accept: "CHAPTER",
+    hover(item) {
+      if (item.index !== index) {
+        onMove(item.index, index);
+        item.index = index;
+      }
+    },
+  });
+
+  const [{ isDragging }, drag] = useDrag({
+    type: "CHAPTER",
+    item: { index },
+    collect: (monitor) => ({
+      isDragging: monitor.isDragging(),
+    }),
+  });
+
+  drag(drop(ref));
+
+  return (
+    <div
+      ref={ref}
+      onClick={onSelect}
+      className={`p-2 ${isSelected ? "bg-primary/20" : "bg-white"} ${
+        isDragging ? "opacity-50" : ""
+      } cursor-pointer border rounded-md`}
+    >
+      {chapter.title}
+    </div>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────
+   Chapter Rail (now LEFT side)
+────────────────────────────────────────────────────────────── */
 const ChapterRail = ({
-  chapters, selectedId, onSelect, onAdd, onDelete, open, setOpen, side = "right"
+  chapters,
+  selectedId,
+  onSelect,
+  onAdd,
+  onDelete,
+  onMove,
+  open,
+  setOpen,
+  side = "left",
 }) => {
   const isRight = side === "right";
   const toggleBtnPos = isRight ? "right-3" : "left-3";
@@ -201,12 +257,15 @@ const ChapterRail = ({
       {/* Mobile drawer */}
       <aside
         className={[
-          "xl:hidden fixed top-16", fixedSide,
+          "xl:hidden fixed top-16",
+          fixedSide,
           "h-[calc(100vh-4rem)] w-72 z-30",
-          "bg-white/70 backdrop-blur-xl", borderSide, "border-white/60",
+          "bg-white/70 backdrop-blur-xl",
+          borderSide,
+          "border-white/60",
           "transition-transform duration-300",
           open ? "translate-x-0" : hiddenX,
-          "overflow-hidden"
+          "overflow-hidden",
         ].join(" ")}
       >
         <RailInner
@@ -215,20 +274,62 @@ const ChapterRail = ({
           onSelect={onSelect}
           onAdd={onAdd}
           onDelete={onDelete}
+          onMove={onMove}
         />
       </aside>
 
       {/* Desktop/static column */}
       <div className="hidden xl:block">
         <div className="sticky top-20">
-          <div className="rounded-2xl bg-white/70 backdrop-blur-xl border border-white/60 overflow-hidden">
-            <RailInner
-              chapters={chapters}
-              selectedId={selectedId}
-              onSelect={onSelect}
-              onAdd={onAdd}
-              onDelete={onDelete}
-            />
+          <div className="rounded-2xl bg-white/70 backdrop-blur-xl border border-white/60 overflow-hidden p-3">
+            <div className="px-1 pb-3 flex items-center justify-between">
+              <h2 className="text-ink font-semibold">Chapters</h2>
+              <button
+                type="button"
+                onClick={onAdd}
+                className="p-2 rounded-md glass-soft border border-white/40 text-ink hover:bg-white/80"
+                title="New chapter"
+              >
+                <Plus size={16} />
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+              {chapters.map((ch, i) => (
+                <div
+                  key={ch.id}
+                  className={[
+                    "group rounded-xl border",
+                    selectedId === ch.id
+                      ? "bg-primary/15 border-primary/40"
+                      : "bg-white/70 border-white/60 hover:bg-white/80",
+                    "text-ink p-2",
+                  ].join(" ")}
+                >
+                  <DraggableChapter
+                    chapter={ch}
+                    index={i}
+                    isSelected={selectedId === ch.id}
+                    onSelect={() => onSelect(ch.id)}
+                    onMove={onMove}
+                  />
+                  <div className="mt-1 px-1 flex items-center gap-2 text-xs text-muted">
+                    <span>{(ch.wordCount || 0).toLocaleString()} words</span> •{" "}
+                    <span>{ch.lastEdited || "—"}</span>
+                    <span className="ml-auto px-2 py-0.5 text-[10px] rounded bg-white/70 border border-white/60 text-muted">
+                      {ch.status || "draft"}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => onDelete(ch.id)}
+                      className="ml-2 text-rose-500 hover:text-rose-600 p-1"
+                      title="Delete"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -236,9 +337,9 @@ const ChapterRail = ({
   );
 };
 
-const RailInner = ({ chapters, selectedId, onSelect, onAdd, onDelete }) => (
-  <div className="h-full flex flex-col">
-    <div className="px-4 py-3 flex items-center justify-between border-b border-white/60">
+const RailInner = ({ chapters, selectedId, onSelect, onAdd, onDelete, onMove }) => (
+  <div className="h-full flex flex-col p-3">
+    <div className="px-1 pb-3 flex items-center justify-between border-b border-white/60">
       <h2 className="text-ink font-semibold">Chapters</h2>
       <button
         type="button"
@@ -249,33 +350,18 @@ const RailInner = ({ chapters, selectedId, onSelect, onAdd, onDelete }) => (
         <Plus size={16} />
       </button>
     </div>
-
-    <div className="flex-1 overflow-y-auto p-3">
-      {chapters.map((ch) => (
-        <div
-          key={ch.id}
-          className={[
-            "group mb-2 rounded-xl border",
-            selectedId === ch.id
-              ? "bg-primary/15 border-primary/40"
-              : "bg-white/70 border-white/60 hover:bg-white/80",
-            "text-ink"
-          ].join(" ")}
-        >
-          <button
-            type="button"
-            onClick={() => onSelect(ch.id)}
-            className="w-full text-left px-3 py-2"
-          >
-            <div className="text-sm font-medium truncate">{ch.title}</div>
-            <div className="text-xs text-muted">
-              {(ch.wordCount || 0).toLocaleString()} words • {ch.lastEdited || "—"}
-            </div>
-          </button>
-          <div className="px-3 pb-2 flex gap-2">
-            <span className="px-2 py-0.5 text-[10px] rounded bg-white/70 border border-white/60 text-muted">
-              {ch.status || "draft"}
-            </span>
+    <div className="flex-1 overflow-y-auto space-y-2 pt-3 pr-1">
+      {chapters.map((ch, i) => (
+        <div key={ch.id} className="group rounded-xl border bg-white/70 border-white/60 text-ink p-2">
+          <DraggableChapter
+            chapter={ch}
+            index={i}
+            isSelected={selectedId === ch.id}
+            onSelect={() => onSelect(ch.id)}
+            onMove={onMove}
+          />
+          <div className="mt-1 px-1 flex items-center gap-2 text-xs text-muted">
+            <span>{(ch.wordCount || 0).toLocaleString()} words</span> • <span>{ch.lastEdited || "—"}</span>
             <button
               type="button"
               onClick={() => onDelete(ch.id)}
@@ -292,14 +378,19 @@ const RailInner = ({ chapters, selectedId, onSelect, onAdd, onDelete }) => (
 );
 
 /* ──────────────────────────────────────────────────────────────
-   LEFT: Sidebar (Quick Nav, Stats, AI Coach)
-───────────────────────────────────────────────────────────── */
+   LEFT: Meta Sidebar (Quick Nav, Stats, AI Coach)
+────────────────────────────────────────────────────────────── */
 const MetaSidebar = ({
-  book, chapterWordCount, totalWords,
-  aiMode, setAiMode, aiResults, onRunAI, onApplyFixes
+  book,
+  chapterWordCount,
+  totalWords,
+  aiMode,
+  setAiMode,
+  aiResults,
+  onRunChecks,
+  onApplyFixes,
 }) => {
   const modes = ["Fiction", "Poetry", "Screenplay", "Memoir", "Non-fiction"];
-  const stats = aiResults?.stats;
 
   return (
     <aside className="hidden xl:block">
@@ -346,7 +437,7 @@ const MetaSidebar = ({
           </div>
         </div>
 
-        {/* AI Coach (local checks; no backend yet) */}
+        {/* AI Coach (local checks) */}
         <div className="rounded-2xl bg-white/80 backdrop-blur border border-border p-4">
           <div className="flex items-center gap-2 text-ink font-semibold mb-2">
             <Bot size={16} className="text-primary" /> AI Coach
@@ -360,35 +451,37 @@ const MetaSidebar = ({
               onChange={(e) => setAiMode(e.target.value)}
             >
               {modes.map((m) => (
-                <option key={m} value={m}>{m}</option>
+                <option key={m} value={m}>
+                  {m}
+                </option>
               ))}
             </select>
           </div>
 
           <div className="grid grid-cols-2 gap-2">
             <button
-              onClick={() => onRunAI({ grammar: true })}
+              onClick={() => onRunChecks({ grammar: true })}
               className="px-2 py-1 rounded-md text-sm border border-border hover:bg-white/80"
               title="Grammar & punctuation"
             >
               Grammar
             </button>
             <button
-              onClick={() => onRunAI({ clarity: true })}
+              onClick={() => onRunChecks({ clarity: true })}
               className="px-2 py-1 rounded-md text-sm border border-border hover:bg-white/80"
               title="Clarity & readability"
             >
               Clarity
             </button>
             <button
-              onClick={() => onRunAI({ style: true })}
+              onClick={() => onRunChecks({ style: true })}
               className="px-2 py-1 rounded-md text-sm border border-border hover:bg-white/80"
               title="Style & overuse"
             >
               Style
             </button>
             <button
-              onClick={() => onRunAI({ consistency: true })}
+              onClick={() => onRunChecks({ consistency: true })}
               className="px-2 py-1 rounded-md text-sm border border-border hover:bg-white/80"
               title="Common consistency checks"
             >
@@ -398,7 +491,9 @@ const MetaSidebar = ({
 
           <div className="flex items-center justify-between mt-3">
             <button
-              onClick={() => onRunAI({ grammar: true, clarity: true, style: true, consistency: true })}
+              onClick={() =>
+                onRunChecks({ grammar: true, clarity: true, style: true, consistency: true })
+              }
               className="inline-flex items-center gap-2 px-3 py-1.5 rounded-md bg-primary text-white text-sm hover:opacity-90"
             >
               Run All
@@ -419,11 +514,21 @@ const MetaSidebar = ({
                 <div className="rounded-lg border border-white/60 bg-white/70 p-2 text-xs text-ink">
                   <div className="font-medium mb-1">Readability</div>
                   <div className="grid grid-cols-2 gap-1">
-                    <div>Words: <b>{aiResults.stats.words.toLocaleString()}</b></div>
-                    <div>Sentences: <b>{aiResults.stats.sentences}</b></div>
-                    <div>Avg sent.: <b>{aiResults.stats.avgSentence}</b></div>
-                    <div>Flesch Ease: <b>{aiResults.stats.fleschEase}</b></div>
-                    <div>Grade: <b>{aiResults.stats.grade}</b></div>
+                    <div>
+                      Words: <b>{aiResults.stats.words.toLocaleString()}</b>
+                    </div>
+                    <div>
+                      Sentences: <b>{aiResults.stats.sentences}</b>
+                    </div>
+                    <div>
+                      Avg sent.: <b>{aiResults.stats.avgSentence}</b>
+                    </div>
+                    <div>
+                      Flesch Ease: <b>{aiResults.stats.fleschEase}</b>
+                    </div>
+                    <div>
+                      Grade: <b>{aiResults.stats.grade}</b>
+                    </div>
                   </div>
                 </div>
               )}
@@ -431,11 +536,14 @@ const MetaSidebar = ({
               {(aiResults.issues?.length || 0) > 0 ? (
                 <div className="space-y-2">
                   {aiResults.issues.map((it, i) => (
-                    <div key={i}
+                    <div
+                      key={i}
                       className={`rounded-lg p-2 text-sm border ${
-                        it.type === "grammar" ? "border-amber-300 bg-amber-50"
-                        : it.type === "clarity" ? "border-sky-300 bg-sky-50"
-                        : "border-slate-300 bg-white"
+                        it.type === "grammar"
+                          ? "border-amber-300 bg-amber-50"
+                          : it.type === "clarity"
+                          ? "border-sky-300 bg-sky-50"
+                          : "border-slate-300 bg-white"
                       }`}
                     >
                       <div className="font-medium">{it.title}</div>
@@ -476,14 +584,32 @@ const MetaSidebar = ({
 };
 
 // simple icon to avoid another import
-const UsersIcon = (props) => <svg {...props} width="16" height="16" viewBox="0 0 24 24" className="text-primary"><path fill="currentColor" d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5s-3 1.34-3 3s1.34 3 3 3m-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5S5 6.34 5 8s1.34 3 3 3m0 2c-2.33 0-7 1.17-7 3.5V19h10v-2.5C11 14.17 6.33 13 4 13m12 0c-.29 0-.62.02-.97.05c1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5"/></svg>;
+const UsersIcon = (props) => (
+  <svg
+    {...props}
+    width="16"
+    height="16"
+    viewBox="0 0 24 24"
+    className="text-primary"
+  >
+    <path
+      fill="currentColor"
+      d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5s-3 1.34-3 3s1.34 3 3 3m-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5S5 6.34 5 8s1.34 3 3 3m0 2c-2.33 0-7 1.17-7 3.5V19h10v-2.5C11 14.17 6.33 13 4 13m12 0c-.29 0-.62.02-.97.05c1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5"
+    />
+  </svg>
+);
 
 /* ──────────────────────────────────────────────────────────────
    Writing Editor (ReactQuill + toolbar + fullscreen)
-───────────────────────────────────────────────────────────── */
+────────────────────────────────────────────────────────────── */
 const WritingEditor = ({
-  chapter, onSave, onUpdate, onCreateNew,
-  onPushTOC, onImportDocx, onImportHtml
+  chapter,
+  onSave,
+  onUpdate,
+  onCreateNew,
+  onPushTOC,
+  onImportDocx,
+  onImportHtml,
 }) => {
   const [title, setTitle] = useState(chapter?.title || "");
   const [html, setHtml] = useState(chapter?.content || "");
@@ -517,11 +643,8 @@ const WritingEditor = ({
 
   useEffect(() => setCount(countWords(html)), [html]);
 
-  // Debounced propagate to parent (autosave)
-  const pushUpdate = useMemo(
-    () => debounce((next) => onUpdate(next), 500),
-    [onUpdate]
-  );
+  // Debounced autosave to parent
+  const pushUpdate = useMemo(() => debounce((next) => onUpdate(next), 500), [onUpdate]);
 
   useEffect(() => {
     if (!chapter) return;
@@ -537,58 +660,84 @@ const WritingEditor = ({
 
   const handleSave = () => {
     if (!chapter) return;
-    onSave?.();
+    onSave?.({
+      ...chapter,
+      title,
+      content: html,
+      wordCount: countWords(html),
+      lastEdited: "Just now",
+    });
   };
   const toggleFullscreen = () => setIsFullscreen((v) => !v);
 
-  // AI Handler
-  async function runAI(mode = "proofread") {
+  // Quill toolbar/modules (highlighting & formatting supported by default)
+  const quillModules = useMemo(
+    () => ({
+      toolbar: [
+        [{ header: [1, 2, 3, false] }],
+        ["bold", "italic", "underline", "strike"],
+        [{ list: "ordered" }, { list: "bullet" }],
+        [{ align: [] }],
+        ["blockquote", "code-block"],
+        ["link", "image"],
+        ["clean"],
+      ],
+    }),
+    []
+  );
+
+  /* ---------- AI: Proofread/Clarify with robust error handling ---------- */
+  async function runAIProofread(htmlContent, setHtmlFn) {
     try {
-      setAiBusy(true);
-
-      // Grab the current HTML from the editor
-      const htmlToEdit = html || "";
-
       const res = await fetch(AI_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          mode,                     // "proofread" | "clarify"
-          content: htmlToEdit,
-          constraints: {
-            preserveVoice: true,
-            noEmDashes: true
-          }
+          mode: "proofread",
+          content: htmlContent,
+          constraints: { preserveVoice: true, noEmDashes: true },
         }),
       });
-
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        throw new Error(data?.error || `AI error (${res.status})`);
+      if (res.ok) {
+        setHtmlFn(data.editedHtml || htmlContent);
+      } else {
+        throw new Error(data?.error || "AI proofreading failed.");
       }
-
-      // Replace the editor contents with the edited HTML
-      setHtml(data.editedHtml || "");
-    } catch (e) {
-      alert(e.message || "AI request failed");
-      // optional: console.error(e);
-    } finally {
-      setAiBusy(false);
+    } catch (error) {
+      alert(error.message || "AI request failed.");
     }
   }
 
-  // Quill toolbar
-  const quillModules = useMemo(() => ({
-    toolbar: [
-      [{ header: [1, 2, 3, false] }],
-      ["bold", "italic", "underline", "strike"],
-      [{ list: "ordered" }, { list: "bullet" }],
-      [{ align: [] }],
-      ["blockquote", "code-block"],
-      ["link", "image"],
-      ["clean"],
-    ],
-  }), []);
+  // Convenience wrapper for your toolbar buttons
+  const cloudRewrite = async (mode = "proofread") => {
+    try {
+      setAiBusy(true);
+      if (mode === "proofread") {
+        await runAIProofread(html || "", setHtml);
+        return;
+      }
+      const res = await fetch(AI_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mode, // "proofread" | "clarify"
+          content: html || "",
+          constraints: {
+            preserveVoice: true,
+            noEmDashes: true,
+          },
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || `AI error (${res.status})`);
+      setHtml(data.editedHtml || "");
+    } catch (e) {
+      alert(e.message || "AI request failed");
+    } finally {
+      setAiBusy(false);
+    }
+  };
 
   const PageShell = ({ children }) => (
     <div className="flex-1 p-6 overflow-auto grid place-items-center">
@@ -622,37 +771,59 @@ const WritingEditor = ({
       {/* Toolbar header */}
       <div className="rounded-2xl bg-white/80 backdrop-blur border border-border p-2 shadow-sm">
         <div className="flex flex-wrap items-center gap-1">
-          {/* These align buttons wrap selected block inside <div style="text-align:..."> by inserting HTML; Quill already supports align, so we just show icons for familiarity */}
-          <button className="btn-icon" title="Align left"><AlignLeft size={16} /></button>
-          <button className="btn-icon" title="Align center"><AlignCenter size={16} /></button>
-          <button className="btn-icon" title="Align right"><AlignRight size={16} /></button>
+          {/* Visual buttons (Quill handles real formatting) */}
+          <button className="btn-icon" title="Align left">
+            <AlignLeft size={16} />
+          </button>
+          <button className="btn-icon" title="Align center">
+            <AlignCenter size={16} />
+          </button>
+          <button className="btn-icon" title="Align right">
+            <AlignRight size={16} />
+          </button>
           <span className="mx-1 h-5 w-px bg-border" />
-          <button className="btn-icon" title="Bold"><Bold size={16} /></button>
-          <button className="btn-icon" title="Italic"><Italic size={16} /></button>
-          <button className="btn-icon" title="Underline"><Underline size={16} /></button>
+          <button className="btn-icon" title="Bold">
+            <Bold size={16} />
+          </button>
+          <button className="btn-icon" title="Italic">
+            <Italic size={16} />
+          </button>
+          <button className="btn-icon" title="Underline">
+            <Underline size={16} />
+          </button>
           <span className="mx-1 h-5 w-px bg-border" />
-          <button className="btn-chip"><Heading1 size={16} /> H1</button>
-          <button className="btn-chip"><Heading2 size={16} /> H2</button>
-          <button className="btn-chip"><Heading3 size={16} /> H3</button>
+          <button className="btn-chip">
+            <Heading1 size={16} /> H1
+          </button>
+          <button className="btn-chip">
+            <Heading2 size={16} /> H2
+          </button>
+          <button className="btn-chip">
+            <Heading3 size={16} /> H3
+          </button>
           <span className="mx-1 h-5 w-px bg-border" />
-          <button className="btn-icon" title="Bulleted list"><List size={16} /></button>
-          <button className="btn-icon" title="Numbered list"><ListOrdered size={16} /></button>
-          <button className="btn-icon" title="Quote block"><Quote size={16} /></button>
-
-          <span className="mx-1 h-5 w-px bg-border" />
+          <button className="btn-icon" title="Bulleted list">
+            <List size={16} />
+          </button>
+          <button className="btn-icon" title="Numbered list">
+            <ListOrdered size={16} />
+          </button>
+          <button className="btn-icon" title="Quote block">
+            <Quote size={16} />
+          </button>
 
           {/* AI buttons */}
+          <span className="mx-1 h-5 w-px bg-border" />
           <button
-            onClick={() => runAI("proofread")}
+            onClick={() => cloudRewrite("proofread")}
             className="btn-chip disabled:opacity-60"
             disabled={aiBusy}
             title="AI Proofread (grammar/clarity)"
           >
             {aiBusy ? "AI…working" : "AI: Proofread"}
           </button>
-
           <button
-            onClick={() => runAI("clarify")}
+            onClick={() => cloudRewrite("clarify")}
             className="btn-chip disabled:opacity-60"
             disabled={aiBusy}
             title="AI Clarify (tighten sentences)"
@@ -660,16 +831,25 @@ const WritingEditor = ({
             {aiBusy ? "AI…working" : "AI: Clarify"}
           </button>
 
-          <span className="mx-1 h-5 w-px bg-border" />
-
           {/* Imports */}
+          <span className="mx-1 h-5 w-px bg-border" />
           <label className="btn-chip cursor-pointer" title="Import DOCX">
             <Upload size={16} /> DOCX
-            <input type="file" accept=".docx" className="hidden" onChange={(e) => onImportDocx(e, setHtml)} />
+            <input
+              type="file"
+              accept=".docx"
+              className="hidden"
+              onChange={(e) => onImportDocx(e, setHtml)}
+            />
           </label>
           <label className="btn-chip cursor-pointer" title="Import HTML">
             <Upload size={16} /> HTML
-            <input type="file" accept=".html,.htm,.xhtml" className="hidden" onChange={(e) => onImportHtml(e, setHtml)} />
+            <input
+              type="file"
+              accept=".html,.htm,.xhtml"
+              className="hidden"
+              onChange={(e) => onImportHtml(e, setHtml)}
+            />
           </label>
 
           <button onClick={() => onPushTOC()} className="btn-chip" title="Update TOC from headings">
@@ -712,7 +892,11 @@ const WritingEditor = ({
       </div>
 
       {/* Desk + page */}
-      <div className="rounded-3xl bg-[rgb(244,247,250)] shadow-2xl border border-border overflow-hidden flex-1 flex flex-col" ref={containerRef}>
+      <div
+        className="rounded-3xl shadow-2xl border border-border overflow-hidden flex-1 flex flex-col"
+        ref={containerRef}
+        style={{ background: "rgba(244,247,250,0.9)" }}
+      >
         <div className="px-5 py-3 border-b border-border bg-white/70 backdrop-blur flex items-center justify-between">
           <div className="flex items-center gap-4">
             <input
@@ -730,14 +914,16 @@ const WritingEditor = ({
         </div>
 
         <PageShell>
-          {/* Preview just renders the HTML; otherwise show Quill editor */}
           {showPreview ? (
             <div className="prose max-w-none text-ink">
-              <div dangerouslySetInnerHTML={{ __html: `<h1>${title || ""}</h1>${html || ""}` }} />
+              <div
+                dangerouslySetInnerHTML={{
+                  __html: `<h1>${title || ""}</h1>${html || ""}`,
+                }}
+              />
             </div>
           ) : (
             <div className="rounded-[20px] border border-slate-200 shadow-sm overflow-hidden">
-              {/* Quill toolbar shows automatically via theme 'snow' */}
               <ReactQuill
                 theme="snow"
                 value={html || ""}
@@ -771,10 +957,16 @@ const WritingEditor = ({
         <div className="fixed inset-0 z-[9999]" style={{ background: "#fdecef" }}>
           {/* Header */}
           <div className="absolute top-0 left-0 right-0 p-3 flex items-center justify-end">
-            <button onClick={handleSave} className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-white hover:opacity-90 mr-2">
+            <button
+              onClick={handleSave}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-white hover:opacity-90 mr-2"
+            >
               <Save size={16} /> Save
             </button>
-            <button onClick={toggleFullscreen} className="px-3 py-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-50">
+            <button
+              onClick={toggleFullscreen}
+              className="px-3 py-2 rounded-lg bg-white border border-slate-200 hover:bg-slate-50"
+            >
               <MinimizeIcon size={18} />
             </button>
           </div>
@@ -814,7 +1006,7 @@ const WritingEditor = ({
 
 /* ──────────────────────────────────────────────────────────────
    Main
-───────────────────────────────────────────────────────────── */
+────────────────────────────────────────────────────────────── */
 export default function WriteSection() {
   const initial = useMemo(getInitialState, []);
   const [book, setBook] = useState(initial.book);
@@ -827,7 +1019,10 @@ export default function WriteSection() {
   const selected = chapters.find((c) => c.id === selectedId) || null;
 
   // totals
-  const totalWords = chapters.reduce((s, c) => s + (c.wordCount || countWords(c.content || "")), 0);
+  const totalWords = chapters.reduce(
+    (s, c) => s + (c.wordCount || countWords(c.content || "")),
+    0
+  );
 
   // persist (debounced)
   useEffect(() => {
@@ -838,7 +1033,7 @@ export default function WriteSection() {
         chapters,
         daily: current.daily || { goal: 500, counts: {} },
         settings: current.settings || { theme: "light", focusMode: false },
-        tocOutline: current.tocOutline || []
+        tocOutline: current.tocOutline || [],
       });
     }, 400);
     return () => clearTimeout(t);
@@ -888,6 +1083,28 @@ export default function WriteSection() {
   const updateChapter = (updated) => {
     setChapters((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
   };
+  // Reorder chapters (drag & drop)
+  const moveChapter = (fromIndex, toIndex) => {
+    setChapters((prev) => {
+      const next = [...prev];
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, moved);
+      return next;
+    });
+  };
+
+  /* ---------- Save button (explicit persist) ---------- */
+  const handleExplicitSave = (updatedSelected) => {
+    setChapters((prev) => prev.map((c) => (c.id === updatedSelected.id ? updatedSelected : c)));
+    const current = loadState() || {};
+    saveState({
+      book,
+      chapters: chapters.map((c) => (c.id === updatedSelected.id ? updatedSelected : c)),
+      daily: current.daily || { goal: 500, counts: {} },
+      settings: current.settings || { theme: "light", focusMode: false },
+      tocOutline: current.tocOutline || [],
+    });
+  };
 
   /* ---------- Export (JSON) ---------- */
   const exportJSON = () => {
@@ -900,6 +1117,126 @@ export default function WriteSection() {
     a.download = "story_export.json";
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  /* ---------- Local quick checks ---------- */
+  const runChecks = ({ grammar, clarity, style, consistency }) => {
+    if (!selected) return;
+    const html = selected.content || "";
+    const issues = [];
+
+    if (grammar) {
+      if (/\s[,.!?;:]/.test(html)) {
+        issues.push({
+          type: "grammar",
+          title: "Spacing before punctuation",
+          message: "Remove spaces before , . ! ? ; :",
+          example: "Hello , world → Hello, world",
+        });
+      }
+      if (/(^|[^\w'])i(\b)/.test(html.replace(/<[^>]+>/g, " "))) {
+        issues.push({
+          type: "grammar",
+          title: "Lowercase 'i'",
+          message: "Capitalize the pronoun 'I' when used alone.",
+        });
+      }
+      if (/--/.test(html)) {
+        issues.push({
+          type: "grammar",
+          title: "Double hyphen",
+          message: "Replace with period + space or revise punctuation.",
+        });
+      }
+      if (/ {2,}/.test(html.replace(/<[^>]+>/g, " "))) {
+        issues.push({
+          type: "grammar",
+          title: "Double spaces",
+          message: "Condense multiple spaces to one.",
+        });
+      }
+    }
+
+    if (clarity) {
+      const text = html
+        .replace(/<br\s*\/?>/gi, "\n")
+        .replace(/<\/p>/gi, "\n\n")
+        .replace(/<[^>]+>/g, "")
+        .trim();
+      const sentences = text.split(/(?<=[.!?]["')\]]*)\s+/).filter(Boolean);
+      const long = sentences.filter((s) => s.split(/\s+/).length > 30);
+      if (long.length) {
+        issues.push({
+          type: "clarity",
+          title: "Long sentences",
+          message: `${long.length} sentence(s) exceed 30 words—consider splitting.`,
+        });
+      }
+      const par = text.split(/\n{2,}/).filter(Boolean);
+      const longp = par.filter((p) => p.split(/\s+/).length > 250);
+      if (longp.length) {
+        issues.push({
+          type: "clarity",
+          title: "Very long paragraphs",
+          message: `${longp.length} very long paragraph(s)—consider paragraph breaks.`,
+        });
+      }
+    }
+
+    if (style) {
+      const text = html.replace(/<[^>]+>/g, " ");
+      const very = (text.match(/\bvery\b/gi) || []).length;
+      if (very > 2) {
+        issues.push({
+          type: "style",
+          title: "Weak intensifier 'very'",
+          message: "Replace 'very' with stronger wording.",
+        });
+      }
+      const adverbs = (text.match(/\b\w+ly\b/gi) || []).length;
+      if (adverbs > 15) {
+        issues.push({
+          type: "style",
+          title: "Adverb overuse",
+          message: "Reduce -ly adverbs for tighter prose.",
+        });
+      }
+    }
+
+    if (consistency) {
+      const text = html;
+      const openSmart = (text.match(/[“‘]/g) || []).length;
+      const closeSmart = (text.match(/[”’]/g) || []).length;
+      if (Math.abs(openSmart - closeSmart) > 0) {
+        issues.push({
+          type: "style",
+          title: "Mismatched smart quotes",
+          message: "Balance opening/closing quotes.",
+        });
+      }
+      if (/\b(Email|email|e-mail)\b/.test(text)) {
+        issues.push({
+          type: "style",
+          title: "Term consistency",
+          message: "Ensure consistent variants (e.g., email vs e-mail).",
+        });
+      }
+    }
+
+    const stats = computeReadability(html);
+    setAiResults({ issues, stats, mode: aiMode });
+  };
+
+  const applyAIQuickFixes = () => {
+    if (!selected) return;
+    const fixed = applyQuickFixes(selected.content || "");
+    updateChapter({
+      ...selected,
+      content: fixed,
+      wordCount: countWords(fixed),
+      lastEdited: "Just now",
+    });
+    runChecks({ grammar: true, clarity: true, style: true, consistency: true });
   };
 
   /* ---------- Push TOC ---------- */
@@ -938,13 +1275,15 @@ export default function WriteSection() {
       .replace(/<\/w:p>/g, "\n")
       .replace(/<w:tab\/>/g, "\t")
       .replace(/<[^>]+>/g, "")
-      .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+      .replace(/&amp;/g, "&")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
       .replace(/\n{3,}/g, "\n\n")
       .trim();
 
     const html = text
       .split(/\n{2,}/)
-      .map(p => `<p>${escapeHtml(p)}</p>`)
+      .map((p) => `<p>${escapeHtml(p)}</p>`)
       .join("\n");
 
     setHtml((prev) => (prev ? prev + "\n" + html : html));
@@ -955,7 +1294,6 @@ export default function WriteSection() {
     const file = e.target.files?.[0];
     if (!file) return;
     const txt = await file.text();
-    // Keep basic structure but normalize common tags
     let clean = txt
       .replace(/<h1[^>]*>(.*?)<\/h1>/gi, (_m, p1) => `<h1>${p1}</h1>`)
       .replace(/<h2[^>]*>(.*?)<\/h2>/gi, (_m, p1) => `<h2>${p1}</h2>`)
@@ -967,130 +1305,68 @@ export default function WriteSection() {
     e.target.value = "";
   };
 
-  /* ---------- AI (local quick checks + mode-aware hints) ---------- */
-  const runAI = ({ grammar, clarity, style, consistency }) => {
-    if (!selected) return;
-    const html = selected.content || "";
-    const issues = [];
-
-    if (grammar) {
-      if (/\s[,.!?;:]/.test(html)) {
-        issues.push({ type: "grammar", title: "Spacing before punctuation", message: "Remove spaces before , . ! ? ; :", example: "Hello , world → Hello, world" });
-      }
-      if (/(^|[^\w'])i(\b)/.test(html.replace(/<[^>]+>/g, " "))) {
-        issues.push({ type: "grammar", title: "Lowercase 'i'", message: "Capitalize the pronoun 'I' when used alone." });
-      }
-      if (/--/.test(html)) {
-        issues.push({ type: "grammar", title: "Double hyphen", message: "Replace with period + space or revise punctuation." });
-      }
-      if (/ {2,}/.test(html.replace(/<[^>]+>/g, " "))) {
-        issues.push({ type: "grammar", title: "Double spaces", message: "Condense multiple spaces to one." });
-      }
-    }
-
-    if (clarity) {
-      const text = html.replace(/<br\s*\/?>/gi, "\n").replace(/<\/p>/gi, "\n\n").replace(/<[^>]+>/g, "").trim();
-      const sentences = text.split(/(?<=[.!?]["')\]]*)\s+/).filter(Boolean);
-      const long = sentences.filter((s) => s.split(/\s+/).length > 30);
-      if (long.length) {
-        issues.push({ type: "clarity", title: "Long sentences", message: `${long.length} sentence(s) exceed 30 words—consider splitting.` });
-      }
-      const par = text.split(/\n{2,}/).filter(Boolean);
-      const longp = par.filter((p) => p.split(/\s+/).length > 250);
-      if (longp.length) {
-        issues.push({ type: "clarity", title: "Very long paragraphs", message: `${longp.length} very long paragraph(s)—consider paragraph breaks.` });
-      }
-    }
-
-    if (style) {
-      const text = html.replace(/<[^>]+>/g, " ");
-      const very = (text.match(/\bvery\b/gi) || []).length;
-      if (very > 2) {
-        issues.push({ type: "style", title: "Weak intensifier 'very'", message: "Replace 'very' with stronger wording." });
-      }
-      const adverbs = (text.match(/\b\w+ly\b/gi) || []).length;
-      if (adverbs > 15) {
-        issues.push({ type: "style", title: "Adverb overuse", message: "Reduce -ly adverbs for tighter prose." });
-      }
-    }
-
-    if (consistency) {
-      const text = html;
-      const openSmart = (text.match(/["']/g) || []).length;
-      const closeSmart = (text.match(/["']/g) || []).length;
-      if (Math.abs(openSmart - closeSmart) > 0) {
-        issues.push({ type: "style", title: "Mismatched smart quotes", message: "Balance opening/closing quotes." });
-      }
-      if (/\b(Email|email|e-mail)\b/.test(text)) {
-        issues.push({ type: "style", title: "Term consistency", message: "Ensure consistent variants (e.g., email vs e-mail)." });
-      }
-    }
-
-    const stats = computeReadability(html);
-    setAiResults({ issues, stats, mode: aiMode });
-  };
-
-  const applyAIQuickFixes = () => {
-    if (!selected) return;
-    const fixed = applyQuickFixes(selected.content || "");
-    updateChapter({ ...selected, content: fixed, wordCount: countWords(fixed), lastEdited: "Just now" });
-    runAI({ grammar: true, clarity: true, style: true, consistency: true });
-  };
-
   return (
-    <div className="min-h-screen bg-base bg-radial-fade text-ink">
-      <TopBanner
-        bookTitle={book?.title}
-        onNewChapter={addChapter}
-        onExport={exportJSON}
-      />
+    <DndProvider backend={HTML5Backend}>
+      {/* Faint books background */}
+      <div
+        className="min-h-screen bg-fixed text-ink"
+        style={{
+          backgroundImage: "url('/assets/faint-books.jpg')", // <- replace with your actual path
+          backgroundSize: "cover",
+          backgroundRepeat: "no-repeat",
+          backgroundAttachment: "fixed",
+        }}
+      >
+        <TopBanner bookTitle={book?.title} onNewChapter={addChapter} onExport={exportJSON} />
 
-      <div className="max-w-7xl mx-auto px-3 sm:px-6">
-        {/* 3-column layout on xl: [left meta | editor | right chapters] */}
-        <div className="grid grid-cols-1 xl:grid-cols-[20rem_1fr_20rem] gap-6 pt-6 lg:pt-8 w-full">
-          {/* left meta + AI */}
-          <MetaSidebar
-            book={book}
-            chapterWordCount={selected ? countWords(selected.content || "") : 0}
-            totalWords={totalWords}
-            aiMode={aiMode}
-            setAiMode={setAiMode}
-            aiResults={aiResults}
-            onRunAI={runAI}
-            onApplyFixes={applyAIQuickFixes}
-          />
+        <div className="max-w-7xl mx-auto px-3 sm:px-6">
+          {/* 3-column layout on xl: [LEFT chapters | editor | RIGHT meta] */}
+          <div className="grid grid-cols-1 xl:grid-cols-[20rem_1fr_20rem] gap-6 pt-6 lg:pt-8 w-full">
+            {/* LEFT chapters (moved from right) */}
+            <ChapterRail
+              chapters={chapters}
+              selectedId={selectedId}
+              onSelect={setSelectedId}
+              onAdd={addChapter}
+              onDelete={deleteChapter}
+              onMove={moveChapter}
+              open={railOpen}
+              setOpen={setRailOpen}
+              side="left"
+            />
 
-          {/* center editor */}
-          <WritingEditor
-            chapter={selected}
-            onSave={() => {}}
-            onUpdate={updateChapter}
-            onCreateNew={addChapter}
-            onPushTOC={pushTOC}
-            onImportDocx={importDocx}
-            onImportHtml={importHtml}
-          />
+            {/* center editor */}
+            <WritingEditor
+              chapter={selected}
+              onSave={handleExplicitSave}
+              onUpdate={updateChapter}
+              onCreateNew={addChapter}
+              onPushTOC={pushTOC}
+              onImportDocx={importDocx}
+              onImportHtml={importHtml}
+            />
 
-          {/* right chapters */}
-          <ChapterRail
-            chapters={chapters}
-            selectedId={selectedId}
-            onSelect={setSelectedId}
-            onAdd={addChapter}
-            onDelete={deleteChapter}
-            open={railOpen}
-            setOpen={setRailOpen}
-            side="right"
-          />
+            {/* RIGHT meta + AI */}
+            <MetaSidebar
+              book={book}
+              chapterWordCount={selected ? countWords(selected.content || "") : 0}
+              totalWords={totalWords}
+              aiMode={aiMode}
+              setAiMode={setAiMode}
+              aiResults={aiResults}
+              onRunChecks={runChecks}
+              onApplyFixes={applyAIQuickFixes}
+            />
+          </div>
         </div>
       </div>
-    </div>
+    </DndProvider>
   );
 }
 
 /* ──────────────────────────────────────────────────────────────
    Tiny button styles (inject once)
-───────────────────────────────────────────────────────────── */
+────────────────────────────────────────────────────────────── */
 const styleTag = document.createElement("style");
 styleTag.innerHTML = `
 .btn-icon{display:inline-flex;align-items:center;gap:.25rem;padding:.4rem;border-radius:.5rem;border:1px solid var(--brand-border,#e5e7eb);background:#fff;color:#0f172a}
@@ -1102,7 +1378,7 @@ if (typeof document !== "undefined") document.head.appendChild(styleTag);
 
 /* ──────────────────────────────────────────────────────────────
    Helper for import
-───────────────────────────────────────────────────────────── */
+────────────────────────────────────────────────────────────── */
 function escapeHtml(s = "") {
   return s.replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
 }
