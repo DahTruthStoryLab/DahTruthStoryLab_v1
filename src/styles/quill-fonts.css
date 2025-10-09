@@ -1,21 +1,50 @@
-/* Apply families when selected */
+/* ===== Quill font families (must be GLOBAL CSS) ===== */
+
+/* Base stacks */
 .ql-font-sans { font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
 .ql-font-serif { font-family: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif; }
 .ql-font-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
+
+/* Word-style families */
+.ql-font-arial { font-family: Arial, "Helvetica Neue", Helvetica, sans-serif; }
+.ql-font-calibri { font-family: Calibri, "Segoe UI", "Helvetica Neue", Arial, sans-serif; }
+.ql-font-cambria { font-family: Cambria, Georgia, "Times New Roman", Times, serif; }
+.ql-font-timesnewroman { font-family: "Times New Roman", Times, serif; }
 .ql-font-georgia { font-family: Georgia, serif; }
 .ql-font-garamond { font-family: Garamond, "Adobe Garamond Pro", serif; }
-.ql-font-times { font-family: "Times New Roman", Times, serif; }
+.ql-font-verdana { font-family: Verdana, Geneva, Tahoma, sans-serif; }
+.ql-font-couriernew { font-family: "Courier New", Courier, monospace; }
 
-/* Show readable names in the picker menu */
+/* ===== Friendly names in the font picker ===== */
 .ql-snow .ql-picker.ql-font .ql-picker-item[data-value="sans"]::before,
 .ql-snow .ql-picker.ql-font .ql-picker-label[data-value="sans"]::before { content: "Sans Serif"; }
+
 .ql-snow .ql-picker.ql-font .ql-picker-item[data-value="serif"]::before,
 .ql-snow .ql-picker.ql-font .ql-picker-label[data-value="serif"]::before { content: "Serif"; }
+
 .ql-snow .ql-picker.ql-font .ql-picker-item[data-value="mono"]::before,
 .ql-snow .ql-picker.ql-font .ql-picker-label[data-value="mono"]::before { content: "Mono"; }
+
+.ql-snow .ql-picker.ql-font .ql-picker-item[data-value="arial"]::before,
+.ql-snow .ql-picker.ql-font .ql-picker-label[data-value="arial"]::before { content: "Arial"; }
+
+.ql-snow .ql-picker.ql-font .ql-picker-item[data-value="calibri"]::before,
+.ql-snow .ql-picker.ql-font .ql-picker-label[data-value="calibri"]::before { content: "Calibri"; }
+
+.ql-snow .ql-picker.ql-font .ql-picker-item[data-value="cambria"]::before,
+.ql-snow .ql-picker.ql-font .ql-picker-label[data-value="cambria"]::before { content: "Cambria"; }
+
+.ql-snow .ql-picker.ql-font .ql-picker-item[data-value="timesnewroman"]::before,
+.ql-snow .ql-picker.ql-font .ql-picker-label[data-value="timesnewroman"]::before { content: "Times New Roman"; }
+
 .ql-snow .ql-picker.ql-font .ql-picker-item[data-value="georgia"]::before,
 .ql-snow .ql-picker.ql-font .ql-picker-label[data-value="georgia"]::before { content: "Georgia"; }
+
 .ql-snow .ql-picker.ql-font .ql-picker-item[data-value="garamond"]::before,
 .ql-snow .ql-picker.ql-font .ql-picker-label[data-value="garamond"]::before { content: "Garamond"; }
-.ql-snow .ql-picker.ql-font .ql-picker-item[data-value="times"]::before,
-.ql-snow .ql-picker.ql-font .ql-picker-label[data-value="times"]::before { content: "Times"; }
+
+.ql-snow .ql-picker.ql-font .ql-picker-item[data-value="verdana"]::before,
+.ql-snow .ql-picker.ql-font .ql-picker-label[data-value="verdana"]::before { content: "Verdana"; }
+
+.ql-snow .ql-picker.ql-font .ql-picker-item[data-value="couriernew"]::before,
+.ql-snow .ql-picker.ql-font .ql-picker-label[data-value="couriernew"]::before { content: "Courier New"; }
