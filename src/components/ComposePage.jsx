@@ -7,12 +7,20 @@ import { ArrowLeft, Bot, Save, Maximize2, Minimize2 } from "lucide-react";
 
 /* ------- Fonts whitelist (family + size) ------- */
 const Font = Quill.import("formats/font");
-Font.whitelist = ["sans", "serif", "mono", "georgia", "garamond", "times"];
+
+// Add Word-style families + the simple stacks
+const FONT_WHITELIST = [
+  "sans", "serif", "mono",
+  "arial", "calibri", "cambria", "timesnewroman",
+  "georgia", "garamond", "verdana", "couriernew",
+];
+Font.whitelist = FONT_WHITELIST;
 Quill.register(Font, true);
 
 const Size = Quill.import("formats/size");
 Size.whitelist = ["small", false, "large", "huge"];
 Quill.register(Size, true);
+
 
 /* ------- Env + storage (reuse your app's key) ------- */
 const AI_URL = process.env.REACT_APP_AI_URL || "/api/ai/rewrite";
