@@ -7,8 +7,6 @@ import { ArrowLeft, Bot, Save, Maximize2, Minimize2 } from "lucide-react";
 
 /* ------- Fonts whitelist (family + size) ------- */
 const Font = Quill.import("formats/font");
-
-// Add Word-style families + the simple stacks
 const FONT_WHITELIST = [
   "sans", "serif", "mono",
   "arial", "calibri", "cambria", "timesnewroman",
@@ -21,9 +19,9 @@ const Size = Quill.import("formats/size");
 Size.whitelist = ["small", false, "large", "huge"];
 Quill.register(Size, true);
 
-
-/* ------- Env + storage (reuse your app's key) ------- */
-const AI_URL = process.env.REACT_APP_AI_URL || "/api/ai/rewrite";
+/* ------- API + storage ------- */
+// Always go through Amplify rewrite (prod + dev)
+const AI_URL = "/api/ai/rewrite";
 const STORAGE_KEY = "dahtruth-story-lab-toc-v3";
 
 const loadState = () => {
@@ -104,7 +102,7 @@ export default function ComposePage() {
     () => ({
       toolbar: [
         [{ header: [1, 2, 3, false] }],
-        [{ font: Font.whitelist }],
+        [{ font: FONT_WHITELIST }],
         [{ size: Size.whitelist }],
         ["bold", "italic", "underline", "strike"],
         [{ list: "ordered" }, { list: "bullet" }],
@@ -117,118 +115,35 @@ export default function ComposePage() {
     []
   );
 
- /* SAVE (updates chapters + writes localStorage immediately) */
-const handleSave = () => {
-  const updated = {
-    ...selected,
-    title: title || selected.title,
-    content: html,
-    wordCount: countWords(html),
-    lastEdited: "Just now",
-    status: selected.status || "draft",
+  /* SAVE (updates chapters + writes localStorage immediately) */
+  const handleSave = () => {
+    if (!selected?.id) return;
+
+    const updated = {
+      ...selected,
+      title: title || selected.title,
+      content: html,
+      wordCount: countWords(html),
+      lastEdited: "Just now",
+      status: selected.status || "draft",
+    };
+
+    setChapters((prev) => {
+      const next = prev.map((c) => (c.id === updated.id ? updated : c));
+      // write-through persist so refresh sees it right away
+      const current = loadState() || {};
+      saveState({
+        book,
+        chapters: next,
+        daily: current.daily || { goal: 500, counts: {} },
+        settings: current.settings || { theme: "light", focusMode: false },
+        tocOutline: current.tocOutline || [],
+      });
+      return next;
+    });
   };
 
-  setChapters(prev => {
-    const next = prev.map(c => (c.id === updated.id ? updated : c));
-    // write-through persist so refresh sees it right away
-    const current = loadState() || {};
-    saveState({
-      book,
-      chapters: next,
-      daily: current.daily || { goal: 500, counts: {} },
-      settings: current.settings || { theme: "light", focusMode: false },
-      tocOutline: current.tocOutline || [],
-    });
-    return next;
-  });
-};
-
-/* AI: proofread/clarify via proxy — apply to editor AND chapter */
-const runAI = async (mode = "proofread") => {
-  try {
-    setAiBusy(true);
-    const res = await fetch(AI_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        mode,
-        content: html || "",
-        constraints: { preserveVoice: true, noEmDashes: true },
-      }),
-    });
-
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(data?.error || `AI error (${res.status})`);
-
-    const edited = data.editedHtml ?? html;
-
-    // apply to editor
-    setHtml(edited);
-
-    // persist into the selected chapter immediately
-    setChapters(prev => {
-      const next = prev.map(c =>
-        c.id === selected.id
-          ? {
-              ...c,
-              title: title || c.title,
-              content: edited,
-              wordCount: (edited.replace(/<[^>]+>/g, " ").trim().match(/\S+/g) || []).length,
-              lastEdited: "Just now",
-            }
-          : c
-      );
-      // write-through to localStorage
-      const current = loadState() || {};
-      saveState({
-        book,
-        chapters: next,
-        daily: current.daily || { goal: 500, counts: {} },
-        settings: current.settings || { theme: "light", focusMode: false },
-        tocOutline: current.tocOutline || [],
-      });
-      return next;
-    });
-  } catch (e) {
-    alert(e.message || "AI request failed");
-  } finally {
-    setAiBusy(false);
-  }
-};
-
-      // write-through persist now
-      const current = loadState() || {};
-      saveState({
-        book,
-        chapters: next,
-        daily: current.daily || { goal: 500, counts: {} },
-        settings: current.settings || { theme: "light", focusMode: false },
-        tocOutline: current.tocOutline || [],
-      });
-
-      return next;
-    });
-  } catch (e) {
-    alert(e.message || "AI request failed");
-  } finally {
-    setAiBusy(false);
-  }
-};
-
-
-  /* keyboard shortcut Cmd/Ctrl+S to save */
-  useEffect(() => {
-    const onKey = (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
-        e.preventDefault();
-        handleSave();
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [handleSave, title, html, selected]);
-
-  /* AI: proofread/clarify via proxy */
+  /* AI: proofread/clarify via proxy — apply to editor AND chapter */
   const runAI = async (mode = "proofread") => {
     try {
       setAiBusy(true);
@@ -241,17 +156,72 @@ const runAI = async (mode = "proofread") => {
           constraints: { preserveVoice: true, noEmDashes: true },
         }),
       });
-      const data = await res.json().catch(() => ({}));
+
+      // Debug visibility (helps if it ever “does nothing”)
+      const raw = await res.text();
+      console.log("[AI] status:", res.status, "ct:", res.headers.get("content-type"));
+      console.log("[AI] body:", raw);
+
+      let data = {};
+      try {
+        data = JSON.parse(raw);
+      } catch {
+        data = {};
+      }
       if (!res.ok) throw new Error(data?.error || `AI error (${res.status})`);
-      setHtml(data.editedHtml ?? html); // update editor
-      // optionally persist immediately
-      setTimeout(handleSave, 0);
+
+      const edited = data.editedHtml ?? html;
+
+      // apply to editor
+      setHtml(edited);
+
+      // persist into the selected chapter immediately
+      if (selected?.id) {
+        setChapters((prev) => {
+          const next = prev.map((c) =>
+            c.id === selected.id
+              ? {
+                  ...c,
+                  title: title || c.title,
+                  content: edited,
+                  wordCount:
+                    (edited.replace(/<[^>]+>/g, " ").trim().match(/\S+/g) || []).length,
+                  lastEdited: "Just now",
+                }
+              : c
+          );
+          // write-through to localStorage
+          const current = loadState() || {};
+          saveState({
+            book,
+            chapters: next,
+            daily: current.daily || { goal: 500, counts: {} },
+            settings: current.settings || { theme: "light", focusMode: false },
+            tocOutline: current.tocOutline || [],
+          });
+          return next;
+        });
+      }
     } catch (e) {
+      console.error("[AI] error:", e);
       alert(e.message || "AI request failed");
     } finally {
       setAiBusy(false);
     }
   };
+
+  /* keyboard shortcut Cmd/Ctrl+S to save */
+  useEffect(() => {
+    const onKey = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        handleSave();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [title, html, selected]);
 
   /* add a new chapter quickly */
   const addChapter = () => {
