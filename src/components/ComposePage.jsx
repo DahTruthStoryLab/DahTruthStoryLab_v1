@@ -1,0 +1,348 @@
+// src/components/ComposePage.jsx
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import ReactQuill from "react-quill";
+import Quill from "quill";
+import "react-quill/dist/quill.snow.css";
+import { ArrowLeft, Bot, Save, Maximize2, Minimize2 } from "lucide-react";
+
+/* ------- Fonts whitelist (family + size) ------- */
+const Font = Quill.import("formats/font");
+Font.whitelist = ["sans", "serif", "mono", "georgia", "garamond", "times"];
+Quill.register(Font, true);
+
+const Size = Quill.import("formats/size");
+Size.whitelist = ["small", false, "large", "huge"];
+Quill.register(Size, true);
+
+/* ------- Env + storage (reuse your app's key) ------- */
+const AI_URL = process.env.REACT_APP_AI_URL || "/api/ai/rewrite";
+const STORAGE_KEY = "dahtruth-story-lab-toc-v3";
+
+const loadState = () => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+};
+const saveState = (state) => {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    window.dispatchEvent(new Event("project:change"));
+  } catch {}
+};
+
+/* ------- Small helpers ------- */
+const countWords = (html = "") =>
+  (html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim() || "")
+    ? html.replace(/<[^>]+>/g, " ").trim().split(/\s+/).length
+    : 0;
+
+/* ==============================
+   Compose Page (new, isolated)
+   ============================== */
+export default function ComposePage() {
+  const initial = useMemo(loadState, []);
+  const [book, setBook] = useState(initial?.book || { title: "Untitled Book" });
+  const [chapters, setChapters] = useState(initial?.chapters || []);
+  const first = chapters[0] || null;
+
+  const [selectedId, setSelectedId] = useState(first?.id || null);
+  const selected = chapters.find((c) => c.id === selectedId) || null;
+
+  const [title, setTitle] = useState(selected?.title || "");
+  const [html, setHtml] = useState(selected?.content || "");
+  const [isFS, setIsFS] = useState(false);
+  const [aiBusy, setAiBusy] = useState(false);
+
+  /* keep local editor state synced with selected chapter */
+  useEffect(() => {
+    if (!selected) return;
+    setTitle(selected.title || "");
+    setHtml(selected.content || "");
+  }, [selectedId]); // eslint-disable-line
+
+  /* persist project on change (debounced-ish) */
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const current = loadState() || {};
+      saveState({
+        book,
+        chapters,
+        daily: current.daily || { goal: 500, counts: {} },
+        settings: current.settings || { theme: "light", focusMode: false },
+        tocOutline: current.tocOutline || [],
+      });
+    }, 400);
+    return () => clearTimeout(t);
+  }, [book, chapters]);
+
+  /* Proper Quill toolbar (wired + fonts) */
+  const modules = useMemo(
+    () => ({
+      toolbar: [
+        [{ header: [1, 2, 3, false] }],
+        [{ font: Font.whitelist }],
+        [{ size: Size.whitelist }],
+        ["bold", "italic", "underline", "strike"],
+        [{ list: "ordered" }, { list: "bullet" }],
+        [{ align: [] }],
+        ["blockquote", "code-block"],
+        ["link", "image"],
+        ["clean"],
+      ],
+    }),
+    []
+  );
+
+  /* SAVE (updates localStorage + chapter list) */
+  const handleSave = () => {
+    if (!selected) return;
+    const updated = {
+      ...selected,
+      title: title || selected.title,
+      content: html,
+      wordCount: countWords(html),
+      lastEdited: "Just now",
+      status: selected.status || "draft",
+    };
+    setChapters((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+    // project-level persist is handled by useEffect above
+  };
+
+  /* AI: proofread/clarify via proxy */
+  const runAI = async (mode = "proofread") => {
+    try {
+      setAiBusy(true);
+      const res = await fetch(AI_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mode,
+          content: html || "",
+          constraints: { preserveVoice: true, noEmDashes: true },
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || `AI error (${res.status})`);
+      setHtml(data.editedHtml || html); // fallback if service returns empty
+    } catch (e) {
+      alert(e.message || "AI request failed");
+    } finally {
+      setAiBusy(false);
+    }
+  };
+
+  /* add a new chapter quickly */
+  const addChapter = () => {
+    const id = Date.now();
+    const ch = {
+      id,
+      title: `Chapter ${chapters.length + 1}: Untitled`,
+      content: "",
+      wordCount: 0,
+      lastEdited: "Just now",
+      status: "draft",
+    };
+    setChapters((prev) => [ch, ...prev]);
+    setSelectedId(id);
+  };
+
+  /* simple chapter sidebar item */
+  const ChapterItem = ({ ch }) => (
+    <button
+      type="button"
+      onClick={() => setSelectedId(ch.id)}
+      className={[
+        "w-full text-left px-3 py-2 rounded-lg border",
+        selectedId === ch.id
+          ? "bg-primary/15 border-primary/40"
+          : "bg-white border-white/60 hover:bg-white/80",
+      ].join(" ")}
+      title={`${(ch.wordCount || 0).toLocaleString()} words`}
+    >
+      <div className="font-medium truncate">{ch.title}</div>
+      <div className="text-xs text-slate-500">
+        {(ch.wordCount || 0).toLocaleString()} words • {ch.lastEdited || "—"}
+      </div>
+    </button>
+  );
+
+  /* Back to Writing (route: /writing) */
+  const goBack = () => {
+    window.location.href = "/writing";
+  };
+
+  /* editor focus works: no overlays above editor, no pointer-events blockers */
+  return (
+    <div className="min-h-screen bg-[rgb(244,247,250)] text-slate-900">
+      {/* Top bar */}
+      <div className="sticky top-0 z-40 bg-white/80 backdrop-blur border-b border-slate-200">
+        <div className="max-w-7xl mx-auto px-4 h-14 flex items-center gap-2">
+          <button
+            onClick={goBack}
+            className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50"
+            title="Back to Writing"
+          >
+            <ArrowLeft size={16} /> Back
+          </button>
+
+          <div className="ml-auto flex items-center gap-2">
+            <button
+              onClick={() => runAI("proofread")}
+              className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50 disabled:opacity-60"
+              disabled={aiBusy}
+              title="AI Proofread"
+            >
+              <Bot size={16} />
+              {aiBusy ? "AI…" : "AI: Proofread"}
+            </button>
+            <button
+              onClick={() => runAI("clarify")}
+              className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50 disabled:opacity-60"
+              disabled={aiBusy}
+              title="AI Clarify"
+            >
+              <Bot size={16} />
+              {aiBusy ? "AI…" : "AI: Clarify"}
+            </button>
+            <button
+              onClick={handleSave}
+              className="inline-flex items-center gap-2 rounded-lg bg-primary text-white px-3 py-1.5 hover:opacity-90"
+              title="Save"
+            >
+              <Save size={16} /> Save
+            </button>
+            <button
+              onClick={() => setIsFS((v) => !v)}
+              className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50"
+              title={isFS ? "Exit Fullscreen" : "Fullscreen"}
+            >
+              {isFS ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+              {isFS ? "Exit" : "Fullscreen"}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Layout */}
+      <div className="max-w-7xl mx-auto px-4 py-6 grid grid-cols-1 xl:grid-cols-[18rem_1fr] gap-6">
+        {/* Left: Chapters (kept visible in fullscreen too) */}
+        <aside
+          className="xl:sticky xl:top-16 space-y-2"
+          style={{ zIndex: 10 }}
+        >
+          <div className="flex items-center justify-between">
+            <div className="text-sm text-slate-600">Chapters</div>
+            <button
+              onClick={addChapter}
+              className="text-sm px-2 py-1 rounded-md border bg-white hover:bg-slate-50"
+            >
+              + Add
+            </button>
+          </div>
+          <div className="space-y-2">
+            {chapters.map((c) => (
+              <ChapterItem key={c.id} ch={c} />
+            ))}
+            {!chapters.length && (
+              <div className="text-sm text-slate-500">
+                No chapters yet. Click “+ Add”.
+              </div>
+            )}
+          </div>
+        </aside>
+
+        {/* Center: Editor */}
+        <section className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+          <div className="px-4 py-3 border-b border-slate-200 flex items-center gap-3">
+            <input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Chapter title"
+              className="w-full text-lg font-semibold outline-none bg-transparent"
+            />
+            <div className="text-sm text-slate-500">
+              {(countWords(html) || 0).toLocaleString()} words
+            </div>
+          </div>
+
+          <div className="p-3">
+            <ReactQuill
+              theme="snow"
+              value={html}
+              onChange={setHtml}
+              modules={modules}
+              placeholder="Start writing your story here…"
+            />
+          </div>
+        </section>
+      </div>
+
+      {/* Fullscreen overlay — keeps chapters visible */}
+      {isFS && (
+        <div className="fixed inset-0 z-[9999] bg-[#fdecef]">
+          <div className="absolute top-0 left-0 right-0 p-3 flex items-center justify-end gap-2">
+            <button
+              onClick={handleSave}
+              className="inline-flex items-center gap-2 rounded-lg bg-primary text-white px-3 py-1.5 hover:opacity-90"
+            >
+              <Save size={16} /> Save
+            </button>
+            <button
+              onClick={() => setIsFS(false)}
+              className="rounded-lg border bg-white px-3 py-1.5 hover:bg-slate-50"
+            >
+              <Minimize2 size={18} />
+            </button>
+          </div>
+
+          <div className="pt-14 pb-6 px-6 h-full grid grid-cols-1 xl:grid-cols-[18rem_1fr] gap-6 overflow-auto">
+            {/* Chapters stay visible */}
+            <aside className="space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="text-sm text-slate-700">Chapters</div>
+                <button
+                  onClick={addChapter}
+                  className="text-sm px-2 py-1 rounded-md border bg-white hover:bg-slate-50"
+                >
+                  + Add
+                </button>
+              </div>
+              <div className="space-y-2">
+                {chapters.map((c) => (
+                  <ChapterItem key={c.id} ch={c} />
+                ))}
+              </div>
+            </aside>
+
+            {/* Page */}
+            <div className="w-full max-w-3xl mx-auto bg-white border border-slate-200 rounded-[14px] shadow-2xl">
+              <div className="px-3 py-2 border-b border-slate-200 flex items-center justify-between">
+                <input
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className="text-xl font-semibold bg-transparent outline-none"
+                  placeholder="Chapter title"
+                />
+                <span className="text-sm text-slate-500">
+                  {(countWords(html) || 0).toLocaleString()} words
+                </span>
+              </div>
+              <div className="p-3">
+                <ReactQuill
+                  theme="snow"
+                  value={html}
+                  onChange={setHtml}
+                  modules={modules}
+                  placeholder="Write in fullscreen…"
+                />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
