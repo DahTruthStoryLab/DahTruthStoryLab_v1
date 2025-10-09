@@ -10,6 +10,10 @@ import {
 } from "react-router-dom";
 import { UserProvider } from "./lib/state/userStore";
 
+/* ✅ Add these: DnD provider at app root */
+import { DndProvider } from "react-dnd";
+import { HTML5Backend } from "react-dnd-html5-backend";
+
 /* =========================
    Lazy-loaded pages
    ========================= */
@@ -34,15 +38,15 @@ const Clothesline          = lazy(() => import("./components/storylab/Clotheslin
 const HopesFearsLegacy     = lazy(() => import("./components/storylab/HopesFearsLegacy"));
 const WorkshopCohort       = lazy(() => import("./components/storylab/WorkshopCohort.jsx"));
 
-// Publishing (keep the .tsx path since your page is TSX)
+// Publishing (TSX)
 const Publishing           = lazy(() => import("./pages/Publishing.tsx"));
 
-// Profile (now enabled)
-const Profile              = lazy(() => import("./components/Profile")); 
+// Profile
+const Profile              = lazy(() => import("./components/Profile"));
 
-// add imports near the top with your other lazy imports
-const PlansPage = lazy(() => import("./components/PlansPage"));
-const BillingSuccess = lazy(() => import("./pages/BillingSuccess.jsx"));
+// Plans / Billing
+const PlansPage            = lazy(() => import("./components/PlansPage"));
+const BillingSuccess       = lazy(() => import("./pages/BillingSuccess.jsx"));
 
 /* =========================
    Global UI helpers
@@ -102,225 +106,226 @@ function TableOfContentsRouter() {
 export default function App() {
   return (
     <UserProvider>
-      <Router>
-        <ScrollToTop />
-        <Suspense fallback={<Fallback />}>
-          <Routes>
-            {/* Public */}
-            <Route path="/" element={<LandingPage />} />
-            <Route path="/signin" element={<SignInPage />} />
-            <Route path="/auth/register" element={<RegistrationPage />} />
+      {/* ✅ Provide DnD at the app root once */}
+      <DndProvider backend={HTML5Backend}>
+        <Router>
+          <ScrollToTop />
+          <Suspense fallback={<Fallback />}>
+            <Routes>
+              {/* Public */}
+              <Route path="/" element={<LandingPage />} />
+              <Route path="/signin" element={<SignInPage />} />
+              <Route path="/auth/register" element={<RegistrationPage />} />
 
-            {/* Protected */}
-            <Route
-              path="/dashboard"
-              element={
-                <ProtectedRoute>
-                  <Dashboard />
-                </ProtectedRoute>
-              }
-            />
+              {/* Protected */}
+              <Route
+                path="/dashboard"
+                element={
+                  <ProtectedRoute>
+                    <Dashboard />
+                  </ProtectedRoute>
+                }
+              />
 
-            {/* Writer/Writing (all point to WriteSection) */}
-            <Route
-              path="/writer"
-              element={
-                <ProtectedRoute>
-                  <WriteSection />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/write"
-              element={
-                <ProtectedRoute>
-                  <WriteSection />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/writing"
-              element={
-                <ProtectedRoute>
-                  <WriteSection />
-                </ProtectedRoute>
-              }
-            />
+              {/* Writer/Writing */}
+              <Route
+                path="/writer"
+                element={
+                  <ProtectedRoute>
+                    <WriteSection />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/write"
+                element={
+                  <ProtectedRoute>
+                    <WriteSection />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/writing"
+                element={
+                  <ProtectedRoute>
+                    <WriteSection />
+                  </ProtectedRoute>
+                }
+              />
 
-            {/* StoryLab */}
-            <Route
-              path="/story-lab"
-              element={
-                <ProtectedRoute>
-                  <StoryLabLanding />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/story-lab/prompts"
-              element={
-                <ProtectedRoute>
-                  <StoryPromptsWorkshop />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/story-lab/community"
-              element={
-                <ProtectedRoute>
-                  <WorkshopCohort />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/story-lab/workshop"
-              element={
-                <ProtectedRoute>
-                  <StoryWorkshop />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/story-lab/workshop/priorities"
-              element={
-                <ProtectedRoute>
-                  <PriorityCards />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/story-lab/workshop/roadmap"
-              element={
-                <ProtectedRoute>
-                  <CharacterRoadmap />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/story-lab/workshop/clothesline"
-              element={
-                <ProtectedRoute>
-                  <Clothesline />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/story-lab/workshop/hfl"
-              element={
-                <ProtectedRoute>
-                  <HopesFearsLegacy />
-                </ProtectedRoute>
-              }
-            />
+              {/* StoryLab */}
+              <Route
+                path="/story-lab"
+                element={
+                  <ProtectedRoute>
+                    <StoryLabLanding />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/story-lab/prompts"
+                element={
+                  <ProtectedRoute>
+                    <StoryPromptsWorkshop />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/story-lab/community"
+                element={
+                  <ProtectedRoute>
+                    <WorkshopCohort />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/story-lab/workshop"
+                element={
+                  <ProtectedRoute>
+                    <StoryWorkshop />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/story-lab/workshop/priorities"
+                element={
+                  <ProtectedRoute>
+                    <PriorityCards />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/story-lab/workshop/roadmap"
+                element={
+                  <ProtectedRoute>
+                    <CharacterRoadmap />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/story-lab/workshop/clothesline"
+                element={
+                  <ProtectedRoute>
+                    <Clothesline />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/story-lab/workshop/hfl"
+                element={
+                  <ProtectedRoute>
+                    <HopesFearsLegacy />
+                  </ProtectedRoute>
+                }
+              />
 
-            {/* Table of Contents */}
-            <Route
-              path="/toc"
-              element={
-                <ProtectedRoute>
-                  <TableOfContentsRouter />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/toc/v1"
-              element={
-                <ProtectedRoute>
-                  <TOCPage />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/toc/v2"
-              element={
-                <ProtectedRoute>
-                  <TOCPage2 />
-                </ProtectedRoute>
-              }
-            />
+              {/* Table of Contents */}
+              <Route
+                path="/toc"
+                element={
+                  <ProtectedRoute>
+                    <TableOfContentsRouter />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/toc/v1"
+                element={
+                  <ProtectedRoute>
+                    <TOCPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/toc/v2"
+                element={
+                  <ProtectedRoute>
+                    <TOCPage2 />
+                  </ProtectedRoute>
+                }
+              />
 
-            {/* Project */}
-            <Route
-              path="/project"
-              element={
-                <ProtectedRoute>
-                  <ProjectPage />
-                </ProtectedRoute>
-              }
-            />
+              {/* Project */}
+              <Route
+                path="/project"
+                element={
+                  <ProtectedRoute>
+                    <ProjectPage />
+                  </ProtectedRoute>
+                }
+              />
 
-            {/* Calendar */}
-            <Route
-              path="/calendar"
-              element={
-                <ProtectedRoute>
-                  <Calendar />
-                </ProtectedRoute>
-              }
-            />
+              {/* Calendar */}
+              <Route
+                path="/calendar"
+                element={
+                  <ProtectedRoute>
+                    <Calendar />
+                  </ProtectedRoute>
+                }
+              />
 
-            {/* Profile */}
-            <Route
-              path="/profile"
-              element={
-                <ProtectedRoute>
-                  <Profile />
-                </ProtectedRoute>
-              }
-            />
+              {/* Profile */}
+              <Route
+                path="/profile"
+                element={
+                  <ProtectedRoute>
+                    <Profile />
+                  </ProtectedRoute>
+                }
+              />
 
-            {/* Main Publishing route */}
-            <Route
-              path="/publishing"
-              element={
-                <ProtectedRoute>
-                  <Publishing />
-                </ProtectedRoute>
-              }
-            />
+              {/* Publishing */}
+              <Route
+                path="/publishing"
+                element={
+                  <ProtectedRoute>
+                    <Publishing />
+                  </ProtectedRoute>
+                }
+              />
 
-            {/* Redirects (short/legacy paths) */}
-            <Route path="/publish" element={<Navigate to="/publishing" replace />} />
-            <Route path="/publishing-suite" element={<Navigate to="/publishing" replace />} />
-            <Route path="/storylab/publishing" element={<Navigate to="/publishing" replace />} />
-            {/* (Optional) catch subpaths like /publish/foo */}
-            <Route path="/publish/*" element={<Navigate to="/publishing" replace />} />
-            <Route path="/publishing-suite/*" element={<Navigate to="/publishing" replace />} />
-            <Route path="/storylab/publishing/*" element={<Navigate to="/publishing" replace />} />
+              {/* Redirects */}
+              <Route path="/publish" element={<Navigate to="/publishing" replace />} />
+              <Route path="/publishing-suite" element={<Navigate to="/publishing" replace />} />
+              <Route path="/storylab/publishing" element={<Navigate to="/publishing" replace />} />
+              <Route path="/publish/*" element={<Navigate to="/publishing" replace />} />
+              <Route path="/publishing-suite/*" element={<Navigate to="/publishing" replace />} />
 
-            {/* Misc */}
-            <Route
-              path="/store"
-              element={
-                <ProtectedRoute>
-                  <PlansPage />
-                </ProtectedRoute>
-              }
-            />
-            
-            <Route
-              path="/billing/success"
-              element={
-                <ProtectedRoute>
-                  <BillingSuccess />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/about"
-              element={
-                <ProtectedRoute>
-                  <Placeholder title="About" />
-                </ProtectedRoute>
-              }
-            />
+              {/* Store / Billing */}
+              <Route
+                path="/store"
+                element={
+                  <ProtectedRoute>
+                    <PlansPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/billing/success"
+                element={
+                  <ProtectedRoute>
+                    <BillingSuccess />
+                  </ProtectedRoute>
+                }
+              />
 
-            {/* Fallback */}
-            <Route path="*" element={<Placeholder title="Not Found" />} />
-          </Routes>
-        </Suspense>
-      </Router>
+              {/* Misc */}
+              <Route
+                path="/about"
+                element={
+                  <ProtectedRoute>
+                    <Placeholder title="About" />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Fallback */}
+              <Route path="*" element={<Placeholder title="Not Found" />} />
+            </Routes>
+          </Suspense>
+        </Router>
+      </DndProvider>
     </UserProvider>
   );
 }
-
