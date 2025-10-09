@@ -109,18 +109,104 @@ export default function ComposePage() {
     []
   );
 
-  /* SAVE (updates localStorage + chapter list) */
-  const handleSave = () => {
-    const updated = {
-      ...selected,
-      title: title || selected.title,
-      content: html,
-      wordCount: countWords(html),
-      lastEdited: "Just now",
-      status: selected.status || "draft",
-    };
-    setChapters((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
+ /* SAVE (updates chapters + writes localStorage immediately) */
+const handleSave = () => {
+  const updated = {
+    ...selected,
+    title: title || selected.title,
+    content: html,
+    wordCount: countWords(html),
+    lastEdited: "Just now",
+    status: selected.status || "draft",
   };
+
+  setChapters(prev => {
+    const next = prev.map(c => (c.id === updated.id ? updated : c));
+    // write-through persist so refresh sees it right away
+    const current = loadState() || {};
+    saveState({
+      book,
+      chapters: next,
+      daily: current.daily || { goal: 500, counts: {} },
+      settings: current.settings || { theme: "light", focusMode: false },
+      tocOutline: current.tocOutline || [],
+    });
+    return next;
+  });
+};
+
+/* AI: proofread/clarify via proxy — apply to editor AND chapter */
+const runAI = async (mode = "proofread") => {
+  try {
+    setAiBusy(true);
+    const res = await fetch(AI_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        mode,
+        content: html || "",
+        constraints: { preserveVoice: true, noEmDashes: true },
+      }),
+    });
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data?.error || `AI error (${res.status})`);
+
+    const edited = data.editedHtml ?? html;
+
+    // apply to editor
+    setHtml(edited);
+
+    // persist into the selected chapter immediately
+    setChapters(prev => {
+      const next = prev.map(c =>
+        c.id === selected.id
+          ? {
+              ...c,
+              title: title || c.title,
+              content: edited,
+              wordCount: (edited.replace(/<[^>]+>/g, " ").trim().match(/\S+/g) || []).length,
+              lastEdited: "Just now",
+            }
+          : c
+      );
+      // write-through to localStorage
+      const current = loadState() || {};
+      saveState({
+        book,
+        chapters: next,
+        daily: current.daily || { goal: 500, counts: {} },
+        settings: current.settings || { theme: "light", focusMode: false },
+        tocOutline: current.tocOutline || [],
+      });
+      return next;
+    });
+  } catch (e) {
+    alert(e.message || "AI request failed");
+  } finally {
+    setAiBusy(false);
+  }
+};
+
+      // write-through persist now
+      const current = loadState() || {};
+      saveState({
+        book,
+        chapters: next,
+        daily: current.daily || { goal: 500, counts: {} },
+        settings: current.settings || { theme: "light", focusMode: false },
+        tocOutline: current.tocOutline || [],
+      });
+
+      return next;
+    });
+  } catch (e) {
+    alert(e.message || "AI request failed");
+  } finally {
+    setAiBusy(false);
+  }
+};
+
 
   /* keyboard shortcut Cmd/Ctrl+S to save */
   useEffect(() => {
