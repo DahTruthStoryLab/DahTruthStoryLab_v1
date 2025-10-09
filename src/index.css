@@ -1,3 +1,16 @@
+/* --- Word-style fonts via Google Fonts --- */
+@import url('https://fonts.googleapis.com/css2?family=Arial:wght@400;700&family=Calibri:wght@400;700&family=Cambria:wght@400;700&family=Times+New+Roman:wght@400;700&family=Georgia:wght@400;700&family=Garamond:wght@400;700&family=Verdana:wght@400;700&family=Courier+New:wght@400;700&display=swap');
+
+/* Map font-family names for Quill’s CSS */
+.ql-font-arial        { font-family: 'Arial', sans-serif; }
+.ql-font-calibri      { font-family: 'Calibri', sans-serif; }
+.ql-font-cambria      { font-family: 'Cambria', serif; }
+.ql-font-timesnewroman{ font-family: 'Times New Roman', serif; }
+.ql-font-georgia      { font-family: 'Georgia', serif; }
+.ql-font-garamond     { font-family: 'Garamond', serif; }
+.ql-font-verdana      { font-family: 'Verdana', sans-serif; }
+.ql-font-couriernew   { font-family: 'Courier New', monospace; }
+
 /* Tailwind layers MUST be first */
 @tailwind base;
 @tailwind components;
