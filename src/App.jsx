@@ -46,7 +46,10 @@ const Profile              = lazy(() => import("./components/Profile"));
 
 // Plans / Billing
 const PlansPage            = lazy(() => import("./components/PlansPage"));
-const BillingSuccess       = lazy(() => import("./pages/BillingSuccess.jsx"));
+const BillingSuccess       = lazy(() => import("./pages/BillingSuccess.jsx")); 
+
+// at top with lazy imports
+const ComposePage = lazy(() => import("./components/ComposePage"));
 
 /* =========================
    Global UI helpers
@@ -309,7 +312,15 @@ export default function App() {
                   </ProtectedRoute>
                 }
               />
-
+             <Route
+                path="/compose"
+                element={
+                  <ProtectedRoute>
+                    <ComposePage />
+                  </ProtectedRoute>
+              }
+            />
+              
               {/* Misc */}
               <Route
                 path="/about"
