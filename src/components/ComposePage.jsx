@@ -34,10 +34,23 @@ const saveState = (state) => {
 };
 
 /* ------- Small helpers ------- */
-const countWords = (html = "") =>
-  (html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim() || "")
-    ? html.replace(/<[^>]+>/g, " ").trim().split(/\s+/).length
-    : 0;
+const countWords = (html = "") => {
+  const text = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+  return text ? text.split(/\s+/).length : 0;
+};
+const ensureFirstChapter = (chapters) => {
+  if (Array.isArray(chapters) && chapters.length) return chapters;
+  return [
+    {
+      id: Date.now(),
+      title: "Chapter 1: Untitled",
+      content: "",
+      wordCount: 0,
+      lastEdited: "Just now",
+      status: "draft",
+    },
+  ];
+};
 
 /* ==============================
    Compose Page (new, isolated)
@@ -45,23 +58,23 @@ const countWords = (html = "") =>
 export default function ComposePage() {
   const initial = useMemo(loadState, []);
   const [book, setBook] = useState(initial?.book || { title: "Untitled Book" });
-  const [chapters, setChapters] = useState(initial?.chapters || []);
-  const first = chapters[0] || null;
+  const [chapters, setChapters] = useState(ensureFirstChapter(initial?.chapters || []));
+  const [selectedId, setSelectedId] = useState(chapters[0].id);
+  const selected = chapters.find((c) => c.id === selectedId) || chapters[0];
 
-  const [selectedId, setSelectedId] = useState(first?.id || null);
-  const selected = chapters.find((c) => c.id === selectedId) || null;
-
-  const [title, setTitle] = useState(selected?.title || "");
-  const [html, setHtml] = useState(selected?.content || "");
+  const [title, setTitle] = useState(selected.title || "");
+  const [html, setHtml] = useState(selected.content || "");
   const [isFS, setIsFS] = useState(false);
   const [aiBusy, setAiBusy] = useState(false);
+  const editorRef = useRef(null);
 
   /* keep local editor state synced with selected chapter */
   useEffect(() => {
-    if (!selected) return;
-    setTitle(selected.title || "");
-    setHtml(selected.content || "");
-  }, [selectedId]); // eslint-disable-line
+    const sel = chapters.find((c) => c.id === selectedId);
+    if (!sel) return;
+    setTitle(sel.title || "");
+    setHtml(sel.content || "");
+  }, [selectedId, chapters]);
 
   /* persist project on change (debounced-ish) */
   useEffect(() => {
@@ -98,7 +111,6 @@ export default function ComposePage() {
 
   /* SAVE (updates localStorage + chapter list) */
   const handleSave = () => {
-    if (!selected) return;
     const updated = {
       ...selected,
       title: title || selected.title,
@@ -108,8 +120,19 @@ export default function ComposePage() {
       status: selected.status || "draft",
     };
     setChapters((prev) => prev.map((c) => (c.id === updated.id ? updated : c)));
-    // project-level persist is handled by useEffect above
   };
+
+  /* keyboard shortcut Cmd/Ctrl+S to save */
+  useEffect(() => {
+    const onKey = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        handleSave();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [handleSave, title, html, selected]);
 
   /* AI: proofread/clarify via proxy */
   const runAI = async (mode = "proofread") => {
@@ -126,7 +149,9 @@ export default function ComposePage() {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data?.error || `AI error (${res.status})`);
-      setHtml(data.editedHtml || html); // fallback if service returns empty
+      setHtml(data.editedHtml ?? html); // update editor
+      // optionally persist immediately
+      setTimeout(handleSave, 0);
     } catch (e) {
       alert(e.message || "AI request failed");
     } finally {
@@ -169,12 +194,11 @@ export default function ComposePage() {
     </button>
   );
 
-  /* Back to Writing (route: /writing) */
+  /* Back to Writing (route: /writing; adjust if needed) */
   const goBack = () => {
     window.location.href = "/writing";
   };
 
-  /* editor focus works: no overlays above editor, no pointer-events blockers */
   return (
     <div className="min-h-screen bg-[rgb(244,247,250)] text-slate-900">
       {/* Top bar */}
@@ -228,11 +252,8 @@ export default function ComposePage() {
 
       {/* Layout */}
       <div className="max-w-7xl mx-auto px-4 py-6 grid grid-cols-1 xl:grid-cols-[18rem_1fr] gap-6">
-        {/* Left: Chapters (kept visible in fullscreen too) */}
-        <aside
-          className="xl:sticky xl:top-16 space-y-2"
-          style={{ zIndex: 10 }}
-        >
+        {/* Left: Chapters */}
+        <aside className="xl:sticky xl:top-16 space-y-2" style={{ zIndex: 10 }}>
           <div className="flex items-center justify-between">
             <div className="text-sm text-slate-600">Chapters</div>
             <button
@@ -246,11 +267,6 @@ export default function ComposePage() {
             {chapters.map((c) => (
               <ChapterItem key={c.id} ch={c} />
             ))}
-            {!chapters.length && (
-              <div className="text-sm text-slate-500">
-                No chapters yet. Click “+ Add”.
-              </div>
-            )}
           </div>
         </aside>
 
@@ -270,6 +286,7 @@ export default function ComposePage() {
 
           <div className="p-3">
             <ReactQuill
+              ref={editorRef}
               theme="snow"
               value={html}
               onChange={setHtml}
@@ -332,6 +349,7 @@ export default function ComposePage() {
               </div>
               <div className="p-3">
                 <ReactQuill
+                  ref={editorRef}
                   theme="snow"
                   value={html}
                   onChange={setHtml}
