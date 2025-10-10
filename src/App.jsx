@@ -12,11 +12,11 @@ import {
 /* ---------------------------
    DnD Multi-backend (desktop + mobile)
 ---------------------------- */
+// src/App.jsx
 import { DndProvider } from "react-dnd";
-import { HTML5Backend } from "react-dnd-html5-backend";
-import { TouchBackend } from "react-dnd-touch-backend";
-import { MultiBackend, TouchTransition } from "react-dnd-multi-backend";
-import "dnd-multi-backend/dist/styles.css";
+import { MultiBackend, HTML5toTouch } from "dnd-multi-backend"; // ✅ correct package & preset
+import "dnd-multi-backend/dist/styles.css"; // optional, fine to keep
+
 
 import { UserProvider } from "./lib/state/userStore";
 
@@ -114,7 +114,7 @@ export default function App() {
         <Router>
           <ScrollToTop />
           <Suspense fallback={<Fallback />}>
-            {/* your existing <Routes>…</Routes> */}
+            {/* ...your <Routes> ... */}
           </Suspense>
         </Router>
       </DndProvider>
