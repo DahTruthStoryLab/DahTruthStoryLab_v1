@@ -1,3 +1,4 @@
+// src/App.jsx
 import React, { Suspense, lazy, useEffect } from "react";
 import {
   BrowserRouter as Router,
@@ -7,11 +8,9 @@ import {
   useLocation,
   Navigate,
 } from "react-router-dom";
-import { UserProvider } from "./lib/state/userStore";
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
-import { TouchBackend } from "react-dnd-touch-backend";
-import { MultiBackend, TouchTransition } from "dnd-multi-backend";
+import { UserProvider } from "./lib/state/userStore";
 
 /* =========================
    Lazy-loaded pages
@@ -24,10 +23,8 @@ const TOCPage              = lazy(() => import("./components/TOCPage"));
 const TOCPage2             = lazy(() => import("./components/TOCPage2"));
 const ProjectPage          = lazy(() => import("./components/ProjectPage"));
 const WhoAmI               = lazy(() => import("./components/WhoAmI"));
-// ❗ Keep only ONE of the following two lines:
+const WriteSection         = lazy(() => import("./components/WriteSection"));
 const ComposePage          = lazy(() => import("./components/ComposePage"));
-// const WriteSection      = lazy(() => import("./components/WriteSection")); // optional if you keep the old one
-
 const Calendar             = lazy(() => import("./components/Calendar"));
 const StoryLabLanding      = lazy(() => import("./lib/storylab/StoryLabLanding"));
 const StoryPromptsWorkshop = lazy(() => import("./lib/storylab/StoryPromptsWorkshop"));
@@ -41,7 +38,7 @@ const Publishing           = lazy(() => import("./pages/Publishing.tsx"));
 const Profile              = lazy(() => import("./components/Profile"));
 const PlansPage            = lazy(() => import("./components/PlansPage"));
 const BillingSuccess       = lazy(() => import("./pages/BillingSuccess.jsx"));
-const AiTools = lazy(() => import("./pages/AiTools"));
+const AiTools              = lazy(() => import("./pages/AiTools")); // if you created this
 
 /* =========================
    Global UI helpers
@@ -51,15 +48,6 @@ const Fallback = () => (
     <div className="text-center">
       <div className="animate-pulse text-lg">Loading…</div>
       <p className="text-muted mt-1">Please wait a moment.</p>
-    </div>
-  </div>
-);
-
-const Placeholder = ({ title = "Coming soon" }) => (
-  <div className="min-h-[60vh] flex items-center justify-center text-[color:var(--color-ink)]">
-    <div className="text-center glass-panel px-6 py-5">
-      <h1 className="text-2xl heading-serif mb-1">{title}</h1>
-      <p className="text-muted">This page hasn't been built yet.</p>
     </div>
   </div>
 );
@@ -94,26 +82,14 @@ function TableOfContentsRouter() {
   if (chosen !== stored) localStorage.setItem(key, chosen);
   return chosen === "1" ? <TOCPage /> : <TOCPage2 />;
 }
-const DND_OPTIONS = {
-  backends: [
-    { backend: HTML5Backend },        // mouse/desktop
-    {
-      backend: TouchBackend,          // touch/mobile/tablet
-      options: { enableMouseEvents: true },
-      preview: true,
-      transition: TouchTransition,
-    },
-  ],
-};
 
 /* =========================
-   App (single export)
+   App
    ========================= */
 export default function App() {
   return (
     <UserProvider>
-      {/* ✅ Provide DnD at the app root once, with multi-backend */}
-      <DndProvider backend={MultiBackend} options={DND_OPTIONS}>
+      <DndProvider backend={HTML5Backend}>
         <Router>
           <ScrollToTop />
           <Suspense fallback={<Fallback />}>
@@ -122,14 +98,7 @@ export default function App() {
               <Route path="/" element={<LandingPage />} />
               <Route path="/signin" element={<SignInPage />} />
               <Route path="/auth/register" element={<RegistrationPage />} />
-              {/* ...keep the rest of your routes as-is... */}
-            </Routes>
-          </Suspense>
-        </Router>
-      </DndProvider>
-    </UserProvider>
-  );
-}
+
               {/* Protected */}
               <Route
                 path="/dashboard"
@@ -139,7 +108,9 @@ export default function App() {
                   </ProtectedRoute>
                 }
               />
-             <Route
+
+              {/* Writer/Writing (route all to ComposePage) */}
+              <Route
                 path="/writer"
                 element={
                   <ProtectedRoute>
@@ -147,7 +118,6 @@ export default function App() {
                   </ProtectedRoute>
                 }
               />
-              
               <Route
                 path="/write"
                 element={
@@ -156,7 +126,6 @@ export default function App() {
                   </ProtectedRoute>
                 }
               />
-              
               <Route
                 path="/writing"
                 element={
@@ -165,7 +134,16 @@ export default function App() {
                   </ProtectedRoute>
                 }
               />
-            {/* StoryLab */}
+              <Route
+                path="/compose"
+                element={
+                  <ProtectedRoute>
+                    <ComposePage />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* StoryLab */}
               <Route
                 path="/story-lab"
                 element={
@@ -296,52 +274,22 @@ export default function App() {
                   </ProtectedRoute>
                 }
               />
-
-              {/* Redirects */}
               <Route path="/publish" element={<Navigate to="/publishing" replace />} />
               <Route path="/publishing-suite" element={<Navigate to="/publishing" replace />} />
               <Route path="/storylab/publishing" element={<Navigate to="/publishing" replace />} />
               <Route path="/publish/*" element={<Navigate to="/publishing" replace />} />
               <Route path="/publishing-suite/*" element={<Navigate to="/publishing" replace />} />
-
-              {/* Store / Billing */}
               <Route
-                path="/store"
+                path="/ai-tools"
                 element={
                   <ProtectedRoute>
-                    <PlansPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/billing/success"
-                element={
-                  <ProtectedRoute>
-                    <BillingSuccess />
-                  </ProtectedRoute>
-                }
-              />
-             <Route
-                path="/compose"
-                element={
-                  <ProtectedRoute>
-                    <ComposePage />
-                  </ProtectedRoute>
-              }
-            />
-              
-              {/* Misc */}
-              <Route
-                path="/about"
-                element={
-                  <ProtectedRoute>
-                    <Placeholder title="About" />
+                    <AiTools />
                   </ProtectedRoute>
                 }
               />
 
               {/* Fallback */}
-              <Route path="*" element={<Placeholder title="Not Found" />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </Suspense>
         </Router>
@@ -349,13 +297,3 @@ export default function App() {
     </UserProvider>
   );
 }
-
-// inside <Routes> with other protected routes:
-    <Route
-  path="/ai-tools"
-  element={
-    <ProtectedRoute>
-      <AiTools />
-    </ProtectedRoute>
-  }
-/>
