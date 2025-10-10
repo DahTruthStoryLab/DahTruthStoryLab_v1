@@ -5,6 +5,9 @@ import Quill from "quill";
 import "react-quill/dist/quill.snow.css";
 import { ArrowLeft, Bot, Save, Maximize2, Minimize2 } from "lucide-react";
 
+// ✅ Add this line below your existing imports:
+import { useAI } from "../lib/AiProvider";
+
 /* ------- Fonts whitelist (family + size) ------- */
 const Font = Quill.import("formats/font");
 const FONT_WHITELIST = [
@@ -62,6 +65,7 @@ const ensureFirstChapter = (chapters) => {
    Compose Page (new, isolated)
    ============================== */
 export default function ComposePage() {
+  const ai = useAI();
   const initial = useMemo(loadState, []);
   const [book, setBook] = useState(initial?.book || { title: "Untitled Book" });
   const [chapters, setChapters] = useState(ensureFirstChapter(initial?.chapters || []));
@@ -144,26 +148,31 @@ export default function ComposePage() {
   };
 
   /* AI: proofread/clarify via proxy — apply to editor AND chapter */
-  const runAI = async (mode = "proofread") => {
-    try {
-      setAiBusy(true);
-      const res = await fetch(AI_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          mode,
-          content: html || "",
-          constraints: { preserveVoice: true, noEmDashes: true },
-        }),
-      });
+  // make sure at the top of the file you have: import { useAI } from "../lib/AiProvider";
+const ai = useAI();
 
-      const handleSaveAndProof = async () => {
-        await runAI("proofread"); // update editor + chapter immediately
-        handleSave();             // refresh lastEdited, make sure it’s persisted
-      };
+/* AI: proofread/clarify via shared layer — apply to editor AND chapter */
+const runAI = async (mode = "proofread") => {
+  try {
+    setAiBusy(true);
+    const edited = await ai.proofread(html, { mode });
+    setHtml(edited);
 
-     // at top of file (module scope)
-const AI_URL = "/api/ai/rewrite";
+    // (optional) immediately persist to selected chapter
+    // setChapters(prev => { ...saveState(...); return next; });
+  } catch (e) {
+    console.error("[AI] error:", e);
+    alert(e.message || "AI request failed");
+  } finally {
+    setAiBusy(false);
+  }
+};
+
+/* Combo: Proofread then Save */
+const handleSaveAndProof = async () => {
+  await runAI("proofread");
+  handleSave();
+};
 
 export default function ComposePage() {
   // 1) state + refs (your real state here)
