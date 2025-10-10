@@ -1,12 +1,9 @@
 // src/components/ComposePage.jsx
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import ReactQuill from "react-quill";
 import Quill from "quill";
 import "react-quill/dist/quill.snow.css";
-import { ArrowLeft, Bot, Save, Maximize2, Minimize2 } from "lucide-react";
-import { useCallback } from "react";
-
-// Shared AI layer
+import { ArrowLeft, Bot, Save, Maximize2, Minimize2, RotateCcw, RotateCw } from "lucide-react";
 import { useAI } from "../lib/AiProvider";
 
 /* ------- Fonts whitelist (family + size) ------- */
@@ -25,20 +22,11 @@ Quill.register(Size, true);
 
 /* ------- Storage helpers ------- */
 const STORAGE_KEY = "dahtruth-story-lab-toc-v3";
-
 const loadState = () => {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
+  try { const raw = localStorage.getItem(STORAGE_KEY); return raw ? JSON.parse(raw) : null; } catch { return null; }
 };
 const saveState = (state) => {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    window.dispatchEvent(new Event("project:change"));
-  } catch {}
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); window.dispatchEvent(new Event("project:change")); } catch {}
 };
 
 /* ------- Small helpers ------- */
@@ -46,25 +34,17 @@ const countWords = (html = "") => {
   const text = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
   return text ? text.split(/\s+/).length : 0;
 };
-const ensureFirstChapter = (chapters) => {
-  if (Array.isArray(chapters) && chapters.length) return chapters;
-  return [
-    {
-      id: Date.now(),
-      title: "Chapter 1: Untitled",
-      content: "",
-      wordCount: 0,
-      lastEdited: "Just now",
-      status: "draft",
-    },
-  ];
-};
+const ensureFirstChapter = (chapters) =>
+  Array.isArray(chapters) && chapters.length ? chapters : [{
+    id: Date.now(), title: "Chapter 1: Untitled", content: "",
+    wordCount: 0, lastEdited: "Just now", status: "draft",
+  }];
 
 /* ==============================
    Compose Page (isolated writer)
 ============================== */
 export default function ComposePage() {
-  const ai = useAI(); // ✅ exactly one instance
+  const ai = useAI();
 
   // Load initial project
   const initial = useMemo(loadState, []);
@@ -103,7 +83,7 @@ export default function ComposePage() {
     return () => clearTimeout(t);
   }, [book, chapters]);
 
-  /* Quill toolbar modules */
+  /* Quill toolbar modules (with fonts) */
   const modules = useMemo(
     () => ({
       toolbar: [
@@ -117,45 +97,24 @@ export default function ComposePage() {
         ["link", "image"],
         ["clean"],
       ],
+      history: { delay: 500, maxStack: 200, userOnly: true },
     }),
     []
   );
 
-// src/components/ComposePage.jsx
-import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
-import ReactQuill from "react-quill";
-import Quill from "quill";
-import "react-quill/dist/quill.snow.css";
-// ...your other imports...
-
-export default function ComposePage() {
-  // --- state + refs ---
-  const [book, setBook] = useState(/* existing load */);
-  const [chapters, setChapters] = useState(/* existing load */);
-  const [selectedId, setSelectedId] = useState(/* first chapter id */);
-  const selected = chapters.find(c => c.id === selectedId) || null;
-
-  const [title, setTitle] = useState(selected?.title || "");
-  const [html,  setHtml]  = useState(selected?.content || "");
-  const editorRef = useRef(null); // used by undo/redo AND both editors
-
-  // --- effects you already have (sync selected -> title/html, persist, etc.) ---
-
-  // --- SAVE (inside component) ---
+  /* Save (write-through persist immediately) */
   const handleSave = useCallback(() => {
     if (!selected?.id) return;
-
     const updated = {
       ...selected,
       title: title || selected.title,
       content: html,
-      wordCount: (html.replace(/<[^>]+>/g, " ").trim().match(/\S+/g) || []).length,
+      wordCount: countWords(html),
       lastEdited: "Just now",
       status: selected.status || "draft",
     };
-
-    setChapters(prev => {
-      const next = prev.map(c => (c.id === updated.id ? updated : c));
+    setChapters((prev) => {
+      const next = prev.map((c) => (c.id === updated.id ? updated : c));
       const current = loadState() || {};
       saveState({
         book,
@@ -168,58 +127,19 @@ export default function ComposePage() {
     });
   }, [selected?.id, selected, title, html, book]);
 
-  // --- Undo / Redo using Quill history ---
+  /* Undo / Redo (Quill history) */
   const undo = () => editorRef.current?.getEditor?.()?.history?.undo?.();
   const redo = () => editorRef.current?.getEditor?.()?.history?.redo?.();
 
-  // --- AI + other handlers you already have ---
-
-  return (
-    <div>
-      {/* Top bar buttons (examples): */}
-      <div className="flex gap-2">
-        <button type="button" onClick={undo} className="btn">Undo</button>
-        <button type="button" onClick={redo} className="btn">Redo</button>
-        <button type="button" onClick={handleSave} className="btn-primary">Save</button>
-        {/* Proof + Save button can call your handleSaveAndProof() */}
-      </div>
-
-      {/* Main editor */}
-      <ReactQuill
-        ref={editorRef}
-        theme="snow"
-        value={html}
-        onChange={setHtml}
-        modules={modules} // your toolbar config
-        placeholder="Start writing your story here…"
-      />
-
-      {/* Fullscreen editor (use the SAME ref so undo/redo works there too) */}
-      {isFS && (
-        <ReactQuill
-          ref={editorRef}
-          theme="snow"
-          value={html}
-          onChange={setHtml}
-          modules={modules}
-          placeholder="Write in fullscreen…"
-        />
-      )}
-    </div>
-  );
-}
-
-  /* ✅ AI: proofread/clarify via shared layer — apply to editor AND chapter */
+  /* AI: proofread/clarify via shared layer — apply to editor AND chapter */
   const runAI = async (mode = "proofread") => {
     try {
       setAiBusy(true);
       const edited = await ai.proofread(html || "", { mode, noEmDashes: true });
-
-      // Update editor
       const newHtml = edited ?? html;
       setHtml(newHtml);
 
-      // Persist into the selected chapter right away
+      // persist into the selected chapter immediately
       if (selected?.id) {
         setChapters((prev) => {
           const next = prev.map((c) =>
@@ -228,8 +148,7 @@ export default function ComposePage() {
                   ...c,
                   title: title || c.title,
                   content: newHtml,
-                  wordCount:
-                    (newHtml.replace(/<[^>]+>/g, " ").trim().match(/\S+/g) || []).length,
+                  wordCount: countWords(newHtml),
                   lastEdited: "Just now",
                 }
               : c
@@ -260,51 +179,32 @@ export default function ComposePage() {
   };
 
   /* Keyboard shortcuts */
- useEffect(() => {
-  const onKeyDown = (e) => {
-    const k = e.key?.toLowerCase?.();
-    const meta = e.ctrlKey || e.metaKey;
-
-    if (!meta || !k) return;
-
-    // Save (Cmd/Ctrl+S)  — Shift adds Proofread
-    if (k === "s") {
-      e.preventDefault();
-      if (e.shiftKey) {
-        handleSaveAndProof();
-      } else {
+  useEffect(() => {
+    const onKey = (e) => {
+      const k = e.key.toLowerCase();
+      // Save
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && k === "s") {
+        e.preventDefault();
         handleSave();
       }
-      return;
-    }
-
-    // Undo/Redo (Cmd/Ctrl+Z, Cmd/Ctrl+Shift+Z, Cmd/Ctrl+Y)
-    if (k === "z") {
-      e.preventDefault();
-      if (e.shiftKey) {
-        redo();
-      } else {
+      // Save + Proofread
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && k === "s") {
+        e.preventDefault();
+        handleSaveAndProof();
+      }
+      // Undo / Redo
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && k === "z") {
+        e.preventDefault();
         undo();
       }
-      return;
-    }
-    if (k === "y") {
-      e.preventDefault();
-      redo();
-      return;
-    }
-  };
-
-  window.addEventListener("keydown", onKeyDown);
-  return () => window.removeEventListener("keydown", onKeyDown);
-  // If these handlers aren't wrapped in useCallback, you can keep this
-  // dependency list and ignore the lint warning, or wrap them in useCallback.
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-}, [handleSave, handleSaveAndProof, undo, redo]);
-
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && k === "z") {
+        e.preventDefault();
+        redo();
+      }
+    };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [title, html, selected?.id]);
+  }, [handleSave, handleSaveAndProof]);
 
   /* Add a new chapter */
   const addChapter = () => {
@@ -342,9 +242,7 @@ export default function ComposePage() {
   );
 
   /* Back to Writing (route: /writing; adjust if needed) */
-  const goBack = () => {
-    window.location.href = "/writing";
-  };
+  const goBack = () => { window.location.href = "/writing"; };
 
   return (
     <div className="min-h-screen bg-[rgb(244,247,250)] text-slate-900">
@@ -360,6 +258,13 @@ export default function ComposePage() {
           </button>
 
           <div className="ml-auto flex items-center gap-2">
+            <button onClick={undo} className="rounded-lg border px-2 py-1.5 bg-white hover:bg-slate-50" title="Undo">
+              <RotateCcw size={16} />
+            </button>
+            <button onClick={redo} className="rounded-lg border px-2 py-1.5 bg-white hover:bg-slate-50" title="Redo">
+              <RotateCw size={16} />
+            </button>
+
             <button
               onClick={() => runAI("proofread")}
               className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50 disabled:opacity-60"
@@ -420,9 +325,7 @@ export default function ComposePage() {
             </button>
           </div>
           <div className="space-y-2">
-            {chapters.map((c) => (
-              <ChapterItem key={c.id} ch={c} />
-            ))}
+            {chapters.map((c) => (<ChapterItem key={c.id} ch={c} />))}
           </div>
         </aside>
 
@@ -484,9 +387,7 @@ export default function ComposePage() {
                 </button>
               </div>
               <div className="space-y-2">
-                {chapters.map((c) => (
-                  <ChapterItem key={c.id} ch={c} />
-                ))}
+                {chapters.map((c) => (<ChapterItem key={c.id} ch={c} />))}
               </div>
             </aside>
 
