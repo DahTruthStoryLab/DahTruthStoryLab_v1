@@ -153,11 +153,13 @@ const ai = useAI();
 
 /* AI: proofread/clarify via shared layer — apply to editor AND chapter */
 const runAI = async (mode = "proofread") => {
-  try {
-    setAiBusy(true);
-    const edited = await ai.proofread(html, { mode });
-    setHtml(edited);
-
+    try {
+      setAiBusy(true);
+      // use shared layer
+      const edited = await ai.proofread(html || "", { mode, noEmDashes: true });
+      // apply to editor
+      setHtml(edited ?? html);
+      
    // src/components/ComposePage.jsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import ReactQuill from "react-quill";
