@@ -158,145 +158,159 @@ const runAI = async (mode = "proofread") => {
     const edited = await ai.proofread(html, { mode });
     setHtml(edited);
 
-    // (optional) immediately persist to selected chapter
-    // setChapters(prev => { ...saveState(...); return next; });
-  } catch (e) {
-    console.error("[AI] error:", e);
-    alert(e.message || "AI request failed");
-  } finally {
-    setAiBusy(false);
+   // src/components/ComposePage.jsx
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import ReactQuill from "react-quill";
+import Quill from "quill";
+import "react-quill/dist/quill.snow.css";
+import { ArrowLeft, Bot, Save, Maximize2, Minimize2 } from "lucide-react";
+import { useAI } from "../lib/AiProvider";
+
+/* ------- Fonts whitelist (family + size) ------- */
+const Font = Quill.import("formats/font");
+const FONT_WHITELIST = [
+  "sans", "serif", "mono",
+  "arial", "calibri", "cambria", "timesnewroman",
+  "georgia", "garamond", "verdana", "couriernew",
+];
+Font.whitelist = FONT_WHITELIST;
+Quill.register(Font, true);
+
+const Size = Quill.import("formats/size");
+Size.whitelist = ["small", false, "large", "huge"];
+Quill.register(Size, true);
+
+/* ------- Storage helpers ------- */
+const STORAGE_KEY = "dahtruth-story-lab-toc-v3";
+
+const loadState = () => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
   }
 };
-
-/* Combo: Proofread then Save */
-const handleSaveAndProof = async () => {
-  await runAI("proofread");
-  handleSave();
+const saveState = (state) => {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    window.dispatchEvent(new Event("project:change"));
+  } catch {}
 };
 
+/* ------- Small helpers ------- */
+const countWords = (html = "") => {
+  const text = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+  return text ? text.split(/\s+/).length : 0;
+};
+const ensureFirstChapter = (chapters) => {
+  if (Array.isArray(chapters) && chapters.length) return chapters;
+  return [
+    {
+      id: Date.now(),
+      title: "Chapter 1: Untitled",
+      content: "",
+      wordCount: 0,
+      lastEdited: "Just now",
+      status: "draft",
+    },
+  ];
+};
+
+/* ==============================
+   Compose Page (isolated writer)
+============================== */
 export default function ComposePage() {
-  // 1) state + refs (your real state here)
-  const [title, setTitle] = useState(selected?.title || "");
-  const [html, setHtml] = useState(selected?.content || "");
+  const ai = useAI();
+
+  // Load initial project
+  const initial = useMemo(loadState, []);
+  const [book, setBook] = useState(initial?.book || { title: "Untitled Book" });
+  const [chapters, setChapters] = useState(ensureFirstChapter(initial?.chapters || []));
+  const [selectedId, setSelectedId] = useState(chapters[0].id);
+  const selected = chapters.find((c) => c.id === selectedId) || chapters[0];
+
+  // Editor state
+  const [title, setTitle] = useState(selected.title || "");
+  const [html, setHtml] = useState(selected.content || "");
+  const [isFS, setIsFS] = useState(false);
   const [aiBusy, setAiBusy] = useState(false);
-  // also have: chapters, selectedId, selected, etc.
+  const editorRef = useRef(null);
 
-  // 2) effects (real ones, not placeholders)
+  /* Sync editor when selected chapter changes */
   useEffect(() => {
-    // sync title/html when selected chapter changes
-    if (!selected) return;
-    setTitle(selected.title || "");
-    setHtml(selected.content || "");
-  }, [selected?.id]); // your real deps
+    const sel = chapters.find((c) => c.id === selectedId);
+    if (!sel) return;
+    setTitle(sel.title || "");
+    setHtml(sel.content || "");
+  }, [selectedId, chapters]);
 
-  // 3) modules (real toolbar config)
-  const modules = useMemo(() => ({
-    toolbar: [
-      [{ header: [1, 2, 3, false] }],
-      [{ font: ["sans","serif","mono","arial","calibri","cambria","timesnewroman","georgia","garamond","verdana","couriernew"] }],
-      [{ size: ["small", false, "large", "huge"] }],
-      ["bold","italic","underline","strike"],
-      [{ list:"ordered" }, { list:"bullet" }],
-      [{ align: [] }],
-      ["blockquote","code-block"],
-      ["link","image"],
-      ["clean"],
-    ],
-  }), []);
+  /* Persist project (debounced-ish) */
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const current = loadState() || {};
+      saveState({
+        book,
+        chapters,
+        daily: current.daily || { goal: 500, counts: {} },
+        settings: current.settings || { theme: "light", focusMode: false },
+        tocOutline: current.tocOutline || [],
+      });
+    }, 400);
+    return () => clearTimeout(t);
+  }, [book, chapters]);
 
-  // 4) helpers used by AI
+  /* Quill toolbar modules */
+  const modules = useMemo(
+    () => ({
+      toolbar: [
+        [{ header: [1, 2, 3, false] }],
+        [{ font: FONT_WHITELIST }],
+        [{ size: Size.whitelist }],
+        ["bold", "italic", "underline", "strike"],
+        [{ list: "ordered" }, { list: "bullet" }],
+        [{ align: [] }],
+        ["blockquote", "code-block"],
+        ["link", "image"],
+        ["clean"],
+      ],
+    }),
+    []
+  );
+
+  /* Save (write-through persist immediately) */
   const handleSave = () => {
-    // your real write-through save here (updates chapters + localStorage)
+    const updated = {
+      ...selected,
+      title: title || selected.title,
+      content: html,
+      wordCount: countWords(html),
+      lastEdited: "Just now",
+      status: selected.status || "draft",
+    };
+
+    setChapters((prev) => {
+      const next = prev.map((c) => (c.id === updated.id ? updated : c));
+      const current = loadState() || {};
+      saveState({
+        book,
+        chapters: next,
+        daily: current.daily || { goal: 500, counts: {} },
+        settings: current.settings || { theme: "light", focusMode: false },
+        tocOutline: current.tocOutline || [],
+      });
+      return next;
+    });
   };
 
-  // 5) ✅ AI function (exactly one)
+  /* AI: proofread/clarify via shared layer — apply to editor AND persist */
   const runAI = async (mode = "proofread") => {
     try {
       setAiBusy(true);
-      const res = await fetch(AI_URL, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          mode,
-          content: html || "",
-          constraints: { preserveVoice: true, noEmDashes: true },
-        }),
-      });
-
-      const raw = await res.text();
-      console.log("[AI] status:", res.status, "ct:", res.headers.get("content-type"));
-      console.log("[AI] body:", raw);
-
-      let data = {};
-      try { data = JSON.parse(raw); } catch {}
-      if (!res.ok) throw new Error(data?.error || `AI error (${res.status})`);
-
-      const edited = data.editedHtml ?? html;
+      const edited = await ai.proofread(html, { mode });
       setHtml(edited);
 
-      // persist into selected chapter immediately (your existing code)
-      // setChapters(prev => { ...saveState(...); return next; });
-    } catch (e) {
-      console.error("[AI] error:", e);
-      alert(e.message || "AI request failed");
-    } finally {
-      setAiBusy(false);
-    }
-  };
-
-  // 6) combo
-  const handleSaveAndProof = async () => {
-    await runAI("proofread");
-    handleSave();
-  };
-
-  // 7) keybindings (use your real deps)
-  useEffect(() => {
-    const onKey = (e) => {
-      const k = e.key.toLowerCase();
-      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && k === "s") {
-        e.preventDefault();
-        handleSave();
-      }
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && k === "s") {
-        e.preventDefault();
-        handleSaveAndProof();
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [handleSave, handleSaveAndProof]);
-
-  // 8) JSX return (buttons call runAI/handleSave/etc.)
-  return (
-    // ...
-    // <button onClick={() => runAI("proofread")}>AI: Proofread</button>
-    // <button onClick={() => runAI("clarify")}>AI: Clarify</button>
-    // <button onClick={handleSaveAndProof}>Proof + Save</button>
-    // <button onClick={handleSave}>Save</button>
-    // ...
-  );
-}
-
-      // Debug visibility (helps if it ever “does nothing”)
-      const raw = await res.text();
-      console.log("[AI] status:", res.status, "ct:", res.headers.get("content-type"));
-      console.log("[AI] body:", raw);
-
-      let data = {};
-      try {
-        data = JSON.parse(raw);
-      } catch {
-        data = {};
-      }
-      if (!res.ok) throw new Error(data?.error || `AI error (${res.status})`);
-
-      const edited = data.editedHtml ?? html;
-
-      // apply to editor
-      setHtml(edited);
-
-      // persist into the selected chapter immediately
+      // Persist into the selected chapter immediately
       if (selected?.id) {
         setChapters((prev) => {
           const next = prev.map((c) =>
@@ -311,7 +325,6 @@ export default function ComposePage() {
                 }
               : c
           );
-          // write-through to localStorage
           const current = loadState() || {};
           saveState({
             book,
@@ -331,20 +344,32 @@ export default function ComposePage() {
     }
   };
 
-  /* keyboard shortcut Cmd/Ctrl+S to save */
+  /* Combo: Proofread then Save (updates lastEdited/timestamps) */
+  const handleSaveAndProof = async () => {
+    await runAI("proofread");
+    handleSave();
+  };
+
+  /* Keyboard shortcuts */
   useEffect(() => {
     const onKey = (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+      const k = e.key.toLowerCase();
+      // Save
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && k === "s") {
         e.preventDefault();
         handleSave();
+      }
+      // Save + Proofread
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && k === "s") {
+        e.preventDefault();
+        handleSaveAndProof();
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [title, html, selected]);
+  }, [title, html, selected?.id]);
 
-  /* add a new chapter quickly */
+  /* Add a new chapter */
   const addChapter = () => {
     const id = Date.now();
     const ch = {
@@ -359,7 +384,7 @@ export default function ComposePage() {
     setSelectedId(id);
   };
 
-  /* simple chapter sidebar item */
+  /* Chapter list item */
   const ChapterItem = ({ ch }) => (
     <button
       type="button"
@@ -415,6 +440,15 @@ export default function ComposePage() {
             >
               <Bot size={16} />
               {aiBusy ? "AI…" : "AI: Clarify"}
+            </button>
+            <button
+              onClick={handleSaveAndProof}
+              className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50 disabled:opacity-60"
+              disabled={aiBusy}
+              title="Proofread + Save"
+            >
+              <Bot size={16} />
+              Proof + Save
             </button>
             <button
               onClick={handleSave}
