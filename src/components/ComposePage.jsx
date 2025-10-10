@@ -305,14 +305,7 @@ export default function ComposePage() {
     });
   };
 
-  /* AI: proofread/clarify via shared layer — apply to editor AND persist */
-  const runAI = async (mode = "proofread") => {
-    try {
-      setAiBusy(true);
-      const edited = await ai.proofread(html, { mode });
-      setHtml(edited);
-
-      // Persist into the selected chapter immediately
+    // Persist into the selected chapter immediately
       if (selected?.id) {
         setChapters((prev) => {
           const next = prev.map((c) =>
@@ -426,7 +419,7 @@ export default function ComposePage() {
 
           <div className="ml-auto flex items-center gap-2">
             <button
-              onClick={() => runAI("proofread")}
+              onClick={() => runAI("proofread")} …>AI: Proofread</button>
               className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50 disabled:opacity-60"
               disabled={aiBusy}
               title="AI Proofread"
@@ -435,7 +428,7 @@ export default function ComposePage() {
               {aiBusy ? "AI…" : "AI: Proofread"}
             </button>
             <button
-              onClick={() => runAI("clarify")}
+              onClick={() => runAI("clarify")} …>AI: Clarify</button>
               className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50 disabled:opacity-60"
               disabled={aiBusy}
               title="AI Clarify"
@@ -444,7 +437,7 @@ export default function ComposePage() {
               {aiBusy ? "AI…" : "AI: Clarify"}
             </button>
             <button
-              onClick={handleSaveAndProof}
+              onClick={handleSaveAndProof} …>Proof + Save</button>
               className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50 disabled:opacity-60"
               disabled={aiBusy}
               title="Proofread + Save"
