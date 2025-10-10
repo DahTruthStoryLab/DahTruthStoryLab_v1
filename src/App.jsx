@@ -8,8 +8,16 @@ import {
   useLocation,
   Navigate,
 } from "react-router-dom";
+
+/* ---------------------------
+   DnD Multi-backend (desktop + mobile)
+---------------------------- */
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
+import { TouchBackend } from "react-dnd-touch-backend";
+import { MultiBackend, TouchTransition } from "react-dnd-multi-backend";
+import "dnd-multi-backend/dist/styles.css";
+
 import { UserProvider } from "./lib/state/userStore";
 
 /* =========================
@@ -38,7 +46,7 @@ const Publishing           = lazy(() => import("./pages/Publishing.tsx"));
 const Profile              = lazy(() => import("./components/Profile"));
 const PlansPage            = lazy(() => import("./components/PlansPage"));
 const BillingSuccess       = lazy(() => import("./pages/BillingSuccess.jsx"));
-const AiTools              = lazy(() => import("./pages/AiTools")); // if you created this
+const AiTools              = lazy(() => import("./pages/AiTools"));
 
 /* =========================
    Global UI helpers
@@ -84,12 +92,28 @@ function TableOfContentsRouter() {
 }
 
 /* =========================
-   App
+   DnD MultiBackend options
+   ========================= */
+const DND_OPTIONS = {
+  backends: [
+    { id: "html5", backend: HTML5Backend },
+    {
+      id: "touch",
+      backend: TouchBackend,
+      options: { enableMouseEvents: true },
+      preview: true,
+      transition: TouchTransition,
+    },
+  ],
+};
+
+/* =========================
+   App Root
    ========================= */
 export default function App() {
   return (
     <UserProvider>
-      <DndProvider backend={HTML5Backend}>
+      <DndProvider backend={MultiBackend} options={DND_OPTIONS}>
         <Router>
           <ScrollToTop />
           <Suspense fallback={<Fallback />}>
@@ -109,39 +133,18 @@ export default function App() {
                 }
               />
 
-              {/* Writer/Writing (route all to ComposePage) */}
-              <Route
-                path="/writer"
-                element={
-                  <ProtectedRoute>
-                    <ComposePage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/write"
-                element={
-                  <ProtectedRoute>
-                    <ComposePage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/writing"
-                element={
-                  <ProtectedRoute>
-                    <ComposePage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/compose"
-                element={
-                  <ProtectedRoute>
-                    <ComposePage />
-                  </ProtectedRoute>
-                }
-              />
+              {/* Writer/Writing */}
+              {["/writer", "/write", "/writing", "/compose"].map((p) => (
+                <Route
+                  key={p}
+                  path={p}
+                  element={
+                    <ProtectedRoute>
+                      <ComposePage />
+                    </ProtectedRoute>
+                  }
+                />
+              ))}
 
               {/* StoryLab */}
               <Route
@@ -209,7 +212,7 @@ export default function App() {
                 }
               />
 
-              {/* Table of Contents */}
+              {/* TOC */}
               <Route
                 path="/toc"
                 element={
@@ -279,6 +282,8 @@ export default function App() {
               <Route path="/storylab/publishing" element={<Navigate to="/publishing" replace />} />
               <Route path="/publish/*" element={<Navigate to="/publishing" replace />} />
               <Route path="/publishing-suite/*" element={<Navigate to="/publishing" replace />} />
+
+              {/* AI Tools */}
               <Route
                 path="/ai-tools"
                 element={
