@@ -1,5 +1,4 @@
 // src/App.jsx
-// src/App.jsx (top of file)
 import React, { Suspense, lazy, useEffect } from "react";
 import {
   BrowserRouter as Router,
@@ -86,22 +85,6 @@ function TableOfContentsRouter() {
   if (chosen !== stored) localStorage.setItem(key, chosen);
   return chosen === "1" ? <TOCPage /> : <TOCPage2 />;
 }
-
-/* =========================
-   DnD MultiBackend options
-   ========================= */
-const HTML5toTouch = {
-  backends: [
-    { id: "html5", backend: HTML5Backend },
-    {
-      id: "touch",
-      backend: TouchBackend,
-      options: { enableMouseEvents: true },
-      preview: true,
-      transition: createTransition("touchstart", (e) => !!e.touches),
-    },
-  ],
-};
 
 export default function App() {
   return (
