@@ -8,6 +8,10 @@ import {
   Navigate,
 } from "react-router-dom";
 import { UserProvider } from "./lib/state/userStore";
+import { DndProvider } from "react-dnd";
+import { HTML5Backend } from "react-dnd-html5-backend";
+import { TouchBackend } from "react-dnd-touch-backend";
+import { MultiBackend, TouchTransition } from "dnd-multi-backend";
 
 /* =========================
    Lazy-loaded pages
@@ -90,6 +94,17 @@ function TableOfContentsRouter() {
   if (chosen !== stored) localStorage.setItem(key, chosen);
   return chosen === "1" ? <TOCPage /> : <TOCPage2 />;
 }
+const DND_OPTIONS = {
+  backends: [
+    { backend: HTML5Backend },        // mouse/desktop
+    {
+      backend: TouchBackend,          // touch/mobile/tablet
+      options: { enableMouseEvents: true },
+      preview: true,
+      transition: TouchTransition,
+    },
+  ],
+};
 
 /* =========================
    App (single export)
@@ -97,8 +112,8 @@ function TableOfContentsRouter() {
 export default function App() {
   return (
     <UserProvider>
-      {/* ✅ Provide DnD at the app root once */}
-      <DndProvider backend={HTML5Backend}>
+      {/* ✅ Provide DnD at the app root once, with multi-backend */}
+      <DndProvider backend={MultiBackend} options={DND_OPTIONS}>
         <Router>
           <ScrollToTop />
           <Suspense fallback={<Fallback />}>
@@ -107,7 +122,14 @@ export default function App() {
               <Route path="/" element={<LandingPage />} />
               <Route path="/signin" element={<SignInPage />} />
               <Route path="/auth/register" element={<RegistrationPage />} />
-
+              {/* ...keep the rest of your routes as-is... */}
+            </Routes>
+          </Suspense>
+        </Router>
+      </DndProvider>
+    </UserProvider>
+  );
+}
               {/* Protected */}
               <Route
                 path="/dashboard"
