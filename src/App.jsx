@@ -50,7 +50,7 @@ const PlansPage            = lazy(() => import("./components/PlansPage"));
 const BillingSuccess       = lazy(() => import("./pages/BillingSuccess.jsx")); 
 
 // at top with lazy imports
-const ComposePage = lazy(() => import("./components/ComposePage"));
+const ComposePage          = lazy(() => import("./components/ComposePage"));
 
 /* =========================
    Global UI helpers
@@ -131,12 +131,12 @@ export default function App() {
                 }
               />
 
-              {/* Writer/Writing */}
+              {/* Writer/Writing (all point to ComposePage) */}
               <Route
                 path="/writer"
                 element={
                   <ProtectedRoute>
-                    <WriteSection />
+                    <ComposePage />
                   </ProtectedRoute>
                 }
               />
@@ -144,7 +144,7 @@ export default function App() {
                 path="/write"
                 element={
                   <ProtectedRoute>
-                    <WriteSection />
+                    <ComposePage />
                   </ProtectedRoute>
                 }
               />
@@ -152,7 +152,7 @@ export default function App() {
                 path="/writing"
                 element={
                   <ProtectedRoute>
-                    <WriteSection />
+                    <ComposePage />
                   </ProtectedRoute>
                 }
               />
