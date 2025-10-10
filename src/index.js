@@ -3,6 +3,8 @@ import React from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App";
 import "./index.css";
+import App from "./App";
++import { AiProvider } from "./lib/AiProvider";
 
 // (Optional) Amplify – safe configure
 try {
@@ -57,11 +59,14 @@ class ErrorBoundary extends React.Component {
 }
 
 const root = createRoot(document.getElementById("root"));
-root.render(
-  <React.StrictMode>
-    <ErrorBoundary>
-      <App />
-    </ErrorBoundary>
-  </React.StrictMode>
-);
-
+// ...
+ root.render(
+   <React.StrictMode>
+     <ErrorBoundary>
+-      <App />
++      <AiProvider>
++        <App />
++      </AiProvider>
+     </ErrorBoundary>
+   </React.StrictMode>
+ );
