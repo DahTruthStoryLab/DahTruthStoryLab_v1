@@ -1,4 +1,3 @@
-// src/App.jsx
 import React, { Suspense, lazy, useEffect } from "react";
 import {
   BrowserRouter as Router,
@@ -9,10 +8,6 @@ import {
   Navigate,
 } from "react-router-dom";
 import { UserProvider } from "./lib/state/userStore";
-
-/* ✅ Add these: DnD provider at app root */
-import { DndProvider } from "react-dnd";
-import { HTML5Backend } from "react-dnd-html5-backend";
 
 /* =========================
    Lazy-loaded pages
@@ -25,11 +20,11 @@ const TOCPage              = lazy(() => import("./components/TOCPage"));
 const TOCPage2             = lazy(() => import("./components/TOCPage2"));
 const ProjectPage          = lazy(() => import("./components/ProjectPage"));
 const WhoAmI               = lazy(() => import("./components/WhoAmI"));
+// ❗ Keep only ONE of the following two lines:
 const ComposePage          = lazy(() => import("./components/ComposePage"));
-const Calendar             = lazy(() => import("./components/Calendar"));
-const AiTools              = lazy(() => import("./pages/AiTools.jsx"));
+// const WriteSection      = lazy(() => import("./components/WriteSection")); // optional if you keep the old one
 
-// StoryLab
+const Calendar             = lazy(() => import("./components/Calendar"));
 const StoryLabLanding      = lazy(() => import("./lib/storylab/StoryLabLanding"));
 const StoryPromptsWorkshop = lazy(() => import("./lib/storylab/StoryPromptsWorkshop"));
 const StoryWorkshop        = lazy(() => import("./components/storylab/StoryWorkshop"));
@@ -38,19 +33,10 @@ const CharacterRoadmap     = lazy(() => import("./components/storylab/CharacterR
 const Clothesline          = lazy(() => import("./components/storylab/Clothesline"));
 const HopesFearsLegacy     = lazy(() => import("./components/storylab/HopesFearsLegacy"));
 const WorkshopCohort       = lazy(() => import("./components/storylab/WorkshopCohort.jsx"));
-
-// Publishing (TSX)
 const Publishing           = lazy(() => import("./pages/Publishing.tsx"));
-
-// Profile
 const Profile              = lazy(() => import("./components/Profile"));
-
-// Plans / Billing
 const PlansPage            = lazy(() => import("./components/PlansPage"));
-const BillingSuccess       = lazy(() => import("./pages/BillingSuccess.jsx")); 
-
-// at top with lazy imports
-const ComposePage          = lazy(() => import("./components/ComposePage"));
+const BillingSuccess       = lazy(() => import("./pages/BillingSuccess.jsx"));
 
 /* =========================
    Global UI helpers
@@ -138,22 +124,24 @@ export default function App() {
                   </ProtectedRoute>
                 }
               />
+              
               <Route
                 path="/write"
                 element={
                   <ProtectedRoute>
                     <ComposePage />
                   </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/writing"
-              element={
-                <ProtectedRoute>
-                  <ComposePage />
-                </ProtectedRoute>
-              }
-            />
+                }
+              />
+              
+              <Route
+                path="/writing"
+                element={
+                  <ProtectedRoute>
+                    <ComposePage />
+                  </ProtectedRoute>
+                }
+              />
             {/* StoryLab */}
               <Route
                 path="/story-lab"
