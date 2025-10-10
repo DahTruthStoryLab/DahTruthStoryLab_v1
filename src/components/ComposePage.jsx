@@ -157,6 +157,118 @@ export default function ComposePage() {
         }),
       });
 
+      const handleSaveAndProof = async () => {
+        await runAI("proofread"); // update editor + chapter immediately
+        handleSave();             // refresh lastEdited, make sure it’s persisted
+      };
+
+     // at top of file (module scope)
+const AI_URL = "/api/ai/rewrite";
+
+export default function ComposePage() {
+  // 1) state + refs (your real state here)
+  const [title, setTitle] = useState(selected?.title || "");
+  const [html, setHtml] = useState(selected?.content || "");
+  const [aiBusy, setAiBusy] = useState(false);
+  // also have: chapters, selectedId, selected, etc.
+
+  // 2) effects (real ones, not placeholders)
+  useEffect(() => {
+    // sync title/html when selected chapter changes
+    if (!selected) return;
+    setTitle(selected.title || "");
+    setHtml(selected.content || "");
+  }, [selected?.id]); // your real deps
+
+  // 3) modules (real toolbar config)
+  const modules = useMemo(() => ({
+    toolbar: [
+      [{ header: [1, 2, 3, false] }],
+      [{ font: ["sans","serif","mono","arial","calibri","cambria","timesnewroman","georgia","garamond","verdana","couriernew"] }],
+      [{ size: ["small", false, "large", "huge"] }],
+      ["bold","italic","underline","strike"],
+      [{ list:"ordered" }, { list:"bullet" }],
+      [{ align: [] }],
+      ["blockquote","code-block"],
+      ["link","image"],
+      ["clean"],
+    ],
+  }), []);
+
+  // 4) helpers used by AI
+  const handleSave = () => {
+    // your real write-through save here (updates chapters + localStorage)
+  };
+
+  // 5) ✅ AI function (exactly one)
+  const runAI = async (mode = "proofread") => {
+    try {
+      setAiBusy(true);
+      const res = await fetch(AI_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mode,
+          content: html || "",
+          constraints: { preserveVoice: true, noEmDashes: true },
+        }),
+      });
+
+      const raw = await res.text();
+      console.log("[AI] status:", res.status, "ct:", res.headers.get("content-type"));
+      console.log("[AI] body:", raw);
+
+      let data = {};
+      try { data = JSON.parse(raw); } catch {}
+      if (!res.ok) throw new Error(data?.error || `AI error (${res.status})`);
+
+      const edited = data.editedHtml ?? html;
+      setHtml(edited);
+
+      // persist into selected chapter immediately (your existing code)
+      // setChapters(prev => { ...saveState(...); return next; });
+    } catch (e) {
+      console.error("[AI] error:", e);
+      alert(e.message || "AI request failed");
+    } finally {
+      setAiBusy(false);
+    }
+  };
+
+  // 6) combo
+  const handleSaveAndProof = async () => {
+    await runAI("proofread");
+    handleSave();
+  };
+
+  // 7) keybindings (use your real deps)
+  useEffect(() => {
+    const onKey = (e) => {
+      const k = e.key.toLowerCase();
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && k === "s") {
+        e.preventDefault();
+        handleSave();
+      }
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && k === "s") {
+        e.preventDefault();
+        handleSaveAndProof();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [handleSave, handleSaveAndProof]);
+
+  // 8) JSX return (buttons call runAI/handleSave/etc.)
+  return (
+    // ...
+    // <button onClick={() => runAI("proofread")}>AI: Proofread</button>
+    // <button onClick={() => runAI("clarify")}>AI: Clarify</button>
+    // <button onClick={handleSaveAndProof}>Proof + Save</button>
+    // <button onClick={handleSave}>Save</button>
+    // ...
+  );
+}
+
       // Debug visibility (helps if it ever “does nothing”)
       const raw = await res.text();
       console.log("[AI] status:", res.status, "ct:", res.headers.get("content-type"));
