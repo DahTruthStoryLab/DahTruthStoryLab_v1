@@ -1,8 +1,19 @@
 // src/components/storylab/CharacterRoadmap.jsx
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { Link } from "react-router-dom";
-import { Map as RouteIcon, Plus, Trash2, ArrowUp, ArrowDown } from "lucide-react";
-import { loadProject, saveProject, ensureWorkshopFields, uid } from "../../lib/storylab/projectStore";
+import {
+  Map as RouteIcon,
+  Plus,
+  Trash2,
+  GripVertical,
+} from "lucide-react";
+import { useDrag, useDrop } from "react-dnd";
+import {
+  loadProject,
+  saveProject,
+  ensureWorkshopFields,
+  uid,
+} from "../../lib/storylab/projectStore";
 import BackToLanding, { BackToLandingFab } from "./BackToLanding";
 
 /* ---------------------------
@@ -15,33 +26,129 @@ const PageBanner = () => (
       <div className="relative z-10">
         <div className="mx-auto mb-3 inline-flex items-center justify-center rounded-xl border border-border bg-white/70 px-4 py-1.5">
           <RouteIcon size={14} className="mr-2 text-muted" />
-          <span className="text-xs font-semibold tracking-wide text-muted">DahTruth · StoryLab</span>
+          <span className="text-xs font-semibold tracking-wide text-muted">
+            DahTruth · StoryLab
+          </span>
         </div>
-        <h1 className="text-3xl font-extrabold text-ink mb-2">Character Roadmap</h1>
+        <h1 className="text-3xl font-extrabold text-ink mb-2">
+          Character Roadmap
+        </h1>
         <p className="mt-1 text-sm text-muted max-w-xl mx-auto">
-          A phased view of your progression. (Stub — extend per character later.)
+          A phased view of your progression. Drag to reorder milestones.
         </p>
       </div>
     </div>
   </div>
 );
 
+/* ---------------------------
+   DnD type
+---------------------------- */
+const ItemTypes = {
+  MILESTONE: "MILESTONE",
+};
+
+/* -------------------------------------------------
+   Draggable Milestone Row
+-------------------------------------------------- */
+function DraggableMilestone({
+  item,
+  index,
+  moveItem, // (from, to) => void
+  update,
+  remove,
+}) {
+  const ref = useRef(null);
+
+  // Drop target — accepts other milestones and reorders on hover
+  const [, drop] = useDrop({
+    accept: ItemTypes.MILESTONE,
+    hover(dragItem) {
+      if (!ref.current) return;
+      if (dragItem.index === index) return;
+      moveItem(dragItem.index, index);
+      dragItem.index = index; // mutate drag index so it doesn’t thrash
+    },
+  });
+
+  // Drag source
+  const [{ isDragging }, drag] = useDrag({
+    type: ItemTypes.MILESTONE,
+    item: { id: item.id, index },
+    collect: (monitor) => ({
+      isDragging: monitor.isDragging(),
+    }),
+  });
+
+  drag(drop(ref));
+
+  return (
+    <div
+      ref={ref}
+      className={`grid gap-2 md:grid-cols-[auto_1fr_auto_auto] items-center border border-border bg-white rounded-xl px-3 py-2 transition-shadow ${
+        isDragging ? "opacity-60 shadow-inner" : "hover:shadow-sm"
+      }`}
+    >
+      {/* Drag handle */}
+      <div
+        className="flex items-center justify-center pr-1 cursor-grab active:cursor-grabbing select-none"
+        title="Drag to reorder"
+      >
+        <GripVertical className="h-5 w-5 text-slate-400" />
+      </div>
+
+      {/* Title input */}
+      <input
+        value={item.title}
+        onChange={(e) => update(item.id, { title: e.target.value })}
+        className="w-full border-b border-border focus:border-primary outline-none py-1"
+        placeholder="Milestone title"
+      />
+
+      {/* Done checkbox */}
+      <label className="text-sm inline-flex items-center gap-2 justify-self-start md:justify-self-center">
+        <input
+          type="checkbox"
+          checked={!!item.done}
+          onChange={(e) => update(item.id, { done: e.target.checked })}
+        />
+        Done
+      </label>
+
+      {/* Delete */}
+      <button
+        className="border border-border rounded-md px-2 py-1 justify-self-end"
+        onClick={() => remove(item.id)}
+        title="Delete"
+      >
+        <Trash2 className="h-4 w-4" />
+      </button>
+    </div>
+  );
+}
+
 /* ------------------------------------------------
    CharacterRoadmap (single export — no duplicates)
 ------------------------------------------------- */
 export default function CharacterRoadmap() {
-  const [project, setProject] = useState(() => ensureWorkshopFields(loadProject()));
+  const [project, setProject] = useState(() =>
+    ensureWorkshopFields(loadProject())
+  );
   const items = project.roadmap || [];
 
+  // Persist helper
   const commit = (mutator) => {
     const copy = JSON.parse(JSON.stringify(project));
     mutator(copy);
     ensureWorkshopFields(copy);
     saveProject(copy);
     setProject(copy);
-    try { window.dispatchEvent(new Event("project:change")); } catch {}
+    try {
+      window.dispatchEvent(new Event("project:change"));
+    } catch {}
   };
 
+  // CRUD
   const add = () =>
     commit((p) => {
       p.roadmap.push({ id: uid(), title: "New Milestone", done: false });
@@ -58,13 +165,19 @@ export default function CharacterRoadmap() {
       if (r) Object.assign(r, patch);
     });
 
-  const move = (id, dir) =>
+  // Reorder (DnD)
+  const moveItem = (fromIndex, toIndex) =>
     commit((p) => {
-      const i = p.roadmap.findIndex((x) => x.id === id);
-      const j = i + (dir === "up" ? -1 : 1);
-      if (i < 0 || j < 0 || j >= p.roadmap.length) return;
-      const [it] = p.roadmap.splice(i, 1);
-      p.roadmap.splice(j, 0, it);
+      const list = p.roadmap;
+      if (
+        fromIndex < 0 ||
+        toIndex < 0 ||
+        fromIndex >= list.length ||
+        toIndex >= list.length
+      )
+        return;
+      const [m] = list.splice(fromIndex, 1);
+      list.splice(toIndex, 0, m);
     });
 
   return (
@@ -88,7 +201,9 @@ export default function CharacterRoadmap() {
 
         <div className="rounded-2xl border border-border bg-white/70 backdrop-blur-xl p-6 space-y-3">
           <div className="flex items-center justify-between mb-1">
-            <div className="text-sm text-muted">You are here ➜ There (order matters)</div>
+            <div className="text-sm text-muted">
+              Drag milestones to reorder (top = earlier).
+            </div>
             <button
               onClick={add}
               className="rounded-lg px-3 py-2 border border-border bg-white hover:bg-white/90 text-sm"
@@ -98,55 +213,20 @@ export default function CharacterRoadmap() {
           </div>
 
           {items.map((r, idx) => (
-            <div
+            <DraggableMilestone
               key={r.id}
-              className="grid gap-2 md:grid-cols-[auto_1fr_auto_auto] items-center border border-border bg-white rounded-xl px-3 py-2"
-            >
-              <div className="flex gap-1">
-                <button
-                  className="border border-border rounded-md px-2 py-1"
-                  onClick={() => move(r.id, "up")}
-                  title="Move up"
-                >
-                  <ArrowUp className="h-4 w-4" />
-                </button>
-                <button
-                  className="border border-border rounded-md px-2 py-1"
-                  onClick={() => move(r.id, "down")}
-                  title="Move down"
-                >
-                  <ArrowDown className="h-4 w-4" />
-                </button>
-              </div>
-
-              <input
-                value={r.title}
-                onChange={(e) => update(r.id, { title: e.target.value })}
-                className="w-full border-b border-border focus:border-primary outline-none py-1"
-                placeholder={`Milestone ${idx + 1}`}
-              />
-
-              <label className="text-sm inline-flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={!!r.done}
-                  onChange={(e) => update(r.id, { done: e.target.checked })}
-                />
-                Done
-              </label>
-
-              <button
-                className="border border-border rounded-md px-2 py-1"
-                onClick={() => remove(r.id)}
-                title="Delete"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
-            </div>
+              item={r}
+              index={idx}
+              moveItem={moveItem}
+              update={update}
+              remove={remove}
+            />
           ))}
 
           {items.length === 0 && (
-            <div className="text-sm text-muted">No milestones yet. Click “Add Milestone”.</div>
+            <div className="text-sm text-muted">
+              No milestones yet. Click “Add Milestone”.
+            </div>
           )}
         </div>
       </div>
