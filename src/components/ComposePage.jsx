@@ -4,6 +4,7 @@ import ReactQuill from "react-quill";
 import Quill from "quill";
 import "react-quill/dist/quill.snow.css";
 import { ArrowLeft, Bot, Save, Maximize2, Minimize2 } from "lucide-react";
+import { useCallback } from "react";
 
 // Shared AI layer
 import { useAI } from "../lib/AiProvider";
@@ -120,19 +121,41 @@ export default function ComposePage() {
     []
   );
 
-  /* Save (write-through persist immediately) */
-  const handleSave = () => {
+// src/components/ComposePage.jsx
+import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import ReactQuill from "react-quill";
+import Quill from "quill";
+import "react-quill/dist/quill.snow.css";
+// ...your other imports...
+
+export default function ComposePage() {
+  // --- state + refs ---
+  const [book, setBook] = useState(/* existing load */);
+  const [chapters, setChapters] = useState(/* existing load */);
+  const [selectedId, setSelectedId] = useState(/* first chapter id */);
+  const selected = chapters.find(c => c.id === selectedId) || null;
+
+  const [title, setTitle] = useState(selected?.title || "");
+  const [html,  setHtml]  = useState(selected?.content || "");
+  const editorRef = useRef(null); // used by undo/redo AND both editors
+
+  // --- effects you already have (sync selected -> title/html, persist, etc.) ---
+
+  // --- SAVE (inside component) ---
+  const handleSave = useCallback(() => {
+    if (!selected?.id) return;
+
     const updated = {
       ...selected,
       title: title || selected.title,
       content: html,
-      wordCount: countWords(html),
+      wordCount: (html.replace(/<[^>]+>/g, " ").trim().match(/\S+/g) || []).length,
       lastEdited: "Just now",
       status: selected.status || "draft",
     };
 
-    setChapters((prev) => {
-      const next = prev.map((c) => (c.id === updated.id ? updated : c));
+    setChapters(prev => {
+      const next = prev.map(c => (c.id === updated.id ? updated : c));
       const current = loadState() || {};
       saveState({
         book,
@@ -143,28 +166,47 @@ export default function ComposePage() {
       });
       return next;
     });
-  };
+  }, [selected?.id, selected, title, html, book]);
 
-  export default function ComposePage() {
-  // --- state + refs (keep these together) ---
-  const [title, setTitle] = useState(/* ... */);
-  const [html, setHtml]   = useState(/* ... */);
-  // ...
-  const editorRef = useRef(null);   // ← put ref here
+  // --- Undo / Redo using Quill history ---
+  const undo = () => editorRef.current?.getEditor?.()?.history?.undo?.();
+  const redo = () => editorRef.current?.getEditor?.()?.history?.redo?.();
 
-  // Undo/Redo handlers use that ref, so also here:
-  const undo = () => {
-    const q = editorRef.current?.getEditor?.();
-    q?.history?.undo?.();
-  };
-  const redo = () => {
-    const q = editorRef.current?.getEditor?.();
-    q?.history?.redo?.();
-  };
+  // --- AI + other handlers you already have ---
 
-  // ...effects, modules, handleSave, runAI, etc...
-  // In JSX, wire the ref:
-  // <ReactQuill ref={editorRef} ... />
+  return (
+    <div>
+      {/* Top bar buttons (examples): */}
+      <div className="flex gap-2">
+        <button type="button" onClick={undo} className="btn">Undo</button>
+        <button type="button" onClick={redo} className="btn">Redo</button>
+        <button type="button" onClick={handleSave} className="btn-primary">Save</button>
+        {/* Proof + Save button can call your handleSaveAndProof() */}
+      </div>
+
+      {/* Main editor */}
+      <ReactQuill
+        ref={editorRef}
+        theme="snow"
+        value={html}
+        onChange={setHtml}
+        modules={modules} // your toolbar config
+        placeholder="Start writing your story here…"
+      />
+
+      {/* Fullscreen editor (use the SAME ref so undo/redo works there too) */}
+      {isFS && (
+        <ReactQuill
+          ref={editorRef}
+          theme="snow"
+          value={html}
+          onChange={setHtml}
+          modules={modules}
+          placeholder="Write in fullscreen…"
+        />
+      )}
+    </div>
+  );
 }
 
   /* ✅ AI: proofread/clarify via shared layer — apply to editor AND chapter */
