@@ -5,167 +5,7 @@ import Quill from "quill";
 import "react-quill/dist/quill.snow.css";
 import { ArrowLeft, Bot, Save, Maximize2, Minimize2 } from "lucide-react";
 
-// ✅ Add this line below your existing imports:
-import { useAI } from "../lib/AiProvider";
-
-/* ------- Fonts whitelist (family + size) ------- */
-const Font = Quill.import("formats/font");
-const FONT_WHITELIST = [
-  "sans", "serif", "mono",
-  "arial", "calibri", "cambria", "timesnewroman",
-  "georgia", "garamond", "verdana", "couriernew",
-];
-Font.whitelist = FONT_WHITELIST;
-Quill.register(Font, true);
-
-const Size = Quill.import("formats/size");
-Size.whitelist = ["small", false, "large", "huge"];
-Quill.register(Size, true);
-
-/* ------- API + storage ------- */
-// Always go through Amplify rewrite (prod + dev)
-const AI_URL = "/api/ai/rewrite";
-const STORAGE_KEY = "dahtruth-story-lab-toc-v3";
-
-const loadState = () => {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch {
-    return null;
-  }
-};
-const saveState = (state) => {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    window.dispatchEvent(new Event("project:change"));
-  } catch {}
-};
-
-/* ------- Small helpers ------- */
-const countWords = (html = "") => {
-  const text = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
-  return text ? text.split(/\s+/).length : 0;
-};
-const ensureFirstChapter = (chapters) => {
-  if (Array.isArray(chapters) && chapters.length) return chapters;
-  return [
-    {
-      id: Date.now(),
-      title: "Chapter 1: Untitled",
-      content: "",
-      wordCount: 0,
-      lastEdited: "Just now",
-      status: "draft",
-    },
-  ];
-};
-
-/* ==============================
-   Compose Page (new, isolated)
-   ============================== */
-export default function ComposePage() {
-  const ai = useAI();
-  const initial = useMemo(loadState, []);
-  const [book, setBook] = useState(initial?.book || { title: "Untitled Book" });
-  const [chapters, setChapters] = useState(ensureFirstChapter(initial?.chapters || []));
-  const [selectedId, setSelectedId] = useState(chapters[0].id);
-  const selected = chapters.find((c) => c.id === selectedId) || chapters[0];
-
-  const [title, setTitle] = useState(selected.title || "");
-  const [html, setHtml] = useState(selected.content || "");
-  const [isFS, setIsFS] = useState(false);
-  const [aiBusy, setAiBusy] = useState(false);
-  const editorRef = useRef(null);
-
-  /* keep local editor state synced with selected chapter */
-  useEffect(() => {
-    const sel = chapters.find((c) => c.id === selectedId);
-    if (!sel) return;
-    setTitle(sel.title || "");
-    setHtml(sel.content || "");
-  }, [selectedId, chapters]);
-
-  /* persist project on change (debounced-ish) */
-  useEffect(() => {
-    const t = setTimeout(() => {
-      const current = loadState() || {};
-      saveState({
-        book,
-        chapters,
-        daily: current.daily || { goal: 500, counts: {} },
-        settings: current.settings || { theme: "light", focusMode: false },
-        tocOutline: current.tocOutline || [],
-      });
-    }, 400);
-    return () => clearTimeout(t);
-  }, [book, chapters]);
-
-  /* Proper Quill toolbar (wired + fonts) */
-  const modules = useMemo(
-    () => ({
-      toolbar: [
-        [{ header: [1, 2, 3, false] }],
-        [{ font: FONT_WHITELIST }],
-        [{ size: Size.whitelist }],
-        ["bold", "italic", "underline", "strike"],
-        [{ list: "ordered" }, { list: "bullet" }],
-        [{ align: [] }],
-        ["blockquote", "code-block"],
-        ["link", "image"],
-        ["clean"],
-      ],
-    }),
-    []
-  );
-
-  /* SAVE (updates chapters + writes localStorage immediately) */
-  const handleSave = () => {
-    if (!selected?.id) return;
-
-    const updated = {
-      ...selected,
-      title: title || selected.title,
-      content: html,
-      wordCount: countWords(html),
-      lastEdited: "Just now",
-      status: selected.status || "draft",
-    };
-
-    setChapters((prev) => {
-      const next = prev.map((c) => (c.id === updated.id ? updated : c));
-      // write-through persist so refresh sees it right away
-      const current = loadState() || {};
-      saveState({
-        book,
-        chapters: next,
-        daily: current.daily || { goal: 500, counts: {} },
-        settings: current.settings || { theme: "light", focusMode: false },
-        tocOutline: current.tocOutline || [],
-      });
-      return next;
-    });
-  };
-
-  /* AI: proofread/clarify via proxy — apply to editor AND chapter */
-  // make sure at the top of the file you have: import { useAI } from "../lib/AiProvider";
-const ai = useAI();
-
-/* AI: proofread/clarify via shared layer — apply to editor AND chapter */
-const runAI = async (mode = "proofread") => {
-    try {
-      setAiBusy(true);
-      // use shared layer
-      const edited = await ai.proofread(html || "", { mode, noEmDashes: true });
-      // apply to editor
-      setHtml(edited ?? html);
-      
-   // src/components/ComposePage.jsx
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import ReactQuill from "react-quill";
-import Quill from "quill";
-import "react-quill/dist/quill.snow.css";
-import { ArrowLeft, Bot, Save, Maximize2, Minimize2 } from "lucide-react";
+// Shared AI layer
 import { useAI } from "../lib/AiProvider";
 
 /* ------- Fonts whitelist (family + size) ------- */
@@ -223,7 +63,7 @@ const ensureFirstChapter = (chapters) => {
    Compose Page (isolated writer)
 ============================== */
 export default function ComposePage() {
-  const ai = useAI();
+  const ai = useAI(); // ✅ exactly one instance
 
   // Load initial project
   const initial = useMemo(loadState, []);
@@ -305,7 +145,17 @@ export default function ComposePage() {
     });
   };
 
-    // Persist into the selected chapter immediately
+  /* ✅ AI: proofread/clarify via shared layer — apply to editor AND chapter */
+  const runAI = async (mode = "proofread") => {
+    try {
+      setAiBusy(true);
+      const edited = await ai.proofread(html || "", { mode, noEmDashes: true });
+
+      // Update editor
+      const newHtml = edited ?? html;
+      setHtml(newHtml);
+
+      // Persist into the selected chapter right away
       if (selected?.id) {
         setChapters((prev) => {
           const next = prev.map((c) =>
@@ -313,9 +163,9 @@ export default function ComposePage() {
               ? {
                   ...c,
                   title: title || c.title,
-                  content: edited,
+                  content: newHtml,
                   wordCount:
-                    (edited.replace(/<[^>]+>/g, " ").trim().match(/\S+/g) || []).length,
+                    (newHtml.replace(/<[^>]+>/g, " ").trim().match(/\S+/g) || []).length,
                   lastEdited: "Just now",
                 }
               : c
@@ -419,7 +269,7 @@ export default function ComposePage() {
 
           <div className="ml-auto flex items-center gap-2">
             <button
-              onClick={() => runAI("proofread")} …>AI: Proofread</button>
+              onClick={() => runAI("proofread")}
               className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50 disabled:opacity-60"
               disabled={aiBusy}
               title="AI Proofread"
@@ -428,7 +278,7 @@ export default function ComposePage() {
               {aiBusy ? "AI…" : "AI: Proofread"}
             </button>
             <button
-              onClick={() => runAI("clarify")} …>AI: Clarify</button>
+              onClick={() => runAI("clarify")}
               className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50 disabled:opacity-60"
               disabled={aiBusy}
               title="AI Clarify"
@@ -437,7 +287,7 @@ export default function ComposePage() {
               {aiBusy ? "AI…" : "AI: Clarify"}
             </button>
             <button
-              onClick={handleSaveAndProof} …>Proof + Save</button>
+              onClick={handleSaveAndProof}
               className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50 disabled:opacity-60"
               disabled={aiBusy}
               title="Proofread + Save"
