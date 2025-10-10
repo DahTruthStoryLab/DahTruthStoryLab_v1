@@ -25,7 +25,7 @@ const TOCPage              = lazy(() => import("./components/TOCPage"));
 const TOCPage2             = lazy(() => import("./components/TOCPage2"));
 const ProjectPage          = lazy(() => import("./components/ProjectPage"));
 const WhoAmI               = lazy(() => import("./components/WhoAmI"));
-const WriteSection         = lazy(() => import("./components/WriteSection"));
+const ComposePage          = lazy(() => import("./components/ComposePage"));
 const Calendar             = lazy(() => import("./components/Calendar"));
 const AiTools              = lazy(() => import("./pages/AiTools.jsx"));
 
@@ -130,9 +130,7 @@ export default function App() {
                   </ProtectedRoute>
                 }
               />
-
-              {/* Writer/Writing (all point to ComposePage) */}
-              <Route
+             <Route
                 path="/writer"
                 element={
                   <ProtectedRoute>
@@ -146,18 +144,17 @@ export default function App() {
                   <ProtectedRoute>
                     <ComposePage />
                   </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/writing"
-                element={
-                  <ProtectedRoute>
-                    <ComposePage />
-                  </ProtectedRoute>
-                }
-              />
-
-              {/* StoryLab */}
+              }
+            />
+            <Route
+              path="/writing"
+              element={
+                <ProtectedRoute>
+                  <ComposePage />
+                </ProtectedRoute>
+              }
+            />
+            {/* StoryLab */}
               <Route
                 path="/story-lab"
                 element={
