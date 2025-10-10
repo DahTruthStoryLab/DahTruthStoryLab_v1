@@ -145,6 +145,28 @@ export default function ComposePage() {
     });
   };
 
+  export default function ComposePage() {
+  // --- state + refs (keep these together) ---
+  const [title, setTitle] = useState(/* ... */);
+  const [html, setHtml]   = useState(/* ... */);
+  // ...
+  const editorRef = useRef(null);   // ← put ref here
+
+  // Undo/Redo handlers use that ref, so also here:
+  const undo = () => {
+    const q = editorRef.current?.getEditor?.();
+    q?.history?.undo?.();
+  };
+  const redo = () => {
+    const q = editorRef.current?.getEditor?.();
+    q?.history?.redo?.();
+  };
+
+  // ...effects, modules, handleSave, runAI, etc...
+  // In JSX, wire the ref:
+  // <ReactQuill ref={editorRef} ... />
+}
+
   /* ✅ AI: proofread/clarify via shared layer — apply to editor AND chapter */
   const runAI = async (mode = "proofread") => {
     try {
@@ -196,20 +218,48 @@ export default function ComposePage() {
   };
 
   /* Keyboard shortcuts */
-  useEffect(() => {
-    const onKey = (e) => {
-      const k = e.key.toLowerCase();
-      // Save
-      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && k === "s") {
-        e.preventDefault();
+ useEffect(() => {
+  const onKeyDown = (e) => {
+    const k = e.key?.toLowerCase?.();
+    const meta = e.ctrlKey || e.metaKey;
+
+    if (!meta || !k) return;
+
+    // Save (Cmd/Ctrl+S)  — Shift adds Proofread
+    if (k === "s") {
+      e.preventDefault();
+      if (e.shiftKey) {
+        handleSaveAndProof();
+      } else {
         handleSave();
       }
-      // Save + Proofread
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && k === "s") {
-        e.preventDefault();
-        handleSaveAndProof();
+      return;
+    }
+
+    // Undo/Redo (Cmd/Ctrl+Z, Cmd/Ctrl+Shift+Z, Cmd/Ctrl+Y)
+    if (k === "z") {
+      e.preventDefault();
+      if (e.shiftKey) {
+        redo();
+      } else {
+        undo();
       }
-    };
+      return;
+    }
+    if (k === "y") {
+      e.preventDefault();
+      redo();
+      return;
+    }
+  };
+
+  window.addEventListener("keydown", onKeyDown);
+  return () => window.removeEventListener("keydown", onKeyDown);
+  // If these handlers aren't wrapped in useCallback, you can keep this
+  // dependency list and ignore the lint warning, or wrap them in useCallback.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [handleSave, handleSaveAndProof, undo, redo]);
+
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [title, html, selected?.id]);
