@@ -94,7 +94,7 @@ function TableOfContentsRouter() {
 /* =========================
    DnD MultiBackend options
    ========================= */
-const DND_OPTIONS = {
+const HTML5toTouch = {
   backends: [
     { id: "html5", backend: HTML5Backend },
     {
@@ -102,22 +102,25 @@ const DND_OPTIONS = {
       backend: TouchBackend,
       options: { enableMouseEvents: true },
       preview: true,
-      transition: TouchTransition,
+      transition: createTransition("touchstart", (e) => !!e.touches),
     },
   ],
 };
 
-/* =========================
-   App Root
-   ========================= */
 export default function App() {
   return (
     <UserProvider>
-      <DndProvider backend={MultiBackend} options={DND_OPTIONS}>
+      <DndProvider backend={MultiBackend} options={HTML5toTouch}>
         <Router>
           <ScrollToTop />
           <Suspense fallback={<Fallback />}>
-            <Routes>
+            {/* your existing <Routes>…</Routes> */}
+          </Suspense>
+        </Router>
+      </DndProvider>
+    </UserProvider>
+  );
+}
               {/* Public */}
               <Route path="/" element={<LandingPage />} />
               <Route path="/signin" element={<SignInPage />} />
