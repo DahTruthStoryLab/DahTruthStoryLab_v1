@@ -5,6 +5,10 @@ import { Pin, Users } from "lucide-react";
 import { loadProject, ensureWorkshopFields } from "../../lib/storylab/projectStore";
 
 import BackToLanding, { BackToLandingFab } from "./BackToLanding";
+import CharacterModal from "./CharacterModal"; 
+
+const [selected, setSelected] = useState(null);
+const [showModal, setShowModal] = useState(false);
 
 /* ---------------------------
    Page banner (light/glass)
@@ -26,6 +30,28 @@ const PageBanner = () => (
     </div>
   </div>
 );
+
+// was: const [project] = useState(() => ensureWorkshopFields(loadProject()));
+const [project, setProject] = useState(() => ensureWorkshopFields(loadProject()));
+
+const commit = (mutator) => {
+  const copy = JSON.parse(JSON.stringify(project));
+  mutator(copy);
+  ensureWorkshopFields(copy);
+  saveProject(copy);
+  setProject(copy);
+  try { window.dispatchEvent(new Event("project:change")); } catch {}
+};
+
+const moveCard = useCallback((from, to) => {
+  commit((p) => {
+    const list = Array.isArray(p.characters) ? p.characters : [];
+    if (from === to || from < 0 || to < 0 || from >= list.length || to >= list.length) return;
+    const [moved] = list.splice(from, 1);
+    list.splice(to, 0, moved);
+    p.characters = list;
+  });
+}, [project]);
 
 /* ---------------------------
    Character card
@@ -50,6 +76,45 @@ function CharacterCard({ c }) {
           </span>
         ))}
       </div>
+    </div>
+  );
+}
+
+/* ---------------------------
+   Draggable card (react-dnd)
+---------------------------- */
+function DraggableCard({ c, index, moveCard, onClick }) {
+  const ref = useRef(null);
+
+  const [, drop] = useDrop({
+    accept: "CLOTHES_CARD",
+    hover(item) {
+      if (!ref.current) return;
+      if (item.index === index) return;
+      moveCard(item.index, index);
+      item.index = index; // update the dragging item's index
+    },
+  });
+
+  const [{ isDragging }, drag] = useDrag({
+    type: "CLOTHES_CARD",
+    item: { id: c.id, index },
+    collect: (monitor) => ({
+      isDragging: monitor.isDragging(),
+    }),
+  });
+
+  drag(drop(ref));
+
+  return (
+    <div
+      ref={ref}
+      onClick={onClick}
+      style={{ opacity: isDragging ? 0.5 : 1 }}
+      className="cursor-move"
+      title="Drag to reorder • Click to edit"
+    >
+      <CharacterCard c={c} />
     </div>
   );
 }
@@ -102,19 +167,25 @@ export default function Clothesline() {
               })}
             </svg>
 
-            <div className="absolute inset-0 pointer-events-none">
+           <div className="absolute inset-0 pointer-events-none">
               {characters.slice(0, anchors.length).map((c, i) => (
                 <div
                   key={c.id || `${c.name}-${i}`}
                   className="absolute pointer-events-auto"
                   style={{ left: `${anchors[i] * 100}%`, top: i % 2 ? "55%" : "12%" }}
                 >
-                  <CharacterCard c={c} />
+                  <DraggableCard
+                    c={c}
+                    index={i}
+                    moveCard={moveCard}
+                    onClick={() => {
+                      setSelected(c);
+                      setShowModal(true);
+                    }}
+                  />
                 </div>
               ))}
             </div>
-          </div>
-        </div>
 
         <div className="text-sm text-muted mt-3">
           (This view reads from your shared <code>project.characters</code>.)
