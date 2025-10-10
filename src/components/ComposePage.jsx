@@ -3,15 +3,32 @@ import React, { useEffect, useMemo, useRef, useState, useCallback } from "react"
 import ReactQuill from "react-quill";
 import Quill from "quill";
 import "react-quill/dist/quill.snow.css";
-import { ArrowLeft, Bot, Save, Maximize2, Minimize2, RotateCcw, RotateCw } from "lucide-react";
+import {
+  ArrowLeft,
+  Bot,
+  Save,
+  Maximize2,
+  Minimize2,
+  RotateCcw,
+  RotateCw,
+} from "lucide-react";
 import { useAI } from "../lib/AiProvider";
+import { useNavigate } from "react-router-dom";
 
 /* ------- Fonts whitelist (family + size) ------- */
 const Font = Quill.import("formats/font");
 const FONT_WHITELIST = [
-  "sans", "serif", "mono",
-  "arial", "calibri", "cambria", "timesnewroman",
-  "georgia", "garamond", "verdana", "couriernew",
+  "sans",
+  "serif",
+  "mono",
+  "arial",
+  "calibri",
+  "cambria",
+  "timesnewroman",
+  "georgia",
+  "garamond",
+  "verdana",
+  "couriernew",
 ];
 Font.whitelist = FONT_WHITELIST;
 Quill.register(Font, true);
@@ -23,10 +40,18 @@ Quill.register(Size, true);
 /* ------- Storage helpers ------- */
 const STORAGE_KEY = "dahtruth-story-lab-toc-v3";
 const loadState = () => {
-  try { const raw = localStorage.getItem(STORAGE_KEY); return raw ? JSON.parse(raw) : null; } catch { return null; }
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
 };
 const saveState = (state) => {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); window.dispatchEvent(new Event("project:change")); } catch {}
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    window.dispatchEvent(new Event("project:change"));
+  } catch {}
 };
 
 /* ------- Small helpers ------- */
@@ -35,21 +60,32 @@ const countWords = (html = "") => {
   return text ? text.split(/\s+/).length : 0;
 };
 const ensureFirstChapter = (chapters) =>
-  Array.isArray(chapters) && chapters.length ? chapters : [{
-    id: Date.now(), title: "Chapter 1: Untitled", content: "",
-    wordCount: 0, lastEdited: "Just now", status: "draft",
-  }];
+  Array.isArray(chapters) && chapters.length
+    ? chapters
+    : [
+        {
+          id: Date.now(),
+          title: "Chapter 1: Untitled",
+          content: "",
+          wordCount: 0,
+          lastEdited: "Just now",
+          status: "draft",
+        },
+      ];
 
 /* ==============================
    Compose Page (isolated writer)
 ============================== */
 export default function ComposePage() {
   const ai = useAI();
+  const navigate = useNavigate();
 
   // Load initial project
   const initial = useMemo(loadState, []);
   const [book, setBook] = useState(initial?.book || { title: "Untitled Book" });
-  const [chapters, setChapters] = useState(ensureFirstChapter(initial?.chapters || []));
+  const [chapters, setChapters] = useState(
+    ensureFirstChapter(initial?.chapters || [])
+  );
   const [selectedId, setSelectedId] = useState(chapters[0].id);
   const selected = chapters.find((c) => c.id === selectedId) || chapters[0];
 
@@ -83,7 +119,7 @@ export default function ComposePage() {
     return () => clearTimeout(t);
   }, [book, chapters]);
 
-  /* Quill toolbar modules (with fonts) */
+  /* Quill toolbar modules */
   const modules = useMemo(
     () => ({
       toolbar: [
@@ -102,7 +138,7 @@ export default function ComposePage() {
     []
   );
 
-  /* Save (write-through persist immediately) */
+  /* Save */
   const handleSave = useCallback(() => {
     if (!selected?.id) return;
     const updated = {
@@ -127,11 +163,11 @@ export default function ComposePage() {
     });
   }, [selected?.id, selected, title, html, book]);
 
-  /* Undo / Redo (Quill history) */
+  /* Undo / Redo */
   const undo = () => editorRef.current?.getEditor?.()?.history?.undo?.();
   const redo = () => editorRef.current?.getEditor?.()?.history?.redo?.();
 
-  /* AI: proofread/clarify via shared layer — apply to editor AND chapter */
+  /* AI proof/clarify */
   const runAI = async (mode = "proofread") => {
     try {
       setAiBusy(true);
@@ -139,7 +175,6 @@ export default function ComposePage() {
       const newHtml = edited ?? html;
       setHtml(newHtml);
 
-      // persist into the selected chapter immediately
       if (selected?.id) {
         setChapters((prev) => {
           const next = prev.map((c) =>
@@ -172,7 +207,6 @@ export default function ComposePage() {
     }
   };
 
-  /* Combo: Proofread then Save (updates lastEdited/timestamps) */
   const handleSaveAndProof = async () => {
     await runAI("proofread");
     handleSave();
@@ -182,17 +216,14 @@ export default function ComposePage() {
   useEffect(() => {
     const onKey = (e) => {
       const k = e.key.toLowerCase();
-      // Save
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && k === "s") {
         e.preventDefault();
         handleSave();
       }
-      // Save + Proofread
       if ((e.ctrlKey || e.metaKey) && e.shiftKey && k === "s") {
         e.preventDefault();
         handleSaveAndProof();
       }
-      // Undo / Redo
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && k === "z") {
         e.preventDefault();
         undo();
@@ -241,8 +272,8 @@ export default function ComposePage() {
     </button>
   );
 
-  /* Back to Writing (route: /writing; adjust if needed) */
-  const goBack = () => { window.location.href = "/writing"; };
+  /* Back to Dashboard */
+  const goBack = () => navigate("/dashboard");
 
   return (
     <div className="min-h-screen bg-[rgb(244,247,250)] text-slate-900">
@@ -252,16 +283,24 @@ export default function ComposePage() {
           <button
             onClick={goBack}
             className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50"
-            title="Back to Writing"
+            title="Back to Dashboard"
           >
-            <ArrowLeft size={16} /> Back
+            <ArrowLeft size={16} /> Back to Dashboard
           </button>
 
           <div className="ml-auto flex items-center gap-2">
-            <button onClick={undo} className="rounded-lg border px-2 py-1.5 bg-white hover:bg-slate-50" title="Undo">
+            <button
+              onClick={undo}
+              className="rounded-lg border px-2 py-1.5 bg-white hover:bg-slate-50"
+              title="Undo"
+            >
               <RotateCcw size={16} />
             </button>
-            <button onClick={redo} className="rounded-lg border px-2 py-1.5 bg-white hover:bg-slate-50" title="Redo">
+            <button
+              onClick={redo}
+              className="rounded-lg border px-2 py-1.5 bg-white hover:bg-slate-50"
+              title="Redo"
+            >
               <RotateCw size={16} />
             </button>
 
@@ -325,7 +364,9 @@ export default function ComposePage() {
             </button>
           </div>
           <div className="space-y-2">
-            {chapters.map((c) => (<ChapterItem key={c.id} ch={c} />))}
+            {chapters.map((c) => (
+              <ChapterItem key={c.id} ch={c} />
+            ))}
           </div>
         </aside>
 
@@ -356,26 +397,37 @@ export default function ComposePage() {
         </section>
       </div>
 
-      {/* Fullscreen overlay — keeps chapters visible */}
+      {/* Fullscreen overlay */}
       {isFS && (
         <div className="fixed inset-0 z-[9999] bg-[#fdecef]">
-          <div className="absolute top-0 left-0 right-0 p-3 flex items-center justify-end gap-2">
+          <div className="absolute top-0 left-0 right-0 p-3 flex items-center justify-between gap-2">
             <button
-              onClick={handleSave}
-              className="inline-flex items-center gap-2 rounded-lg bg-primary text-white px-3 py-1.5 hover:opacity-90"
+              onClick={goBack}
+              className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50"
+              title="Back to Dashboard"
             >
-              <Save size={16} /> Save
+              <ArrowLeft size={16} /> Back
             </button>
-            <button
-              onClick={() => setIsFS(false)}
-              className="rounded-lg border bg-white px-3 py-1.5 hover:bg-slate-50"
-            >
-              <Minimize2 size={18} />
-            </button>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleSave}
+                className="inline-flex items-center gap-2 rounded-lg bg-primary text-white px-3 py-1.5 hover:opacity-90"
+              >
+                <Save size={16} /> Save
+              </button>
+              <button
+                onClick={() => setIsFS(false)}
+                className="rounded-lg border bg-white px-3 py-1.5 hover:bg-slate-50"
+                title="Exit Fullscreen"
+              >
+                <Minimize2 size={18} />
+              </button>
+            </div>
           </div>
 
           <div className="pt-14 pb-6 px-6 h-full grid grid-cols-1 xl:grid-cols-[18rem_1fr] gap-6 overflow-auto">
-            {/* Chapters stay visible */}
+            {/* Chapters */}
             <aside className="space-y-2">
               <div className="flex items-center justify-between">
                 <div className="text-sm text-slate-700">Chapters</div>
@@ -387,7 +439,9 @@ export default function ComposePage() {
                 </button>
               </div>
               <div className="space-y-2">
-                {chapters.map((c) => (<ChapterItem key={c.id} ch={c} />))}
+                {chapters.map((c) => (
+                  <ChapterItem key={c.id} ch={c} />
+                ))}
               </div>
             </aside>
 
