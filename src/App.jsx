@@ -27,6 +27,7 @@ const ProjectPage          = lazy(() => import("./components/ProjectPage"));
 const WhoAmI               = lazy(() => import("./components/WhoAmI"));
 const WriteSection         = lazy(() => import("./components/WriteSection"));
 const Calendar             = lazy(() => import("./components/Calendar"));
+const AiTools              = lazy(() => import("./pages/AiTools.jsx"));
 
 // StoryLab
 const StoryLabLanding      = lazy(() => import("./lib/storylab/StoryLabLanding"));
@@ -340,3 +341,13 @@ export default function App() {
     </UserProvider>
   );
 }
+
+// inside <Routes> with other protected routes:
+    <Route
+      path="/ai-tools"
+      element={
+        <ProtectedRoute>
+          <AiTools />
+        </ProtectedRoute>
+  }
+/>
