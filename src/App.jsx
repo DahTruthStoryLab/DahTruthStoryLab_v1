@@ -37,6 +37,7 @@ const Publishing           = lazy(() => import("./pages/Publishing.tsx"));
 const Profile              = lazy(() => import("./components/Profile"));
 const PlansPage            = lazy(() => import("./components/PlansPage"));
 const BillingSuccess       = lazy(() => import("./pages/BillingSuccess.jsx"));
+const AiTools = lazy(() => import("./pages/AiTools"));
 
 /* =========================
    Global UI helpers
@@ -329,10 +330,10 @@ export default function App() {
 
 // inside <Routes> with other protected routes:
     <Route
-      path="/ai-tools"
-      element={
-        <ProtectedRoute>
-          <AiTools />
-        </ProtectedRoute>
+  path="/ai-tools"
+  element={
+    <ProtectedRoute>
+      <AiTools />
+    </ProtectedRoute>
   }
 />
