@@ -1,4 +1,5 @@
 // src/App.jsx
+// src/App.jsx (top of file)
 import React, { Suspense, lazy, useEffect } from "react";
 import {
   BrowserRouter as Router,
@@ -9,14 +10,9 @@ import {
   Navigate,
 } from "react-router-dom";
 
-/* ---------------------------
-   DnD Multi-backend (desktop + mobile)
----------------------------- */
-// src/App.jsx
 import { DndProvider } from "react-dnd";
-import { MultiBackend, HTML5toTouch } from "dnd-multi-backend"; // ✅ correct package & preset
-import "dnd-multi-backend/dist/styles.css"; // optional, fine to keep
-
+import { MultiBackend, HTML5toTouch } from "dnd-multi-backend"; // ✅ single source
+import "dnd-multi-backend/dist/styles.css";
 
 import { UserProvider } from "./lib/state/userStore";
 
