@@ -1,5 +1,5 @@
 // src/components/storylab/PriorityCards.jsx
-import React, { useState } from "react";
+import React, { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { Link } from "react-router-dom";
 import { Plus, GripVertical, Trash2, Flag, Tag, CheckCircle, ListChecks } from "lucide-react";
 import { loadProject, saveProject, ensureWorkshopFields, uid } from "../../lib/storylab/projectStore";
@@ -25,23 +25,145 @@ const PageBanner = () => (
 );
 
 /* ------------------------------------------------
+   DraggableCard - Internal component for cards
+------------------------------------------------- */
+const DraggableCard = ({ card, index, isDragging, onEdit, onDelete, moveCard }) => {
+  const dragRef = useRef(null);
+  const dragItem = useRef(null);
+  const dragOverItem = useRef(null);
+
+  const handleDragStart = (e) => {
+    dragItem.current = index;
+    e.dataTransfer.effectAllowed = "move";
+  };
+
+  const handleDragEnter = (e) => {
+    dragOverItem.current = index;
+    if (dragItem.current !== null && dragItem.current !== dragOverItem.current) {
+      moveCard(dragItem.current, dragOverItem.current);
+      dragItem.current = dragOverItem.current;
+    }
+  };
+
+  const handleDragEnd = (e) => {
+    dragItem.current = null;
+    dragOverItem.current = null;
+  };
+
+  return (
+    <div
+      ref={dragRef}
+      draggable
+      onDragStart={handleDragStart}
+      onDragEnter={handleDragEnter}
+      onDragEnd={handleDragEnd}
+      className={`bg-white/80 backdrop-blur-xl border border-border rounded-2xl p-4 shadow-sm transition-all ${
+        isDragging ? "opacity-50 rotate-[0.5deg] shadow-lg" : "hover:shadow-md"
+      }`}
+    >
+      <div className="flex items-start gap-3">
+        <div className="cursor-grab active:cursor-grabbing pt-1 text-muted" title="Drag to reorder">
+          <GripVertical />
+        </div>
+
+        <div className="flex-1">
+          <input
+            value={card.title}
+            onChange={(e) => onEdit(card.id, { title: e.target.value })}
+            className="w-full bg-transparent border-b border-border focus:border-primary outline-none text-ink text-base"
+            placeholder="Priority title"
+          />
+
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs bg-white/70">
+              <Tag className="h-3 w-3" />
+              <select
+                value={card.scope}
+                onChange={(e) => onEdit(card.id, { scope: e.target.value })}
+                className="bg-transparent outline-none"
+              >
+                <option>Character</option>
+                <option>Plot</option>
+                <option>World</option>
+                <option>Craft</option>
+              </select>
+            </span>
+
+            <span className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs bg-white/70">
+              <Flag className="h-3 w-3 text-amber-600" />
+              <select
+                value={card.priority}
+                onChange={(e) => onEdit(card.id, { priority: e.target.value })}
+                className="bg-transparent outline-none"
+              >
+                <option>High</option>
+                <option>Medium</option>
+                <option>Low</option>
+              </select>
+            </span>
+
+            <span className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs bg-white/70">
+              <CheckCircle className="h-3 w-3 text-emerald-600" />
+              <select
+                value={card.status}
+                onChange={(e) => onEdit(card.id, { status: e.target.value })}
+                className="bg-transparent outline-none"
+              >
+                <option>Open</option>
+                <option>In Session</option>
+                <option>Done</option>
+              </select>
+            </span>
+          </div>
+        </div>
+
+        <button
+          onClick={() => onDelete(card.id)}
+          className="bg-white/70 border border-border p-2 rounded-lg text-muted hover:text-ink transition-colors"
+          title="Delete"
+        >
+          <Trash2 className="h-4 w-4" />
+        </button>
+      </div>
+    </div>
+  );
+};
+
+/* ------------------------------------------------
    PriorityCards (single export — no duplicates)
 ------------------------------------------------- */
 export default function PriorityCards() {
-  const [project, setProject] = useState(() => ensureWorkshopFields(loadProject()));
+  // Initialize project state with workshop fields (memoized)
+  const initialProject = useMemo(() => ensureWorkshopFields(loadProject()), []);
+  const [project, setProject] = useState(initialProject);
   const [dragging, setDragging] = useState(null);
-  const items = Array.isArray(project.priorities) ? project.priorities : [];
+  const [selectedId, setSelectedId] = useState(null);
+  
+  // Memoized items array
+  const items = useMemo(() => 
+    Array.isArray(project.priorities) ? project.priorities : [], 
+    [project.priorities]
+  );
 
-  const commit = (mutator) => {
+  // Commit changes to project store and trigger updates (memoized callback)
+  const commit = useCallback((mutator) => {
     const copy = JSON.parse(JSON.stringify(project));
     mutator(copy);
     ensureWorkshopFields(copy);
     saveProject(copy);
     setProject(copy);
-    try { window.dispatchEvent(new Event("project:change")); } catch {}
-  };
+    try { 
+      window.dispatchEvent(new Event("project:change")); 
+    } catch {}
+  }, [project]);
 
-  const add = () =>
+  // Persist whenever project changes
+  useEffect(() => {
+    saveProject(project);
+  }, [project]);
+
+  // Add new priority card (memoized)
+  const add = useCallback(() => {
     commit((p) => {
       p.priorities.push({
         id: uid(),
@@ -52,28 +174,64 @@ export default function PriorityCards() {
         done: false,
       });
     });
+  }, [commit]);
 
-  const del = (id) => commit((p) => { p.priorities = p.priorities.filter((c) => c.id !== id); });
+  // Delete priority card by id (memoized)
+  const del = useCallback((id) => {
+    commit((p) => { 
+      p.priorities = p.priorities.filter((c) => c.id !== id); 
+    });
+    if (selectedId === id) {
+      setSelectedId(null);
+    }
+  }, [commit, selectedId]);
 
-  const edit = (id, patch) =>
+  // Edit priority card fields (memoized)
+  const edit = useCallback((id, patch) => {
     commit((p) => {
       const it = p.priorities.find((x) => x.id === id);
       if (it) Object.assign(it, patch);
     });
+  }, [commit]);
 
-  // Drag & drop reorder
-  const onDragStart = (id) => setDragging(id);
-  const onDragOver = (e, overId) => {
+  // Enhanced moveCard function for drag-and-drop reordering (memoized)
+  const moveCard = useCallback((fromIndex, toIndex) => {
+    if (fromIndex === toIndex) return;
+    commit((p) => {
+      const result = [...p.priorities];
+      const [removed] = result.splice(fromIndex, 1);
+      result.splice(toIndex, 0, removed);
+      p.priorities = result;
+    });
+  }, [commit]);
+
+  // Drag & drop handlers (keeping for compatibility)
+  const onDragStart = useCallback((id) => {
+    setDragging(id);
+    setSelectedId(id);
+  }, []);
+
+  const onDragOver = useCallback((e, overId) => {
     e.preventDefault();
     if (!dragging || dragging === overId) return;
     commit((p) => {
       const a = p.priorities.findIndex((c) => c.id === dragging);
       const b = p.priorities.findIndex((c) => c.id === overId);
-      const [moved] = p.priorities.splice(a, 1);
-      p.priorities.splice(b, 0, moved);
+      if (a !== -1 && b !== -1) {
+        const [moved] = p.priorities.splice(a, 1);
+        p.priorities.splice(b, 0, moved);
+      }
     });
-  };
-  const onDragEnd = () => setDragging(null);
+  }, [dragging, commit]);
+
+  const onDragEnd = useCallback(() => {
+    setDragging(null);
+  }, []);
+
+  // Select card handler
+  const selectCard = useCallback((id) => {
+    setSelectedId(id);
+  }, []);
 
   return (
     <div className="min-h-screen bg-base text-ink">
@@ -98,106 +256,57 @@ export default function PriorityCards() {
           {/* Controls */}
           <div className="flex items-center justify-between bg-white/80 backdrop-blur-xl border border-border rounded-2xl px-4 py-3">
             <div className="flex items-center gap-3">
-              <div className="rounded-xl px-3 py-1 border border-border bg-white/60">Priority Cards</div>
+              <div className="rounded-xl px-3 py-1 border border-border bg-white/60">
+                Priority Cards
+                {selectedId && <span className="ml-2 text-xs text-muted">• Selected</span>}
+              </div>
               <span className="text-sm text-muted">Drag to reorder · Inline edit</span>
             </div>
             <button
               onClick={add}
-              className="rounded-lg px-3 py-2 border border-border bg-white hover:bg-white/90 text-sm"
+              className="rounded-lg px-3 py-2 border border-border bg-white hover:bg-white/90 text-sm transition-colors"
               title="Add card"
             >
               <Plus className="h-4 w-4 inline mr-1" /> Add Card
             </button>
           </div>
 
-          {/* Cards */}
+          {/* Cards Grid - Using DraggableCard component */}
           <div className="grid gap-3">
-            {items.map((card) => (
-              <div
+            {items.map((card, index) => (
+              <DraggableCard
                 key={card.id}
-                draggable
-                onDragStart={() => onDragStart(card.id)}
-                onDragOver={(e) => onDragOver(e, card.id)}
-                onDragEnd={onDragEnd}
-                className={`bg-white/80 backdrop-blur-xl border border-border rounded-2xl p-4 shadow-sm ${
-                  dragging === card.id ? "rotate-[0.5deg] shadow" : "hover:shadow"
-                }`}
-              >
-                <div className="flex items-start gap-3">
-                  <div className="cursor-grab pt-1 text-muted" title="Drag">
-                    <GripVertical />
-                  </div>
-
-                  <div className="flex-1">
-                    <input
-                      value={card.title}
-                      onChange={(e) => edit(card.id, { title: e.target.value })}
-                      className="w-full bg-transparent border-b border-border focus:border-primary outline-none text-ink text-base"
-                      placeholder="Priority title"
-                    />
-
-                    <div className="mt-2 flex flex-wrap items-center gap-2">
-                      <span className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs bg-white/70">
-                        <Tag className="h-3 w-3" />
-                        <select
-                          value={card.scope}
-                          onChange={(e) => edit(card.id, { scope: e.target.value })}
-                          className="bg-transparent outline-none"
-                        >
-                          <option>Character</option>
-                          <option>Plot</option>
-                          <option>World</option>
-                          <option>Craft</option>
-                        </select>
-                      </span>
-
-                      <span className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs bg-white/70">
-                        <Flag className="h-3 w-3 text-amber-600" />
-                        <select
-                          value={card.priority}
-                          onChange={(e) => edit(card.id, { priority: e.target.value })}
-                          className="bg-transparent outline-none"
-                        >
-                          <option>High</option>
-                          <option>Medium</option>
-                          <option>Low</option>
-                        </select>
-                      </span>
-
-                      <span className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs bg-white/70">
-                        <CheckCircle className="h-3 w-3 text-emerald-600" />
-                        <select
-                          value={card.status}
-                          onChange={(e) => edit(card.id, { status: e.target.value })}
-                          className="bg-transparent outline-none"
-                        >
-                          <option>Open</option>
-                          <option>In Session</option>
-                          <option>Done</option>
-                        </select>
-                      </span>
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => del(card.id)}
-                    className="bg-white/70 border border-border p-2 rounded-lg text-muted hover:text-ink"
-                    title="Delete"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-              </div>
+                card={card}
+                index={index}
+                isDragging={dragging === card.id}
+                onEdit={edit}
+                onDelete={del}
+                moveCard={moveCard}
+              />
             ))}
 
             {items.length === 0 && (
-              <div className="text-sm text-muted p-2">No cards yet. Click “Add Card”.</div>
+              <div className="text-sm text-muted p-2">No cards yet. Click "Add Card".</div>
             )}
           </div>
+
+          {/* Stats footer */}
+          {items.length > 0 && (
+            <div className="bg-white/80 backdrop-blur-xl border border-border rounded-2xl px-4 py-3 text-sm text-muted">
+              <div className="flex items-center justify-between">
+                <span>Total Cards: {items.length}</span>
+                <span>
+                  {items.filter(c => c.status === "Done").length} Done · {" "}
+                  {items.filter(c => c.status === "In Session").length} In Session · {" "}
+                  {items.filter(c => c.status === "Open").length} Open
+                </span>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Mobile “Back to Landing” button */}
+      {/* Mobile "Back to Landing" button */}
       <BackToLandingFab />
     </div>
   );
