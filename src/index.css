@@ -1,4 +1,12 @@
-/* --- Word-style fonts via Google Fonts --- */
+/* ✅ Tailwind should be first */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* (Optional) Quill's default theme – include if you use the Snow theme */
+@import "react-quill/dist/quill.snow.css";
+
+/* --- Word-style fonts via Google Fonts --- */ 
 @import url('https://fonts.googleapis.com/css2?family=Arial:wght@400;700&family=Calibri:wght@400;700&family=Cambria:wght@400;700&family=Times+New+Roman:wght@400;700&family=Georgia:wght@400;700&family=Garamond:wght@400;700&family=Verdana:wght@400;700&family=Courier+New:wght@400;700&display=swap');
 @import "./styles/quill-fonts.css";
 
@@ -28,11 +36,6 @@
 .ql-snow .ql-picker.ql-font .ql-picker-item[data-value="garamond"]::before { content: "Garamond"; }
 .ql-snow .ql-picker.ql-font .ql-picker-label[data-value="times"]::before,
 .ql-snow .ql-picker.ql-font .ql-picker-item[data-value="times"]::before { content: "Times"; }
-
-/* Tailwind layers MUST be first */
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
 
 /* ================================
    Brand + Global Base (LIGHT THEME)
