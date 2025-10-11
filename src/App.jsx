@@ -13,7 +13,8 @@ import {
 // DnD Multi-backend (desktop + mobile)
 // ---------------------------
 import { DndProvider } from "react-dnd";
-import { MultiBackend, HTML5toTouch } from "dnd-multi-backend";
+import { MultiBackend } from "dnd-multi-backend";
+import { HTML5toTouch } from "rdndmb-html5-to-touch";
 
 import { UserProvider } from "./lib/state/userStore";
 
