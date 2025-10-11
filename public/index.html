@@ -17,14 +17,13 @@
     <meta name="color-scheme" content="light" />
     <meta name="robots" content="index,follow" />
 
-    <!-- Open Graph / Facebook -->
+    <!-- Open Graph -->
     <meta property="og:title" content="DahTruth Story Lab" />
     <meta
       property="og:description"
       content="Write, organize, format, and publish your stories with DahTruth Story Lab."
     />
     <meta property="og:type" content="website" />
-    <!-- If you have a public URL, update this to the full canonical URL -->
     <meta property="og:url" content="/" />
     <meta property="og:image" content="/og-image.png" />
 
@@ -40,7 +39,6 @@
     <!-- Icons -->
     <link rel="icon" href="/favicon.ico" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
-    <!-- Optional PWA manifest (add public/manifest.json to use this) -->
     <link rel="manifest" href="/manifest.json" />
 
     <!-- Fonts -->
@@ -51,12 +49,12 @@
       rel="stylesheet"
     />
 
-    <!-- iOS/Android app-like hints (safe to keep even if not a full PWA) -->
+    <!-- App-like hints -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 
-    <!-- Inline base styles so the page looks on-brand before JS mounts -->
+    <!-- Inline base styles -->
     <style>
       :root {
         --bg: #f6faff;
@@ -64,7 +62,6 @@
         --subtext: #5b6b7c;
         --accent: #1f3a5f;
       }
-      /* Reset-ish */
       html, body {
         padding: 0;
         margin: 0;
@@ -85,12 +82,10 @@
         color: var(--text);
         margin: 0.2em 0 0.4em;
       }
-      /* Make the root fill the viewport to avoid flashes during route changes */
       #root {
         min-height: 100vh;
-        display: contents; /* lets your app layout handle containers */
+        display: contents;
       }
-      /* Prefer light theme explicitly */
       @media (prefers-color-scheme: dark) {
         :root { color-scheme: light; }
       }
@@ -99,6 +94,8 @@
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>
     <div id="root"></div>
-    <!-- CRA will inject your JS/CSS bundles here -->
+
+    <!-- Vite entry (change to /src/main.tsx if you use TypeScript) -->
+    <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
