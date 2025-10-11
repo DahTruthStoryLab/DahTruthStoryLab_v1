@@ -104,7 +104,7 @@ export default function ComposePage() {
     setHtml(sel.content || "");
   }, [selectedId, chapters]);
 
-  /* Persist project (debounced-ish) */
+  /* Persist project (debounced) */
   useEffect(() => {
     const t = setTimeout(() => {
       const current = loadState() || {};
@@ -138,30 +138,37 @@ export default function ComposePage() {
     []
   );
 
-  /* Save */
+  /* Save - FIXED to use current state properly */
   const handleSave = useCallback(() => {
-    if (!selected?.id) return;
-    const updated = {
-      ...selected,
-      title: title || selected.title,
-      content: html,
-      wordCount: countWords(html),
-      lastEdited: "Just now",
-      status: selected.status || "draft",
-    };
-    setChapters((prev) => {
-      const next = prev.map((c) => (c.id === updated.id ? updated : c));
+    setChapters((prevChapters) => {
+      const chapterToUpdate = prevChapters.find((c) => c.id === selectedId);
+      if (!chapterToUpdate) return prevChapters;
+
+      const updated = {
+        ...chapterToUpdate,
+        title: title || chapterToUpdate.title,
+        content: html,
+        wordCount: countWords(html),
+        lastEdited: new Date().toLocaleString(),
+        status: chapterToUpdate.status || "draft",
+      };
+
+      const nextChapters = prevChapters.map((c) =>
+        c.id === updated.id ? updated : c
+      );
+
       const current = loadState() || {};
       saveState({
         book,
-        chapters: next,
+        chapters: nextChapters,
         daily: current.daily || { goal: 500, counts: {} },
         settings: current.settings || { theme: "light", focusMode: false },
         tocOutline: current.tocOutline || [],
       });
-      return next;
+
+      return nextChapters;
     });
-  }, [selected?.id, selected, title, html, book]);
+  }, [selectedId, title, html, book]);
 
   /* Undo / Redo */
   const undo = () => editorRef.current?.getEditor?.()?.history?.undo?.();
@@ -175,30 +182,29 @@ export default function ComposePage() {
       const newHtml = edited ?? html;
       setHtml(newHtml);
 
-      if (selected?.id) {
-        setChapters((prev) => {
-          const next = prev.map((c) =>
-            c.id === selected.id
-              ? {
-                  ...c,
-                  title: title || c.title,
-                  content: newHtml,
-                  wordCount: countWords(newHtml),
-                  lastEdited: "Just now",
-                }
-              : c
-          );
-          const current = loadState() || {};
-          saveState({
-            book,
-            chapters: next,
-            daily: current.daily || { goal: 500, counts: {} },
-            settings: current.settings || { theme: "light", focusMode: false },
-            tocOutline: current.tocOutline || [],
-          });
-          return next;
+      // Update the chapter immediately
+      setChapters((prev) => {
+        const next = prev.map((c) =>
+          c.id === selectedId
+            ? {
+                ...c,
+                title: title || c.title,
+                content: newHtml,
+                wordCount: countWords(newHtml),
+                lastEdited: new Date().toLocaleString(),
+              }
+            : c
+        );
+        const current = loadState() || {};
+        saveState({
+          book,
+          chapters: next,
+          daily: current.daily || { goal: 500, counts: {} },
+          settings: current.settings || { theme: "light", focusMode: false },
+          tocOutline: current.tocOutline || [],
         });
-      }
+        return next;
+      });
     } catch (e) {
       console.error("[AI] error:", e);
       alert(e.message || "AI request failed");
@@ -208,13 +214,19 @@ export default function ComposePage() {
   };
 
   const handleSaveAndProof = async () => {
-    await runAI("proofread");
     handleSave();
+    await runAI("proofread");
   };
 
-  /* Keyboard shortcuts */
+  /* Keyboard shortcuts - FIXED to not interfere with editor */
   useEffect(() => {
     const onKey = (e) => {
+      // Don't intercept if user is typing in an input or the editor
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || 
+          e.target.classList.contains('ql-editor')) {
+        return;
+      }
+
       const k = e.key.toLowerCase();
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && k === "s") {
         e.preventDefault();
@@ -275,6 +287,65 @@ export default function ComposePage() {
   /* Back to Dashboard */
   const goBack = () => navigate("/dashboard");
 
+  /* Toolbar component to avoid duplication */
+  const Toolbar = ({ compact = false }) => (
+    <>
+      {!compact && (
+        <>
+          <button
+            onClick={undo}
+            className="rounded-lg border px-2 py-1.5 bg-white hover:bg-slate-50"
+            title="Undo"
+          >
+            <RotateCcw size={16} />
+          </button>
+          <button
+            onClick={redo}
+            className="rounded-lg border px-2 py-1.5 bg-white hover:bg-slate-50"
+            title="Redo"
+          >
+            <RotateCw size={16} />
+          </button>
+        </>
+      )}
+
+      <button
+        onClick={() => runAI("proofread")}
+        className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50 disabled:opacity-60"
+        disabled={aiBusy}
+        title="AI Proofread"
+      >
+        <Bot size={16} />
+        {aiBusy ? "AI…" : compact ? "Proof" : "AI: Proofread"}
+      </button>
+      <button
+        onClick={() => runAI("clarify")}
+        className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50 disabled:opacity-60"
+        disabled={aiBusy}
+        title="AI Clarify"
+      >
+        <Bot size={16} />
+        {aiBusy ? "AI…" : compact ? "Clarify" : "AI: Clarify"}
+      </button>
+      <button
+        onClick={handleSaveAndProof}
+        className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50 disabled:opacity-60"
+        disabled={aiBusy}
+        title="Proofread + Save"
+      >
+        <Bot size={16} />
+        Proof + Save
+      </button>
+      <button
+        onClick={handleSave}
+        className="inline-flex items-center gap-2 rounded-lg bg-primary text-white px-3 py-1.5 hover:opacity-90"
+        title="Save (Ctrl+S)"
+      >
+        <Save size={16} /> Save
+      </button>
+    </>
+  );
+
   return (
     <div className="min-h-screen bg-[rgb(244,247,250)] text-slate-900">
       {/* Top bar */}
@@ -289,55 +360,7 @@ export default function ComposePage() {
           </button>
 
           <div className="ml-auto flex items-center gap-2">
-            <button
-              onClick={undo}
-              className="rounded-lg border px-2 py-1.5 bg-white hover:bg-slate-50"
-              title="Undo"
-            >
-              <RotateCcw size={16} />
-            </button>
-            <button
-              onClick={redo}
-              className="rounded-lg border px-2 py-1.5 bg-white hover:bg-slate-50"
-              title="Redo"
-            >
-              <RotateCw size={16} />
-            </button>
-
-            <button
-              onClick={() => runAI("proofread")}
-              className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50 disabled:opacity-60"
-              disabled={aiBusy}
-              title="AI Proofread"
-            >
-              <Bot size={16} />
-              {aiBusy ? "AI…" : "AI: Proofread"}
-            </button>
-            <button
-              onClick={() => runAI("clarify")}
-              className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50 disabled:opacity-60"
-              disabled={aiBusy}
-              title="AI Clarify"
-            >
-              <Bot size={16} />
-              {aiBusy ? "AI…" : "AI: Clarify"}
-            </button>
-            <button
-              onClick={handleSaveAndProof}
-              className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50 disabled:opacity-60"
-              disabled={aiBusy}
-              title="Proofread + Save"
-            >
-              <Bot size={16} />
-              Proof + Save
-            </button>
-            <button
-              onClick={handleSave}
-              className="inline-flex items-center gap-2 rounded-lg bg-primary text-white px-3 py-1.5 hover:opacity-90"
-              title="Save"
-            >
-              <Save size={16} /> Save
-            </button>
+            <Toolbar />
             <button
               onClick={() => setIsFS((v) => !v)}
               className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50"
@@ -397,10 +420,10 @@ export default function ComposePage() {
         </section>
       </div>
 
-      {/* Fullscreen overlay */}
+      {/* Fullscreen overlay - FIXED with AI buttons */}
       {isFS && (
         <div className="fixed inset-0 z-[9999] bg-[#fdecef]">
-          <div className="absolute top-0 left-0 right-0 p-3 flex items-center justify-between gap-2">
+          <div className="absolute top-0 left-0 right-0 p-3 flex items-center justify-between gap-2 bg-white/90 backdrop-blur border-b">
             <button
               onClick={goBack}
               className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50"
@@ -410,12 +433,7 @@ export default function ComposePage() {
             </button>
 
             <div className="flex items-center gap-2">
-              <button
-                onClick={handleSave}
-                className="inline-flex items-center gap-2 rounded-lg bg-primary text-white px-3 py-1.5 hover:opacity-90"
-              >
-                <Save size={16} /> Save
-              </button>
+              <Toolbar compact />
               <button
                 onClick={() => setIsFS(false)}
                 className="rounded-lg border bg-white px-3 py-1.5 hover:bg-slate-50"
@@ -426,7 +444,7 @@ export default function ComposePage() {
             </div>
           </div>
 
-          <div className="pt-14 pb-6 px-6 h-full grid grid-cols-1 xl:grid-cols-[18rem_1fr] gap-6 overflow-auto">
+          <div className="pt-20 pb-6 px-6 h-full grid grid-cols-1 xl:grid-cols-[18rem_1fr] gap-6 overflow-auto">
             {/* Chapters */}
             <aside className="space-y-2">
               <div className="flex items-center justify-between">
