@@ -14,7 +14,6 @@ import {
 // ---------------------------
 import { DndProvider } from "react-dnd";
 import { MultiBackend, HTML5toTouch } from "dnd-multi-backend";
-import "dnd-multi-backend/dist/styles.css";
 
 import { UserProvider } from "./lib/state/userStore";
 
