@@ -29,7 +29,6 @@ const TOCPage              = lazy(() => import("./components/TOCPage"));
 const TOCPage2             = lazy(() => import("./components/TOCPage2"));
 const ProjectPage          = lazy(() => import("./components/ProjectPage"));
 const WhoAmI               = lazy(() => import("./components/WhoAmI"));
-const WriteSection         = lazy(() => import("./components/WriteSection"));
 const ComposePage          = lazy(() => import("./components/ComposePage"));
 const Calendar             = lazy(() => import("./components/Calendar"));
 const StoryLabLanding      = lazy(() => import("./lib/storylab/StoryLabLanding"));
