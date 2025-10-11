@@ -1,9 +1,6 @@
 // tailwind.config.js (ESM)
 export default {
   content: ["./index.html", "./src/**/*.{js,jsx,ts,tsx}"],
-  theme: { extend: {} },
-  plugins: [],
-};
   theme: {
     extend: {
       colors: {
@@ -36,13 +33,11 @@ export default {
         lg: "24px",
       },
       backgroundImage: {
-        // soft radial spotlight used as bg-radial-fade
         "radial-fade": "radial-gradient(1000px 600px at 50% -120px, rgba(255,255,255,0.9), rgba(255,255,255,0) 70%)",
       },
     },
   },
   plugins: [
-    // Glassmorphism helpers
     function ({ addUtilities, theme }) {
       const border = theme("colors.border");
       addUtilities({
