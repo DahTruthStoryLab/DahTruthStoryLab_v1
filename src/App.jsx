@@ -16,7 +16,7 @@ import { DndProvider } from "react-dnd";
 import { MultiBackend } from "dnd-multi-backend";
 import { HTML5toTouch } from "rdndmb-html5-to-touch";
 
-import { UserProvider } from "./lib/state/userStore";
+import { UserProvider } from "./lib/state/userStore.jsx";
 
 /* =========================
    Lazy-loaded pages
