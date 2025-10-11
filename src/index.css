@@ -176,3 +176,12 @@
 .bg-radial-fade {
   background-image: radial-gradient(circle at 20% 10%, rgba(202,177,214,0.25), rgba(234,242,255,0) 60%);
 }
+
+/* =======================
+   Optional DnD visuals
+   ======================= */
+/* Add these so you don't need the library stylesheet */
+.dnd-draggable { touch-action: none; }               /* better touch dragging */
+.dnd-dragging  { opacity: .5; }                      /* feedback while dragging */
+.dnd-drop-hover { outline: 2px dashed currentColor;  /* highlight drop zones */
+                  outline-offset: 2px; }
