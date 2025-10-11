@@ -9,10 +9,11 @@ import {
   Navigate,
 } from "react-router-dom";
 
+import React, { Suspense, lazy, useEffect } from "react";
+import { BrowserRouter as Router, Routes, Route, Navigate } from "react-router-dom";
 import { DndProvider } from "react-dnd";
-import { MultiBackend, HTML5toTouch } from "dnd-multi-backend"; // ✅ single source
+import { MultiBackend, HTML5toTouch } from "dnd-multi-backend";
 import "dnd-multi-backend/dist/styles.css";
-
 import { UserProvider } from "./lib/state/userStore";
 
 /* =========================
