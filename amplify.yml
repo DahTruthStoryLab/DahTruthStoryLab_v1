@@ -1,23 +1,25 @@
 version: 1
-frontend:
-  phases:
-    preBuild:
-      commands:
-        - "nvm install 20.19.4"
-        - "nvm use 20.19.4"
-        - "node -v"
-        - "npm ci --legacy-peer-deps --no-audit --no-fund"
-    build:
-      commands:
-        - "export NODE_OPTIONS=--max-old-space-size=4096"
-        - "export CI=false"
-        - "npm run build"
-  artifacts:
-    baseDirectory: build
-    files:
-      - "**/*"
-  cache:
-    paths:
-      - "node_modules/**/*"
-      - "~/.npm/**/*"
-      - "~/.cache/**/*"
+applications:
+  - frontend:
+      phases:
+        preBuild:
+          commands:
+            - nvm install 20.19.4
+            - nvm use 20.19.4
+            - node -v
+            - npm ci --legacy-peer-deps
+            - npm install react-quill@^2 quill@^1 lucide-react jszip
+        build:
+          commands:
+            - export NODE_OPTIONS="--max-old-space-size=4096"
+            - export CI=false
+            - npm run build
+      artifacts:
+        baseDirectory: dist
+        files:
+          - '**/*'
+      cache:
+        paths:
+          - node_modules/**/*
+          - ~/.npm/**/*
+          - ~/.cache/**/*
