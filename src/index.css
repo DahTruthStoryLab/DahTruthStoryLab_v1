@@ -1,16 +1,14 @@
-/* ✅ Tailwind should be first */
+/* ✅ ALL @import statements MUST come first */
+@import "react-quill/dist/quill.snow.css";
+@import url('https://fonts.googleapis.com/css2?family=Arial:wght@400;700&family=Calibri:wght@400;700&family=Cambria:wght@400;700&family=Times+New+Roman:wght@400;700&family=Georgia:wght@400;700&family=Garamond:wght@400;700&family=Verdana:wght@400;700&family=Courier+New:wght@400;700&display=swap');
+@import "./styles/quill-fonts.css";
+
+/* NOW Tailwind can come after imports */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* (Optional) Quill's default theme – include if you use the Snow theme */
-@import "react-quill/dist/quill.snow.css";
-
-/* --- Word-style fonts via Google Fonts --- */ 
-@import url('https://fonts.googleapis.com/css2?family=Arial:wght@400;700&family=Calibri:wght@400;700&family=Cambria:wght@400;700&family=Times+New+Roman:wght@400;700&family=Georgia:wght@400;700&family=Garamond:wght@400;700&family=Verdana:wght@400;700&family=Courier+New:wght@400;700&display=swap');
-@import "./styles/quill-fonts.css";
-
-/* Map font-family names for Quill’s CSS */
+/* Map font-family names for Quill's CSS */
 .ql-font-arial        { font-family: 'Arial', sans-serif; }
 .ql-font-calibri      { font-family: 'Calibri', sans-serif; }
 .ql-font-cambria      { font-family: 'Cambria', serif; }
