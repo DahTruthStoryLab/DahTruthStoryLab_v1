@@ -109,7 +109,7 @@ async function summarizeLocal(text = "") {
   return truncateWords(text, 40);
 }
 async function summarize(content) {
-  const url = process.env.REACT_APP_SUMMARY_URL;
+  const url = process.env.VITE_SUMMARY_URL;
   if (url) {
     try {
       const r = await fetch(url, {

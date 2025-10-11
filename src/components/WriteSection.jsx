@@ -16,7 +16,7 @@ import "react-quill/dist/quill.snow.css"; // toolbar styling
    Backend AI endpoint
    - Replace with your exact Lambda Function URL or "/api/ai/rewrite"
 ────────────────────────────────────────────────────────────── */
-const AI_URL = process.env.REACT_APP_AI_URL || "/api/ai/rewrite";
+const AI_URL = process.env.VITE_AI_URL || "/api/ai/rewrite";
 
 /* ──────────────────────────────────────────────────────────────
    Storage (kept compatible with your app-wide key)

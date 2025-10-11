@@ -5,7 +5,7 @@ import {
 } from "lucide-react";
 
 // 👉 Add this: read API base from env (set in Amplify) or fallback to "" for dev proxy
-const API_BASE = process.env.REACT_APP_API_BASE || "";
+const API_BASE = process.env.VITE_API_BASE || "";
 
 const FEATURE_LIST = [
   "Cloud sync & backups",
