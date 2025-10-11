@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useAI } from "../lib/AiProvider";
 import { useNavigate } from "react-router-dom";
+import { useDrag, useDrop } from "react-dnd"; // ← DnD hooks
 
 /* ------- Fonts whitelist (family + size) ------- */
 const Font = Quill.import("formats/font");
@@ -72,6 +73,16 @@ const ensureFirstChapter = (chapters) =>
           status: "draft",
         },
       ];
+
+/* Prevent global shortcuts when typing in inputs or Quill editor */
+function isEditableTarget(t) {
+  if (!t) return false;
+  const el = t.nodeType === 3 ? t.parentElement : t;
+  const tag = (el?.tagName || "").toLowerCase();
+  if (tag === "input" || tag === "textarea") return true;
+  if (el?.isContentEditable) return true;
+  return !!el?.closest?.('.ql-editor,[contenteditable="true"]');
+}
 
 /* ==============================
    Compose Page (isolated writer)
@@ -138,7 +149,7 @@ export default function ComposePage() {
     []
   );
 
-  /* Save - FIXED to use current state properly */
+  /* Save */
   const handleSave = useCallback(() => {
     setChapters((prevChapters) => {
       const chapterToUpdate = prevChapters.find((c) => c.id === selectedId);
@@ -218,14 +229,10 @@ export default function ComposePage() {
     await runAI("proofread");
   };
 
-  /* Keyboard shortcuts - FIXED to not interfere with editor */
+  /* Keyboard shortcuts – guarded */
   useEffect(() => {
     const onKey = (e) => {
-      // Don't intercept if user is typing in an input or the editor
-      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || 
-          e.target.classList.contains('ql-editor')) {
-        return;
-      }
+      if (isEditableTarget(e.target)) return; // ← don’t hijack editor typing
 
       const k = e.key.toLowerCase();
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && k === "s") {
@@ -245,8 +252,8 @@ export default function ComposePage() {
         redo();
       }
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("keydown", onKey, { capture: true });
+    return () => window.removeEventListener("keydown", onKey, { capture: true });
   }, [handleSave, handleSaveAndProof]);
 
   /* Add a new chapter */
@@ -264,30 +271,86 @@ export default function ComposePage() {
     setSelectedId(id);
   };
 
-  /* Chapter list item */
-  const ChapterItem = ({ ch }) => (
-    <button
-      type="button"
-      onClick={() => setSelectedId(ch.id)}
-      className={[
-        "w-full text-left px-3 py-2 rounded-lg border",
-        selectedId === ch.id
-          ? "bg-primary/15 border-primary/40"
-          : "bg-white border-white/60 hover:bg-white/80",
-      ].join(" ")}
-      title={`${(ch.wordCount || 0).toLocaleString()} words`}
-    >
-      <div className="font-medium truncate">{ch.title}</div>
-      <div className="text-xs text-slate-500">
-        {(ch.wordCount || 0).toLocaleString()} words • {ch.lastEdited || "—"}
-      </div>
-    </button>
-  );
+  /* Reorder helper */
+  const reorderChapters = (dragId, targetId) => {
+    if (!dragId || !targetId || dragId === targetId) return;
+    setChapters((prev) => {
+      const from = prev.findIndex((c) => c.id === dragId);
+      const to = prev.findIndex((c) => c.id === targetId);
+      if (from === -1 || to === -1 || from === to) return prev;
+
+      const next = prev.slice();
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+
+      const current = loadState() || {};
+      saveState({
+        book,
+        chapters: next,
+        daily: current.daily || { goal: 500, counts: {} },
+        settings: current.settings || { theme: "light", focusMode: false },
+        tocOutline: current.tocOutline || [],
+      });
+
+      if (selectedId === dragId) setSelectedId(dragId);
+      return next;
+    });
+  };
+
+  /* Draggable + droppable chapter list item */
+  const ChapterItem = ({ ch }) => {
+    const [{ isDragging }, dragRef] = useDrag(
+      () => ({
+        type: "CHAPTER",
+        item: { id: ch.id },
+        collect: (m) => ({ isDragging: m.isDragging() }),
+      }),
+      [ch.id]
+    );
+
+    const [{ isOver }, dropRef] = useDrop(
+      () => ({
+        accept: "CHAPTER",
+        drop: (item) => {
+          if (item?.id && item.id !== ch.id) reorderChapters(item.id, ch.id);
+        },
+        collect: (m) => ({ isOver: m.isOver() }),
+      }),
+      [ch.id]
+    );
+
+    const setRefs = (el) => {
+      dropRef(el);
+      dragRef(el);
+    };
+
+    return (
+      <button
+        ref={setRefs}
+        type="button"
+        onClick={() => setSelectedId(ch.id)}
+        className={[
+          "w-full text-left px-3 py-2 rounded-lg border transition",
+          isOver ? "dnd-drop-hover" : "",
+          isDragging ? "dnd-draggable dnd-dragging" : "dnd-draggable",
+          selectedId === ch.id
+            ? "bg-primary/15 border-primary/40"
+            : "bg-white border-white/60 hover:bg-white/80",
+        ].join(" ")}
+        title={`${(ch.wordCount || 0).toLocaleString()} words`}
+      >
+        <div className="font-medium truncate">{ch.title}</div>
+        <div className="text-xs text-slate-500">
+          {(ch.wordCount || 0).toLocaleString()} words • {ch.lastEdited || "—"}
+        </div>
+      </button>
+    );
+  };
 
   /* Back to Dashboard */
   const goBack = () => navigate("/dashboard");
 
-  /* Toolbar component to avoid duplication */
+  /* Toolbar component */
   const Toolbar = ({ compact = false }) => (
     <>
       {!compact && (
@@ -420,7 +483,7 @@ export default function ComposePage() {
         </section>
       </div>
 
-      {/* Fullscreen overlay - FIXED with AI buttons */}
+      {/* Fullscreen overlay */}
       {isFS && (
         <div className="fixed inset-0 z-[9999] bg-[#fdecef]">
           <div className="absolute top-0 left-0 right-0 p-3 flex items-center justify-between gap-2 bg-white/90 backdrop-blur border-b">
@@ -493,3 +556,4 @@ export default function ComposePage() {
     </div>
   );
 }
+
