@@ -1,10 +1,9 @@
-/** @type {import('tailwindcss').Config} */
-module.exports = {
-  content: [
-    "./index.html",            // for Vite
-    "./public/index.html",     // for CRA
-    "./src/**/*.{js,jsx,ts,tsx}",
-  ],
+// tailwind.config.js (ESM)
+export default {
+  content: ["./index.html", "./src/**/*.{js,jsx,ts,tsx}"],
+  theme: { extend: {} },
+  plugins: [],
+};
   theme: {
     extend: {
       colors: {
