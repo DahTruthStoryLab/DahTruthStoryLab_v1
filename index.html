@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en" class="theme-light">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <title>DahTruth Story Lab</title>
+
+    <!-- Primary SEO -->
+    <meta
+      name="description"
+      content="DahTruth Story Lab — write, organize, format, and publish your manuscripts with presets for agents, KDP, and more."
+    />
+    <meta name="theme-color" content="#EAF2FF" />
+    <meta name="color-scheme" content="light" />
+    <meta name="robots" content="index,follow" />
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="DahTruth Story Lab" />
+    <meta
+      property="og:description"
+      content="Write, organize, format, and publish your stories with DahTruth Story Lab."
+    />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="/" />
+    <meta property="og:image" content="/og-image.png" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="DahTruth Story Lab" />
+    <meta
+      name="twitter:description"
+      content="Write, organize, format, and publish your stories with presets for agents, KDP, DOCX, EPUB, and more."
+    />
+    <meta name="twitter:image" content="/og-image.png" />
+
+    <!-- Icons -->
+    <link rel="icon" href="/favicon.ico" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/manifest.json" />
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Playfair+Display:wght@700;900&display=swap"
+      rel="stylesheet"
+    />
+
+    <!-- App-like hints -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+
+    <!-- Inline base styles -->
+    <style>
+      :root {
+        --bg: #f6faff;
+        --text: #0a2540;
+        --subtext: #5b6b7c;
+        --accent: #1f3a5f;
+      }
+      html, body {
+        padding: 0;
+        margin: 0;
+        height: 100%;
+        background: var(--bg);
+        color: var(--text);
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        text-rendering: optimizeLegibility;
+      }
+      body {
+        font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto,
+          Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji";
+        line-height: 1.5;
+      }
+      h1, h2, h3 {
+        font-family: "Playfair Display", Georgia, "Times New Roman", serif;
+        color: var(--text);
+        margin: 0.2em 0 0.4em;
+      }
+      #root {
+        min-height: 100vh;
+        display: contents;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root { color-scheme: light; }
+      }
+    </style>
+  </head>
+  <body>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="root"></div>
+
+    <!-- Vite entry (change to /src/main.tsx if you use TypeScript) -->
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
