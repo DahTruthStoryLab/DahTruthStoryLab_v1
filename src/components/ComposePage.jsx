@@ -17,7 +17,7 @@ import {
 import { useAI } from "../lib/AiProvider";
 import { useNavigate } from "react-router-dom";
 import { useDrag, useDrop } from "react-dnd";
-import * as mammoth from "mammoth/mammoth.browser";
+import * as mammoth from "mammoth/mammoth.browser.js";
 import { pickAndImportOneNotePage } from "../lib/onenoteImport";
 
 /* ------- Fonts whitelist (family + size) ------- */
