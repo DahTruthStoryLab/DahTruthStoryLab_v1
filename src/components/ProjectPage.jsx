@@ -575,24 +575,6 @@ export default function ProjectPage() {
 
               <div className="space-y-4">
                 <div>
-                  <label className="text-xs text-muted mb-1 block">Target Words</label>
-                  <input
-                    type="number"
-                    min={1000}
-                    step={500}
-                    value={book.targetWords || 0}
-                    onChange={(e) =>
-                      setBook((b) => ({
-                        ...b,
-                        targetWords: clamp(Number(e.target.value) || 0, 0, 5_000_000),
-                      }))
-                    }
-                    className="w-full rounded-lg bg-white border border-[hsl(var(--border))] px-4 py-3 text-sm outline-none"
-                    style={{ fontFamily: "Playfair Display, ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif" }}
-                  />
-                </div>
-
-                <div>
                   <label className="text-xs text-muted mb-1 block">Status</label>
                   <select
                     value={book.status || "Draft"}
@@ -699,6 +681,21 @@ export default function ProjectPage() {
     </div>
   );
 }
+                  <label className="text-xs text-muted mb-1 block">Target Words</label>
+                  <input
+                    type="number"
+                    min={1000}
+                    step={500}
+                    value={book.targetWords || 0}
+                    onChange={(e) =>
+                      setBook((b) => ({
+                        ...b,
+                        targetWords: clamp(Number(e.target.value) || 0, 0, 5_000_000),
+                      }))
+                    }
+                    className="w-full rounded-lg bg-white border border-[hsl(var(--border))] px-4 py-3 text-sm outline-none"
+                    style={{ fontFamily: "Playfair Display, ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif" }}
+                  />
                 </div>
 
                 <div>
@@ -762,3 +759,6 @@ export default function ProjectPage() {
                     placeholder="Your name..."
                     style={{ fontFamily: "Playfair Display, ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif" }}
                   />
+                </div>
+
+                <div>
