@@ -12,7 +12,7 @@ import {
 // ---------------------------
 // DnD Multi-backend (desktop + mobile)
 import { DndProvider } from "react-dnd";
-import { MultiBackend, HTML5toTouch } from "dnd-multi-backend";
+import { HTML5Backend } from "react-dnd-html5-backend";
 
 import { UserProvider } from "./lib/userStore.jsx";
 
@@ -92,11 +92,18 @@ function TableOfContentsRouter() {
 export default function App() {
   return (
     <UserProvider>
-      {/* ✅ Provide DnD at the app root once, using multi-backend for mouse + touch */}
-      <DndProvider backend={MultiBackend} options={HTML5toTouch}>
+      {/* ✅ Provide DnD at the app root (HTML5 backend) */}
+      <DndProvider backend={HTML5Backend}>
         <Router>
           <ScrollToTop />
           <Suspense fallback={<Fallback />}>
+            {/* ...your Routes... */}
+          </Suspense>
+        </Router>
+      </DndProvider>
+    </UserProvider>
+  );
+}
             <Routes>
               {/* Public */}
               <Route path="/" element={<LandingPage />} />
