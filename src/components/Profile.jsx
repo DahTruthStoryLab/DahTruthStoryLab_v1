@@ -16,6 +16,7 @@ import {
   Layers,
   Store,
   Info,
+  Loader2,
 } from "lucide-react";
 
 let useUserSafe = null;
@@ -127,6 +128,7 @@ export default function Profile() {
   const [bio, setBio] = useState(initial.bio || "");
   const [avatar, setAvatar] = useState(initial.avatar || ""); // base64 (optional)
   const [lastSaved, setLastSaved] = useState(Date.now());
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
   useEffect(() => {
     if (store?.user) {
@@ -137,12 +139,79 @@ export default function Profile() {
     }
   }, [store?.user?.displayName, store?.user?.email, store?.user?.bio, store?.user?.avatar]);
 
-  const onPickAvatar = (file) => {
+  const onPickAvatar = async (file) => {
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => setAvatar(String(reader.result || ""));
-    reader.readAsDataURL(file);
+    
+    setUploadingAvatar(true);
+    
+    try {
+      // Check file size (max 10MB)
+      const maxSize = 10 * 1024 * 1024;
+      if (file.size > maxSize) {
+        alert("Image is too large. Please choose an image under 10MB.");
+        return;
+      }
+
+      // For HEIC files, try to convert or handle appropriately
+      const isHEIC = file.name.toLowerCase().endsWith('.heic') || 
+                     file.name.toLowerCase().endsWith('.heif') ||
+                     file.type === 'image/heic' ||
+                     file.type === 'image/heif';
+
+      if (isHEIC) {
+        // Create canvas to convert the image
+        const img = document.createElement('img');
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Read the file as data URL first
+        const reader = new FileReader();
+        const dataUrl = await new Promise((resolve, reject) => {
+          reader.onload = (e) => resolve(e.target.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+
+        // Try to load it as an image
+        await new Promise((resolve, reject) => {
+          img.onload = resolve;
+          img.onerror = () => {
+            // If direct loading fails, alert user
+            alert("Unable to process HEIC image. Please convert to JPG/PNG first, or use the Photos app to save as JPG.");
+            reject(new Error("HEIC not supported"));
+          };
+          img.src = dataUrl;
+        });
+
+        // If we got here, the browser can handle it - convert to JPEG
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx.drawImage(img, 0, 0);
+        
+        // Convert to JPEG with good quality
+        const jpegDataUrl = canvas.toDataURL('image/jpeg', 0.9);
+        setAvatar(jpegDataUrl);
+      } else {
+        // Standard image formats
+        const reader = new FileReader();
+        reader.onload = () => {
+          setAvatar(String(reader.result || ""));
+        };
+        reader.onerror = () => {
+          alert("Failed to read image file. Please try a different image.");
+        };
+        reader.readAsDataURL(file);
+      }
+    } catch (err) {
+      console.error("Error uploading avatar:", err);
+      if (err.message !== "HEIC not supported") {
+        alert("Failed to upload image. Please try again or use a different image.");
+      }
+    } finally {
+      setUploadingAvatar(false);
+    }
   };
+
   const removeAvatar = () => setAvatar("");
 
   const save = () => {
@@ -214,8 +283,13 @@ export default function Profile() {
             <div className="glass-panel p-6">
               <div className="text-lg font-semibold mb-4 heading-serif">Profile Photo</div>
 
-              <div className="rounded-2xl overflow-hidden border border-[hsl(var(--border))] bg-[color:var(--color-primary)]/40 aspect-square max-w-sm flex items-center justify-center mb-4">
-                {avatar ? (
+              <div className="rounded-2xl overflow-hidden border border-[hsl(var(--border))] bg-[color:var(--color-primary)]/40 aspect-square max-w-sm flex items-center justify-center mb-4 relative">
+                {uploadingAvatar ? (
+                  <div className="text-center">
+                    <Loader2 size={32} className="mx-auto mb-2 animate-spin text-[color:var(--color-ink)]/60" />
+                    <div className="text-sm text-muted">Processing image...</div>
+                  </div>
+                ) : avatar ? (
                   <img src={avatar} alt="Avatar" className="w-full h-full object-cover" />
                 ) : (
                   <div className="w-full h-full grid place-items-center">
@@ -227,16 +301,26 @@ export default function Profile() {
               </div>
 
               <div className="flex gap-2">
-                <label className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-[color:var(--color-primary)] border border-[hsl(var(--border))] hover:opacity-90 text-sm cursor-pointer">
-                  <Image size={16} /> Upload
+                <label className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-[color:var(--color-primary)] border border-[hsl(var(--border))] hover:opacity-90 text-sm cursor-pointer disabled:opacity-50">
+                  {uploadingAvatar ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" /> Processing
+                    </>
+                  ) : (
+                    <>
+                      <Image size={16} /> Upload
+                    </>
+                  )}
                   <input
                     type="file"
-                    accept="image/*"
+                    accept="image/*,.heic,.heif"
+                    capture="environment"
                     className="hidden"
                     onChange={(e) => e.target.files?.[0] && onPickAvatar(e.target.files[0])}
+                    disabled={uploadingAvatar}
                   />
                 </label>
-                {avatar && (
+                {avatar && !uploadingAvatar && (
                   <button
                     onClick={removeAvatar}
                     className="px-3 py-2 rounded-lg bg-white border border-[hsl(var(--border))] hover:opacity-90 text-sm"
@@ -244,6 +328,9 @@ export default function Profile() {
                     Remove
                   </button>
                 )}
+              </div>
+              <div className="text-xs text-muted mt-2 text-center">
+                Supports JPG, PNG, or iPhone HEIC photos
               </div>
             </div>
 
@@ -335,11 +422,19 @@ export default function Profile() {
             <div className="glass-panel p-6">
               <div className="text-lg font-semibold mb-4 heading-serif">Preview</div>
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-full bg-[color:var(--color-accent)] grid place-items-center shadow">
-                  <span className="text-[color:var(--color-ink)] font-black">
-                    {authorInitial}
-                  </span>
-                </div>
+                {avatar ? (
+                  <img 
+                    src={avatar} 
+                    alt={displayName || "Profile"} 
+                    className="w-12 h-12 rounded-full object-cover shadow border-2 border-[hsl(var(--border))]" 
+                  />
+                ) : (
+                  <div className="w-12 h-12 rounded-full bg-[color:var(--color-accent)] grid place-items-center shadow">
+                    <span className="text-[color:var(--color-ink)] font-black">
+                      {authorInitial}
+                    </span>
+                  </div>
+                )}
                 <div className="min-w-0">
                   <div
                     className="font-bold text-lg truncate"
