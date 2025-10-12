@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   BookOpen, Save, Download, Upload, Target, Tag, Image, AlertCircle,
-  TrendingUp, Clock, Star, BarChart3, CheckCircle, Edit3, Loader2
+  TrendingUp, Clock, Star, BarChart3, CheckCircle, Edit3, Loader2, ArrowLeft
 } from "lucide-react";
 import heic2any from "heic2any";
 
