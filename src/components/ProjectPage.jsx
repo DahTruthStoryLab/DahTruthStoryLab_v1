@@ -7,19 +7,11 @@ import {
 } from "lucide-react";
 import heic2any from "heic2any";
 
-/* ──────────────────────────────────────────────────────────────
-   Optional store hook (safe shim). Always call at top-level.
-   If userStore exists, we'll use its hook; otherwise this returns null.
-─────────────────────────────────────────────────────────────── */
 let useUser = () => null;
 try {
-  // eslint-disable-next-line global-require
   useUser = require("../lib/state/userStore").useUser;
 } catch {}
 
-/* ──────────────────────────────────────────────────────────────
-   Shared storage helpers (same key as TOCPage2)
-─────────────────────────────────────────────────────────────── */
 const STORAGE_KEY = "dahtruth-story-lab-toc-v3";
 
 const loadState = () => {
@@ -35,14 +27,10 @@ const loadState = () => {
 const saveState = (state) => {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    // broadcast so other pages (TOC, etc.) update live
     window.dispatchEvent(new Event("project:change"));
   } catch {}
 };
 
-/* ──────────────────────────────────────────────────────────────
-   Profile name helpers (UserProvider → localStorage fallback)
-─────────────────────────────────────────────────────────────── */
 function readProfileObject() {
   try {
     const keys = ["dt_profile", "userProfile", "profile", "currentUser"];
@@ -54,6 +42,7 @@ function readProfileObject() {
   } catch {}
   return null;
 }
+
 function extractDisplayName(obj) {
   if (!obj || typeof obj !== "object") return "";
   if (obj.displayName) return obj.displayName;
@@ -76,9 +65,6 @@ async function heicArrayBufferToJpegDataUrl(arrayBuffer, quality = 0.9) {
   return dataUrl;
 }
 
-/* ──────────────────────────────────────────────────────────────
-   Small helpers
-─────────────────────────────────────────────────────────────── */
 const countWords = (s = "") => s.trim().split(/\s+/).filter(Boolean).length;
 const daysUntil = (yyyy_mm_dd) => {
   if (!yyyy_mm_dd) return null;
@@ -90,7 +76,6 @@ const clamp = (n, lo, hi) => Math.max(lo, Math.min(hi, n));
 const progressPct = (cur, tgt) => Math.min((cur / Math.max(tgt || 1, 1)) * 100, 100);
 const getReadingTime = (wordCount) => Math.ceil(wordCount / 200);
 
-// Light theme status pill colors
 const getStatusColor = (status) => {
   const pill = (bg, text, border) =>
     `bg-[${bg}] text-[${text}] border ${border} rounded-full`;
@@ -125,35 +110,28 @@ async function downscaleDataUrl(dataUrl, maxDim = 2000, quality = 0.9) {
   return canvas.toDataURL("image/jpeg", quality);
 }
 
-/* ──────────────────────────────────────────────────────────────
-   Component
-─────────────────────────────────────────────────────────────── */
 export default function ProjectPage() {
   const navigate = useNavigate();
-
-  // ✅ Call hook unconditionally at top-level (lint-safe)
   const store = useUser();
 
-  // Load existing app state (book/chapters/daily/settings)
-  const existing =
-    loadState() || {
-      book: {
-        title: "Untitled Book",
-        subtitle: "",
-        author: "",
-        genre: "",
-        tags: [],
-        targetWords: 25000,
-        deadline: "",
-        status: "Draft",
-        logline: "",
-        synopsis: "",
-        cover: "",
-      },
-      chapters: [],
-      daily: { goal: 500, counts: {} },
-      settings: { theme: "light", focusMode: false },
-    };
+  const existing = loadState() || {
+    book: {
+      title: "Untitled Book",
+      subtitle: "",
+      author: "",
+      genre: "",
+      tags: [],
+      targetWords: 25000,
+      deadline: "",
+      status: "Draft",
+      logline: "",
+      synopsis: "",
+      cover: "",
+    },
+    chapters: [],
+    daily: { goal: 500, counts: {} },
+    settings: { theme: "light", focusMode: false },
+  };
 
   const [book, setBook] = useState({
     title: "Untitled Book",
@@ -176,14 +154,12 @@ export default function ProjectPage() {
   const [lastSaved, setLastSaved] = useState(Date.now());
   const [uploadingCover, setUploadingCover] = useState(false);
 
-  // Live profile display name (UserProvider → localStorage)
   const profileDisplayName = useMemo(() => {
     if (store?.user?.displayName) return store.user.displayName;
     const obj = readProfileObject();
     return extractDisplayName(obj) || "";
   }, [store?.user?.displayName]);
 
-  // On mount: if book.author is empty, populate from profile and persist
   useEffect(() => {
     if (!book.author && profileDisplayName) {
       setBook((b) => {
@@ -199,17 +175,15 @@ export default function ProjectPage() {
       });
       setLastSaved(Date.now());
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // run once on mount
+  }, []);
 
-  // Listen for profile changes; update header author (and book.author if empty)
   useEffect(() => {
     const onProfileChange = () => {
       const obj = readProfileObject();
       const name = extractDisplayName(obj) || "";
       if (!name) return;
       setBook((b) => {
-        if (b.author && b.author.trim().length > 0) return b; // don't override explicit author
+        if (b.author && b.author.trim().length > 0) return b;
         const next = { ...b, author: name };
         const current = loadState() || {};
         saveState({
@@ -228,10 +202,8 @@ export default function ProjectPage() {
       window.removeEventListener("profile:updated", onProfileChange);
       window.removeEventListener("storage", onProfileChange);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chapters, daily, settings]);
 
-  // Live sync: if other pages change the project, refresh
   useEffect(() => {
     const sync = () => {
       const s = loadState();
@@ -249,7 +221,6 @@ export default function ProjectPage() {
     };
   }, []);
 
-  // Debounced auto-save whenever the book object changes
   useEffect(() => {
     const t = setTimeout(() => {
       const current = loadState() || {};
@@ -262,10 +233,8 @@ export default function ProjectPage() {
       setLastSaved(Date.now());
     }, 800);
     return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [book]);
 
-  // Explicit save button
   const saveNow = () => {
     const current = loadState() || {};
     saveState({
@@ -277,7 +246,6 @@ export default function ProjectPage() {
     setLastSaved(Date.now());
   };
 
-  // Export backup JSON of the whole workspace
   const exportJSON = () => {
     const blob = new Blob(
       [JSON.stringify({ book, chapters, daily, settings }, null, 2)],
@@ -293,13 +261,10 @@ export default function ProjectPage() {
     URL.revokeObjectURL(url);
   };
 
-  // Cover image upload with iPhone HEIC support and conversion
   const onCoverPicked = async (file) => {
     if (!file) return;
-
     setUploadingCover(true);
     try {
-      // max 10MB
       const maxSize = 10 * 1024 * 1024;
       if (file.size > maxSize) {
         alert("Image is too large. Please choose an image under 10MB.");
@@ -313,13 +278,11 @@ export default function ProjectPage() {
         file.type === "image/heif";
 
       if (isHEIC) {
-        // HEIC → JPEG via heic2any, then optional downscale
         const ab = await file.arrayBuffer();
         const jpegDataUrl = await heicArrayBufferToJpegDataUrl(ab, 0.9);
         const scaled = await downscaleDataUrl(jpegDataUrl, 2000, 0.9);
         setBook((b) => ({ ...b, cover: scaled }));
       } else {
-        // JPG/PNG/WEBP → DataURL, then optional downscale
         const dataUrl = await new Promise((resolve, reject) => {
           const fr = new FileReader();
           fr.onload = () => resolve(String(fr.result || ""));
@@ -339,17 +302,16 @@ export default function ProjectPage() {
 
   const removeCover = () => setBook((b) => ({ ...b, cover: "" }));
 
-  // Tags
   const addTag = () => {
     const t = newTag.trim();
     if (!t || (book.tags || []).includes(t)) return;
     setBook((b) => ({ ...b, tags: [...(b.tags || []), t] }));
     setNewTag("");
   };
+  
   const removeTag = (tag) =>
     setBook((b) => ({ ...b, tags: (b.tags || []).filter((x) => x !== tag) }));
 
-  // Derived stats
   const totalWords = chapters.reduce((sum, ch) => sum + countWords(ch.content || ""), 0);
   const pct = progressPct(totalWords, book.targetWords || 25000);
   const daysLeft = daysUntil(book.deadline);
@@ -362,13 +324,11 @@ export default function ProjectPage() {
     (ch) => (ch.content || "").trim().length > 100
   ).length;
 
-  // Render author for header: prefer explicit book.author, else live profile name
   const headerAuthor = book.author?.trim() || profileDisplayName || "";
 
   return (
     <div className="min-h-screen text-[color:var(--color-ink)] bg-[color:var(--color-base)] bg-radial-fade py-8">
       <div className="mx-auto max-w-6xl px-4">
-        {/* Top header */}
         <div className="glass-panel">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between px-6 py-5">
             <div className="flex items-center gap-4">
@@ -384,18 +344,10 @@ export default function ProjectPage() {
               </div>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
-              <button
-                onClick={saveNow}
-                className="btn-gold inline-flex items-center gap-2"
-                title="Save"
-              >
+              <button onClick={saveNow} className="btn-gold inline-flex items-center gap-2" title="Save">
                 <Save size={16} /> Save
               </button>
-              <button
-                onClick={exportJSON}
-                className="btn-primary inline-flex items-center gap-2"
-                title="Export backup JSON"
-              >
+              <button onClick={exportJSON} className="btn-primary inline-flex items-center gap-2" title="Export backup JSON">
                 <Download size={16} /> Export
               </button>
               <div className="text-xs text-muted">
@@ -405,9 +357,7 @@ export default function ProjectPage() {
           </div>
         </div>
 
-        {/* Quick Stats Row */}
         <div className="mt-6 grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {/* Progress */}
           <div className="glass-panel p-4">
             <div className="flex items-center gap-2 mb-2">
               <TrendingUp size={16} className="text-[color:var(--color-ink)]/70" />
@@ -415,14 +365,10 @@ export default function ProjectPage() {
             </div>
             <div className="text-2xl font-bold">{pct.toFixed(1)}%</div>
             <div className="w-full bg-[color:var(--color-primary)]/60 rounded-full h-2 mt-2">
-              <div
-                className="bg-[color:var(--color-accent)] h-2 rounded-full transition-all duration-500"
-                style={{ width: `${pct}%` }}
-              />
+              <div className="bg-[color:var(--color-accent)] h-2 rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
             </div>
           </div>
 
-          {/* Reading Time */}
           <div className="glass-panel p-4">
             <div className="flex items-center gap-2 mb-2">
               <Clock size={16} className="text-[color:var(--color-ink)]/70" />
@@ -432,7 +378,6 @@ export default function ProjectPage() {
             <div className="text-xs text-muted mt-1">~{Math.round(totalReadingTime / 60)}h total</div>
           </div>
 
-          {/* Completion */}
           <div className="glass-panel p-4">
             <div className="flex items-center gap-2 mb-2">
               <CheckCircle size={16} className="text-[color:var(--color-ink)]/70" />
@@ -442,25 +387,19 @@ export default function ProjectPage() {
             <div className="text-xs text-muted mt-1">of {chapters.length} chapters</div>
           </div>
 
-          {/* Status Badge */}
           <div className="glass-panel p-4">
             <div className="flex items-center gap-2 mb-2">
               <Star size={16} className="text-[color:var(--color-ink)]/70" />
               <div className="text-sm text-muted">Status</div>
             </div>
-            <div
-              className={`inline-flex items-center px-3 py-1 text-sm font-medium ${getStatusColor(book.status)}`}
-            >
+            <div className={`inline-flex items-center px-3 py-1 text-sm font-medium ${getStatusColor(book.status)}`}>
               {book.status}
             </div>
           </div>
         </div>
 
-        {/* Main content grid */}
         <div className="mt-6 grid lg:grid-cols-[320px,1fr] gap-6">
-          {/* Left sidebar - Cover & Meta */}
           <div className="space-y-6">
-            {/* Cover Card */}
             <div className="glass-panel p-6">
               <div className="text-lg font-semibold mb-4 flex items-center gap-2 heading-serif">
                 <Image size={18} className="text-[color:var(--color-ink)]/80" />
@@ -505,17 +444,13 @@ export default function ProjectPage() {
                   />
                 </label>
                 {book.cover && !uploadingCover && (
-                  <button
-                    onClick={removeCover}
-                    className="px-3 py-2 rounded-lg bg-white border border-[hsl(var(--border))] hover:opacity-90 text-sm"
-                  >
+                  <button onClick={removeCover} className="px-3 py-2 rounded-lg bg-white border border-[hsl(var(--border))] hover:opacity-90 text-sm">
                     Remove
                   </button>
                 )}
               </div>
             </div>
 
-            {/* Tags Card */}
             <div className="glass-panel p-6">
               <div className="text-lg font-semibold mb-4 flex items-center gap-2 heading-serif">
                 <Tag size={18} className="text-[color:var(--color-ink)]/80" />
@@ -534,14 +469,9 @@ export default function ProjectPage() {
 
               <div className="flex flex-wrap gap-2 mb-4">
                 {(book.tags || []).map((t) => (
-                  <span
-                    key={t}
-                    className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs bg-[color:var(--color-primary)] text-[color:var(--color-ink)] border border-[hsl(var(--border))]"
-                  >
+                  <span key={t} className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs bg-[color:var(--color-primary)] text-[color:var(--color-ink)] border border-[hsl(var(--border))]">
                     {t}
-                    <button className="hover:opacity-80 ml-1" onClick={() => removeTag(t)}>
-                      ×
-                    </button>
+                    <button className="hover:opacity-80 ml-1" onClick={() => removeTag(t)}>×</button>
                   </span>
                 ))}
               </div>
@@ -550,23 +480,15 @@ export default function ProjectPage() {
                 <input
                   value={newTag}
                   onChange={(e) => setNewTag(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") addTag();
-                  }}
+                  onKeyDown={(e) => { if (e.key === "Enter") addTag(); }}
                   placeholder="Add tag..."
                   className="flex-1 rounded-lg bg-white border border-[hsl(var(--border))] px-3 py-2 text-sm outline-none placeholder:text-[color:var(--color-muted)]"
                   style={{ fontFamily: "Playfair Display, ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif" }}
                 />
-                <button
-                  onClick={addTag}
-                  className="btn-primary px-4 py-2"
-                >
-                  Add
-                </button>
+                <button onClick={addTag} className="btn-primary px-4 py-2">Add</button>
               </div>
             </div>
 
-            {/* Goals Card */}
             <div className="glass-panel p-6">
               <div className="text-lg font-semibold mb-4 flex items-center gap-2 heading-serif">
                 <Target size={18} className="text-[color:var(--color-ink)]/80" />
@@ -575,116 +497,39 @@ export default function ProjectPage() {
 
               <div className="space-y-4">
                 <div>
-                  <label className="text-xs text-muted mb-1 block">Status</label>
-                  <select
-                    value={book.status || "Draft"}
-                    onChange={(e) => setBook((b) => ({ ...b, status: e.target.value }))}
-                    className="w-full rounded-lg bg-white border border-[hsl(var(--border))] px-4 py-3 text-sm outline-none"
-                    style={{ fontFamily: "Playfair Display, ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif" }}
-                  >
-                    {["Idea", "Outline", "Draft", "Revision", "Editing", "Published"].map((s) => (
-                      <option key={s} value={s}>
-                        {s}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                <div>
-                  <label className="text-xs text-muted mb-1 block">Logline</label>
+                  <label className="text-xs text-muted mb-1 block">Target Words</label>
                   <input
-                    value={book.logline || ""}
-                    onChange={(e) => setBook((b) => ({ ...b, logline: e.target.value }))}
-                    placeholder="One-sentence hook for your story..."
+                    type="number"
+                    min="1000"
+                    step="500"
+                    value={book.targetWords || 0}
+                    onChange={(e) => setBook((b) => ({ ...b, targetWords: clamp(Number(e.target.value) || 0, 0, 5000000) }))}
                     className="w-full rounded-lg bg-white border border-[hsl(var(--border))] px-4 py-3 text-sm outline-none"
                     style={{ fontFamily: "Playfair Display, ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif" }}
                   />
                 </div>
-              </div>
 
-              <div>
-                <label className="text-xs text-muted mb-1 block">Synopsis</label>
-                <textarea
-                  value={book.synopsis || ""}
-                  onChange={(e) => setBook((b) => ({ ...b, synopsis: e.target.value }))}
-                  placeholder="High-level overview of your book..."
-                  className="w-full min-h-[160px] rounded-lg bg-white border border-[hsl(var(--border))] px-4 py-3 text-sm outline-none resize-vertical"
-                  style={{ fontFamily: "Playfair Display, ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif" }}
-                />
-              </div>
-            </div>
-
-            {/* Statistics */}
-            <div className="glass-panel p-6">
-              <div className="text-lg font-semibold mb-4 flex items-center gap-2 heading-serif">
-                <BarChart3 size={18} className="text-[color:var(--color-ink)]/80" />
-                Writing Statistics
-              </div>
-
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="text-center">
-                  <div className="text-2xl font-bold">{totalWords.toLocaleString()}</div>
-                  <div className="text-xs text-muted">Total Words</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold">{chapters.length}</div>
-                  <div className="text-xs text-muted">Chapters</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold">{avgWordsPerChapter.toLocaleString()}</div>
-                  <div className="text-xs text-muted">Avg/Chapter</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold">{totalReadingTime}m</div>
-                  <div className="text-xs text-muted">Read Time</div>
-                </div>
-              </div>
-
-              <div className="mt-6 p-4 rounded-lg bg-[color:var(--color-primary)]/50 border border-[hsl(var(--border))]">
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-sm">Word Count Progress</span>
-                  <span className="text-sm text-muted">
-                    {totalWords.toLocaleString()} / {book.targetWords.toLocaleString()}
-                  </span>
-                </div>
-                <div className="w-full bg-white rounded-full h-3 border border-[hsl(var(--border))]">
-                  <div
-                    className="bg-[color:var(--color-accent)] h-3 rounded-full transition-all duration-700 relative overflow-hidden"
-                    style={{ width: `${Math.min(pct, 100)}%` }}
-                  >
-                    <div className="absolute inset-0 bg-white/30 animate-pulse" />
-                  </div>
+                <div>
+                  <label className="text-xs text-muted mb-1 block">Deadline</label>
+                  <input
+                    type="date"
+                    value={book.deadline || ""}
+                    onChange={(e) => setBook((b) => ({ ...b, deadline: e.target.value }))}
+                    className="w-full rounded-lg bg-white border border-[hsl(var(--border))] px-4 py-3 text-sm outline-none"
+                    style={{ fontFamily: "Playfair Display, ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif" }}
+                  />
+                  {book.deadline && (
+                    <div className="text-xs text-muted mt-2">
+                      {daysLeft >= 0 ? `${daysLeft} days remaining` : `${Math.abs(daysLeft)} days overdue`}
+                      {wordsPerDayNeeded && <div className="mt-1">Need {wordsPerDayNeeded.toLocaleString()} words/day</div>}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
-
-            {/* Helpful message if no chapters */}
-            {chapters.length === 0 && (
-              <div className="glass-panel p-6 text-center">
-                <AlertCircle className="mx-auto mb-3 text-[color:var(--color-ink)]/70" size={32} />
-                <div className="text-lg font-medium mb-2">Ready to start writing?</div>
-                <div className="text-sm text-muted mb-4">
-                  Head over to your Table of Contents to create your first chapter and begin your story.
-                </div>
-                <button
-                  onClick={() => navigate("/toc")}
-                  className="btn-primary inline-flex items-center gap-2"
-                >
-                  <BookOpen size={16} />
-                  Go to Table of Contents
-                </button>
-              </div>
-            )}
           </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-                  
-          {/* Right side - Story Details */}
+
           <div className="space-y-6">
-            {/* Title & Basic Info */}
             <div className="glass-panel p-6">
               <div className="text-lg font-semibold mb-4 flex items-center gap-2 heading-serif">
                 <Edit3 size={18} className="text-[color:var(--color-ink)]/80" />
@@ -726,7 +571,6 @@ export default function ProjectPage() {
                 </div>
 
                 <div>
-<div>
                   <label className="text-xs text-muted mb-1 block">Status</label>
                   <select
                     value={book.status || "Draft"}
@@ -735,9 +579,7 @@ export default function ProjectPage() {
                     style={{ fontFamily: "Playfair Display, ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif" }}
                   >
                     {["Idea", "Outline", "Draft", "Revision", "Editing", "Published"].map((s) => (
-                      <option key={s} value={s}>
-                        {s}
-                      </option>
+                      <option key={s} value={s}>{s}</option>
                     ))}
                   </select>
                 </div>
@@ -766,7 +608,6 @@ export default function ProjectPage() {
               </div>
             </div>
 
-            {/* Statistics */}
             <div className="glass-panel p-6">
               <div className="text-lg font-semibold mb-4 flex items-center gap-2 heading-serif">
                 <BarChart3 size={18} className="text-[color:var(--color-ink)]/80" />
@@ -810,7 +651,6 @@ export default function ProjectPage() {
               </div>
             </div>
 
-            {/* Helpful message if no chapters */}
             {chapters.length === 0 && (
               <div className="glass-panel p-6 text-center">
                 <AlertCircle className="mx-auto mb-3 text-[color:var(--color-ink)]/70" size={32} />
@@ -833,4 +673,3 @@ export default function ProjectPage() {
     </div>
   );
 }
-                  
