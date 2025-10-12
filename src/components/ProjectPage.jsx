@@ -105,18 +105,6 @@ const getStatusColor = (status) => {
   return colors[status] || colors.Draft;
 };
 
-async function heicArrayBufferToJpegDataUrl(arrayBuffer, quality = 0.9) {
-  const blob = new Blob([arrayBuffer], { type: "image/heic" });
-  const jpegBlob = await heic2any({ blob, toType: "image/jpeg", quality });
-  const dataUrl = await new Promise((resolve, reject) => {
-    const fr = new FileReader();
-    fr.onload = () => resolve(String(fr.result || ""));
-    fr.onerror = reject;
-    fr.readAsDataURL(jpegBlob);
-  });
-  return dataUrl;
-}
-
 async function downscaleDataUrl(dataUrl, maxDim = 2000, quality = 0.9) {
   const img = await new Promise((resolve, reject) => {
     const x = new Image();
@@ -307,83 +295,43 @@ export default function ProjectPage() {
 
   // Cover image upload with iPhone HEIC support and conversion
   const onCoverPicked = async (file) => {
-  if (!file) return;
+    if (!file) return;
 
-  setUploadingCover(true);
-  try {
-    // max 10MB
-    const maxSize = 10 * 1024 * 1024;
-    if (file.size > maxSize) {
-      alert("Image is too large. Please choose an image under 10MB.");
-      return;
-    }
+    setUploadingCover(true);
+    try {
+      // max 10MB
+      const maxSize = 10 * 1024 * 1024;
+      if (file.size > maxSize) {
+        alert("Image is too large. Please choose an image under 10MB.");
+        return;
+      }
 
-    const isHEIC =
-      file.name.toLowerCase().endsWith(".heic") ||
-      file.name.toLowerCase().endsWith(".heif") ||
-      file.type === "image/heic" ||
-      file.type === "image/heif";
+      const isHEIC =
+        file.name.toLowerCase().endsWith(".heic") ||
+        file.name.toLowerCase().endsWith(".heif") ||
+        file.type === "image/heic" ||
+        file.type === "image/heif";
 
-    if (isHEIC) {
-      // HEIC → JPEG via heic2any, then optional downscale
-      const ab = await file.arrayBuffer();
-      const jpegDataUrl = await heicArrayBufferToJpegDataUrl(ab, 0.9);
-      const scaled = await downscaleDataUrl(jpegDataUrl, 2000, 0.9);
-      setBook((b) => ({ ...b, cover: scaled }));
-    } else {
-      // JPG/PNG/WEBP → DataURL, then optional downscale
-      const dataUrl = await new Promise((resolve, reject) => {
-        const fr = new FileReader();
-        fr.onload = () => resolve(String(fr.result || ""));
-        fr.onerror = reject;
-        fr.readAsDataURL(file);
-      });
-      const scaled = await downscaleDataUrl(String(dataUrl), 2000, 0.9);
-      setBook((b) => ({ ...b, cover: scaled }));
-    }
-  } catch (err) {
-    console.error("Error uploading cover:", err);
-    alert("Failed to upload image. Please try again or use a different image.");
-  } finally {
-    setUploadingCover(false);
-  }
-};
-
-        // Try to load it as an image
-        await new Promise((resolve, reject) => {
-          img.onload = resolve;
-          img.onerror = () => {
-            // If direct loading fails, alert user
-            alert("Unable to process HEIC image. Please convert to JPG/PNG first, or use the Photos app to save as JPG.");
-            reject(new Error("HEIC not supported"));
-          };
-          img.src = dataUrl;
-        });
-
-        // If we got here, the browser can handle it - convert to JPEG
-        canvas.width = img.width;
-        canvas.height = img.height;
-        ctx.drawImage(img, 0, 0);
-        
-        // Convert to JPEG with good quality
-        const jpegDataUrl = canvas.toDataURL('image/jpeg', 0.9);
-        setBook((b) => ({ ...b, cover: jpegDataUrl }));
+      if (isHEIC) {
+        // HEIC → JPEG via heic2any, then optional downscale
+        const ab = await file.arrayBuffer();
+        const jpegDataUrl = await heicArrayBufferToJpegDataUrl(ab, 0.9);
+        const scaled = await downscaleDataUrl(jpegDataUrl, 2000, 0.9);
+        setBook((b) => ({ ...b, cover: scaled }));
       } else {
-        // Standard image formats
-        const reader = new FileReader();
-        reader.onload = () => {
-          setBook((b) => ({ ...b, cover: reader.result }));
-        };
-        reader.onerror = () => {
-          alert("Failed to read image file. Please try a different image.");
-        };
-        reader.readAsDataURL(file);
+        // JPG/PNG/WEBP → DataURL, then optional downscale
+        const dataUrl = await new Promise((resolve, reject) => {
+          const fr = new FileReader();
+          fr.onload = () => resolve(String(fr.result || ""));
+          fr.onerror = reject;
+          fr.readAsDataURL(file);
+        });
+        const scaled = await downscaleDataUrl(String(dataUrl), 2000, 0.9);
+        setBook((b) => ({ ...b, cover: scaled }));
       }
     } catch (err) {
       console.error("Error uploading cover:", err);
-      if (err.message !== "HEIC not supported") {
-        alert("Failed to upload image. Please try again or use a different image.");
-      }
+      alert("Failed to upload image. Please try again or use a different image.");
     } finally {
       setUploadingCover(false);
     }
@@ -645,69 +593,6 @@ export default function ProjectPage() {
                 </div>
 
                 <div>
-                  <label className="text-xs text-muted mb-1 block">Deadline</label>
-                  <input
-                    type="date"
-                    value={book.deadline || ""}
-                    onChange={(e) => setBook((b) => ({ ...b, deadline: e.target.value }))}
-                    className="w-full rounded-lg bg-white border border-[hsl(var(--border))] px-4 py-3 text-sm outline-none"
-                    style={{ fontFamily: "Playfair Display, ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif" }}
-                  />
-                  {book.deadline && (
-                    <div className="text-xs text-muted mt-2">
-                      {daysLeft >= 0 ? `${daysLeft} days remaining` : `${Math.abs(daysLeft)} days overdue`}
-                      {wordsPerDayNeeded && <div className="mt-1">Need {wordsPerDayNeeded.toLocaleString()} words/day</div>}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Right side - Story Details */}
-          <div className="space-y-6">
-            {/* Title & Basic Info */}
-            <div className="glass-panel p-6">
-              <div className="text-lg font-semibold mb-4 flex items-center gap-2 heading-serif">
-                <Edit3 size={18} className="text-[color:var(--color-ink)]/80" />
-                Story Details
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                <div className="md:col-span-2">
-                  <label className="text-xs text-muted mb-1 block">Title (updates across entire app)</label>
-                  <input
-                    value={book.title}
-                    onChange={(e) => setBook((b) => ({ ...b, title: e.target.value }))}
-                    className="w-full rounded-lg bg-white border border-[hsl(var(--border))] px-4 py-3 text-lg font-semibold outline-none"
-                    placeholder="Your story title..."
-                    style={{ fontFamily: "Playfair Display, ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif" }}
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs text-muted mb-1 block">Subtitle</label>
-                  <input
-                    value={book.subtitle || ""}
-                    onChange={(e) => setBook((b) => ({ ...b, subtitle: e.target.value }))}
-                    className="w-full rounded-lg bg-white border border-[hsl(var(--border))] px-4 py-3 text-sm outline-none"
-                    placeholder="Optional subtitle..."
-                    style={{ fontFamily: "Playfair Display, ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif" }}
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs text-muted mb-1 block">Author</label>
-                  <input
-                    value={book.author || ""}
-                    onChange={(e) => setBook((b) => ({ ...b, author: e.target.value }))}
-                    className="w-full rounded-lg bg-white border border-[hsl(var(--border))] px-4 py-3 text-sm outline-none"
-                    placeholder="Your name..."
-                    style={{ fontFamily: "Playfair Display, ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif" }}
-                  />
-                </div>
-
-                <div>
                   <label className="text-xs text-muted mb-1 block">Status</label>
                   <select
                     value={book.status || "Draft"}
@@ -814,3 +699,66 @@ export default function ProjectPage() {
     </div>
   );
 }
+                </div>
+
+                <div>
+                  <label className="text-xs text-muted mb-1 block">Deadline</label>
+                  <input
+                    type="date"
+                    value={book.deadline || ""}
+                    onChange={(e) => setBook((b) => ({ ...b, deadline: e.target.value }))}
+                    className="w-full rounded-lg bg-white border border-[hsl(var(--border))] px-4 py-3 text-sm outline-none"
+                    style={{ fontFamily: "Playfair Display, ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif" }}
+                  />
+                  {book.deadline && (
+                    <div className="text-xs text-muted mt-2">
+                      {daysLeft >= 0 ? `${daysLeft} days remaining` : `${Math.abs(daysLeft)} days overdue`}
+                      {wordsPerDayNeeded && <div className="mt-1">Need {wordsPerDayNeeded.toLocaleString()} words/day</div>}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Right side - Story Details */}
+          <div className="space-y-6">
+            {/* Title & Basic Info */}
+            <div className="glass-panel p-6">
+              <div className="text-lg font-semibold mb-4 flex items-center gap-2 heading-serif">
+                <Edit3 size={18} className="text-[color:var(--color-ink)]/80" />
+                Story Details
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <div className="md:col-span-2">
+                  <label className="text-xs text-muted mb-1 block">Title (updates across entire app)</label>
+                  <input
+                    value={book.title}
+                    onChange={(e) => setBook((b) => ({ ...b, title: e.target.value }))}
+                    className="w-full rounded-lg bg-white border border-[hsl(var(--border))] px-4 py-3 text-lg font-semibold outline-none"
+                    placeholder="Your story title..."
+                    style={{ fontFamily: "Playfair Display, ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif" }}
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs text-muted mb-1 block">Subtitle</label>
+                  <input
+                    value={book.subtitle || ""}
+                    onChange={(e) => setBook((b) => ({ ...b, subtitle: e.target.value }))}
+                    className="w-full rounded-lg bg-white border border-[hsl(var(--border))] px-4 py-3 text-sm outline-none"
+                    placeholder="Optional subtitle..."
+                    style={{ fontFamily: "Playfair Display, ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif" }}
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs text-muted mb-1 block">Author</label>
+                  <input
+                    value={book.author || ""}
+                    onChange={(e) => setBook((b) => ({ ...b, author: e.target.value }))}
+                    className="w-full rounded-lg bg-white border border-[hsl(var(--border))] px-4 py-3 text-sm outline-none"
+                    placeholder="Your name..."
+                    style={{ fontFamily: "Playfair Display, ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif" }}
+                  />
