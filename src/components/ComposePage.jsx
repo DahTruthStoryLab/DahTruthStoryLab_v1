@@ -482,14 +482,16 @@ export default function ComposePage() {
       )}
 
       {/* Import/Export */}
-      <ImportDocxButton />
+     <ImportDocxButton />
+
       <button
         onClick={handleImportOneNote}
         className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50"
         title="Import from OneNote"
       >
-        Import OneNote
+        <Upload size={16} /> OneNote
       </button>
+      
       <button
         onClick={exportToDocx}
         className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50"
