@@ -11,10 +11,13 @@ import {
   Minimize2,
   RotateCcw,
   RotateCw,
+  Download,
+  Upload,
 } from "lucide-react";
 import { useAI } from "../lib/AiProvider";
 import { useNavigate } from "react-router-dom";
-import { useDrag, useDrop } from "react-dnd"; // ← DnD hooks
+import { useDrag, useDrop } from "react-dnd";
+import * as mammoth from "mammoth";
 
 /* ------- Fonts whitelist (family + size) ------- */
 const Font = Quill.import("formats/font");
@@ -106,6 +109,7 @@ export default function ComposePage() {
   const [isFS, setIsFS] = useState(false);
   const [aiBusy, setAiBusy] = useState(false);
   const editorRef = useRef(null);
+  const fsEditorRef = useRef(null); // Separate ref for fullscreen editor
 
   /* Sync editor when selected chapter changes */
   useEffect(() => {
@@ -182,8 +186,14 @@ export default function ComposePage() {
   }, [selectedId, title, html, book]);
 
   /* Undo / Redo */
-  const undo = () => editorRef.current?.getEditor?.()?.history?.undo?.();
-  const redo = () => editorRef.current?.getEditor?.()?.history?.redo?.();
+  const undo = () => {
+    const editor = isFS ? fsEditorRef.current : editorRef.current;
+    editor?.getEditor?.()?.history?.undo?.();
+  };
+  const redo = () => {
+    const editor = isFS ? fsEditorRef.current : editorRef.current;
+    editor?.getEditor?.()?.history?.redo?.();
+  };
 
   /* AI proof/clarify */
   const runAI = async (mode = "proofread") => {
@@ -193,7 +203,6 @@ export default function ComposePage() {
       const newHtml = edited ?? html;
       setHtml(newHtml);
 
-      // Update the chapter immediately
       setChapters((prev) => {
         const next = prev.map((c) =>
           c.id === selectedId
@@ -232,7 +241,7 @@ export default function ComposePage() {
   /* Keyboard shortcuts – guarded */
   useEffect(() => {
     const onKey = (e) => {
-      if (isEditableTarget(e.target)) return; // ← don’t hijack editor typing
+      if (isEditableTarget(e.target)) return;
 
       const k = e.key.toLowerCase();
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && k === "s") {
@@ -254,7 +263,7 @@ export default function ComposePage() {
     };
     window.addEventListener("keydown", onKey, { capture: true });
     return () => window.removeEventListener("keydown", onKey, { capture: true });
-  }, [handleSave, handleSaveAndProof]);
+  }, [handleSave, handleSaveAndProof, isFS]);
 
   /* Add a new chapter */
   const addChapter = () => {
@@ -295,6 +304,108 @@ export default function ComposePage() {
       if (selectedId === dragId) setSelectedId(dragId);
       return next;
     });
+  };
+
+  /* Import Word (.docx) */
+  const ImportDocxButton = () => {
+    const fileInputRef = useRef(null);
+    const onPick = () => fileInputRef.current?.click();
+    const onFile = async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      if (!file.name.toLowerCase().endsWith(".docx")) {
+        alert("Please choose a .docx file (not .doc).");
+        return;
+      }
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        const { value: htmlContent } = await mammoth.convertToHtml(
+          { arrayBuffer },
+          {
+            styleMap: [
+              "p[style-name='Heading 1'] => h1:fresh",
+              "p[style-name='Heading 2'] => h2:fresh",
+            ],
+            convertImage: mammoth.images.inline(async (elem) => {
+              const buff = await elem.read("base64");
+              return { src: `data:${elem.contentType};base64,${buff}` };
+            }),
+          }
+        );
+        // Get the active editor (normal or fullscreen)
+        const activeEditor = isFS ? fsEditorRef.current : editorRef.current;
+        const q = activeEditor?.getEditor?.();
+        if (q) {
+          const delta = q.clipboard.convert({ html: htmlContent });
+          q.setContents(delta, "user");
+          setHtml(q.root.innerHTML);
+        }
+      } catch (err) {
+        console.error(err);
+        alert("Failed to import .docx");
+      } finally {
+        e.target.value = "";
+      }
+    };
+    return (
+      <>
+        <button
+          onClick={onPick}
+          className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50"
+          title="Import Word Document"
+        >
+          <Upload size={16} /> Import
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+          className="hidden"
+          onChange={onFile}
+        />
+      </>
+    );
+  };
+
+  /* Export to Word (.docx) */
+  const exportToDocx = () => {
+    try {
+      // Create a simple HTML document with proper Word formatting
+      const docHtml = `
+        <!DOCTYPE html>
+        <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+        <head>
+          <meta charset='utf-8'>
+          <title>${title || "Untitled Chapter"}</title>
+          <style>
+            body { font-family: 'Times New Roman', serif; font-size: 12pt; line-height: 1.5; }
+            h1, h2, h3 { font-family: 'Arial', sans-serif; }
+            p { margin: 0 0 12pt 0; }
+          </style>
+        </head>
+        <body>
+          <h1>${title || "Untitled Chapter"}</h1>
+          ${html}
+        </body>
+        </html>
+      `;
+
+      // Convert to blob and download
+      const blob = new Blob(['\ufeff', docHtml], {
+        type: 'application/msword'
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${title || "chapter"}.doc`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+      alert("Failed to export document");
+    }
   };
 
   /* Draggable + droppable chapter list item */
@@ -371,6 +482,15 @@ export default function ComposePage() {
           </button>
         </>
       )}
+
+      <ImportDocxButton />
+      <button
+        onClick={exportToDocx}
+        className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50"
+        title="Export to Word"
+      >
+        <Download size={16} /> Export
+      </button>
 
       <button
         onClick={() => runAI("proofread")}
@@ -541,7 +661,7 @@ export default function ComposePage() {
               </div>
               <div className="p-3">
                 <ReactQuill
-                  ref={editorRef}
+                  ref={fsEditorRef}
                   theme="snow"
                   value={html}
                   onChange={setHtml}
@@ -556,4 +676,3 @@ export default function ComposePage() {
     </div>
   );
 }
-
