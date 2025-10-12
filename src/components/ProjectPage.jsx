@@ -5,6 +5,7 @@ import {
   BookOpen, Save, Download, Upload, Target, Tag, Image, AlertCircle,
   TrendingUp, Clock, Star, BarChart3, CheckCircle, Edit3, Loader2
 } from "lucide-react";
+import heic2any from "heic2any";
 
 /* ──────────────────────────────────────────────────────────────
    Optional store hook (safe shim). Always call at top-level.
@@ -63,6 +64,18 @@ function extractDisplayName(obj) {
   return "";
 }
 
+async function heicArrayBufferToJpegDataUrl(arrayBuffer, quality = 0.9) {
+  const blob = new Blob([arrayBuffer], { type: "image/heic" });
+  const jpegBlob = await heic2any({ blob, toType: "image/jpeg", quality });
+  const dataUrl = await new Promise((resolve, reject) => {
+    const fr = new FileReader();
+    fr.onload = () => resolve(String(fr.result || ""));
+    fr.onerror = reject;
+    fr.readAsDataURL(jpegBlob);
+  });
+  return dataUrl;
+}
+
 /* ──────────────────────────────────────────────────────────────
    Small helpers
 ─────────────────────────────────────────────────────────────── */
@@ -91,6 +104,38 @@ const getStatusColor = (status) => {
   };
   return colors[status] || colors.Draft;
 };
+
+async function heicArrayBufferToJpegDataUrl(arrayBuffer, quality = 0.9) {
+  const blob = new Blob([arrayBuffer], { type: "image/heic" });
+  const jpegBlob = await heic2any({ blob, toType: "image/jpeg", quality });
+  const dataUrl = await new Promise((resolve, reject) => {
+    const fr = new FileReader();
+    fr.onload = () => resolve(String(fr.result || ""));
+    fr.onerror = reject;
+    fr.readAsDataURL(jpegBlob);
+  });
+  return dataUrl;
+}
+
+async function downscaleDataUrl(dataUrl, maxDim = 2000, quality = 0.9) {
+  const img = await new Promise((resolve, reject) => {
+    const x = new Image();
+    x.onload = () => resolve(x);
+    x.onerror = reject;
+    x.src = dataUrl;
+  });
+  let { width, height } = img;
+  if (Math.max(width, height) <= maxDim) return dataUrl;
+  const scale = maxDim / Math.max(width, height);
+  width = Math.round(width * scale);
+  height = Math.round(height * scale);
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(img, 0, 0, width, height);
+  return canvas.toDataURL("image/jpeg", quality);
+}
 
 /* ──────────────────────────────────────────────────────────────
    Component
@@ -262,37 +307,47 @@ export default function ProjectPage() {
 
   // Cover image upload with iPhone HEIC support and conversion
   const onCoverPicked = async (file) => {
-    if (!file) return;
-    
-    setUploadingCover(true);
-    
-    try {
-      // Check file size (max 10MB)
-      const maxSize = 10 * 1024 * 1024;
-      if (file.size > maxSize) {
-        alert("Image is too large. Please choose an image under 10MB.");
-        return;
-      }
+  if (!file) return;
 
-      // For HEIC files, try to convert or handle appropriately
-      const isHEIC = file.name.toLowerCase().endsWith('.heic') || 
-                     file.name.toLowerCase().endsWith('.heif') ||
-                     file.type === 'image/heic' ||
-                     file.type === 'image/heif';
+  setUploadingCover(true);
+  try {
+    // max 10MB
+    const maxSize = 10 * 1024 * 1024;
+    if (file.size > maxSize) {
+      alert("Image is too large. Please choose an image under 10MB.");
+      return;
+    }
 
-      if (isHEIC) {
-        // Create canvas to convert the image
-        const img = document.createElement('img');
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        
-        // Read the file as data URL first
-        const reader = new FileReader();
-        const dataUrl = await new Promise((resolve, reject) => {
-          reader.onload = (e) => resolve(e.target.result);
-          reader.onerror = reject;
-          reader.readAsDataURL(file);
-        });
+    const isHEIC =
+      file.name.toLowerCase().endsWith(".heic") ||
+      file.name.toLowerCase().endsWith(".heif") ||
+      file.type === "image/heic" ||
+      file.type === "image/heif";
+
+    if (isHEIC) {
+      // HEIC → JPEG via heic2any, then optional downscale
+      const ab = await file.arrayBuffer();
+      const jpegDataUrl = await heicArrayBufferToJpegDataUrl(ab, 0.9);
+      const scaled = await downscaleDataUrl(jpegDataUrl, 2000, 0.9);
+      setBook((b) => ({ ...b, cover: scaled }));
+    } else {
+      // JPG/PNG/WEBP → DataURL, then optional downscale
+      const dataUrl = await new Promise((resolve, reject) => {
+        const fr = new FileReader();
+        fr.onload = () => resolve(String(fr.result || ""));
+        fr.onerror = reject;
+        fr.readAsDataURL(file);
+      });
+      const scaled = await downscaleDataUrl(String(dataUrl), 2000, 0.9);
+      setBook((b) => ({ ...b, cover: scaled }));
+    }
+  } catch (err) {
+    console.error("Error uploading cover:", err);
+    alert("Failed to upload image. Please try again or use a different image.");
+  } finally {
+    setUploadingCover(false);
+  }
+};
 
         // Try to load it as an image
         await new Promise((resolve, reject) => {
