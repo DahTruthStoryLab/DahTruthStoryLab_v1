@@ -170,85 +170,40 @@ export default function Profile() {
 
   const onPickAvatar = async (file) => {
     if (!file) return;
-    
     setUploadingAvatar(true);
-    
-   const onPickAvatar = async (file) => {
-  if (!file) return;
-  setUploadingAvatar(true);
-  try {
-    const maxSize = 10 * 1024 * 1024;
-    if (file.size > maxSize) {
-      alert("Image is too large. Please choose an image under 10MB.");
-      return;
-    }
+    try {
+      const maxSize = 10 * 1024 * 1024;
+      if (file.size > maxSize) {
+        alert("Image is too large. Please choose an image under 10MB.");
+        return;
+      }
 
-    const isHEIC =
-      file.name.toLowerCase().endsWith(".heic") ||
-      file.name.toLowerCase().endsWith(".heif") ||
-      file.type === "image/heic" ||
-      file.type === "image/heif";
+      const isHEIC =
+        file.name.toLowerCase().endsWith(".heic") ||
+        file.name.toLowerCase().endsWith(".heif") ||
+        file.type === "image/heic" ||
+        file.type === "image/heif";
 
-    if (isHEIC) {
-      // ✅ New HEIC path: ArrayBuffer -> heic2any -> dataURL
-      const ab = await file.arrayBuffer();
-      const jpegDataUrl = await heicArrayBufferToJpegDataUrl(ab, 0.9);
-      const scaled = await downscaleDataUrl(jpegDataUrl, 2000, 0.9);
-      setAvatar(scaled);
-    } else {
-      // ✅ Non-HEIC path: read as data URL and (optionally) downscale
-      const dataUrl = await new Promise((resolve, reject) => {
-        const fr = new FileReader();
-        fr.onload = () => resolve(String(fr.result || ""));
-        fr.onerror = reject;
-        fr.readAsDataURL(file);
-      });
-      const scaled = await downscaleDataUrl(String(dataUrl), 2000, 0.9);
-      setAvatar(scaled);
-    }
-  } catch (err) {
-    console.error("Error uploading avatar:", err);
-    alert("Failed to upload image. Please try again or use a different image.");
-  } finally {
-    setUploadingAvatar(false);
-  }
-};
-
-        // Try to load it as an image
-        await new Promise((resolve, reject) => {
-          img.onload = resolve;
-          img.onerror = () => {
-            // If direct loading fails, alert user
-            alert("Unable to process HEIC image. Please convert to JPG/PNG first, or use the Photos app to save as JPG.");
-            reject(new Error("HEIC not supported"));
-          };
-          img.src = dataUrl;
-        });
-
-        // If we got here, the browser can handle it - convert to JPEG
-        canvas.width = img.width;
-        canvas.height = img.height;
-        ctx.drawImage(img, 0, 0);
-        
-        // Convert to JPEG with good quality
-        const jpegDataUrl = canvas.toDataURL('image/jpeg', 0.9);
-        setAvatar(jpegDataUrl);
+      if (isHEIC) {
+        // ✅ New HEIC path: ArrayBuffer -> heic2any -> dataURL
+        const ab = await file.arrayBuffer();
+        const jpegDataUrl = await heicArrayBufferToJpegDataUrl(ab, 0.9);
+        const scaled = await downscaleDataUrl(jpegDataUrl, 2000, 0.9);
+        setAvatar(scaled);
       } else {
-        // Standard image formats
-        const reader = new FileReader();
-        reader.onload = () => {
-          setAvatar(String(reader.result || ""));
-        };
-        reader.onerror = () => {
-          alert("Failed to read image file. Please try a different image.");
-        };
-        reader.readAsDataURL(file);
+        // ✅ Non-HEIC path: read as data URL and (optionally) downscale
+        const dataUrl = await new Promise((resolve, reject) => {
+          const fr = new FileReader();
+          fr.onload = () => resolve(String(fr.result || ""));
+          fr.onerror = reject;
+          fr.readAsDataURL(file);
+        });
+        const scaled = await downscaleDataUrl(String(dataUrl), 2000, 0.9);
+        setAvatar(scaled);
       }
     } catch (err) {
       console.error("Error uploading avatar:", err);
-      if (err.message !== "HEIC not supported") {
-        alert("Failed to upload image. Please try again or use a different image.");
-      }
+      alert("Failed to upload image. Please try again or use a different image.");
     } finally {
       setUploadingAvatar(false);
     }
