@@ -18,6 +18,7 @@ import { useAI } from "../lib/AiProvider";
 import { useNavigate } from "react-router-dom";
 import { useDrag, useDrop } from "react-dnd";
 import * as mammoth from "mammoth";
+import { pickAndImportOneNotePage } from "../lib/onenoteImport";
 
 /* ------- Fonts whitelist (family + size) ------- */
 const Font = Quill.import("formats/font");
@@ -82,7 +83,7 @@ function isEditableTarget(t) {
   if (!t) return false;
   const el = t.nodeType === 3 ? t.parentElement : t;
   const tag = (el?.tagName || "").toLowerCase();
-  if (tag === "input" || tag === "textarea") return true;
+  if (tag === "input" || tag === "textarea" || tag === "select") return true;
   if (el?.isContentEditable) return true;
   return !!el?.closest?.('.ql-editor,[contenteditable="true"]');
 }
@@ -186,14 +187,9 @@ export default function ComposePage() {
   }, [selectedId, title, html, book]);
 
   /* Undo / Redo */
-  const undo = () => {
-    const editor = isFS ? fsEditorRef.current : editorRef.current;
-    editor?.getEditor?.()?.history?.undo?.();
-  };
-  const redo = () => {
-    const editor = isFS ? fsEditorRef.current : editorRef.current;
-    editor?.getEditor?.()?.history?.redo?.();
-  };
+  const getActiveEditor = () => (isFS ? fsEditorRef.current : editorRef.current);
+  const undo = () => getActiveEditor()?.getEditor?.()?.history?.undo?.();
+  const redo = () => getActiveEditor()?.getEditor?.()?.history?.redo?.();
 
   /* AI proof/clarify */
   const runAI = async (mode = "proofread") => {
@@ -315,6 +311,7 @@ export default function ComposePage() {
       if (!file) return;
       if (!file.name.toLowerCase().endsWith(".docx")) {
         alert("Please choose a .docx file (not .doc).");
+        e.target.value = "";
         return;
       }
       try {
@@ -325,6 +322,7 @@ export default function ComposePage() {
             styleMap: [
               "p[style-name='Heading 1'] => h1:fresh",
               "p[style-name='Heading 2'] => h2:fresh",
+              "p[style-name='Heading 3'] => h3:fresh",
             ],
             convertImage: mammoth.images.inline(async (elem) => {
               const buff = await elem.read("base64");
@@ -332,8 +330,7 @@ export default function ComposePage() {
             }),
           }
         );
-        // Get the active editor (normal or fullscreen)
-        const activeEditor = isFS ? fsEditorRef.current : editorRef.current;
+        const activeEditor = getActiveEditor();
         const q = activeEditor?.getEditor?.();
         if (q) {
           const delta = q.clipboard.convert({ html: htmlContent });
@@ -352,7 +349,7 @@ export default function ComposePage() {
         <button
           onClick={onPick}
           className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50"
-          title="Import Word Document"
+          title="Import Word Document (.docx)"
         >
           <Upload size={16} /> Import
         </button>
@@ -367,10 +364,13 @@ export default function ComposePage() {
     );
   };
 
-  /* Export to Word (.docx) */
+  /* Import from OneNote (via Microsoft Graph) */
+  const handleImportOneNote = () =>
+    pickAndImportOneNotePage(getActiveEditor(), setHtml);
+
+  /* Export to Word (.doc/.docx-friendly HTML) */
   const exportToDocx = () => {
     try {
-      // Create a simple HTML document with proper Word formatting
       const docHtml = `
         <!DOCTYPE html>
         <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
@@ -379,7 +379,7 @@ export default function ComposePage() {
           <title>${title || "Untitled Chapter"}</title>
           <style>
             body { font-family: 'Times New Roman', serif; font-size: 12pt; line-height: 1.5; }
-            h1, h2, h3 { font-family: 'Arial', sans-serif; }
+            h1, h2, h3 { font-family: Arial, sans-serif; }
             p { margin: 0 0 12pt 0; }
           </style>
         </head>
@@ -389,10 +389,8 @@ export default function ComposePage() {
         </body>
         </html>
       `;
-
-      // Convert to blob and download
       const blob = new Blob(['\ufeff', docHtml], {
-        type: 'application/msword'
+        type: 'application/msword',
       });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
@@ -483,7 +481,15 @@ export default function ComposePage() {
         </>
       )}
 
+      {/* Import/Export */}
       <ImportDocxButton />
+      <button
+        onClick={handleImportOneNote}
+        className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50"
+        title="Import from OneNote"
+      >
+        Import OneNote
+      </button>
       <button
         onClick={exportToDocx}
         className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50"
@@ -492,6 +498,7 @@ export default function ComposePage() {
         <Download size={16} /> Export
       </button>
 
+      {/* AI actions */}
       <button
         onClick={() => runAI("proofread")}
         className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50 disabled:opacity-60"
