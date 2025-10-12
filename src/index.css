@@ -177,9 +177,31 @@
   background-image: radial-gradient(circle at 20% 10%, rgba(202,177,214,0.25), rgba(234,242,255,0) 60%);
 }
 
-/* =======================
-   Optional DnD visuals
-   ======================= */
+// === LocalStorage + helpers ===
+const LS_BEATS_KEY = 'dt_arc_beats_v1';
+const LS_CHARS_KEY = 'dt_arc_chars_v1';
+
+const loadLocal = (key: string, fallback: any) => {
+  try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : fallback; } catch { return fallback; }
+};
+const saveLocal = (key: string, value: any) => { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} };
+
+const snap = (val: number, step = 5, min = 0, max = 100) => {
+  const s = Math.round(val / step) * step;
+  return Math.max(min, Math.min(max, s));
+};
+
+const countWords = (s = "") => s.trim().split(/\s+/).filter(Boolean).length;
+
+const useDebouncedCallback = <T extends any>(fn: (v: T) => void, delay = 250) => {
+  const tRef = useRef<number | null>(null);
+  return (v: T) => {
+    if (tRef.current) window.clearTimeout(tRef.current as any);
+    // @ts-ignore
+    tRef.current = window.setTimeout(() => fn(v), delay);
+  };
+};
+
 /* =======================
    Optional DnD visuals
    ======================= */
