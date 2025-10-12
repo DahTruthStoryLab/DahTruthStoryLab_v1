@@ -1,5 +1,9 @@
 import React from "react";
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { NavLink, Outlet, useNavigate } from "react-router-dom"; 
+
+const StoryLabLayout = lazy(() => import("./components/storylab/StoryLabLayout.jsx"));
+const NarrativeArc   = lazy(() => import("./components/storylab/NarrativeArc.jsx"));
+
 
 function DarkModeToggle() {
   const [dark, setDark] = React.useState(() =>
