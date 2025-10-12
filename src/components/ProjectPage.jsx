@@ -681,43 +681,7 @@ export default function ProjectPage() {
     </div>
   );
 }
-                  <label className="text-xs text-muted mb-1 block">Target Words</label>
-                  <input
-                    type="number"
-                    min={1000}
-                    step={500}
-                    value={book.targetWords || 0}
-                    onChange={(e) =>
-                      setBook((b) => ({
-                        ...b,
-                        targetWords: clamp(Number(e.target.value) || 0, 0, 5_000_000),
-                      }))
-                    }
-                    className="w-full rounded-lg bg-white border border-[hsl(var(--border))] px-4 py-3 text-sm outline-none"
-                    style={{ fontFamily: "Playfair Display, ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif" }}
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs text-muted mb-1 block">Deadline</label>
-                  <input
-                    type="date"
-                    value={book.deadline || ""}
-                    onChange={(e) => setBook((b) => ({ ...b, deadline: e.target.value }))}
-                    className="w-full rounded-lg bg-white border border-[hsl(var(--border))] px-4 py-3 text-sm outline-none"
-                    style={{ fontFamily: "Playfair Display, ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif" }}
-                  />
-                  {book.deadline && (
-                    <div className="text-xs text-muted mt-2">
-                      {daysLeft >= 0 ? `${daysLeft} days remaining` : `${Math.abs(daysLeft)} days overdue`}
-                      {wordsPerDayNeeded && <div className="mt-1">Need {wordsPerDayNeeded.toLocaleString()} words/day</div>}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-
+                  
           {/* Right side - Story Details */}
           <div className="space-y-6">
             {/* Title & Basic Info */}
