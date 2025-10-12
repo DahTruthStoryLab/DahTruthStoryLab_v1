@@ -113,6 +113,35 @@ function ProfileSidebar({ onNavigate }) {
   );
 }
 
+async function heicArrayBufferToJpegDataUrl(ab, quality = 0.9) {
+  const { default: heic2any } = await import("heic2any");
+  const blob = new Blob([ab], { type: "image/heic" });
+  const jpgBlob = await heic2any({ blob, toType: "image/jpeg", quality });
+  return await new Promise((resolve, reject) => {
+    const fr = new FileReader();
+    fr.onload = () => resolve(String(fr.result || ""));
+    fr.onerror = reject;
+    fr.readAsDataURL(jpgBlob);
+  });
+}
+
+async function downscaleDataUrl(dataUrl, maxDim = 2000, quality = 0.9) {
+  const img = await new Promise((res, rej) => {
+    const i = new Image();
+    i.onload = () => res(i);
+    i.onerror = rej;
+    i.src = dataUrl;
+  });
+  const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+  if (scale === 1) return dataUrl;
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(img.width * scale);
+  canvas.height = Math.round(img.height * scale);
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+  return canvas.toDataURL("image/jpeg", quality);
+}
+
 /* ---------- Main Component ---------- */
 export default function Profile() {
   const navigate = useNavigate();
