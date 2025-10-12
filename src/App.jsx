@@ -12,9 +12,34 @@ import {
 // ---------------------------
 // DnD Multi-backend (desktop + mobile)
 import { DndProvider } from "react-dnd";
+import { MultiBackend, TouchTransition, MouseTransition } from "dnd-multi-backend";
 import { HTML5Backend } from "react-dnd-html5-backend";
+import { TouchBackend } from "react-dnd-touch-backend";
 
 import { UserProvider } from "./lib/userStore.jsx";
+
+/* =========================
+   DnD Backend Configuration
+   ========================= */
+const BACKENDS = {
+  backends: [
+    {
+      id: "html5",
+      backend: HTML5Backend,
+      transition: MouseTransition,         // desktop / mouse / pointer
+    },
+    {
+      id: "touch",
+      backend: TouchBackend,
+      options: {
+        enableMouseEvents: true,           // allows hybrid devices
+        delayTouchStart: 0,                // drag starts immediately
+        ignoreContextMenu: true,
+      },
+      transition: TouchTransition,         // phones & tablets
+    },
+  ],
+};
 
 /* =========================
    Lazy-loaded pages
@@ -92,18 +117,11 @@ function TableOfContentsRouter() {
 export default function App() {
   return (
     <UserProvider>
-      {/* ✅ Provide DnD at the app root (HTML5 backend) */}
-      <DndProvider backend={HTML5Backend}>
+      {/* ✅ Multi-backend DnD support (mouse + touch) */}
+      <DndProvider backend={MultiBackend} options={BACKENDS}>
         <Router>
           <ScrollToTop />
           <Suspense fallback={<Fallback />}>
-            {/* ...your Routes... */}
-          </Suspense>
-        </Router>
-      </DndProvider>
-    </UserProvider>
-  );
-}
             <Routes>
               {/* Public */}
               <Route path="/" element={<LandingPage />} />
