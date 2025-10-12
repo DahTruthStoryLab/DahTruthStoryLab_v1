@@ -173,33 +173,46 @@ export default function Profile() {
     
     setUploadingAvatar(true);
     
-    try {
-      // Check file size (max 10MB)
-      const maxSize = 10 * 1024 * 1024;
-      if (file.size > maxSize) {
-        alert("Image is too large. Please choose an image under 10MB.");
-        return;
-      }
+   const onPickAvatar = async (file) => {
+  if (!file) return;
+  setUploadingAvatar(true);
+  try {
+    const maxSize = 10 * 1024 * 1024;
+    if (file.size > maxSize) {
+      alert("Image is too large. Please choose an image under 10MB.");
+      return;
+    }
 
-      // For HEIC files, try to convert or handle appropriately
-      const isHEIC = file.name.toLowerCase().endsWith('.heic') || 
-                     file.name.toLowerCase().endsWith('.heif') ||
-                     file.type === 'image/heic' ||
-                     file.type === 'image/heif';
+    const isHEIC =
+      file.name.toLowerCase().endsWith(".heic") ||
+      file.name.toLowerCase().endsWith(".heif") ||
+      file.type === "image/heic" ||
+      file.type === "image/heif";
 
-      if (isHEIC) {
-        // Create canvas to convert the image
-        const img = document.createElement('img');
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        
-        // Read the file as data URL first
-        const reader = new FileReader();
-        const dataUrl = await new Promise((resolve, reject) => {
-          reader.onload = (e) => resolve(e.target.result);
-          reader.onerror = reject;
-          reader.readAsDataURL(file);
-        });
+    if (isHEIC) {
+      // ✅ New HEIC path: ArrayBuffer -> heic2any -> dataURL
+      const ab = await file.arrayBuffer();
+      const jpegDataUrl = await heicArrayBufferToJpegDataUrl(ab, 0.9);
+      const scaled = await downscaleDataUrl(jpegDataUrl, 2000, 0.9);
+      setAvatar(scaled);
+    } else {
+      // ✅ Non-HEIC path: read as data URL and (optionally) downscale
+      const dataUrl = await new Promise((resolve, reject) => {
+        const fr = new FileReader();
+        fr.onload = () => resolve(String(fr.result || ""));
+        fr.onerror = reject;
+        fr.readAsDataURL(file);
+      });
+      const scaled = await downscaleDataUrl(String(dataUrl), 2000, 0.9);
+      setAvatar(scaled);
+    }
+  } catch (err) {
+    console.error("Error uploading avatar:", err);
+    alert("Failed to upload image. Please try again or use a different image.");
+  } finally {
+    setUploadingAvatar(false);
+  }
+};
 
         // Try to load it as an image
         await new Promise((resolve, reject) => {
