@@ -17,9 +17,23 @@
 .ql-font-garamond     { font-family: 'Garamond', serif; }
 .ql-font-verdana      { font-family: 'Verdana', sans-serif; }
 .ql-font-couriernew   { font-family: 'Courier New', monospace; }
-.ql-font-sans { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
-.ql-font-serif { font-family: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif; }
-.ql-font-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
+.ql-font-sans         { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
+.ql-font-serif        { font-family: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif; }
+.ql-font-mono         { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
+
+/* Quill picker label text (optional, nice UX) */
+.ql-snow .ql-picker.ql-font .ql-picker-label[data-value="sans"]::before,
+.ql-snow .ql-picker.ql-font .ql-picker-item[data-value="sans"]::before { content: "Sans Serif"; }
+.ql-snow .ql-picker.ql-font .ql-picker-label[data-value="serif"]::before,
+.ql-snow .ql-picker.ql-font .ql-picker-item[data-value="serif"]::before { content: "Serif"; }
+.ql-snow .ql-picker.ql-font .ql-picker-label[data-value="mono"]::before,
+.ql-snow .ql-picker.ql-font .ql-picker-item[data-value="mono"]::before { content: "Mono"; }
+.ql-snow .ql-picker.ql-font .ql-picker-label[data-value="georgia"]::before,
+.ql-snow .ql-picker.ql-font .ql-picker-item[data-value="georgia"]::before { content: "Georgia"; }
+.ql-snow .ql-picker.ql-font .ql-picker-label[data-value="garamond"]::before,
+.ql-snow .ql-picker.ql-font .ql-picker-item[data-value="garamond"]::before { content: "Garamond"; }
+.ql-snow .ql-picker.ql-font .ql-picker-label[data-value="times"]::before,
+.ql-snow .ql-picker.ql-font .ql-picker-item[data-value="times"]::before { content: "Times"; }
 
 /* ================================
    Brand + Global Base (LIGHT THEME)
@@ -27,22 +41,22 @@
 @layer base {
   :root,
   .theme-light {
-    /* Your color tokens */
-    --color-base: #F7FAFC;
-    --color-primary: #EAF2FF;
+    /* App color tokens */
+    --color-base:   #F7FAFC;
+    --color-primary:#EAF2FF;
     --color-accent: #CAB1D6;
-    --color-gold: #D4AF37;
-    --color-ink: #0F172A;
-    --color-muted: #94A3B8;
+    --color-gold:   #D4AF37;
+    --color-ink:    #0F172A;
+    --color-muted:  #94A3B8;
 
-    /* Add brand tokens used by the component & gradients */
+    /* Brand tokens used by components & gradients */
     --brand-navy: #0B1B3B;
     --brand-rose: #CAB1D6;
     --brand-gold: #D4AF37;
-    --brand-mauve: #8B6F8F;
+    --brand-mauve:#8B6F8F;
     --brand-ink:  #0F172A;
 
-    /* HSL tokens (optional, for shadcn/ui-style usage) */
+    /* HSL tokens (optional: shadcn/ui-style usage) */
     --background: 210 50% 98%;
     --foreground: 222 47% 11%;
     --muted: 215 20% 93%;
@@ -92,7 +106,9 @@
   img { image-rendering: -webkit-optimize-contrast; }
 }
 
-/* Optional: dark theme */
+/* ===================================
+   Optional: Dark theme (toggle .theme-dark)
+   =================================== */
 .theme-dark {
   --background: 222 61% 7%;
   --foreground: 210 40% 98%;
@@ -127,7 +143,7 @@
   .btn-primary { @apply font-medium px-4 py-2 rounded-lg; background: var(--color-accent); color: var(--color-ink); }
   .btn-gold    { @apply font-medium px-4 py-2 rounded-lg; background: var(--color-gold); color: white; }
 
-  .text-muted { color: var(--color-muted); }
+  .text-muted  { color: var(--color-muted); }
 }
 
 /* Optional radial background accent for hero/dashboard */
@@ -138,4 +154,7 @@
 /* Optional DnD visuals (CSS-only) */
 .dnd-draggable { touch-action: none; }
 .dnd-dragging  { opacity: .5; }
-.dnd-drop-hover { border-color: #4F46E5 !important; background-color: rgba(79, 70, 229, 0.1) !important; }
+.dnd-drop-hover {
+  border-color: #4F46E5 !important;
+  background-color: rgba(79, 70, 229, 0.1) !important;
+}
