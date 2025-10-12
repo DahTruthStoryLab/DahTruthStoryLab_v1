@@ -23,14 +23,13 @@ import {
   Menu,
   X,
 } from "lucide-react";
-import BrandLogo from "../../components/BrandLogo"; // ← adjust if your path differs
+import BrandLogo from "../../components/BrandLogo"; // ← adjust if needed
 
 /**
- * StoryLab Journey Landing — Light theme + mobile/desktop sidebar
- * Uses your Tailwind tokens:
- *  - bg-base bg-radial-fade text-ink
- *  - glass / glass-soft / glass-panel utilities
- *  - primary, accent, border, gold
+ * StoryLab Journey Landing
+ * - Sidebar includes Narrative Arc
+ * - Top bar has ← Dashboard + Settings + Dark toggle (theme-dark)
+ * - Live Modules includes Narrative Arc card
  */
 
 const BASE = "/story-lab";
@@ -41,16 +40,19 @@ const MODULES = [
   { id: "hopes",       title: "Hopes • Fears • Legacy", blurb: "Surface motives that drive choices.",      icon: Heart,      tint: "from-rose-500/20 to-fuchsia-500/20", route: `${BASE}/workshop/hfl` },
   { id: "priority",    title: "Priority Cards",         blurb: "Organize what matters most next.",         icon: Target,     tint: "from-amber-500/20 to-orange-500/20", route: `${BASE}/workshop/priorities` },
   { id: "clothesline", title: "Clothesline",            blurb: "Org-style cast view at a glance.",         icon: LayoutGrid, tint: "from-cyan-500/20 to-blue-500/20",    route: `${BASE}/workshop/clothesline` },
+  // NEW: Narrative Arc in the live section
+  { id: "narrative-arc", title: "Narrative Arc",        blurb: "Map emotional beats and structure.",       icon: Sparkles,   tint: "from-purple-500/20 to-indigo-500/20", route: `${BASE}/narrative-arc` },
 ];
 
 const DEV_SECTIONS = [
   { id: "profiles", title: "Character Profiles", blurb: "Detailed sheets to track traits, wounds, and wants.", icon: Brain,        route: `${BASE}/characters`,        tint: "from-purple-500/20 to-indigo-500/20" },
   { id: "world",    title: "World Bible",        blurb: "Lore, locations, culture—organized and searchable.", icon: BookOpenCheck, route: `${BASE}/world`,             tint: "from-sky-500/20 to-cyan-500/20" },
-  { id: "manager",  title: "Character Manager",  blurb: "Create, link, and reuse your cast.",               icon: FolderKanban,  route: `${BASE}/character-manager`, tint: "from-emerald-500/20 to-lime-500/20" },
+  { id: "manager",  title: "Character Manager",  blurb: "Create, link, and reuse your cast.",                 icon: FolderKanban,  route: `${BASE}/character-manager`, tint: "from-emerald-500/20 to-lime-500/20" },
 ];
 
 const NAV_LINKS = [
   { to: `${BASE}`,                      icon: Compass,    label: "Landing" },
+  { to: `${BASE}/narrative-arc`,       icon: Sparkles,   label: "Narrative Arc" }, // NEW
   { to: `${BASE}/prompts`,             icon: Sparkles,   label: "Story Prompts" },
   { to: `${BASE}/workshop/roadmap`,    icon: MapIcon,    label: "Character Roadmap" },
   { to: `${BASE}/workshop/hfl`,        icon: Heart,      label: "Hopes • Fears • Legacy" },
@@ -86,7 +88,7 @@ function useChapterSentences() {
     pick();
     const onStorage = (e) => e.key === "dahtruth-story-lab-toc-v3" && pick();
     window.addEventListener("storage", onStorage);
-    window.addEventListener("chapters:updated", pick); // dispatch this after saving chapters
+    window.addEventListener("chapters:updated", pick);
     return () => {
       window.removeEventListener("storage", onStorage);
       window.removeEventListener("chapters:updated", pick);
@@ -251,7 +253,7 @@ export default function StoryLabLanding() {
       <DesktopSidebar />
       <MobileSidebar open={mobileOpen} setOpen={setMobileOpen} />
 
-      {/* Top bar — brand */}
+      {/* Top bar — brand + actions */}
       <div className="md:ml-72 sticky top-0 z-40 border-b border-border bg-white/70 backdrop-blur-md">
         <div className="mx-auto max-w-7xl px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -268,7 +270,16 @@ export default function StoryLabLanding() {
               <span className="text-primary">DahTruth</span> • StoryLab
             </span>
           </div>
+
           <div className="flex items-center gap-3">
+            {/* NEW: Back to Dashboard */}
+            <button
+              className="hidden sm:inline-flex items-center gap-2 rounded-xl px-3 py-1.5 text-sm border border-border bg-white hover:shadow"
+              onClick={() => navigate("/dashboard")}
+              title="Back to Dashboard"
+            >
+              ← Dashboard
+            </button>
             <button
               className="hidden sm:inline-flex items-center gap-2 rounded-xl px-3 py-1.5 text-sm border border-border bg-white hover:shadow"
               onClick={() => navigate("/settings")}
@@ -327,7 +338,7 @@ export default function StoryLabLanding() {
         <CommunityStrip />
       </section>
 
-      {/* Toolbelt: Live Session Modules */}
+      {/* Toolbelt: Live Session Modules (now includes Narrative Arc) */}
       <section className="md:ml-72 mx-auto max-w-7xl px-4 py-6">
         <SectionHeader
           title="Live Session Modules"
@@ -344,9 +355,7 @@ export default function StoryLabLanding() {
               transition={{ delay: i * 0.04 }}
               className="group relative overflow-hidden glass-panel p-4 text-left"
             >
-              <div
-                className={`absolute -top-10 -right-10 size-36 rounded-full bg-gradient-to-br ${m.tint} blur-2xl`}
-              />
+              <div className={`absolute -top-10 -right-10 size-36 rounded-full bg-gradient-to-br ${m.tint} blur-2xl`} />
               <div className="flex items-start gap-3 relative">
                 <div className="shrink-0 rounded-xl bg-white p-2 border border-border">
                   <m.icon className="size-5 text-ink" />
@@ -381,9 +390,7 @@ export default function StoryLabLanding() {
               transition={{ delay: i * 0.05 }}
               className="relative overflow-hidden glass-panel p-4 text-left"
             >
-              <div
-                className={`absolute -top-10 -right-10 size-36 rounded-full bg-gradient-to-br ${s.tint} blur-2xl`}
-              />
+              <div className={`absolute -top-10 -right-10 size-36 rounded-full bg-gradient-to-br ${s.tint} blur-2xl`} />
               <div className="flex items-start gap-3 relative">
                 <div className="shrink-0 rounded-xl bg-white p-2 border border-border">
                   <s.icon className="size-5 text-ink" />
@@ -442,13 +449,14 @@ function CountdownStub() {
   );
 }
 
+// Updated to toggle the 'theme-dark' class (matches your CSS tokens)
 function DarkModeToggle() {
-  const [dark, setDark] = React.useState(
-    typeof window !== "undefined" && document.documentElement.classList.contains("dark")
+  const [dark, setDark] = React.useState(() =>
+    typeof window !== "undefined" &&
+    document.documentElement.classList.contains("theme-dark")
   );
   React.useEffect(() => {
-    if (dark) document.documentElement.classList.add("dark");
-    else document.documentElement.classList.remove("dark");
+    document.documentElement.classList.toggle("theme-dark", dark);
   }, [dark]);
   return (
     <button
