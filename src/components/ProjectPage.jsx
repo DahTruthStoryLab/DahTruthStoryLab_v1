@@ -726,3 +726,111 @@ export default function ProjectPage() {
                 </div>
 
                 <div>
+<div>
+                  <label className="text-xs text-muted mb-1 block">Status</label>
+                  <select
+                    value={book.status || "Draft"}
+                    onChange={(e) => setBook((b) => ({ ...b, status: e.target.value }))}
+                    className="w-full rounded-lg bg-white border border-[hsl(var(--border))] px-4 py-3 text-sm outline-none"
+                    style={{ fontFamily: "Playfair Display, ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif" }}
+                  >
+                    {["Idea", "Outline", "Draft", "Revision", "Editing", "Published"].map((s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-xs text-muted mb-1 block">Logline</label>
+                  <input
+                    value={book.logline || ""}
+                    onChange={(e) => setBook((b) => ({ ...b, logline: e.target.value }))}
+                    placeholder="One-sentence hook for your story..."
+                    className="w-full rounded-lg bg-white border border-[hsl(var(--border))] px-4 py-3 text-sm outline-none"
+                    style={{ fontFamily: "Playfair Display, ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif" }}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="text-xs text-muted mb-1 block">Synopsis</label>
+                <textarea
+                  value={book.synopsis || ""}
+                  onChange={(e) => setBook((b) => ({ ...b, synopsis: e.target.value }))}
+                  placeholder="High-level overview of your book..."
+                  className="w-full min-h-[160px] rounded-lg bg-white border border-[hsl(var(--border))] px-4 py-3 text-sm outline-none resize-vertical"
+                  style={{ fontFamily: "Playfair Display, ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif" }}
+                />
+              </div>
+            </div>
+
+            {/* Statistics */}
+            <div className="glass-panel p-6">
+              <div className="text-lg font-semibold mb-4 flex items-center gap-2 heading-serif">
+                <BarChart3 size={18} className="text-[color:var(--color-ink)]/80" />
+                Writing Statistics
+              </div>
+
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="text-center">
+                  <div className="text-2xl font-bold">{totalWords.toLocaleString()}</div>
+                  <div className="text-xs text-muted">Total Words</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold">{chapters.length}</div>
+                  <div className="text-xs text-muted">Chapters</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold">{avgWordsPerChapter.toLocaleString()}</div>
+                  <div className="text-xs text-muted">Avg/Chapter</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold">{totalReadingTime}m</div>
+                  <div className="text-xs text-muted">Read Time</div>
+                </div>
+              </div>
+
+              <div className="mt-6 p-4 rounded-lg bg-[color:var(--color-primary)]/50 border border-[hsl(var(--border))]">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-sm">Word Count Progress</span>
+                  <span className="text-sm text-muted">
+                    {totalWords.toLocaleString()} / {book.targetWords.toLocaleString()}
+                  </span>
+                </div>
+                <div className="w-full bg-white rounded-full h-3 border border-[hsl(var(--border))]">
+                  <div
+                    className="bg-[color:var(--color-accent)] h-3 rounded-full transition-all duration-700 relative overflow-hidden"
+                    style={{ width: `${Math.min(pct, 100)}%` }}
+                  >
+                    <div className="absolute inset-0 bg-white/30 animate-pulse" />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Helpful message if no chapters */}
+            {chapters.length === 0 && (
+              <div className="glass-panel p-6 text-center">
+                <AlertCircle className="mx-auto mb-3 text-[color:var(--color-ink)]/70" size={32} />
+                <div className="text-lg font-medium mb-2">Ready to start writing?</div>
+                <div className="text-sm text-muted mb-4">
+                  Head over to your Table of Contents to create your first chapter and begin your story.
+                </div>
+                <button
+                  onClick={() => navigate("/toc")}
+                  className="btn-primary inline-flex items-center gap-2"
+                >
+                  <BookOpen size={16} />
+                  Go to Table of Contents
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+                  
