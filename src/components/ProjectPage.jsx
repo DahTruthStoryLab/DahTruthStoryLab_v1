@@ -3,7 +3,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   BookOpen, Save, Download, Upload, Target, Tag, Image, AlertCircle,
-  TrendingUp, Clock, Star, BarChart3, CheckCircle, Edit3
+  TrendingUp, Clock, Star, BarChart3, CheckCircle, Edit3, Loader2
 } from "lucide-react";
 
 /* ──────────────────────────────────────────────────────────────
@@ -141,6 +141,7 @@ export default function ProjectPage() {
   const [settings, setSettings] = useState(existing.settings || { theme: "light", focusMode: false });
   const [newTag, setNewTag] = useState("");
   const [lastSaved, setLastSaved] = useState(Date.now());
+  const [uploadingCover, setUploadingCover] = useState(false);
 
   // Live profile display name (UserProvider → localStorage)
   const profileDisplayName = useMemo(() => {
@@ -259,13 +260,80 @@ export default function ProjectPage() {
     URL.revokeObjectURL(url);
   };
 
-  // Cover image upload (stored as data URL)
-  const onCoverPicked = (file) => {
+  // Cover image upload with iPhone HEIC support and conversion
+  const onCoverPicked = async (file) => {
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => setBook((b) => ({ ...b, cover: reader.result }));
-    reader.readAsDataURL(file);
+    
+    setUploadingCover(true);
+    
+    try {
+      // Check file size (max 10MB)
+      const maxSize = 10 * 1024 * 1024;
+      if (file.size > maxSize) {
+        alert("Image is too large. Please choose an image under 10MB.");
+        return;
+      }
+
+      // For HEIC files, try to convert or handle appropriately
+      const isHEIC = file.name.toLowerCase().endsWith('.heic') || 
+                     file.name.toLowerCase().endsWith('.heif') ||
+                     file.type === 'image/heic' ||
+                     file.type === 'image/heif';
+
+      if (isHEIC) {
+        // Create canvas to convert the image
+        const img = document.createElement('img');
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Read the file as data URL first
+        const reader = new FileReader();
+        const dataUrl = await new Promise((resolve, reject) => {
+          reader.onload = (e) => resolve(e.target.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+
+        // Try to load it as an image
+        await new Promise((resolve, reject) => {
+          img.onload = resolve;
+          img.onerror = () => {
+            // If direct loading fails, alert user
+            alert("Unable to process HEIC image. Please convert to JPG/PNG first, or use the Photos app to save as JPG.");
+            reject(new Error("HEIC not supported"));
+          };
+          img.src = dataUrl;
+        });
+
+        // If we got here, the browser can handle it - convert to JPEG
+        canvas.width = img.width;
+        canvas.height = img.height;
+        ctx.drawImage(img, 0, 0);
+        
+        // Convert to JPEG with good quality
+        const jpegDataUrl = canvas.toDataURL('image/jpeg', 0.9);
+        setBook((b) => ({ ...b, cover: jpegDataUrl }));
+      } else {
+        // Standard image formats
+        const reader = new FileReader();
+        reader.onload = () => {
+          setBook((b) => ({ ...b, cover: reader.result }));
+        };
+        reader.onerror = () => {
+          alert("Failed to read image file. Please try a different image.");
+        };
+        reader.readAsDataURL(file);
+      }
+    } catch (err) {
+      console.error("Error uploading cover:", err);
+      if (err.message !== "HEIC not supported") {
+        alert("Failed to upload image. Please try again or use a different image.");
+      }
+    } finally {
+      setUploadingCover(false);
+    }
   };
+
   const removeCover = () => setBook((b) => ({ ...b, cover: "" }));
 
   // Tags
@@ -396,28 +464,44 @@ export default function ProjectPage() {
                 Book Cover
               </div>
 
-              <div className="rounded-2xl overflow-hidden border border-[hsl(var(--border))] bg-[color:var(--color-primary)]/40 aspect-[3/4] flex items-center justify-center mb-4">
-                {book.cover ? (
+              <div className="rounded-2xl overflow-hidden border border-[hsl(var(--border))] bg-[color:var(--color-primary)]/40 aspect-[3/4] flex items-center justify-center mb-4 relative">
+                {uploadingCover ? (
+                  <div className="text-center">
+                    <Loader2 size={32} className="mx-auto mb-2 animate-spin text-[color:var(--color-ink)]/60" />
+                    <div className="text-sm text-muted">Processing image...</div>
+                  </div>
+                ) : book.cover ? (
                   <img src={book.cover} alt="Cover" className="w-full h-full object-cover" />
                 ) : (
                   <div className="text-center text-muted">
                     <Image size={32} className="mx-auto mb-2 opacity-60" />
                     <div className="text-sm">Upload cover image</div>
+                    <div className="text-xs mt-1 opacity-70">JPG, PNG, or HEIC</div>
                   </div>
                 )}
               </div>
 
               <div className="flex gap-2">
-                <label className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-[color:var(--color-primary)] border border-[hsl(var(--border))] hover:opacity-90 text-sm cursor-pointer">
-                  <Upload size={16} /> Upload
+                <label className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-[color:var(--color-primary)] border border-[hsl(var(--border))] hover:opacity-90 text-sm cursor-pointer disabled:opacity-50">
+                  {uploadingCover ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" /> Processing
+                    </>
+                  ) : (
+                    <>
+                      <Upload size={16} /> Upload
+                    </>
+                  )}
                   <input
                     type="file"
-                    accept="image/*"
+                    accept="image/*,.heic,.heif"
+                    capture="environment"
                     onChange={(e) => e.target.files && e.target.files[0] && onCoverPicked(e.target.files[0])}
                     className="hidden"
+                    disabled={uploadingCover}
                   />
                 </label>
-                {book.cover && (
+                {book.cover && !uploadingCover && (
                   <button
                     onClick={removeCover}
                     className="px-3 py-2 rounded-lg bg-white border border-[hsl(var(--border))] hover:opacity-90 text-sm"
