@@ -17,8 +17,6 @@ import {
 import { useAI } from "../lib/AiProvider";
 import { useNavigate } from "react-router-dom";
 import { useDrag, useDrop } from "react-dnd";
-import * as mammoth from "mammoth";
-import { pickAndImportOneNotePage } from "../lib/onenoteImport";
 
 /* ------- Fonts whitelist (family + size) ------- */
 const Font = Quill.import("formats/font");
@@ -41,6 +39,20 @@ Quill.register(Font, true);
 const Size = Quill.import("formats/size");
 Size.whitelist = ["small", false, "large", "huge"];
 Quill.register(Size, true);
+
+/* ------- Load Mammoth dynamically from CDN ------- */
+async function loadMammoth() {
+  if (window.mammoth) return window.mammoth;
+  await new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = "https://cdn.jsdelivr.net/npm/mammoth@1.6.0/mammoth.browser.min.js";
+    s.async = true;
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error("Failed to load Mammoth"));
+    document.head.appendChild(s);
+  });
+  return window.mammoth;
+}
 
 /* ------- Storage helpers ------- */
 const STORAGE_KEY = "dahtruth-story-lab-toc-v3";
@@ -110,7 +122,7 @@ export default function ComposePage() {
   const [isFS, setIsFS] = useState(false);
   const [aiBusy, setAiBusy] = useState(false);
   const editorRef = useRef(null);
-  const fsEditorRef = useRef(null); // Separate ref for fullscreen editor
+  const fsEditorRef = useRef(null);
 
   /* Sync editor when selected chapter changes */
   useEffect(() => {
@@ -154,6 +166,9 @@ export default function ComposePage() {
     []
   );
 
+  /* Get active editor based on fullscreen state */
+  const getActiveEditor = () => (isFS ? fsEditorRef.current : editorRef.current);
+
   /* Save */
   const handleSave = useCallback(() => {
     setChapters((prevChapters) => {
@@ -187,7 +202,6 @@ export default function ComposePage() {
   }, [selectedId, title, html, book]);
 
   /* Undo / Redo */
-  const getActiveEditor = () => (isFS ? fsEditorRef.current : editorRef.current);
   const undo = () => getActiveEditor()?.getEditor?.()?.history?.undo?.();
   const redo = () => getActiveEditor()?.getEditor?.()?.history?.redo?.();
 
@@ -234,7 +248,7 @@ export default function ComposePage() {
     await runAI("proofread");
   };
 
-  /* Keyboard shortcuts – guarded */
+  /* Keyboard shortcuts */
   useEffect(() => {
     const onKey = (e) => {
       if (isEditableTarget(e.target)) return;
@@ -306,6 +320,7 @@ export default function ComposePage() {
   const ImportDocxButton = () => {
     const fileInputRef = useRef(null);
     const onPick = () => fileInputRef.current?.click();
+    
     const onFile = async (e) => {
       const file = e.target.files?.[0];
       if (!file) return;
@@ -314,8 +329,11 @@ export default function ComposePage() {
         e.target.value = "";
         return;
       }
+
       try {
+        const mammoth = await loadMammoth();
         const arrayBuffer = await file.arrayBuffer();
+
         const { value: htmlContent } = await mammoth.convertToHtml(
           { arrayBuffer },
           {
@@ -330,6 +348,7 @@ export default function ComposePage() {
             }),
           }
         );
+
         const activeEditor = getActiveEditor();
         const q = activeEditor?.getEditor?.();
         if (q) {
@@ -344,12 +363,13 @@ export default function ComposePage() {
         e.target.value = "";
       }
     };
+
     return (
       <>
         <button
           onClick={onPick}
           className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50"
-          title="Import Word Document (.docx)"
+          title="Import Word Document"
         >
           <Upload size={16} /> Import
         </button>
@@ -364,11 +384,7 @@ export default function ComposePage() {
     );
   };
 
-  /* Import from OneNote (via Microsoft Graph) */
-  const handleImportOneNote = () =>
-    pickAndImportOneNotePage(getActiveEditor(), setHtml);
-
-  /* Export to Word (.doc/.docx-friendly HTML) */
+  /* Export to Word */
   const exportToDocx = () => {
     try {
       const docHtml = `
@@ -481,96 +497,8 @@ export default function ComposePage() {
         </>
       )}
 
-// Load Mammoth's UMD browser build at runtime (avoids Vite resolving it at build time)
-async function loadMammoth() {
-  if (window.mammoth) return window.mammoth;
-  await new Promise((resolve, reject) => {
-    const s = document.createElement("script");
-    s.src = "https://cdn.jsdelivr.net/npm/mammoth@1.6.0/mammoth.browser.min.js";
-    s.async = true;
-    s.onload = () => resolve();
-    s.onerror = (e) => reject(new Error("Failed to load Mammoth"));
-    document.head.appendChild(s);
-  });
-  return window.mammoth;
-}
+      <ImportDocxButton />
 
-  const ImportDocxButton = () => {
-  const fileInputRef = useRef(null);
-  const onPick = () => fileInputRef.current?.click();
-
-  const onFile = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (!file.name.toLowerCase().endsWith(".docx")) {
-      alert("Please choose a .docx file (not .doc).");
-      e.target.value = "";
-      return;
-    }
-
-    try {
-      const mammoth = await loadMammoth(); // <-- runtime CDN load
-      const arrayBuffer = await file.arrayBuffer();
-
-      const { value: htmlContent } = await mammoth.convertToHtml(
-        { arrayBuffer },
-        {
-          styleMap: [
-            "p[style-name='Heading 1'] => h1:fresh",
-            "p[style-name='Heading 2'] => h2:fresh",
-          ],
-          convertImage: mammoth.images.inline(async (elem) => {
-            const buff = await elem.read("base64");
-            return { src: `data:${elem.contentType};base64,${buff}` };
-          }),
-        }
-      );
-
-      const activeEditor = isFS ? fsEditorRef.current : editorRef.current;
-      const q = activeEditor?.getEditor?.();
-      if (q) {
-        const delta = q.clipboard.convert({ html: htmlContent });
-        q.setContents(delta, "user");
-        setHtml(q.root.innerHTML);
-      }
-    } catch (err) {
-      console.error(err);
-      alert("Failed to import .docx");
-    } finally {
-      e.target.value = "";
-    }
-  };
-
-  return (
-    <>
-      <button
-        onClick={onPick}
-        className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50"
-        title="Import Word Document"
-      >
-        <Upload size={16} /> Import
-      </button>
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-        className="hidden"
-        onChange={onFile}
-      />
-    </>
-  );
-};
-   {/* Import/Export */}
-     <ImportDocxButton />
-
-      <button
-        onClick={handleImportOneNote}
-        className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50"
-        title="Import from OneNote"
-      >
-        <Upload size={16} /> OneNote
-      </button>
-      
       <button
         onClick={exportToDocx}
         className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50"
@@ -579,7 +507,6 @@ async function loadMammoth() {
         <Download size={16} /> Export
       </button>
 
-      {/* AI actions */}
       <button
         onClick={() => runAI("proofread")}
         className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50 disabled:opacity-60"
