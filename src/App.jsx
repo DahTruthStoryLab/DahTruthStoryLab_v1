@@ -67,6 +67,10 @@ const Profile              = lazy(() => import("./components/Profile"));
 const PlansPage            = lazy(() => import("./components/PlansPage"));
 const BillingSuccess       = lazy(() => import("./pages/BillingSuccess.jsx"));
 const AiTools              = lazy(() => import("./pages/AiTools")); // if present
+// NEW: StoryLab layout + Narrative Arc page
+const StoryLabLayout   = lazy(() => import("./components/storylab/StoryLabLayout.jsx"));
+const NarrativeArc     = lazy(() => import("./components/storylab/NarrativeArc.jsx"));
+
 
 /* =========================
    Global UI helpers
@@ -172,71 +176,34 @@ export default function App() {
                 }
               />
 
-              {/* StoryLab */}
-              <Route
-                path="/story-lab"
-                element={
-                  <ProtectedRoute>
-                    <StoryLabLanding />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/story-lab/prompts"
-                element={
-                  <ProtectedRoute>
-                    <StoryPromptsWorkshop />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/story-lab/community"
-                element={
-                  <ProtectedRoute>
-                    <WorkshopCohort />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/story-lab/workshop"
-                element={
-                  <ProtectedRoute>
-                    <StoryWorkshop />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/story-lab/workshop/priorities"
-                element={
-                  <ProtectedRoute>
-                    <PriorityCards />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/story-lab/workshop/roadmap"
-                element={
-                  <ProtectedRoute>
-                    <CharacterRoadmap />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/story-lab/workshop/clothesline"
-                element={
-                  <ProtectedRoute>
-                    <Clothesline />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/story-lab/workshop/hfl"
-                element={
-                  <ProtectedRoute>
-                    <HopesFearsLegacy />
-                  </ProtectedRoute>
-                }
-              />
+          {/* ================= STORYLAB (wrapped by StoryLabLayout) ================= */}
+<Route
+  path="/story-lab"
+  element={
+    <ProtectedRoute>
+      <StoryLabLayout />  {/* sidebar/header + <Outlet/> */}
+    </ProtectedRoute>
+  }
+>
+  {/* Landing at /story-lab */}
+  <Route index element={<StoryLabLanding />} />
+
+  {/* Live / modules (relative paths) */}
+  <Route path="workshop" element={<StoryWorkshop />} />
+  <Route path="workshop/priorities" element={<PriorityCards />} />
+  <Route path="workshop/roadmap" element={<CharacterRoadmap />} />
+  <Route path="workshop/clothesline" element={<Clothesline />} />
+  <Route path="workshop/hfl" element={<HopesFearsLegacy />} />
+  <Route path="prompts" element={<StoryPromptsWorkshop />} />
+  <Route path="community" element={<WorkshopCohort />} />
+
+  {/* NEW: Narrative Arc */}
+  <Route path="narrative-arc" element={<NarrativeArc />} />
+</Route>
+
+{/* Typo/alias redirect */}
+<Route path="/storylab/*" element={<Navigate to="/story-lab" replace />} />
+
 
               {/* Table of Contents */}
               <Route
