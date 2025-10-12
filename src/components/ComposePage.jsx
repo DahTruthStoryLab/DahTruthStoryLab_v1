@@ -481,7 +481,86 @@ export default function ComposePage() {
         </>
       )}
 
-      {/* Import/Export */}
+// Load Mammoth's UMD browser build at runtime (avoids Vite resolving it at build time)
+async function loadMammoth() {
+  if (window.mammoth) return window.mammoth;
+  await new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = "https://cdn.jsdelivr.net/npm/mammoth@1.6.0/mammoth.browser.min.js";
+    s.async = true;
+    s.onload = () => resolve();
+    s.onerror = (e) => reject(new Error("Failed to load Mammoth"));
+    document.head.appendChild(s);
+  });
+  return window.mammoth;
+}
+
+  const ImportDocxButton = () => {
+  const fileInputRef = useRef(null);
+  const onPick = () => fileInputRef.current?.click();
+
+  const onFile = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith(".docx")) {
+      alert("Please choose a .docx file (not .doc).");
+      e.target.value = "";
+      return;
+    }
+
+    try {
+      const mammoth = await loadMammoth(); // <-- runtime CDN load
+      const arrayBuffer = await file.arrayBuffer();
+
+      const { value: htmlContent } = await mammoth.convertToHtml(
+        { arrayBuffer },
+        {
+          styleMap: [
+            "p[style-name='Heading 1'] => h1:fresh",
+            "p[style-name='Heading 2'] => h2:fresh",
+          ],
+          convertImage: mammoth.images.inline(async (elem) => {
+            const buff = await elem.read("base64");
+            return { src: `data:${elem.contentType};base64,${buff}` };
+          }),
+        }
+      );
+
+      const activeEditor = isFS ? fsEditorRef.current : editorRef.current;
+      const q = activeEditor?.getEditor?.();
+      if (q) {
+        const delta = q.clipboard.convert({ html: htmlContent });
+        q.setContents(delta, "user");
+        setHtml(q.root.innerHTML);
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Failed to import .docx");
+    } finally {
+      e.target.value = "";
+    }
+  };
+
+  return (
+    <>
+      <button
+        onClick={onPick}
+        className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50"
+        title="Import Word Document"
+      >
+        <Upload size={16} /> Import
+      </button>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        className="hidden"
+        onChange={onFile}
+      />
+    </>
+  );
+};
+   {/* Import/Export */}
      <ImportDocxButton />
 
       <button
