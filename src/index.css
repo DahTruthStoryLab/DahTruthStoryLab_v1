@@ -3,12 +3,12 @@
 @import url('https://fonts.googleapis.com/css2?family=Arial:wght@400;700&family=Calibri:wght@400;700&family=Cambria:wght@400;700&family=Times+New+Roman:wght@400;700&family=Georgia:wght@400;700&family=Garamond:wght@400;700&family=Verdana:wght@400;700&family=Courier+New:wght@400;700&display=swap');
 @import "./styles/quill-fonts.css";
 
-/* NOW Tailwind can come after imports */
+/* Tailwind */
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* Map font-family names for Quill's CSS */
+/* Quill font mapping */
 .ql-font-arial        { font-family: 'Arial', sans-serif; }
 .ql-font-calibri      { font-family: 'Calibri', sans-serif; }
 .ql-font-cambria      { font-family: 'Cambria', serif; }
@@ -16,24 +16,10 @@
 .ql-font-georgia      { font-family: 'Georgia', serif; }
 .ql-font-garamond     { font-family: 'Garamond', serif; }
 .ql-font-verdana      { font-family: 'Verdana', sans-serif; }
-.ql-font-couriernew   { font-family: 'Courier New', monospace; } 
+.ql-font-couriernew   { font-family: 'Courier New', monospace; }
 .ql-font-sans { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
 .ql-font-serif { font-family: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif; }
 .ql-font-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
-
-/* Picker labels */
-.ql-snow .ql-picker.ql-font .ql-picker-label[data-value="sans"]::before,
-.ql-snow .ql-picker.ql-font .ql-picker-item[data-value="sans"]::before { content: "Sans Serif"; }
-.ql-snow .ql-picker.ql-font .ql-picker-label[data-value="serif"]::before,
-.ql-snow .ql-picker.ql-font .ql-picker-item[data-value="serif"]::before { content: "Serif"; }
-.ql-snow .ql-picker.ql-font .ql-picker-label[data-value="mono"]::before,
-.ql-snow .ql-picker.ql-font .ql-picker-item[data-value="mono"]::before { content: "Mono"; }
-.ql-snow .ql-picker.ql-font .ql-picker-label[data-value="georgia"]::before,
-.ql-snow .ql-picker.ql-font .ql-picker-item[data-value="georgia"]::before { content: "Georgia"; }
-.ql-snow .ql-picker.ql-font .ql-picker-label[data-value="garamond"]::before,
-.ql-snow .ql-picker.ql-font .ql-picker-item[data-value="garamond"]::before { content: "Garamond"; }
-.ql-snow .ql-picker.ql-font .ql-picker-label[data-value="times"]::before,
-.ql-snow .ql-picker.ql-font .ql-picker-item[data-value="times"]::before { content: "Times"; }
 
 /* ================================
    Brand + Global Base (LIGHT THEME)
@@ -41,43 +27,41 @@
 @layer base {
   :root,
   .theme-light {
-    /* Core palette (matches tailwind.config.js) */
-    --color-base: #F7FAFC;     /* off-white bg */
-    --color-primary: #EAF2FF;  /* very light blue */
-    --color-accent: #CAB1D6;   /* mauve */
-    --color-gold: #D4AF37;     /* gold accent */
-    --color-ink: #0F172A;      /* dark text */
-    --color-muted: #94A3B8;    /* subtle text/borders */
+    /* Your color tokens */
+    --color-base: #F7FAFC;
+    --color-primary: #EAF2FF;
+    --color-accent: #CAB1D6;
+    --color-gold: #D4AF37;
+    --color-ink: #0F172A;
+    --color-muted: #94A3B8;
 
-    /* UI tokens (HSL for shadcn-style usage) */
-    --background: 210 50% 98%;          /* ~var(--color-base) */
-    --foreground: 222 47% 11%;          /* ~var(--color-ink) */
+    /* Add brand tokens used by the component & gradients */
+    --brand-navy: #0B1B3B;
+    --brand-rose: #CAB1D6;
+    --brand-gold: #D4AF37;
+    --brand-mauve: #8B6F8F;
+    --brand-ink:  #0F172A;
 
+    /* HSL tokens (optional, for shadcn/ui-style usage) */
+    --background: 210 50% 98%;
+    --foreground: 222 47% 11%;
     --muted: 215 20% 93%;
     --muted-foreground: 215 16% 35%;
-
     --card: 0 0% 100%;
     --card-foreground: 222 47% 11%;
-
     --popover: 0 0% 100%;
     --popover-foreground: 222 47% 11%;
-
-    --primary: 215 100% 92%;            /* ~#EAF2FF */
+    --primary: 215 100% 92%;
     --primary-foreground: 222 47% 11%;
-
-    --secondary: 276 26% 80%;           /* ~mauve-ish */
+    --secondary: 276 26% 80%;
     --secondary-foreground: 222 47% 11%;
-
-    --accent: 276 26% 80%;              /* mauve */
+    --accent: 276 26% 80%;
     --accent-foreground: 222 47% 11%;
-
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 100%;
-
     --border: 215 20% 91%;
     --input: 215 20% 91%;
-    --ring: 47 65% 54%;                 /* gold */
-
+    --ring: 47 65% 54%;
     --radius: 0.75rem;
   }
 
@@ -94,56 +78,41 @@
     -moz-osx-font-smoothing: grayscale;
   }
 
-  /* Headings use Playfair Display */
-  h1, h2, h3, h4, h5, h6,
-  .heading-serif {
+  h1, h2, h3, h4, h5, h6, .heading-serif {
     font-family: "Playfair Display", ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
     font-weight: 700;
     line-height: 1.25;
     color: var(--color-ink);
   }
 
-  /* Code font (unchanged) */
   code {
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   }
 
-  /* Images look crisp */
   img { image-rendering: -webkit-optimize-contrast; }
 }
 
-/* ===================================
-   Optional: Dark theme (toggle via <html>.theme-dark)
-   =================================== */
+/* Optional: dark theme */
 .theme-dark {
   --background: 222 61% 7%;
   --foreground: 210 40% 98%;
-
   --muted: 215 20% 17%;
   --muted-foreground: 215 20% 65%;
-
   --card: 222 61% 9%;
   --card-foreground: 210 40% 98%;
-
   --popover: 222 61% 9%;
   --popover-foreground: 210 40% 98%;
-
   --primary: 199 89% 48%;
   --primary-foreground: 210 40% 98%;
-
   --secondary: 215 20% 17%;
   --secondary-foreground: 210 40% 98%;
-
   --accent: 199 89% 48%;
   --accent-foreground: 210 40% 98%;
-
   --destructive: 0 84% 60%;
   --destructive-foreground: 210 40% 98%;
-
   --border: 215 20% 20%;
   --input: 215 20% 20%;
   --ring: 199 89% 48%;
-
   color: hsl(var(--foreground));
   background-color: hsl(var(--background));
 }
@@ -152,23 +121,12 @@
    Reusable Helper Classes
    ======================= */
 @layer components {
-  /* Glassmorphic panels */
-  .glass-panel {
-    @apply bg-white/60 backdrop-blur-xl border border-white/40 rounded-2xl shadow-lg;
-  }
-  .glass-soft {
-    @apply bg-white/40 backdrop-blur-md border border-white/30 rounded-xl shadow;
-  }
+  .glass-panel { @apply bg-white/60 backdrop-blur-xl border border-white/40 rounded-2xl shadow-lg; }
+  .glass-soft  { @apply bg-white/40 backdrop-blur-md border border-white/30 rounded-xl shadow; }
 
-  /* Buttons aligned to brand */
-  .btn-primary {
-    @apply bg-[color:var(--color-accent)] text-[color:var(--color-ink)] hover:opacity-90 font-medium px-4 py-2 rounded-lg;
-  }
-  .btn-gold {
-    @apply bg-[color:var(--color-gold)] text-white hover:opacity-90 font-medium px-4 py-2 rounded-lg;
-  }
+  .btn-primary { @apply font-medium px-4 py-2 rounded-lg; background: var(--color-accent); color: var(--color-ink); }
+  .btn-gold    { @apply font-medium px-4 py-2 rounded-lg; background: var(--color-gold); color: white; }
 
-  /* Text tokens */
   .text-muted { color: var(--color-muted); }
 }
 
@@ -177,38 +135,7 @@
   background-image: radial-gradient(circle at 20% 10%, rgba(202,177,214,0.25), rgba(234,242,255,0) 60%);
 }
 
-// === LocalStorage + helpers ===
-const LS_BEATS_KEY = 'dt_arc_beats_v1';
-const LS_CHARS_KEY = 'dt_arc_chars_v1';
-
-const loadLocal = (key: string, fallback: any) => {
-  try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : fallback; } catch { return fallback; }
-};
-const saveLocal = (key: string, value: any) => { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} };
-
-const snap = (val: number, step = 5, min = 0, max = 100) => {
-  const s = Math.round(val / step) * step;
-  return Math.max(min, Math.min(max, s));
-};
-
-const countWords = (s = "") => s.trim().split(/\s+/).filter(Boolean).length;
-
-const useDebouncedCallback = <T extends any>(fn: (v: T) => void, delay = 250) => {
-  const tRef = useRef<number | null>(null);
-  return (v: T) => {
-    if (tRef.current) window.clearTimeout(tRef.current as any);
-    // @ts-ignore
-    tRef.current = window.setTimeout(() => fn(v), delay);
-  };
-};
-
-/* =======================
-   Optional DnD visuals
-   ======================= */
-/* Add these so you don't need the library stylesheet */
-.dnd-draggable { touch-action: none; }               /* better touch dragging */
-.dnd-dragging  { opacity: .5; }                      /* feedback while dragging */
-.dnd-drop-hover { 
-  border-color: #4F46E5 !important;
-  background-color: rgba(79, 70, 229, 0.1) !important;
-}
+/* Optional DnD visuals (CSS-only) */
+.dnd-draggable { touch-action: none; }
+.dnd-dragging  { opacity: .5; }
+.dnd-drop-hover { border-color: #4F46E5 !important; background-color: rgba(79, 70, 229, 0.1) !important; }
