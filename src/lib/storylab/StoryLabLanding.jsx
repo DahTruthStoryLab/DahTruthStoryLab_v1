@@ -1,4 +1,5 @@
-// src/pages/storylab/StoryLabLanding.jsx 
+// src/lib/storylab/StoryLabLanding.jsx
+
 import React from "react";
 import { useNavigate, Link, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
@@ -24,6 +25,7 @@ import {
   Menu,
   X,
 } from "lucide-react";
+import BrandLogo from "../../components/BrandLogo";
 
 /* =========================
    Routes & cards
