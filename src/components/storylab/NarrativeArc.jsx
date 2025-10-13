@@ -22,54 +22,84 @@ const LS_BEATS_KEY = "dt_arc_beats_v1";
 const LS_CHARS_KEY = "dt_arc_chars_v1";
 
 const loadLocal = (key, fallback) => {
-  try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : fallback; } catch { return fallback; }
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch {
+    return fallback;
+  }
 };
-const saveLocal = (key, value) => { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} };
+const saveLocal = (key, value) => {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {}
+};
+
+/* small helpers */
+const snap = (val, step = 5, min = 0, max = 100) =>
+  Math.max(min, Math.min(max, Math.round(val / step) * step));
+
+const countWords = (s = "") => s.trim().split(/\s+/).filter(Boolean).length;
+
+const useDebouncedCallback = (fn, delay = 250) => {
+  const tRef = useRef(null);
+  return (v) => {
+    if (tRef.current) window.clearTimeout(tRef.current);
+    tRef.current = window.setTimeout(() => fn(v), delay);
+  };
+};
 
 /* migrate beats to use iconKey (never store functions) */
 function reviveBeats(beats) {
   return (beats || []).map((b) => {
-    // if legacy saved with "icon": <function>, fall back to Heart
-    const iconKey = b.iconKey || b.icon?.name || "Heart";
-    return { ...b, iconKey };
+    const iconKey = b.iconKey || b.icon?.name || "Heart"; // fall back to Heart
+    const { icon, ...rest } = b; // drop any function refs
+    return { ...rest, iconKey };
   });
 }
 
 /* =========================
+   Defaults
+   ========================= */
+const DEFAULT_BEATS = [
+  { id: 1, title: "Preston Meets Darla",        iconKey: "Heart",    position:{ x:10, y:70 }, content:"The moment their paths cross for the first time. Describe the circumstances, the setting, and the immediate connection or tension between them.", color:"primary", size:"large" },
+  { id: 2, title: "Meeting Darla's Parents",    iconKey: "Users",    position:{ x:25, y:45 }, content:"Preston enters Darla's family world. Capture the dynamics, expectations, and how this shapes their relationship.",                                                              color:"accent",  size:"medium" },
+  { id: 3, title: "First Separation",           iconKey: "MapPin",   position:{ x:40, y:60 }, content:"Preston and Darla part ways. What forces them apart? What emotions surface? What remains unresolved?",                                                                               color:"muted",   size:"small" },
+  { id: 4, title: "Mediterranean Consummation", iconKey: "Plane",    position:{ x:55, y:25 }, content:"Their relationship reaches its peak in the Mediterranean. Describe the passion, intimacy, and significance of this moment.",                                                         color:"gold",    size:"xlarge" },
+  { id: 5, title: "Second Separation",          iconKey: "BookOpen", position:{ x:70, y:55 }, content:"Another parting, perhaps more painful than the first. What has changed? What do they each carry forward?",                                                                          color:"muted",   size:"small" },
+  { id: 6, title: "Darla's Death",              iconKey: "Sparkles", position:{ x:85, y:75 }, content:"The final chapter. How does Darla's death occur? What is Preston's emotional journey? How does this transform him?",                                                                 color:"ink",     size:"large" },
+];
+
+const DEFAULT_CHARACTERS = [
+  { id: 1,  name: "Darla Baxter",     initials: "DB", role: "Protagonist",     bg: "bg-brand-rose" },
+  { id: 2,  name: "Preston Stanley",  initials: "PS", role: "Airman",          bg: "bg-brand-navy" },
+  { id: 3,  name: "Macy Baxter",      initials: "MB", role: "Mother",          bg: "bg-brand-mauve" },
+  { id: 4,  name: "Roosevelt Baxter", initials: "RB", role: "Father",          bg: "bg-brand-ink" },
+  { id: 5,  name: "Jonathan",         initials: "J",  role: "Brother",         bg: "bg-brand-gold text-ink" },
+  { id: 6,  name: "Michael",          initials: "M",  role: "Brother",         bg: "bg-brand-gold text-ink" },
+  { id: 7,  name: "Theresa",          initials: "T",  role: "Sister",          bg: "bg-brand-rose" },
+  { id: 8,  name: "Rebecca",          initials: "R",  role: "Jonathan’s wife", bg: "bg-brand-mauve" },
+  { id: 9,  name: "Latoya",           initials: "L",  role: "Michael’s wife",  bg: "bg-brand-mauve" },
+  { id: 10, name: "DeShaun",          initials: "DS", role: "Relative",        bg: "bg-brand-navy" },
+  { id: 11, name: "Pauly",            initials: "P",  role: "Relative",        bg: "bg-brand-navy" },
+  { id: 12, name: "Rev. Wiley",       initials: "RW", role: "Pastor",          bg: "bg-brand-ink" },
+  { id: 13, name: "Nina Knox",        initials: "NK", role: "Grandmother",     bg: "bg-brand-gold text-ink" },
+  { id: 14, name: "Sam Knox",         initials: "SK", role: "Grandfather",     bg: "bg-brand-gold text-ink" },
+  { id: 15, name: "Cordelia King",    initials: "CK", role: "Friend",          bg: "bg-brand-rose" },
+  { id: 16, name: "Jersey",           initials: "JY", role: "Friend",          bg: "bg-brand-ink" },
+];
+
+/* =========================
    Component
    ========================= */
-const StoryArcTracker = () => {
-  const DEFAULT_BEATS = [
-    { id: 1, title: "Preston Meets Darla",        icon: Heart,   position: { x: 10, y: 70 }, content: "The moment their paths cross for the first time. Describe the circumstances, the setting, and the immediate connection or tension between them.", color: "primary", size: "large" },
-    { id: 2, title: "Meeting Darla's Parents",    icon: Users,   position: { x: 25, y: 45 }, content: "Preston enters Darla's family world. Capture the dynamics, expectations, and how this shapes their relationship.",                                      color: "accent",  size: "medium" },
-    { id: 3, title: "First Separation",           icon: MapPin,  position: { x: 40, y: 60 }, content: "Preston and Darla part ways. What forces them apart? What emotions surface? What remains unresolved?",                                         color: "muted",   size: "small" },
-    { id: 4, title: "Mediterranean Consummation", icon: Plane,   position: { x: 55, y: 25 }, content: "Their relationship reaches its peak in the Mediterranean. Describe the passion, intimacy, and significance of this moment.",                       color: "gold",    size: "xlarge" },
-    { id: 5, title: "Second Separation",          icon: BookOpen,position: { x: 70, y: 55 }, content: "Another parting, perhaps more painful than the first. What has changed? What do they each carry forward?",                                          color: "muted",   size: "small" },
-    { id: 6, title: "Darla's Death",              icon: Sparkles,position: { x: 85, y: 75 }, content: "The final chapter. How does Darla's death occur? What is Preston's emotional journey? How does this transform him?",                                 color: "ink",     size: "large" },
-  ];
-
-  const DEFAULT_CHARACTERS = [
-    { id: 1, name: "Darla Baxter",    initials: "DB", role: "Protagonist",      bg: "bg-brand-rose" },
-    { id: 2, name: "Preston Stanley", initials: "PS", role: "Airman",           bg: "bg-brand-navy" },
-    { id: 3, name: "Macy Baxter",     initials: "MB", role: "Mother",           bg: "bg-brand-mauve" },
-    { id: 4, name: "Roosevelt Baxter",initials: "RB", role: "Father",           bg: "bg-brand-ink" },
-    { id: 5, name: "Jonathan",        initials: "J",  role: "Brother",          bg: "bg-brand-gold text-ink" },
-    { id: 6, name: "Michael",         initials: "M",  role: "Brother",          bg: "bg-brand-gold text-ink" },
-    { id: 7, name: "Theresa",         initials: "T",  role: "Sister",           bg: "bg-brand-rose" },
-    { id: 8, name: "Rebecca",         initials: "R",  role: "Jonathan’s wife",  bg: "bg-brand-mauve" },
-    { id: 9, name: "Latoya",          initials: "L",  role: "Michael’s wife",   bg: "bg-brand-mauve" },
-    { id:10, name: "DeShaun",         initials: "DS", role: "Relative",         bg: "bg-brand-navy" },
-    { id:11, name: "Pauly",           initials: "P",  role: "Relative",         bg: "bg-brand-navy" },
-    { id:12, name: "Rev. Wiley",      initials: "RW", role: "Pastor",           bg: "bg-brand-ink" },
-    { id:13, name: "Nina Knox",       initials: "NK", role: "Grandmother",      bg: "bg-brand-gold text-ink" },
-    { id:14, name: "Sam Knox",        initials: "SK", role: "Grandfather",      bg: "bg-brand-gold text-ink" },
-    { id:15, name: "Cordelia King",   initials: "CK", role: "Friend",           bg: "bg-brand-rose" },
-    { id:16, name: "Jersey",          initials: "JY", role: "Friend",           bg: "bg-brand-ink" },
-  ];
-
+export default function NarrativeArc() {
   const [activeNode, setActiveNode] = useState(null);
-  const [storyBeats, setStoryBeats] = useState(() => loadLocal(LS_BEATS_KEY, DEFAULT_BEATS));
-  const [characters, setCharacters] = useState(() => loadLocal(LS_CHARS_KEY, DEFAULT_CHARACTERS));
+  const [storyBeats, setStoryBeats] = useState(() =>
+    reviveBeats(loadLocal(LS_BEATS_KEY, DEFAULT_BEATS))
+  );
+  const [characters, setCharacters] = useState(() =>
+    loadLocal(LS_CHARS_KEY, DEFAULT_CHARACTERS)
+  );
   const [dragIndex, setDragIndex] = useState(null);
 
   // persist to localStorage
@@ -93,7 +123,7 @@ const StoryArcTracker = () => {
     const text = await f.text();
     try {
       const parsed = JSON.parse(text);
-      if (parsed.beats) setStoryBeats(parsed.beats);
+      if (parsed.beats) setStoryBeats(reviveBeats(parsed.beats));
       if (parsed.characters) setCharacters(parsed.characters);
     } catch {}
     e.target.value = "";
@@ -101,19 +131,25 @@ const StoryArcTracker = () => {
 
   // Debounced beat editor
   const debouncedUpdate = useDebouncedCallback(({ id, content }) => {
-    setStoryBeats(prev => prev.map(b => (b.id === id ? { ...b, content } : b)));
+    setStoryBeats((prev) => prev.map((b) => (b.id === id ? { ...b, content } : b)));
   }, 250);
 
   // Keyboard nudging helper (Shift for faster)
   const nudgeBeat = (id, dx, dy, fast = false) => {
     const step = fast ? 5 : 1;
-    setStoryBeats(prev => prev.map(b => b.id === id ? ({
-      ...b,
-      position: {
-        x: snap(b.position.x + dx * step, 5, 5, 95),
-        y: snap(b.position.y + dy * step, 5, 10, 85),
-      }
-    }) : b));
+    setStoryBeats((prev) =>
+      prev.map((b) =>
+        b.id === id
+          ? {
+              ...b,
+              position: {
+                x: snap(b.position.x + dx * step, 5, 5, 95),
+                y: snap(b.position.y + dy * step, 5, 10, 85),
+              },
+            }
+          : b
+      )
+    );
   };
 
   const getNodeSize = (size) => {
@@ -130,7 +166,7 @@ const StoryArcTracker = () => {
 
   const pathD = useMemo(() => {
     if (storyBeats.length < 2) return "";
-    const pts = storyBeats.map(b => b.position);
+    const pts = storyBeats.map((b) => b.position);
     let d = `M ${pts[0].x} ${pts[0].y}`;
     for (let i = 1; i < pts.length; i++) {
       const prev = pts[i - 1];
@@ -151,7 +187,7 @@ const StoryArcTracker = () => {
               <BookOpen className="text-white" size={32} />
             </div>
             <div>
-              <h1 className="text-4xl font-serif font-bold text-ink">Preston & Darla's Journey</h1>
+              <h1 className="text-4xl font-serif font-bold text-ink">Preston & Darla&apos;s Journey</h1>
               <p className="text-muted mt-1 font-sans">An emotional arc through love and loss</p>
             </div>
           </div>
@@ -178,7 +214,7 @@ const StoryArcTracker = () => {
               const yRaw = ((e.clientY - rect.top) / rect.height) * 100;
               const x = snap(xRaw, 5, 5, 95);
               const y = snap(yRaw, 5, 10, 85);
-              setStoryBeats(prev => prev.map(b => b.id === draggedId ? { ...b, position: { x, y } } : b));
+              setStoryBeats((prev) => prev.map((b) => (b.id === draggedId ? { ...b, position: { x, y } } : b)));
             }}
           >
             {/* Decor path */}
@@ -190,14 +226,20 @@ const StoryArcTracker = () => {
                   <stop offset="100%" style={{ stopColor: "var(--brand-ink,  #0F172A)",  stopOpacity: 0.4 }} />
                 </linearGradient>
               </defs>
-              <path d="M 100 200 Q 250 160, 350 130 Q 450 80, 500 50 Q 550 80, 650 140 Q 750 170, 900 210"
-                    fill="none" stroke="url(#masterGradient)" strokeWidth={3} strokeLinecap="round" strokeDasharray="6,4" />
+              <path
+                d="M 100 200 Q 250 160, 350 130 Q 450 80, 500 50 Q 550 80, 650 140 Q 750 170, 900 210"
+                fill="none"
+                stroke="url(#masterGradient)"
+                strokeWidth={3}
+                strokeLinecap="round"
+                strokeDasharray="6,4"
+              />
             </svg>
 
             {/* Draggable beats */}
             <div className="relative z-10 h-full">
               {storyBeats.map((beat) => {
-                const Icon = beat.icon;
+                const Icon = ICONS[beat.iconKey] || Heart;
                 const isActive = activeNode === beat.id;
                 return (
                   <div
@@ -260,7 +302,7 @@ const StoryArcTracker = () => {
 
               {/* Nodes */}
               {storyBeats.map((beat, index) => {
-                const Icon = beat.icon;
+                const Icon = ICONS[beat.iconKey] || Heart;
                 const isActive = activeNode === beat.id;
                 return (
                   <div
@@ -308,8 +350,8 @@ const StoryArcTracker = () => {
               {activeNode ? (
                 <div className="space-y-4">
                   {(() => {
-                    const beat = storyBeats.find(b => b.id === activeNode);
-                    const Icon = beat.icon;
+                    const beat = storyBeats.find((b) => b.id === activeNode);
+                    const Icon = ICONS[beat.iconKey] || Heart;
                     return (
                       <>
                         <div className="flex items-center gap-3 mb-4">
@@ -333,7 +375,10 @@ const StoryArcTracker = () => {
 
                         {/* Word goal (250) */}
                         <div className="mt-2 h-2 bg-white/50 rounded">
-                          <div className="h-2 rounded bg-brand-navy" style={{ width: `${Math.min(100, Math.round((countWords(beat.content) / 250) * 100))}%` }} />
+                          <div
+                            className="h-2 rounded bg-brand-navy"
+                            style={{ width: `${Math.min(100, Math.round((countWords(beat.content) / 250) * 100))}%` }}
+                          />
                         </div>
                         <div className="text-[11px] text-muted text-right">{countWords(beat.content)} / 250 words</div>
                       </>
@@ -368,7 +413,7 @@ const StoryArcTracker = () => {
                 onDrop={(e) => {
                   e.preventDefault();
                   if (dragIndex === null || dragIndex === idx) return;
-                  setCharacters(prev => {
+                  setCharacters((prev) => {
                     const next = [...prev];
                     const [moved] = next.splice(dragIndex, 1);
                     next.splice(idx, 0, moved);
@@ -393,7 +438,7 @@ const StoryArcTracker = () => {
         <div className="glass-soft p-6 mt-8">
           <div className="flex items-center gap-3">
             {storyBeats.map((beat, index) => {
-              const Icon = beat.icon;
+              const Icon = ICONS[beat.iconKey] || Heart;
               const isActive = activeNode === beat.id;
               return (
                 <React.Fragment key={beat.id}>
@@ -426,6 +471,4 @@ const StoryArcTracker = () => {
       `}</style>
     </div>
   );
-};
-
-export default StoryArcTracker;
+}
