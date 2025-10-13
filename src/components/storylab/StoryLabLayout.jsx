@@ -23,9 +23,11 @@ function DarkModeToggle() {
 export default function StoryLabLayout() {
   const navigate = useNavigate();
 
-  const base =
-    "block rounded px-3 py-2 transition hover:bg-black/5 aria-[current=page]:bg-white aria-[current=page]:shadow aria-[current=page]:border aria-[current=page]:border-border";
-
+ const base =
+  "block rounded px-3 py-2 transition hover:bg-black/5";
+const active =
+  "bg-white shadow border border-border"; 
+  
   return (
     <div className="min-h-screen flex bg-base text-ink">
       {/* StoryLab-only sidebar */}
@@ -36,10 +38,13 @@ export default function StoryLabLayout() {
           {/* IMPORTANT: RELATIVE links (no leading /) */}
           <NavLink to="." end className={base}>
             Overview
-          </NavLink>
-          <NavLink to="narrative-arc" className={base}>
+         <NavLink
+            to="narrative-arc"
+            className={({ isActive }) => `${base} ${isActive ? active : ""}`}
+          >
             Narrative Arc
           </NavLink>
+
           <NavLink to="workshop/priorities" className={base}>
             Priority Cards
           </NavLink>
