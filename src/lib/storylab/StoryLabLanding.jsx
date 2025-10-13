@@ -1,3 +1,4 @@
+import R// src/pages/storylab/StoryLabLanding.jsx (or your path)
 import React from "react";
 import { useNavigate, Link, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
@@ -23,11 +24,10 @@ import {
   Menu,
   X,
 } from "lucide-react";
-import BrandLogo from "../../components/BrandLogo";
 
-/* =========================================================
+/* =========================
    Routes & cards
-   ========================================================= */
+   ========================= */
 const BASE = "/story-lab";
 
 const MODULES = [
@@ -131,15 +131,14 @@ function DesktopSidebar() {
     </Link>
   );
   return (
-    <aside className="hidden md:block fixed left-0 top-0 z-40 h-screen w-72 p-3 border-r border-border bg-white/80 backdrop-blur-md">
       <div className="flex items-center gap-2 px-1 py-2">
-        {/* Bigger single logo */}
         <BrandLogo className="h-10 w-auto" />
         <div className="leading-tight">
           <div className="font-serif text-lg font-bold text-ink">DahTruth</div>
           <div className="text-[11px] tracking-wide text-muted">Story Lab</div>
         </div>
       </div>
+
       <div className="mt-2 grid gap-2">
         {NAV_LINKS.map((l) => (
           <Item key={l.to} to={l.to} icon={l.icon} label={l.label} />
@@ -151,15 +150,17 @@ function DesktopSidebar() {
 
 function MobileSidebar({ open, setOpen }) {
   const { pathname } = useLocation();
+
   React.useEffect(() => {
     document.body.style.overflow = open ? "hidden" : "";
-    return () => (document.body.style.overflow = "");
+    return () => { document.body.style.overflow = ""; };
   }, [open]);
 
   const Item = ({ to, icon: Icon, label }) => (
     <Link
       to={to}
       onClick={() => setOpen(false)}
+      aria-current={pathname === to ? "page" : undefined}
       className={`flex items-center gap-3 rounded-2xl px-3 py-2 border transition mb-1
         ${pathname === to
           ? "bg-white border-border text-ink shadow"
@@ -188,9 +189,11 @@ function MobileSidebar({ open, setOpen }) {
             exit={{ x: -320 }}
             transition={{ type: "spring", stiffness: 260, damping: 24 }}
           >
+            {/* Header row — this is the bit you were asking about */}
             <div className="flex items-center justify-between px-1 py-2">
               <div className="flex items-center gap-2">
-                <BrandLogo className="h-7 w-auto" />
+                {/* Increase logo size by changing h-8 -> h-10 if you want it bigger */}
+                <BrandLogo className="h-8 w-auto" />
                 <span className="font-serif text-lg font-bold text-ink">DahTruth</span>
               </div>
               <button
@@ -201,6 +204,7 @@ function MobileSidebar({ open, setOpen }) {
                 <X className="size-5" />
               </button>
             </div>
+
             <div className="mt-2">
               {NAV_LINKS.map((l) => (
                 <Item key={l.to} to={l.to} icon={l.icon} label={l.label} />
