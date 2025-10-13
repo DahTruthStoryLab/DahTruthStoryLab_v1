@@ -94,7 +94,7 @@ function useChapterSentences() {
 function QuoteBarTop() {
   const { line, refresh } = useChapterSentences();
   return (
-    <div className="md:ml-72 mx-auto max-w-7xl px-4 pt-4">
+    <div className="md:ml-80 mx-auto max-w-7xl px-6 pt-4">
       <div className="glass-soft px-5 py-4 flex items-center justify-between">
         <div className="italic text-ink">"{line}"</div>
         <button
@@ -127,17 +127,17 @@ function DesktopSidebar() {
   );
 
   return (
-    <aside className="hidden md:block fixed left-0 top-0 z-40 h-screen w-72 p-3 border-r border-border bg-white/80 backdrop-blur-md">
-      <div className="flex items-center gap-2 px-1 py-2">
+    <aside className="hidden md:block fixed left-0 top-0 z-40 h-screen w-80 p-4 border-r border-border bg-white/80 backdrop-blur-md">
+      <div className="flex items-center gap-3 px-2 py-4">
         <img
           src="/DahTruthLogo.png"
           alt="DahTruth"
-          className="h-10 w-auto rounded-md"
+          className="h-16 w-auto rounded-md"
           onError={(e) => (e.currentTarget.style.display = "none")}
         />
         <div className="leading-tight">
-          <div className="font-serif text-lg font-bold text-ink">DahTruth</div>
-          <div className="text-[11px] tracking-wide text-muted">Story Lab</div>
+          <div className="font-serif text-2xl font-bold text-ink">DahTruth</div>
+          <div className="text-sm tracking-wide text-muted">Story Lab</div>
         </div>
       </div>
 
@@ -243,22 +243,11 @@ function DarkModeToggle() {
   );
 }
 
-function BannerHeader({ onDashboard, onSettings, onOpenMenu, navigate }) {
+function BannerHeader({ onDashboard, onSettings, navigate }) {
   return (
-    <div className="md:ml-72 sticky top-0 z-40 bg-gradient-to-r from-brand-navy/[.06] via-brand-gold/[.05] to-brand-rose/[.06] backdrop-blur-md">
-      {/* Mobile hamburger - only shows on mobile */}
-      <div className="md:hidden px-4 py-3 flex items-center justify-between border-b border-border/50">
-        <button
-          className="rounded-xl border border-border bg-white px-3 py-2"
-          onClick={onOpenMenu}
-          aria-label="Open menu"
-        >
-          <Menu className="size-5 text-ink" />
-        </button>
-      </div>
-
+    <div className="md:ml-80 mt-1 sticky top-1 z-40 bg-gradient-to-r from-brand-navy/[.06] via-brand-gold/[.05] to-brand-rose/[.06] backdrop-blur-md rounded-lg mx-2">
       {/* Main hero banner */}
-      <div className="mx-auto max-w-7xl px-4 pt-8 pb-6">
+      <div className="mx-auto max-w-7xl px-6 pt-8 pb-6">
         <motion.h1
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
@@ -286,7 +275,7 @@ function BannerHeader({ onDashboard, onSettings, onOpenMenu, navigate }) {
       </div>
 
       {/* Description + Actions row */}
-      <div className="mx-auto max-w-7xl px-4 pb-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div className="mx-auto max-w-7xl px-6 pb-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <motion.p
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
@@ -300,7 +289,7 @@ function BannerHeader({ onDashboard, onSettings, onOpenMenu, navigate }) {
         {/* Right: actions */}
         <div className="flex items-center gap-3 shrink-0">
           <button
-            className="inline-flex items-center gap-2 rounded-xl px-3 py-1.5 text-sm border border-border bg-white hover:shadow"
+            className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm bg-amber-500 hover:bg-amber-600 text-white font-semibold shadow"
             onClick={onDashboard}
             title="Back to Dashboard"
           >
@@ -383,7 +372,6 @@ export default function StoryLabLanding() {
       <BannerHeader
         onDashboard={() => navigate("/dashboard")}
         onSettings={() => navigate("/settings")}
-        onOpenMenu={() => setMobileOpen(true)}
         navigate={navigate}
       />
 
@@ -391,12 +379,12 @@ export default function StoryLabLanding() {
       <QuoteBarTop />
 
       {/* Community strip */}
-      <section className="md:ml-72 mx-auto max-w-7xl px-4 pb-4 pt-4">
+      <section className="md:ml-80 mx-auto max-w-7xl px-6 pb-4 pt-4">
         <CommunityStrip />
       </section>
 
       {/* Toolbelt: Live Session Modules */}
-      <section className="md:ml-72 mx-auto max-w-7xl px-4 py-6">
+      <section className="md:ml-80 mx-auto max-w-7xl px-6 py-6">
         <SectionHeader
           title="Live Session Modules"
           subtitle="Your facilitator toolkit—fast access during sessions."
@@ -431,7 +419,7 @@ export default function StoryLabLanding() {
       </section>
 
       {/* Development: Character + World */}
-      <section className="md:ml-72 mx-auto max-w-7xl px-4 pb-16">
+      <section className="md:ml-80 mx-auto max-w-7xl px-6 pb-16">
         <SectionHeader
           title="Character Development"
           subtitle="Deeper craft tools for focused work outside live sessions."
@@ -463,7 +451,7 @@ export default function StoryLabLanding() {
       </section>
 
       {/* Footer */}
-      <footer className="md:ml-72 mx-auto max-w-7xl px-4 pb-16 text-xs text-muted">
+      <footer className="md:ml-80 mx-auto max-w-7xl px-6 pb-16 text-xs text-muted">
         © {new Date().getFullYear()} DahTruth • Where Truth is Written
       </footer>
     </div>
