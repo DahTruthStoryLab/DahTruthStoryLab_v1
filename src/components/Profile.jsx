@@ -20,8 +20,11 @@ import {
 } from "lucide-react";
 import heic2any from "heic2any";
 
+// ✅ Use your real store hook
+import { useUser } from "../lib/userStore.jsx";
+
 /* =========================================================
-   Minimal, self-contained image helpers (no external imports)
+   Minimal, self-contained image helpers (no external helpers)
    ========================================================= */
 const isHeicLike = (f) => {
   const n = f.name?.toLowerCase() || "";
@@ -35,11 +38,11 @@ async function ensureJpegFile(file, quality = 0.9) {
     const name = file.name.replace(/\.(heic|heif)$/i, ".jpg");
     return new File([jpegBlob], name, { type: "image/jpeg" });
   }
-  // If PNG, we’ll keep it unless it's too large—downscale will handle conversion to JPEG later
   return file;
 }
 
 async function resizeImageBlob(file, maxW = 2000, maxH = 2000, quality = 0.9) {
+  // turn File -> dataURL
   const dataUrl = await new Promise((resolve, reject) => {
     const fr = new FileReader();
     fr.onload = () => resolve(String(fr.result || ""));
@@ -47,6 +50,7 @@ async function resizeImageBlob(file, maxW = 2000, maxH = 2000, quality = 0.9) {
     fr.readAsDataURL(file);
   });
 
+  // load into <img>
   const img = await new Promise((res, rej) => {
     const i = new Image();
     i.onload = () => res(i);
@@ -55,10 +59,7 @@ async function resizeImageBlob(file, maxW = 2000, maxH = 2000, quality = 0.9) {
   });
 
   const scale = Math.min(1, maxW / img.width, maxH / img.height);
-  if (scale >= 1) {
-    // no resize needed; return original blob
-    return file;
-  }
+  if (scale >= 1) return file; // no resize needed
 
   const canvas = document.createElement("canvas");
   canvas.width = Math.round(img.width * scale);
@@ -66,7 +67,7 @@ async function resizeImageBlob(file, maxW = 2000, maxH = 2000, quality = 0.9) {
   const ctx = canvas.getContext("2d");
   ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-  // Export to JPEG for consistent previews/storage
+  // export as JPEG for consistency
   const outDataUrl = canvas.toDataURL("image/jpeg", quality);
   const outBlob = await (await fetch(outDataUrl)).blob();
   const name = file.name.replace(/\.(png|webp)$/i, ".jpg");
@@ -74,11 +75,6 @@ async function resizeImageBlob(file, maxW = 2000, maxH = 2000, quality = 0.9) {
     type: "image/jpeg",
   });
 }
-
-/* =========================================================
-   Safe, optional store hook (no import path errors)
-   ========================================================= */
-const useUserSafe = () => null;
 
 /* ---------- Local persistence ---------- */
 const STORAGE_KEY = "dt_profile";
@@ -169,8 +165,8 @@ export default function Profile() {
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
 
-  // Safe (no-op) store hook; wire into your real store later if desired.
-  const store = useUserSafe();
+  // ✅ Always call your real store hook (Provider is mounted in App)
+  const store = useUser();
 
   // Initial state from store or localStorage
   const initial = store?.user ?? readProfile();
@@ -281,9 +277,7 @@ export default function Profile() {
               <div>
                 <h1 className="heading-serif text-2xl">Profile</h1>
                 <div className="text-sm text-muted">
-                  {displayName
-                    ? `Signed in as ${displayName}`
-                    : "Set your author details"}
+                  {displayName ? `Signed in as ${displayName}` : "Set your author details"}
                 </div>
               </div>
             </div>
@@ -439,7 +433,7 @@ export default function Profile() {
               </div>
             </div>
 
-            {/* Quick Actions */}
+              {/* Quick Actions */}
             <div className="glass-panel p-6">
               <div className="text-lg font-semibold mb-4 heading-serif">Quick Actions</div>
               <div className="flex flex-wrap gap-2">
