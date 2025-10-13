@@ -2,14 +2,12 @@
   "name": "dahtruth-storylab",
   "version": "0.1.0",
   "private": true,
-  "type": "module",            // ← add this line
+  "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview"
   },
-  ...
-}
   "dependencies": {
     "@hookform/resolvers": "^3.1.0",
     "@tanstack/react-query": "^4.29.0",
