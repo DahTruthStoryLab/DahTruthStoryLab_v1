@@ -18,6 +18,7 @@ import {
   Info,
   Loader2,
 } from "lucide-react";
+import heic2any from "heic2any";
 
 let useUserSafe = null;
 try {
@@ -113,16 +114,16 @@ function ProfileSidebar({ onNavigate }) {
   );
 }
 
-async function heicArrayBufferToJpegDataUrl(ab, quality = 0.9) {
-  const { default: heic2any } = await import("heic2any");
-  const blob = new Blob([ab], { type: "image/heic" });
-  const jpgBlob = await heic2any({ blob, toType: "image/jpeg", quality });
-  return await new Promise((resolve, reject) => {
+async function heicArrayBufferToJpegDataUrl(arrayBuffer, quality = 0.9) {
+  const blob = new Blob([arrayBuffer], { type: "image/heic" });
+  const jpegBlob = await heic2any({ blob, toType: "image/jpeg", quality });
+  const dataUrl = await new Promise((resolve, reject) => {
     const fr = new FileReader();
     fr.onload = () => resolve(String(fr.result || ""));
     fr.onerror = reject;
-    fr.readAsDataURL(jpgBlob);
+    fr.readAsDataURL(jpegBlob);
   });
+  return dataUrl;
 }
 
 async function downscaleDataUrl(dataUrl, maxDim = 2000, quality = 0.9) {
@@ -187,13 +188,11 @@ export default function Profile() {
         file.type === "image/heif";
 
       if (isHEIC) {
-        // ✅ New HEIC path: ArrayBuffer -> heic2any -> dataURL
         const ab = await file.arrayBuffer();
         const jpegDataUrl = await heicArrayBufferToJpegDataUrl(ab, 0.9);
         const scaled = await downscaleDataUrl(jpegDataUrl, 2000, 0.9);
         setAvatar(scaled);
       } else {
-        // ✅ Non-HEIC path: read as data URL and (optionally) downscale
         const dataUrl = await new Promise((resolve, reject) => {
           const fr = new FileReader();
           fr.onload = () => resolve(String(fr.result || ""));
