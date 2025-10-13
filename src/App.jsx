@@ -177,8 +177,8 @@ export default function App() {
               />
 
               {/* ================= STORYLAB under layout ================= */}
-              <Route
-                path="/story-lab"
+             <Route
+                path="/story-lab/*"
                 element={
                   <ProtectedRoute>
                     <StoryLabLayout />
@@ -186,6 +186,7 @@ export default function App() {
                 }
               >
                 <Route index element={<StoryLabLanding />} />
+                <Route path="narrative-arc" element={<NarrativeArc />} />
                 <Route path="workshop" element={<StoryWorkshop />} />
                 <Route path="workshop/priorities" element={<PriorityCards />} />
                 <Route path="workshop/roadmap" element={<CharacterRoadmap />} />
@@ -193,7 +194,6 @@ export default function App() {
                 <Route path="workshop/hfl" element={<HopesFearsLegacy />} />
                 <Route path="prompts" element={<StoryPromptsWorkshop />} />
                 <Route path="community" element={<WorkshopCohort />} />
-                <Route path="narrative-arc" element={<NarrativeArc />} />
               </Route>
 
               {/* Typo/alias redirect */}
