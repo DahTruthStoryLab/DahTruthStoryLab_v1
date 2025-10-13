@@ -1,5 +1,5 @@
 // src/components/ProjectPage.js
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   BookOpen, Save, Download, Upload, Target, Tag, Image, AlertCircle,
@@ -113,6 +113,7 @@ async function downscaleDataUrl(dataUrl, maxDim = 2000, quality = 0.9) {
 export default function ProjectPage() {
   const navigate = useNavigate();
   const store = useUser();
+  const fileInputRef = useRef(null);
 
   const existing = loadState() || {
     book: {
@@ -268,6 +269,7 @@ export default function ProjectPage() {
       const maxSize = 10 * 1024 * 1024;
       if (file.size > maxSize) {
         alert("Image is too large. Please choose an image under 10MB.");
+        setUploadingCover(false);
         return;
       }
 
@@ -297,6 +299,16 @@ export default function ProjectPage() {
       alert("Failed to upload image. Please try again or use a different image.");
     } finally {
       setUploadingCover(false);
+      // Clear the input so the same file can be selected again
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
+
+  const handleUploadClick = () => {
+    if (fileInputRef.current && !uploadingCover) {
+      fileInputRef.current.click();
     }
   };
 
@@ -311,6 +323,15 @@ export default function ProjectPage() {
   
   const removeTag = (tag) =>
     setBook((b) => ({ ...b, tags: (b.tags || []).filter((x) => x !== tag) }));
+
+  const handleGoBack = () => {
+    // Try to go back in history, or fallback to home/landing page
+    if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      navigate("/");
+    }
+  };
 
   const totalWords = chapters.reduce((sum, ch) => sum + countWords(ch.content || ""), 0);
   const pct = progressPct(totalWords, book.targetWords || 25000);
@@ -329,6 +350,15 @@ export default function ProjectPage() {
   return (
     <div className="min-h-screen text-[color:var(--color-ink)] bg-[color:var(--color-base)] bg-radial-fade py-8">
       <div className="mx-auto max-w-6xl px-4">
+        {/* Back Button */}
+        <button
+          onClick={handleGoBack}
+          className="mb-4 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white border border-[hsl(var(--border))] hover:bg-gray-50 transition-colors text-sm"
+        >
+          <ArrowLeft size={16} />
+          Back
+        </button>
+
         <div className="glass-panel">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between px-6 py-5">
             <div className="flex items-center gap-4">
@@ -424,7 +454,11 @@ export default function ProjectPage() {
               </div>
 
               <div className="flex gap-2">
-                <label className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-[color:var(--color-primary)] border border-[hsl(var(--border))] hover:opacity-90 text-sm cursor-pointer disabled:opacity-50">
+                <button
+                  onClick={handleUploadClick}
+                  disabled={uploadingCover}
+                  className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-[color:var(--color-primary)] border border-[hsl(var(--border))] hover:opacity-90 text-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                >
                   {uploadingCover ? (
                     <>
                       <Loader2 size={16} className="animate-spin" /> Processing
@@ -434,15 +468,19 @@ export default function ProjectPage() {
                       <Upload size={16} /> Upload
                     </>
                   )}
-                  <input
-                    type="file"
-                    accept="image/*,.heic,.heif"
-                    capture="environment"
-                    onChange={(e) => e.target.files && e.target.files[0] && onCoverPicked(e.target.files[0])}
-                    className="hidden"
-                    disabled={uploadingCover}
-                  />
-                </label>
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*,.heic,.heif"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      onCoverPicked(file);
+                    }
+                  }}
+                  className="hidden"
+                />
                 {book.cover && !uploadingCover && (
                   <button onClick={removeCover} className="px-3 py-2 rounded-lg bg-white border border-[hsl(var(--border))] hover:opacity-90 text-sm">
                     Remove
