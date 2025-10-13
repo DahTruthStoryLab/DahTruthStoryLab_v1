@@ -25,26 +25,29 @@ import {
   Menu,
   X,
 } from "lucide-react";
-import BrandLogo from "../../components/BrandLogo";
 
-/* =========================
-   Routes & cards
-   ========================= */
+/**
+ * StoryLab Journey Landing
+ * - Clean banner header
+ * - Single, larger logo in the left sidebar
+ * - Quote bar shows a sentence from user's story (fallback text if none)
+ */
+
 const BASE = "/story-lab";
 
 const MODULES = [
-  { id: "prompts",        title: "Story Prompts",          blurb: "Context-aware sparks for stuck scenes.",   icon: Sparkles,   tint: "from-indigo-500/20 to-sky-500/20",   route: `${BASE}/prompts` },
-  { id: "roadmap",        title: "Character Roadmap",      blurb: "Map growth arcs and pivotal beats.",       icon: MapIcon,    tint: "from-emerald-500/20 to-teal-500/20", route: `${BASE}/workshop/roadmap` },
-  { id: "hopes",          title: "Hopes • Fears • Legacy", blurb: "Surface motives that drive choices.",      icon: Heart,      tint: "from-rose-500/20 to-fuchsia-500/20", route: `${BASE}/workshop/hfl` },
-  { id: "priority",       title: "Priority Cards",         blurb: "Organize what matters most next.",         icon: Target,     tint: "from-amber-500/20 to-orange-500/20", route: `${BASE}/workshop/priorities` },
-  { id: "clothesline",    title: "Clothesline",            blurb: "Org-style cast view at a glance.",         icon: LayoutGrid, tint: "from-cyan-500/20 to-blue-500/20",    route: `${BASE}/workshop/clothesline` },
-  { id: "narrative-arc",  title: "Narrative Arc",          blurb: "Map emotional beats and structure.",       icon: Sparkles,   tint: "from-purple-500/20 to-indigo-500/20", route: `${BASE}/narrative-arc` },
+  { id: "prompts",     title: "Story Prompts",          blurb: "Context-aware sparks for stuck scenes.",   icon: Sparkles,   tint: "from-indigo-500/20 to-sky-500/20",   route: `${BASE}/prompts` },
+  { id: "roadmap",     title: "Character Roadmap",      blurb: "Map growth arcs and pivotal beats.",       icon: MapIcon,    tint: "from-emerald-500/20 to-teal-500/20", route: `${BASE}/workshop/roadmap` },
+  { id: "hopes",       title: "Hopes • Fears • Legacy", blurb: "Surface motives that drive choices.",      icon: Heart,      tint: "from-rose-500/20 to-fuchsia-500/20", route: `${BASE}/workshop/hfl` },
+  { id: "priority",    title: "Priority Cards",         blurb: "Organize what matters most next.",         icon: Target,     tint: "from-amber-500/20 to-orange-500/20", route: `${BASE}/workshop/priorities` },
+  { id: "clothesline", title: "Clothesline",            blurb: "Org-style cast view at a glance.",         icon: LayoutGrid, tint: "from-cyan-500/20 to-blue-500/20",    route: `${BASE}/workshop/clothesline` },
+  { id: "narrative-arc", title: "Narrative Arc",        blurb: "Map emotional beats and structure.",       icon: Sparkles,   tint: "from-purple-500/20 to-indigo-500/20", route: `${BASE}/narrative-arc` },
 ];
 
 const DEV_SECTIONS = [
-  { id: "profiles",  title: "Character Profiles", blurb: "Detailed sheets to track traits, wounds, and wants.", icon: Brain,        route: `${BASE}/characters`,        tint: "from-purple-500/20 to-indigo-500/20" },
-  { id: "world",     title: "World Bible",        blurb: "Lore, locations, culture—organized and searchable.", icon: BookOpenCheck, route: `${BASE}/world`,             tint: "from-sky-500/20 to-cyan-500/20" },
-  { id: "manager",   title: "Character Manager",  blurb: "Create, link, and reuse your cast.",                 icon: FolderKanban,  route: `${BASE}/character-manager`, tint: "from-emerald-500/20 to-lime-500/20" },
+  { id: "profiles", title: "Character Profiles", blurb: "Detailed sheets to track traits, wounds, and wants.", icon: Brain,        route: `${BASE}/characters`,        tint: "from-purple-500/20 to-indigo-500/20" },
+  { id: "world",    title: "World Bible",        blurb: "Lore, locations, culture—organized and searchable.", icon: BookOpenCheck, route: `${BASE}/world`,             tint: "from-sky-500/20 to-cyan-500/20" },
+  { id: "manager",  title: "Character Manager",  blurb: "Create, link, and reuse your cast.",                 icon: FolderKanban,  route: `${BASE}/character-manager`, tint: "from-emerald-500/20 to-lime-500/20" },
 ];
 
 const NAV_LINKS = [
@@ -58,9 +61,7 @@ const NAV_LINKS = [
   { to: `${BASE}/community`,           icon: Users,      label: "Workshop Community" },
 ];
 
-/* =========================================================
-   Quote pulled from user's chapters (localStorage)
-   ========================================================= */
+/* ============ Dynamic Quote (from saved chapters) ============ */
 function useChapterSentences() {
   const [line, setLine] = React.useState("");
   const pick = React.useCallback(() => {
@@ -76,10 +77,10 @@ function useChapterSentences() {
       setLine(
         sentences.length
           ? sentences[Math.floor(Math.random() * sentences.length)].trim()
-          : "These lines will come from your story as you write."
+          : "These will come from your story… start writing and your words will appear here."
       );
     } catch {
-      setLine("These lines will come from your story as you write.");
+      setLine("These will come from your story… start writing and your words will appear here.");
     }
   }, []);
 
@@ -115,11 +116,10 @@ function QuoteBarTop() {
   );
 }
 
-/* =========================================================
-   Sidebar (desktop & mobile)
-   ========================================================= */
+/* ============ Desktop Sidebar (md+) ============ */
 function DesktopSidebar() {
   const { pathname } = useLocation();
+
   const Item = ({ to, icon: Icon, label }) => (
     <Link
       to={to}
@@ -131,10 +131,18 @@ function DesktopSidebar() {
       <Icon className="size-5" />
       <span className="truncate">{label}</span>
     </Link>
-  );
+  ); // ← IMPORTANT: closes the Item arrow function
+
   return (
+    <aside className="hidden md:block fixed left-0 top-0 z-40 h-screen w-72 p-3 border-r border-border bg-white/80 backdrop-blur-md">
       <div className="flex items-center gap-2 px-1 py-2">
-        <BrandLogo className="h-10 w-auto" />
+        {/* Single, larger logo in sidebar */}
+        <img
+          src="/DahTruthLogo.png"
+          alt="DahTruth"
+          className="h-10 w-auto rounded-md"
+          onError={(e) => (e.currentTarget.style.display = "none")}
+        />
         <div className="leading-tight">
           <div className="font-serif text-lg font-bold text-ink">DahTruth</div>
           <div className="text-[11px] tracking-wide text-muted">Story Lab</div>
@@ -150,19 +158,21 @@ function DesktopSidebar() {
   );
 }
 
+/* ============ Mobile Sidebar (slide-in sheet) ============ */
 function MobileSidebar({ open, setOpen }) {
   const { pathname } = useLocation();
 
   React.useEffect(() => {
     document.body.style.overflow = open ? "hidden" : "";
-    return () => { document.body.style.overflow = ""; };
+    return () => {
+      document.body.style.overflow = "";
+    };
   }, [open]);
 
   const Item = ({ to, icon: Icon, label }) => (
     <Link
       to={to}
       onClick={() => setOpen(false)}
-      aria-current={pathname === to ? "page" : undefined}
       className={`flex items-center gap-3 rounded-2xl px-3 py-2 border transition mb-1
         ${pathname === to
           ? "bg-white border-border text-ink shadow"
@@ -191,11 +201,14 @@ function MobileSidebar({ open, setOpen }) {
             exit={{ x: -320 }}
             transition={{ type: "spring", stiffness: 260, damping: 24 }}
           >
-            {/* Header row — this is the bit you were asking about */}
             <div className="flex items-center justify-between px-1 py-2">
               <div className="flex items-center gap-2">
-                {/* Increase logo size by changing h-8 -> h-10 if you want it bigger */}
-                <BrandLogo className="h-8 w-auto" />
+                <img
+                  src="/DahTruthLogo.png"
+                  alt="DahTruth"
+                  className="h-7 w-auto rounded-md"
+                  onError={(e) => (e.currentTarget.style.display = "none")}
+                />
                 <span className="font-serif text-lg font-bold text-ink">DahTruth</span>
               </div>
               <button
@@ -206,7 +219,6 @@ function MobileSidebar({ open, setOpen }) {
                 <X className="size-5" />
               </button>
             </div>
-
             <div className="mt-2">
               {NAV_LINKS.map((l) => (
                 <Item key={l.to} to={l.to} icon={l.icon} label={l.label} />
@@ -219,9 +231,7 @@ function MobileSidebar({ open, setOpen }) {
   );
 }
 
-/* =========================================================
-   Banner header (replaces the old top bar)
-   ========================================================= */
+/* ============ Banner Header ============ */
 function DarkModeToggle() {
   const [dark, setDark] = React.useState(() =>
     typeof window !== "undefined" &&
@@ -245,7 +255,7 @@ function BannerHeader({ onDashboard, onSettings, onOpenMenu }) {
   return (
     <div className="md:ml-72 sticky top-0 z-40 bg-gradient-to-r from-brand-navy/[.06] via-brand-gold/[.05] to-brand-rose/[.06] backdrop-blur-md">
       <div className="mx-auto max-w-7xl px-4 py-5 flex items-center justify-between">
-        {/* Left: mobile menu + page title */}
+        {/* Left: title + mobile hamburger */}
         <div className="flex items-center gap-3">
           <button
             className="md:hidden rounded-xl border border-border bg-white px-3 py-2"
@@ -254,6 +264,7 @@ function BannerHeader({ onDashboard, onSettings, onOpenMenu }) {
           >
             <Menu className="size-5 text-ink" />
           </button>
+
           <h1 className="text-2xl md:text-3xl font-serif font-bold tracking-tight">
             <span className="text-ink/80">Writing Your </span>
             <span className="text-primary">Story Journey</span>
@@ -282,9 +293,56 @@ function BannerHeader({ onDashboard, onSettings, onOpenMenu }) {
   );
 }
 
-/* =========================================================
-   Page
-   ========================================================= */
+/* ============ Small bits ============ */
+function SectionHeader({ title, subtitle }) {
+  return (
+    <div className="mb-4 flex items-end justify-between">
+      <div>
+        <h2 className="text-xl md:text-2xl font-semibold text-ink">{title}</h2>
+        <p className="text-sm text-muted">{subtitle}</p>
+      </div>
+    </div>
+  );
+}
+
+function CountdownStub() {
+  return (
+    <div className="inline-flex items-center gap-2 rounded-2xl px-3 py-1.5 border border-border bg-white/80 text-ink">
+      <CalendarClock className="size-4" />
+      <span className="text-sm">Next session in 2 days</span>
+    </div>
+  );
+}
+
+function CommunityStrip() {
+  return (
+    <div className="grid gap-3 sm:grid-cols-3">
+      <Link to={`${BASE}/community`} className="glass-soft p-4 flex items-start gap-3">
+        <Users className="size-5 text-primary" />
+        <div>
+          <div className="font-semibold text-ink">Workshop Community</div>
+          <div className="text-sm text-muted">Sessions, pairings, critique hub.</div>
+        </div>
+      </Link>
+      <Link to={`${BASE}/workshop`} className="glass-soft p-4 flex items-start gap-3">
+        <Compass className="size-5 text-primary" />
+        <div>
+          <div className="font-semibold text-ink">Workshop Manager</div>
+          <div className="text-sm text-muted">Launch modules & manage flow.</div>
+        </div>
+      </Link>
+      <Link to={`${BASE}/community`} className="glass-soft p-4 flex items-start gap-3">
+        <MessageSquare className="size-5 text-primary" />
+        <div>
+          <div className="font-semibold text-ink">Critique Room</div>
+          <div className="text-sm text-muted">Open live critique.</div>
+        </div>
+      </Link>
+    </div>
+  );
+}
+
+/* ============ Page ============ */
 export default function StoryLabLanding() {
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = React.useState(false);
@@ -295,27 +353,27 @@ export default function StoryLabLanding() {
       <DesktopSidebar />
       <MobileSidebar open={mobileOpen} setOpen={setMobileOpen} />
 
-      {/* New banner */}
+      {/* Banner header */}
       <BannerHeader
         onDashboard={() => navigate("/dashboard")}
         onSettings={() => navigate("/settings")}
         onOpenMenu={() => setMobileOpen(true)}
       />
 
-      {/* Quote pulled from user's writing */}
+      {/* Quote */}
       <QuoteBarTop />
 
-      {/* Hero / CTA */}
+      {/* Hero / Journey Map */}
       <section className="relative md:ml-72">
         <div className="mx-auto max-w-7xl px-4 pt-10 pb-6 relative">
-          <motion.h2
+          <motion.h1
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
             className="text-3xl md:text-5xl font-bold tracking-tight"
           >
             Welcome to your <span className="text-primary">Story Journey</span>
-          </motion.h2>
+          </motion.h1>
           <motion.p
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
@@ -344,12 +402,12 @@ export default function StoryLabLanding() {
         </div>
       </section>
 
-      {/* Community quick links */}
+      {/* Community strip */}
       <section className="md:ml-72 mx-auto max-w-7xl px-4 pb-4">
         <CommunityStrip />
       </section>
 
-      {/* Live modules */}
+      {/* Toolbelt: Live Session Modules */}
       <section className="md:ml-72 mx-auto max-w-7xl px-4 py-6">
         <SectionHeader
           title="Live Session Modules"
@@ -384,7 +442,7 @@ export default function StoryLabLanding() {
         </div>
       </section>
 
-      {/* Development tools */}
+      {/* Development: Character + World */}
       <section className="md:ml-72 mx-auto max-w-7xl px-4 pb-16">
         <SectionHeader
           title="Character Development"
@@ -413,22 +471,6 @@ export default function StoryLabLanding() {
               </div>
             </motion.button>
           ))}
-        </div>
-      </section>
-
-      {/* Secondary inspiration */}
-      <section className="md:ml-72 mx-auto max-w-7xl px-4 pb-16">
-        <div className="glass-panel">
-          <div className="p-6 md:p-8 relative">
-            <div className="flex items-center gap-3 text-primary">
-              <Quote className="size-5" />
-              <span className="uppercase tracking-wider text-xs">Today's Spark</span>
-            </div>
-            <p className="mt-3 text-lg md:text-xl text-ink">
-              “There is no greater agony than bearing an untold story inside you.”
-              <span className="text-muted"> — Maya Angelou</span>
-            </p>
-          </div>
         </div>
       </section>
 
