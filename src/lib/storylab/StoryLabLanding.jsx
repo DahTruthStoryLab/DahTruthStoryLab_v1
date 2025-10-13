@@ -482,3 +482,25 @@ export default function StoryLabLanding() {
   );
 }
 
+/* =========================================================
+   Small atoms
+   ========================================================= */
+function SLSectionHeader({ title, subtitle }) {
+  return (
+    <div className="mb-4 flex items-end justify-between">
+      <div>
+        <h2 className="text-xl md:text-2xl font-semibold text-ink">{title}</h2>
+        <p className="text-sm text-muted">{subtitle}</p>
+      </div>
+    </div>
+  );
+}
+
+function SLCountdownStub() {
+  return (
+    <div className="inline-flex items-center gap-2 rounded-2xl px-3 py-1.5 border border-border bg-white/80 text-ink">
+      <CalendarClock className="size-4" />
+      <span className="text-sm">Next session in 2 days</span>
+    </div>
+  );
+}
