@@ -186,24 +186,34 @@ export default function App() {
   }
 >
   {/* Landing at /story-lab */}
-  <Route index element={<StoryLabLanding />} />
-
-  {/* Live / modules (relative paths) */}
-  <Route path="workshop" element={<StoryWorkshop />} />
-  <Route path="workshop/priorities" element={<PriorityCards />} />
-  <Route path="workshop/roadmap" element={<CharacterRoadmap />} />
-  <Route path="workshop/clothesline" element={<Clothesline />} />
-  <Route path="workshop/hfl" element={<HopesFearsLegacy />} />
-  <Route path="prompts" element={<StoryPromptsWorkshop />} />
-  <Route path="community" element={<WorkshopCohort />} />
-
-  {/* NEW: Narrative Arc */}
-  <Route path="narrative-arc" element={<NarrativeArc />} />
-</Route>
-
-{/* Typo/alias redirect */}
-<Route path="/storylab/*" element={<Navigate to="/story-lab" replace />} />
-
+  {/* ================= STORYLAB (all under a protected layout) ================= */}
+<Route
+  path="/story-lab"
+  element={
+    <ProtectedRoute>
+      <StoryLabLayout />   {/* StoryLab-only sidebar/header + <Outlet/> */}
+    </ProtectedRoute>
+  }
+>
+              {/* index == /story-lab */}
+              <Route index element={<StoryLabLanding />} />
+            
+              {/* Live / modules (ALL RELATIVE PATHS) */}
+              <Route path="workshop" element={<StoryWorkshop />} />
+              <Route path="workshop/priorities" element={<PriorityCards />} />
+              <Route path="workshop/roadmap" element={<CharacterRoadmap />} />
+              <Route path="workshop/clothesline" element={<Clothesline />} />
+              <Route path="workshop/hfl" element={<HopesFearsLegacy />} />
+            
+              <Route path="prompts" element={<StoryPromptsWorkshop />} />
+              <Route path="community" element={<WorkshopCohort />} />
+            
+              {/* Narrative Arc */}
+              <Route path="narrative-arc" element={<NarrativeArc />} />
+            </Route>
+            
+            {/* Typo/alias redirect */}
+            <Route path="/storylab/*" element={<Navigate to="/story-lab" replace />} />
 
               {/* Table of Contents */}
               <Route
