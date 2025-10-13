@@ -23,28 +23,23 @@ function DarkModeToggle() {
 export default function StoryLabLayout() {
   const navigate = useNavigate();
 
- const base =
-  "block rounded px-3 py-2 transition hover:bg-black/5";
-const active =
-  "bg-white shadow border border-border"; 
-  
+  const base =
+    "block rounded px-3 py-2 transition hover:bg-black/5 aria-[current=page]:bg-white aria-[current=page]:shadow aria-[current=page]:border aria-[current=page]:border-border";
+
   return (
     <div className="min-h-screen flex bg-base text-ink">
-      {/* StoryLab-only sidebar */}
+      {/* Sidebar */}
       <aside className="w-64 p-4 border-r bg-white/70 backdrop-blur-md">
         <nav className="space-y-2">
           <div className="text-xs font-bold text-muted uppercase">StoryLab</div>
 
-          {/* IMPORTANT: RELATIVE links (no leading /) */}
+          {/* RELATIVE links (no leading /) */}
           <NavLink to="." end className={base}>
             Overview
-         <NavLink
-            to="narrative-arc"
-            className={({ isActive }) => `${base} ${isActive ? active : ""}`}
-          >
+          </NavLink>
+          <NavLink to="narrative-arc" className={base}>
             Narrative Arc
           </NavLink>
-
           <NavLink to="workshop/priorities" className={base}>
             Priority Cards
           </NavLink>
@@ -63,7 +58,7 @@ const active =
         </nav>
       </aside>
 
-      {/* Header + outlet */}
+      {/* Main column */}
       <div className="flex-1 flex flex-col">
         <header className="border-b bg-white/80 backdrop-blur-md">
           <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
