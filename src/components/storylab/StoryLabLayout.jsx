@@ -1,6 +1,6 @@
 // src/components/storylab/StoryLabLayout.jsx
 import React from "react";
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { Outlet } from "react-router-dom";
 
 function DarkModeToggle() {
   const [dark, setDark] = React.useState(() =>
@@ -21,7 +21,8 @@ function DarkModeToggle() {
 }
 
 export default function StoryLabLayout() {
-  const navigate = useNavigate();
+  return <Outlet />;
+}
 
   const base =
     "block rounded px-3 py-2 transition hover:bg-black/5 aria-[current=page]:bg-white aria-[current=page]:shadow aria-[current=page]:border aria-[current=page]:border-border";
