@@ -23,36 +23,31 @@ import {
   Menu,
   X,
 } from "lucide-react";
-import BrandLogo from "../../components/BrandLogo"; // ← adjust if needed
+import BrandLogo from "../../components/BrandLogo";
 
-/**
- * StoryLab Journey Landing
- * - Sidebar includes Narrative Arc
- * - Top bar has ← Dashboard + Settings + Dark toggle (theme-dark)
- * - Live Modules includes Narrative Arc card
- */
-
+/* =========================================================
+   Routes & cards
+   ========================================================= */
 const BASE = "/story-lab";
 
 const MODULES = [
-  { id: "prompts",     title: "Story Prompts",          blurb: "Context-aware sparks for stuck scenes.",   icon: Sparkles,   tint: "from-indigo-500/20 to-sky-500/20",   route: `${BASE}/prompts` },
-  { id: "roadmap",     title: "Character Roadmap",      blurb: "Map growth arcs and pivotal beats.",       icon: MapIcon,    tint: "from-emerald-500/20 to-teal-500/20", route: `${BASE}/workshop/roadmap` },
-  { id: "hopes",       title: "Hopes • Fears • Legacy", blurb: "Surface motives that drive choices.",      icon: Heart,      tint: "from-rose-500/20 to-fuchsia-500/20", route: `${BASE}/workshop/hfl` },
-  { id: "priority",    title: "Priority Cards",         blurb: "Organize what matters most next.",         icon: Target,     tint: "from-amber-500/20 to-orange-500/20", route: `${BASE}/workshop/priorities` },
-  { id: "clothesline", title: "Clothesline",            blurb: "Org-style cast view at a glance.",         icon: LayoutGrid, tint: "from-cyan-500/20 to-blue-500/20",    route: `${BASE}/workshop/clothesline` },
-  // NEW: Narrative Arc in the live section
-  { id: "narrative-arc", title: "Narrative Arc",        blurb: "Map emotional beats and structure.",       icon: Sparkles,   tint: "from-purple-500/20 to-indigo-500/20", route: `${BASE}/narrative-arc` },
+  { id: "prompts",        title: "Story Prompts",          blurb: "Context-aware sparks for stuck scenes.",   icon: Sparkles,   tint: "from-indigo-500/20 to-sky-500/20",   route: `${BASE}/prompts` },
+  { id: "roadmap",        title: "Character Roadmap",      blurb: "Map growth arcs and pivotal beats.",       icon: MapIcon,    tint: "from-emerald-500/20 to-teal-500/20", route: `${BASE}/workshop/roadmap` },
+  { id: "hopes",          title: "Hopes • Fears • Legacy", blurb: "Surface motives that drive choices.",      icon: Heart,      tint: "from-rose-500/20 to-fuchsia-500/20", route: `${BASE}/workshop/hfl` },
+  { id: "priority",       title: "Priority Cards",         blurb: "Organize what matters most next.",         icon: Target,     tint: "from-amber-500/20 to-orange-500/20", route: `${BASE}/workshop/priorities` },
+  { id: "clothesline",    title: "Clothesline",            blurb: "Org-style cast view at a glance.",         icon: LayoutGrid, tint: "from-cyan-500/20 to-blue-500/20",    route: `${BASE}/workshop/clothesline` },
+  { id: "narrative-arc",  title: "Narrative Arc",          blurb: "Map emotional beats and structure.",       icon: Sparkles,   tint: "from-purple-500/20 to-indigo-500/20", route: `${BASE}/narrative-arc` },
 ];
 
 const DEV_SECTIONS = [
-  { id: "profiles", title: "Character Profiles", blurb: "Detailed sheets to track traits, wounds, and wants.", icon: Brain,        route: `${BASE}/characters`,        tint: "from-purple-500/20 to-indigo-500/20" },
-  { id: "world",    title: "World Bible",        blurb: "Lore, locations, culture—organized and searchable.", icon: BookOpenCheck, route: `${BASE}/world`,             tint: "from-sky-500/20 to-cyan-500/20" },
-  { id: "manager",  title: "Character Manager",  blurb: "Create, link, and reuse your cast.",                 icon: FolderKanban,  route: `${BASE}/character-manager`, tint: "from-emerald-500/20 to-lime-500/20" },
+  { id: "profiles",  title: "Character Profiles", blurb: "Detailed sheets to track traits, wounds, and wants.", icon: Brain,        route: `${BASE}/characters`,        tint: "from-purple-500/20 to-indigo-500/20" },
+  { id: "world",     title: "World Bible",        blurb: "Lore, locations, culture—organized and searchable.", icon: BookOpenCheck, route: `${BASE}/world`,             tint: "from-sky-500/20 to-cyan-500/20" },
+  { id: "manager",   title: "Character Manager",  blurb: "Create, link, and reuse your cast.",                 icon: FolderKanban,  route: `${BASE}/character-manager`, tint: "from-emerald-500/20 to-lime-500/20" },
 ];
 
 const NAV_LINKS = [
   { to: `${BASE}`,                      icon: Compass,    label: "Landing" },
-  { to: `${BASE}/narrative-arc`,       icon: Sparkles,   label: "Narrative Arc" }, // NEW
+  { to: `${BASE}/narrative-arc`,       icon: Sparkles,   label: "Narrative Arc" },
   { to: `${BASE}/prompts`,             icon: Sparkles,   label: "Story Prompts" },
   { to: `${BASE}/workshop/roadmap`,    icon: MapIcon,    label: "Character Roadmap" },
   { to: `${BASE}/workshop/hfl`,        icon: Heart,      label: "Hopes • Fears • Legacy" },
@@ -61,7 +56,9 @@ const NAV_LINKS = [
   { to: `${BASE}/community`,           icon: Users,      label: "Workshop Community" },
 ];
 
-/* ============ Dynamic Quote (from saved chapters) ============ */
+/* =========================================================
+   Quote pulled from user's chapters (localStorage)
+   ========================================================= */
 function useChapterSentences() {
   const [line, setLine] = React.useState("");
   const pick = React.useCallback(() => {
@@ -77,10 +74,10 @@ function useChapterSentences() {
       setLine(
         sentences.length
           ? sentences[Math.floor(Math.random() * sentences.length)].trim()
-          : "Start writing—your own words will appear here."
+          : "These lines will come from your story as you write."
       );
     } catch {
-      setLine("Start writing—your own words will appear here.");
+      setLine("These lines will come from your story as you write.");
     }
   }, []);
 
@@ -116,7 +113,9 @@ function QuoteBarTop() {
   );
 }
 
-/* ============ Desktop Sidebar (md+) ============ */
+/* =========================================================
+   Sidebar (desktop & mobile)
+   ========================================================= */
 function DesktopSidebar() {
   const { pathname } = useLocation();
   const Item = ({ to, icon: Icon, label }) => (
@@ -134,7 +133,8 @@ function DesktopSidebar() {
   return (
     <aside className="hidden md:block fixed left-0 top-0 z-40 h-screen w-72 p-3 border-r border-border bg-white/80 backdrop-blur-md">
       <div className="flex items-center gap-2 px-1 py-2">
-        <BrandLogo className="h-8 w-auto" />
+        {/* Bigger single logo */}
+        <BrandLogo className="h-10 w-auto" />
         <div className="leading-tight">
           <div className="font-serif text-lg font-bold text-ink">DahTruth</div>
           <div className="text-[11px] tracking-wide text-muted">Story Lab</div>
@@ -149,7 +149,6 @@ function DesktopSidebar() {
   );
 }
 
-/* ============ Mobile Sidebar (slide-in sheet) ============ */
 function MobileSidebar({ open, setOpen }) {
   const { pathname } = useLocation();
   React.useEffect(() => {
@@ -214,35 +213,72 @@ function MobileSidebar({ open, setOpen }) {
   );
 }
 
-/* ============ Community Quick Access ============ */
-function CommunityStrip() {
+/* =========================================================
+   Banner header (replaces the old top bar)
+   ========================================================= */
+function DarkModeToggle() {
+  const [dark, setDark] = React.useState(() =>
+    typeof window !== "undefined" &&
+    document.documentElement.classList.contains("theme-dark")
+  );
+  React.useEffect(() => {
+    document.documentElement.classList.toggle("theme-dark", dark);
+  }, [dark]);
   return (
-    <div className="grid gap-3 sm:grid-cols-3">
-      <Link to={`${BASE}/community`} className="glass-soft p-4 flex items-start gap-3">
-        <Users className="size-5 text-primary" />
-        <div>
-          <div className="font-semibold text-ink">Workshop Community</div>
-          <div className="text-sm text-muted">Sessions, pairings, critique hub.</div>
+    <button
+      onClick={() => setDark((d) => !d)}
+      className="inline-flex items-center gap-2 rounded-xl px-3 py-1.5 text-sm border border-border bg-white hover:shadow"
+      aria-label="Toggle dark mode"
+    >
+      {dark ? <Sun className="size-4" /> : <Moon className="size-4" />} {dark ? "Light" : "Dark"}
+    </button>
+  );
+}
+
+function BannerHeader({ onDashboard, onSettings, onOpenMenu }) {
+  return (
+    <div className="md:ml-72 sticky top-0 z-40 bg-gradient-to-r from-brand-navy/[.06] via-brand-gold/[.05] to-brand-rose/[.06] backdrop-blur-md">
+      <div className="mx-auto max-w-7xl px-4 py-5 flex items-center justify-between">
+        {/* Left: mobile menu + page title */}
+        <div className="flex items-center gap-3">
+          <button
+            className="md:hidden rounded-xl border border-border bg-white px-3 py-2"
+            onClick={onOpenMenu}
+            aria-label="Open menu"
+          >
+            <Menu className="size-5 text-ink" />
+          </button>
+          <h1 className="text-2xl md:text-3xl font-serif font-bold tracking-tight">
+            <span className="text-ink/80">Writing Your </span>
+            <span className="text-primary">Story Journey</span>
+          </h1>
         </div>
-      </Link>
-      <Link to={`${BASE}/workshop`} className="glass-soft p-4 flex items-start gap-3">
-        <Compass className="size-5 text-primary" />
-        <div>
-          <div className="font-semibold text-ink">Workshop Manager</div>
-          <div className="text-sm text-muted">Launch modules & manage flow.</div>
+
+        {/* Right: actions */}
+        <div className="flex items-center gap-3">
+          <button
+            className="hidden sm:inline-flex items-center gap-2 rounded-xl px-3 py-1.5 text-sm border border-border bg-white hover:shadow"
+            onClick={onDashboard}
+            title="Back to Dashboard"
+          >
+            ← Dashboard
+          </button>
+          <button
+            className="hidden sm:inline-flex items-center gap-2 rounded-xl px-3 py-1.5 text-sm border border-border bg-white hover:shadow"
+            onClick={onSettings}
+          >
+            <Settings className="size-4" /> Settings
+          </button>
+          <DarkModeToggle />
         </div>
-      </Link>
-      <Link to={`${BASE}/community`} className="glass-soft p-4 flex items-start gap-3">
-        <MessageSquare className="size-5 text-primary" />
-        <div>
-          <div className="font-semibold text-ink">Critique Room</div>
-          <div className="text-sm text-muted">Open live critique.</div>
-        </div>
-      </Link>
+      </div>
     </div>
   );
 }
 
+/* =========================================================
+   Page
+   ========================================================= */
 export default function StoryLabLanding() {
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = React.useState(false);
@@ -253,58 +289,27 @@ export default function StoryLabLanding() {
       <DesktopSidebar />
       <MobileSidebar open={mobileOpen} setOpen={setMobileOpen} />
 
-      {/* Top bar — brand + actions */}
-      <div className="md:ml-72 sticky top-0 z-40 border-b border-border bg-white/70 backdrop-blur-md">
-        <div className="mx-auto max-w-7xl px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            {/* Mobile hamburger */}
-            <button
-              className="md:hidden rounded-xl border border-border bg-white px-3 py-2"
-              onClick={() => setMobileOpen(true)}
-              aria-label="Open menu"
-            >
-              <Menu className="size-5 text-ink" />
-            </button>
-            <BrandLogo className="h-6 w-auto" />
-            <span className="font-semibold tracking-wide">
-              <span className="text-primary">DahTruth</span> • StoryLab
-            </span>
-          </div>
+      {/* New banner */}
+      <BannerHeader
+        onDashboard={() => navigate("/dashboard")}
+        onSettings={() => navigate("/settings")}
+        onOpenMenu={() => setMobileOpen(true)}
+      />
 
-          <div className="flex items-center gap-3">
-            {/* NEW: Back to Dashboard */}
-            <button
-              className="hidden sm:inline-flex items-center gap-2 rounded-xl px-3 py-1.5 text-sm border border-border bg-white hover:shadow"
-              onClick={() => navigate("/dashboard")}
-              title="Back to Dashboard"
-            >
-              ← Dashboard
-            </button>
-            <button
-              className="hidden sm:inline-flex items-center gap-2 rounded-xl px-3 py-1.5 text-sm border border-border bg-white hover:shadow"
-              onClick={() => navigate("/settings")}
-            >
-              <Settings className="size-4" /> Settings
-            </button>
-            <DarkModeToggle />
-          </div>
-        </div>
-      </div>
-
-      {/* Top Quote */}
+      {/* Quote pulled from user's writing */}
       <QuoteBarTop />
 
-      {/* Hero / Journey Map */}
+      {/* Hero / CTA */}
       <section className="relative md:ml-72">
         <div className="mx-auto max-w-7xl px-4 pt-10 pb-6 relative">
-          <motion.h1
+          <motion.h2
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
             className="text-3xl md:text-5xl font-bold tracking-tight"
           >
             Welcome to your <span className="text-primary">Story Journey</span>
-          </motion.h1>
+          </motion.h2>
           <motion.p
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
@@ -333,12 +338,12 @@ export default function StoryLabLanding() {
         </div>
       </section>
 
-      {/* Community strip */}
+      {/* Community quick links */}
       <section className="md:ml-72 mx-auto max-w-7xl px-4 pb-4">
         <CommunityStrip />
       </section>
 
-      {/* Toolbelt: Live Session Modules (now includes Narrative Arc) */}
+      {/* Live modules */}
       <section className="md:ml-72 mx-auto max-w-7xl px-4 py-6">
         <SectionHeader
           title="Live Session Modules"
@@ -373,7 +378,7 @@ export default function StoryLabLanding() {
         </div>
       </section>
 
-      {/* Development: Character + World */}
+      {/* Development tools */}
       <section className="md:ml-72 mx-auto max-w-7xl px-4 pb-16">
         <SectionHeader
           title="Character Development"
@@ -405,7 +410,7 @@ export default function StoryLabLanding() {
         </div>
       </section>
 
-      {/* Quote Banner (secondary inspiration) */}
+      {/* Secondary inspiration */}
       <section className="md:ml-72 mx-auto max-w-7xl px-4 pb-16">
         <div className="glass-panel">
           <div className="p-6 md:p-8 relative">
@@ -429,6 +434,9 @@ export default function StoryLabLanding() {
   );
 }
 
+/* =========================================================
+   Small atoms
+   ========================================================= */
 function SectionHeader({ title, subtitle }) {
   return (
     <div className="mb-4 flex items-end justify-between">
@@ -446,25 +454,5 @@ function CountdownStub() {
       <CalendarClock className="size-4" />
       <span className="text-sm">Next session in 2 days</span>
     </div>
-  );
-}
-
-// Updated to toggle the 'theme-dark' class (matches your CSS tokens)
-function DarkModeToggle() {
-  const [dark, setDark] = React.useState(() =>
-    typeof window !== "undefined" &&
-    document.documentElement.classList.contains("theme-dark")
-  );
-  React.useEffect(() => {
-    document.documentElement.classList.toggle("theme-dark", dark);
-  }, [dark]);
-  return (
-    <button
-      onClick={() => setDark((d) => !d)}
-      className="inline-flex items-center gap-2 rounded-xl px-3 py-1.5 text-sm border border-border bg-white hover:shadow"
-      aria-label="Toggle dark mode"
-    >
-      {dark ? <Sun className="size-4" /> : <Moon className="size-4" />} {dark ? "Light" : "Dark"}
-    </button>
   );
 }
