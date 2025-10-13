@@ -18,15 +18,17 @@ import {
   Info,
   Loader2,
 } from "lucide-react";
-import heic2any from "heic2any";
 
+// ✅ Use shared helpers (no direct heic2any import here)
+import { ensureJpegFile } from "../lib/image/convertHeic";
+import { resizeImageBlob } from "../lib/image/resizeImage";
+
+// Optional store hook (works if <UserProvider> is mounted)
 let useUserSafe = null;
 try {
-  // Works if <UserProvider> is mounted
   // eslint-disable-next-line global-require
   useUserSafe = require("../lib/state/userStore").useUser;
 } catch {
-  // Fallback if `useUserSafe` is not available
   useUserSafe = () => null;
 }
 
@@ -114,35 +116,6 @@ function ProfileSidebar({ onNavigate }) {
   );
 }
 
-async function heicArrayBufferToJpegDataUrl(arrayBuffer, quality = 0.9) {
-  const blob = new Blob([arrayBuffer], { type: "image/heic" });
-  const jpegBlob = await heic2any({ blob, toType: "image/jpeg", quality });
-  const dataUrl = await new Promise((resolve, reject) => {
-    const fr = new FileReader();
-    fr.onload = () => resolve(String(fr.result || ""));
-    fr.onerror = reject;
-    fr.readAsDataURL(jpegBlob);
-  });
-  return dataUrl;
-}
-
-async function downscaleDataUrl(dataUrl, maxDim = 2000, quality = 0.9) {
-  const img = await new Promise((res, rej) => {
-    const i = new Image();
-    i.onload = () => res(i);
-    i.onerror = rej;
-    i.src = dataUrl;
-  });
-  const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
-  if (scale === 1) return dataUrl;
-  const canvas = document.createElement("canvas");
-  canvas.width = Math.round(img.width * scale);
-  canvas.height = Math.round(img.height * scale);
-  const ctx = canvas.getContext("2d");
-  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-  return canvas.toDataURL("image/jpeg", quality);
-}
-
 /* ---------- Main Component ---------- */
 export default function Profile() {
   const navigate = useNavigate();
@@ -157,7 +130,7 @@ export default function Profile() {
   const [displayName, setDisplayName] = useState(initial.displayName || "");
   const [email, setEmail] = useState(initial.email || "");
   const [bio, setBio] = useState(initial.bio || "");
-  const [avatar, setAvatar] = useState(initial.avatar || ""); // base64 (optional)
+  const [avatar, setAvatar] = useState(initial.avatar || ""); // data URL preview
   const [lastSaved, setLastSaved] = useState(Date.now());
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
@@ -168,56 +141,62 @@ export default function Profile() {
       setBio(store.user.bio || "");
       setAvatar(store.user.avatar || "");
     }
-  }, [store?.user?.displayName, store?.user?.email, store?.user?.bio, store?.user?.avatar]);
+  }, [
+    store?.user?.displayName,
+    store?.user?.email,
+    store?.user?.bio,
+    store?.user?.avatar,
+  ]);
+
+  // Convert File -> DataURL (for preview)
+  function fileToDataUrl(file) {
+    return new Promise((resolve, reject) => {
+      const fr = new FileReader();
+      fr.onload = () => resolve(String(fr.result || ""));
+      fr.onerror = reject;
+      fr.readAsDataURL(file);
+    });
+  }
 
   const onPickAvatar = async (file) => {
     if (!file) return;
     setUploadingAvatar(true);
     try {
-      const maxSize = 10 * 1024 * 1024;
+      const maxSize = 10 * 1024 * 1024; // 10MB guardrail
       if (file.size > maxSize) {
         alert("Image is too large. Please choose an image under 10MB.");
         setUploadingAvatar(false);
         return;
       }
 
-      const isHEIC =
-        file.name.toLowerCase().endsWith(".heic") ||
-        file.name.toLowerCase().endsWith(".heif") ||
-        file.type === "image/heic" ||
-        file.type === "image/heif";
+      // 1) Ensure JPEG if user selected HEIC/HEIF (iPhone)
+      let safeFile = await ensureJpegFile(file, 0.9);
 
-      if (isHEIC) {
-        const ab = await file.arrayBuffer();
-        const jpegDataUrl = await heicArrayBufferToJpegDataUrl(ab, 0.9);
-        const scaled = await downscaleDataUrl(jpegDataUrl, 2000, 0.9);
-        setAvatar(scaled);
-      } else {
-        const dataUrl = await new Promise((resolve, reject) => {
-          const fr = new FileReader();
-          fr.onload = () => resolve(String(fr.result || ""));
-          fr.onerror = reject;
-          fr.readAsDataURL(file);
+      // 2) Optional downscale big images (keeps uploads snappy)
+      if (safeFile.size > 5 * 1024 * 1024) {
+        const resizedBlob = await resizeImageBlob(safeFile, 2000, 2000, 0.88);
+        safeFile = new File([resizedBlob], safeFile.name.replace(/\.(png)$/i, ".jpg"), {
+          type: "image/jpeg",
         });
-        const scaled = await downscaleDataUrl(String(dataUrl), 2000, 0.9);
-        setAvatar(scaled);
       }
+
+      // 3) Preview as Data URL
+      const previewUrl = await fileToDataUrl(safeFile);
+      setAvatar(previewUrl);
+
+      // TODO: upload `safeFile` to your backend / Amplify Storage if needed
+      // await Storage.put(`avatars/${userId}.jpg`, safeFile, { contentType: safeFile.type });
     } catch (err) {
       console.error("Error uploading avatar:", err);
-      alert("Failed to upload image. Please try again or use a different image.");
+      alert("Failed to process image. Please try a different photo.");
     } finally {
       setUploadingAvatar(false);
-      // Clear the input so the same file can be selected again
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
   const handleUploadClick = () => {
-    if (fileInputRef.current && !uploadingAvatar) {
-      fileInputRef.current.click();
-    }
+    if (!uploadingAvatar) fileInputRef.current?.click();
   };
 
   const removeAvatar = () => setAvatar("");
@@ -331,9 +310,7 @@ export default function Profile() {
                   className="hidden"
                   onChange={(e) => {
                     const file = e.target.files?.[0];
-                    if (file) {
-                      onPickAvatar(file);
-                    }
+                    if (file) onPickAvatar(file);
                   }}
                 />
                 {avatar && !uploadingAvatar && (
@@ -439,10 +416,10 @@ export default function Profile() {
               <div className="text-lg font-semibold mb-4 heading-serif">Preview</div>
               <div className="flex items-center gap-4">
                 {avatar ? (
-                  <img 
-                    src={avatar} 
-                    alt={displayName || "Profile"} 
-                    className="w-12 h-12 rounded-full object-cover shadow border-2 border-[hsl(var(--border))]" 
+                  <img
+                    src={avatar}
+                    alt={displayName || "Profile"}
+                    className="w-12 h-12 rounded-full object-cover shadow border-2 border-[hsl(var(--border))]"
                   />
                 ) : (
                   <div className="w-12 h-12 rounded-full bg-[color:var(--color-accent)] grid place-items-center shadow">
