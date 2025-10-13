@@ -18,21 +18,69 @@ import {
   Info,
   Loader2,
 } from "lucide-react";
+import heic2any from "heic2any";
 
-// ✅ Use shared helpers (no direct heic2any import here)
-import { ensureJpegFile } from "../lib/image/convertHeic";
-import { resizeImageBlob } from "../lib/image/resizeImage";
+/* =========================================================
+   Minimal, self-contained image helpers (no external imports)
+   ========================================================= */
+const isHeicLike = (f) => {
+  const n = f.name?.toLowerCase() || "";
+  const t = f.type?.toLowerCase() || "";
+  return n.endsWith(".heic") || n.endsWith(".heif") || t === "image/heic" || t === "image/heif";
+};
 
-// Optional store hook (works if <UserProvider> is mounted)
-let useUserSafe = null;
-try {
-  // eslint-disable-next-line global-require
-  useUserSafe = require("../lib/state/userStore").useUser;
-} catch {
-  useUserSafe = () => null;
+async function ensureJpegFile(file, quality = 0.9) {
+  if (isHeicLike(file)) {
+    const jpegBlob = await heic2any({ blob: file, toType: "image/jpeg", quality });
+    const name = file.name.replace(/\.(heic|heif)$/i, ".jpg");
+    return new File([jpegBlob], name, { type: "image/jpeg" });
+  }
+  // If PNG, we’ll keep it unless it's too large—downscale will handle conversion to JPEG later
+  return file;
 }
 
-/* ---------- Helpers ---------- */
+async function resizeImageBlob(file, maxW = 2000, maxH = 2000, quality = 0.9) {
+  const dataUrl = await new Promise((resolve, reject) => {
+    const fr = new FileReader();
+    fr.onload = () => resolve(String(fr.result || ""));
+    fr.onerror = reject;
+    fr.readAsDataURL(file);
+  });
+
+  const img = await new Promise((res, rej) => {
+    const i = new Image();
+    i.onload = () => res(i);
+    i.onerror = rej;
+    i.src = dataUrl;
+  });
+
+  const scale = Math.min(1, maxW / img.width, maxH / img.height);
+  if (scale >= 1) {
+    // no resize needed; return original blob
+    return file;
+  }
+
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(img.width * scale);
+  canvas.height = Math.round(img.height * scale);
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+  // Export to JPEG for consistent previews/storage
+  const outDataUrl = canvas.toDataURL("image/jpeg", quality);
+  const outBlob = await (await fetch(outDataUrl)).blob();
+  const name = file.name.replace(/\.(png|webp)$/i, ".jpg");
+  return new File([outBlob], name.endsWith(".jpg") ? name : `${name}.jpg`, {
+    type: "image/jpeg",
+  });
+}
+
+/* =========================================================
+   Safe, optional store hook (no import path errors)
+   ========================================================= */
+const useUserSafe = () => null;
+
+/* ---------- Local persistence ---------- */
 const STORAGE_KEY = "dt_profile";
 
 function readProfile() {
@@ -121,10 +169,10 @@ export default function Profile() {
   const navigate = useNavigate();
   const fileInputRef = useRef(null);
 
-  // ✅ Always call the hook unconditionally
+  // Safe (no-op) store hook; wire into your real store later if desired.
   const store = useUserSafe();
 
-  // Initialization logic
+  // Initial state from store or localStorage
   const initial = store?.user ?? readProfile();
 
   const [displayName, setDisplayName] = useState(initial.displayName || "");
@@ -174,10 +222,7 @@ export default function Profile() {
 
       // 2) Optional downscale big images (keeps uploads snappy)
       if (safeFile.size > 5 * 1024 * 1024) {
-        const resizedBlob = await resizeImageBlob(safeFile, 2000, 2000, 0.88);
-        safeFile = new File([resizedBlob], safeFile.name.replace(/\.(png)$/i, ".jpg"), {
-          type: "image/jpeg",
-        });
+        safeFile = await resizeImageBlob(safeFile, 2000, 2000, 0.88);
       }
 
       // 3) Preview as Data URL
