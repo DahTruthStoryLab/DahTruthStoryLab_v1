@@ -142,7 +142,7 @@ export default function App() {
                 }
               />
 
-              {/* Writer/Writing (route all to ComposePage) */}
+              {/* Writer/Writing */}
               <Route
                 path="/writer"
                 element={
@@ -176,46 +176,30 @@ export default function App() {
                 }
               />
 
-          {/* ================= STORYLAB (wrapped by StoryLabLayout) ================= */}
-<Route
-  path="/story-lab"
-  element={
-    <ProtectedRoute>
-      <StoryLabLayout />  {/* sidebar/header + <Outlet/> */}
-    </ProtectedRoute>
-  }
->
-  {/* Landing at /story-lab */}
-  {/* ================= STORYLAB (all under a protected layout) ================= */}
-<Route
-  path="/story-lab"
-  element={
-    <ProtectedRoute>
-      <StoryLabLayout />   {/* StoryLab-only sidebar/header + <Outlet/> */}
-    </ProtectedRoute>
-  }
->
-              {/* index == /story-lab */}
-              <Route index element={<StoryLabLanding />} />
-            
-              {/* Live / modules (ALL RELATIVE PATHS) */}
-              <Route path="workshop" element={<StoryWorkshop />} />
-              <Route path="workshop/priorities" element={<PriorityCards />} />
-              <Route path="workshop/roadmap" element={<CharacterRoadmap />} />
-              <Route path="workshop/clothesline" element={<Clothesline />} />
-              <Route path="workshop/hfl" element={<HopesFearsLegacy />} />
-            
-              <Route path="prompts" element={<StoryPromptsWorkshop />} />
-              <Route path="community" element={<WorkshopCohort />} />
-            
-              {/* Narrative Arc */}
-              <Route path="narrative-arc" element={<NarrativeArc />} />
-            </Route>
-            
-            {/* Typo/alias redirect */}
-            <Route path="/storylab/*" element={<Navigate to="/story-lab" replace />} />
+              {/* ================= STORYLAB under layout ================= */}
+              <Route
+                path="/story-lab"
+                element={
+                  <ProtectedRoute>
+                    <StoryLabLayout />
+                  </ProtectedRoute>
+                }
+              >
+                <Route index element={<StoryLabLanding />} />
+                <Route path="workshop" element={<StoryWorkshop />} />
+                <Route path="workshop/priorities" element={<PriorityCards />} />
+                <Route path="workshop/roadmap" element={<CharacterRoadmap />} />
+                <Route path="workshop/clothesline" element={<Clothesline />} />
+                <Route path="workshop/hfl" element={<HopesFearsLegacy />} />
+                <Route path="prompts" element={<StoryPromptsWorkshop />} />
+                <Route path="community" element={<WorkshopCohort />} />
+                <Route path="narrative-arc" element={<NarrativeArc />} />
+              </Route>
 
-              {/* Table of Contents */}
+              {/* Typo/alias redirect */}
+              <Route path="/storylab/*" element={<Navigate to="/story-lab" replace />} />
+
+              {/* TOC */}
               <Route
                 path="/toc"
                 element={
@@ -286,7 +270,7 @@ export default function App() {
               <Route path="/publish/*" element={<Navigate to="/publishing" replace />} />
               <Route path="/publishing-suite/*" element={<Navigate to="/publishing" replace />} />
 
-              {/* Shared AI tools page (optional) */}
+              {/* AI Tools (optional) */}
               <Route
                 path="/ai-tools"
                 element={
