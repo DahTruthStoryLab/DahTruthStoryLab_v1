@@ -26,13 +26,6 @@ import {
   X,
 } from "lucide-react";
 
-/**
- * StoryLab Journey Landing
- * - Clean banner header
- * - Single, larger logo in the left sidebar
- * - Quote bar shows a sentence from user's story (fallback text if none)
- */
-
 const BASE = "/story-lab";
 
 const MODULES = [
@@ -101,9 +94,9 @@ function useChapterSentences() {
 function QuoteBarTop() {
   const { line, refresh } = useChapterSentences();
   return (
-    <div className="mx-auto max-w-7xl px-4 pt-4">
+    <div className="md:ml-72 mx-auto max-w-7xl px-4 pt-4">
       <div className="glass-soft px-5 py-4 flex items-center justify-between">
-        <div className="italic text-ink">“{line}”</div>
+        <div className="italic text-ink">"{line}"</div>
         <button
           onClick={refresh}
           className="ml-4 rounded-xl border border-border bg-white px-3 py-1.5 text-sm text-ink hover:shadow"
@@ -131,12 +124,11 @@ function DesktopSidebar() {
       <Icon className="size-5" />
       <span className="truncate">{label}</span>
     </Link>
-  ); // ← IMPORTANT: closes the Item arrow function
+  );
 
   return (
     <aside className="hidden md:block fixed left-0 top-0 z-40 h-screen w-72 p-3 border-r border-border bg-white/80 backdrop-blur-md">
       <div className="flex items-center gap-2 px-1 py-2">
-        {/* Single, larger logo in sidebar */}
         <img
           src="/DahTruthLogo.png"
           alt="DahTruth"
@@ -251,37 +243,71 @@ function DarkModeToggle() {
   );
 }
 
-function BannerHeader({ onDashboard, onSettings, onOpenMenu }) {
+function BannerHeader({ onDashboard, onSettings, onOpenMenu, navigate }) {
   return (
     <div className="md:ml-72 sticky top-0 z-40 bg-gradient-to-r from-brand-navy/[.06] via-brand-gold/[.05] to-brand-rose/[.06] backdrop-blur-md">
-      <div className="mx-auto max-w-7xl px-4 py-5 flex items-center justify-between">
-        {/* Left: title + mobile hamburger */}
-        <div className="flex items-center gap-3">
-          <button
-            className="md:hidden rounded-xl border border-border bg-white px-3 py-2"
-            onClick={onOpenMenu}
-            aria-label="Open menu"
-          >
-            <Menu className="size-5 text-ink" />
-          </button>
+      {/* Mobile hamburger - only shows on mobile */}
+      <div className="md:hidden px-4 py-3 flex items-center justify-between border-b border-border/50">
+        <button
+          className="rounded-xl border border-border bg-white px-3 py-2"
+          onClick={onOpenMenu}
+          aria-label="Open menu"
+        >
+          <Menu className="size-5 text-ink" />
+        </button>
+      </div>
 
-          <h1 className="text-2xl md:text-3xl font-serif font-bold tracking-tight">
-            <span className="text-ink/80">Writing Your </span>
-            <span className="text-primary">Story Journey</span>
-          </h1>
+      {/* Main hero banner */}
+      <div className="mx-auto max-w-7xl px-4 pt-8 pb-6">
+        <motion.h1
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6 }}
+          className="text-3xl md:text-5xl font-bold tracking-tight"
+        >
+          Welcome to your <span className="text-primary">Story Journey</span>
+        </motion.h1>
+
+        <div className="mt-6 flex flex-wrap items-center gap-3">
+          <button
+            onClick={() => navigate("/journey")}
+            className="inline-flex items-center gap-2 rounded-2xl px-4 py-2 bg-primary hover:bg-primary/90 text-white font-semibold shadow"
+          >
+            <MapIcon className="size-5" /> Open Journey Map
+          </button>
+          <button
+            onClick={() => navigate(`${BASE}/prompts`)}
+            className="inline-flex items-center gap-2 rounded-2xl px-4 py-2 glass"
+          >
+            <PenLine className="size-5" /> Quick Prompt
+          </button>
+          <CountdownStub />
         </div>
+      </div>
+
+      {/* Description + Actions row */}
+      <div className="mx-auto max-w-7xl px-4 pb-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <motion.p
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1, duration: 0.55 }}
+          className="max-w-2xl text-muted"
+        >
+          Choose a path to begin. Each module is a step—prompts, roadmaps, priorities,
+          and character views—designed to move your story forward with clarity and flow.
+        </motion.p>
 
         {/* Right: actions */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 shrink-0">
           <button
-            className="hidden sm:inline-flex items-center gap-2 rounded-xl px-3 py-1.5 text-sm border border-border bg-white hover:shadow"
+            className="inline-flex items-center gap-2 rounded-xl px-3 py-1.5 text-sm border border-border bg-white hover:shadow"
             onClick={onDashboard}
             title="Back to Dashboard"
           >
             ← Dashboard
           </button>
           <button
-            className="hidden sm:inline-flex items-center gap-2 rounded-xl px-3 py-1.5 text-sm border border-border bg-white hover:shadow"
+            className="inline-flex items-center gap-2 rounded-xl px-3 py-1.5 text-sm border border-border bg-white hover:shadow"
             onClick={onSettings}
           >
             <Settings className="size-4" /> Settings
@@ -353,57 +379,19 @@ export default function StoryLabLanding() {
       <DesktopSidebar />
       <MobileSidebar open={mobileOpen} setOpen={setMobileOpen} />
 
-      {/* Banner header */}
+      {/* Banner header - NEW DESIGN */}
       <BannerHeader
         onDashboard={() => navigate("/dashboard")}
         onSettings={() => navigate("/settings")}
         onOpenMenu={() => setMobileOpen(true)}
+        navigate={navigate}
       />
 
-      {/* Quote */}
+      {/* Quote - now comes after the banner */}
       <QuoteBarTop />
 
-      {/* Hero / Journey Map */}
-      <section className="relative md:ml-72">
-        <div className="mx-auto max-w-7xl px-4 pt-10 pb-6 relative">
-          <motion.h1
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
-            className="text-3xl md:text-5xl font-bold tracking-tight"
-          >
-            Welcome to your <span className="text-primary">Story Journey</span>
-          </motion.h1>
-          <motion.p
-            initial={{ opacity: 0, y: 8 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1, duration: 0.55 }}
-            className="mt-3 max-w-2xl text-muted"
-          >
-            Choose a path to begin. Each module is a step—prompts, roadmaps, priorities,
-            and character views—designed to move your story forward with clarity and flow.
-          </motion.p>
-
-          <div className="mt-6 flex flex-wrap items-center gap-3">
-            <button
-              onClick={() => navigate("/journey")}
-              className="inline-flex items-center gap-2 rounded-2xl px-4 py-2 bg-primary hover:bg-primary/90 text-white font-semibold shadow"
-            >
-              <MapIcon className="size-5" /> Open Journey Map
-            </button>
-            <button
-              onClick={() => navigate(`${BASE}/prompts`)}
-              className="inline-flex items-center gap-2 rounded-2xl px-4 py-2 glass"
-            >
-              <PenLine className="size-5" /> Quick Prompt
-            </button>
-            <CountdownStub />
-          </div>
-        </div>
-      </section>
-
       {/* Community strip */}
-      <section className="md:ml-72 mx-auto max-w-7xl px-4 pb-4">
+      <section className="md:ml-72 mx-auto max-w-7xl px-4 pb-4 pt-4">
         <CommunityStrip />
       </section>
 
@@ -478,29 +466,6 @@ export default function StoryLabLanding() {
       <footer className="md:ml-72 mx-auto max-w-7xl px-4 pb-16 text-xs text-muted">
         © {new Date().getFullYear()} DahTruth • Where Truth is Written
       </footer>
-    </div>
-  );
-}
-
-/* =========================================================
-   Small atoms
-   ========================================================= */
-function SLSectionHeader({ title, subtitle }) {
-  return (
-    <div className="mb-4 flex items-end justify-between">
-      <div>
-        <h2 className="text-xl md:text-2xl font-semibold text-ink">{title}</h2>
-        <p className="text-sm text-muted">{subtitle}</p>
-      </div>
-    </div>
-  );
-}
-
-function SLCountdownStub() {
-  return (
-    <div className="inline-flex items-center gap-2 rounded-2xl px-3 py-1.5 border border-border bg-white/80 text-ink">
-      <CalendarClock className="size-4" />
-      <span className="text-sm">Next session in 2 days</span>
     </div>
   );
 }
