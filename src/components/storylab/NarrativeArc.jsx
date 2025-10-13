@@ -1,6 +1,9 @@
 import React, { useMemo, useState, useEffect, useRef } from "react";
 import { Heart, Users, Plane, Sparkles, BookOpen, MapPin } from "lucide-react";
 
+/* Icon registry (string key -> component) */
+const ICONS = { Heart, Users, Plane, Sparkles, BookOpen, MapPin };
+
 /* =========================
    Brand color class mapping
    ========================= */
@@ -23,20 +26,14 @@ const loadLocal = (key, fallback) => {
 };
 const saveLocal = (key, value) => { try { localStorage.setItem(key, JSON.stringify(value)); } catch {} };
 
-const snap = (val, step = 5, min = 0, max = 100) => {
-  const s = Math.round(val / step) * step;
-  return Math.max(min, Math.min(max, s));
-};
-
-const countWords = (s = "") => s.trim().split(/\s+/).filter(Boolean).length;
-
-const useDebouncedCallback = (fn, delay = 250) => {
-  const tRef = useRef(null);
-  return (v) => {
-    if (tRef.current) window.clearTimeout(tRef.current);
-    tRef.current = window.setTimeout(() => fn(v), delay);
-  };
-};
+/* migrate beats to use iconKey (never store functions) */
+function reviveBeats(beats) {
+  return (beats || []).map((b) => {
+    // if legacy saved with "icon": <function>, fall back to Heart
+    const iconKey = b.iconKey || b.icon?.name || "Heart";
+    return { ...b, iconKey };
+  });
+}
 
 /* =========================
    Component
