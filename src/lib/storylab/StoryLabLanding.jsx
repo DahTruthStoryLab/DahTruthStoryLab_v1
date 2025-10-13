@@ -94,7 +94,7 @@ function useChapterSentences() {
 function QuoteBarTop() {
   const { line, refresh } = useChapterSentences();
   return (
-    <div className="md:ml-80 mx-auto max-w-7xl px-6 pt-4">
+    <div className="md:ml-80 px-6 pt-4">
       <div className="glass-soft px-5 py-4 flex items-center justify-between">
         <div className="italic text-ink">"{line}"</div>
         <button
@@ -245,9 +245,9 @@ function DarkModeToggle() {
 
 function BannerHeader({ onDashboard, onSettings, navigate }) {
   return (
-    <div className="md:ml-80 mt-1 sticky top-1 z-40 bg-gradient-to-r from-brand-navy/[.06] via-brand-gold/[.05] to-brand-rose/[.06] backdrop-blur-md rounded-lg mx-2">
+    <div className="md:ml-80 mt-1 sticky top-1 z-40 bg-gradient-to-r from-brand-navy/[.06] via-brand-gold/[.05] to-brand-rose/[.06] backdrop-blur-md rounded-lg ml-2 mr-2">
       {/* Main hero banner */}
-      <div className="mx-auto max-w-7xl px-6 pt-8 pb-6">
+      <div className="px-6 pt-8 pb-6">
         <motion.h1
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
@@ -275,7 +275,7 @@ function BannerHeader({ onDashboard, onSettings, navigate }) {
       </div>
 
       {/* Description + Actions row */}
-      <div className="mx-auto max-w-7xl px-6 pb-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div className="px-6 pb-4 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <motion.p
           initial={{ opacity: 0, y: 8 }}
           animate={{ opacity: 1, y: 0 }}
@@ -289,7 +289,7 @@ function BannerHeader({ onDashboard, onSettings, navigate }) {
         {/* Right: actions */}
         <div className="flex items-center gap-3 shrink-0">
           <button
-            className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm bg-amber-500 hover:bg-amber-600 text-white font-semibold shadow"
+            className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm bg-brand-gold hover:bg-brand-gold/90 text-white font-semibold shadow"
             onClick={onDashboard}
             title="Back to Dashboard"
           >
@@ -379,12 +379,12 @@ export default function StoryLabLanding() {
       <QuoteBarTop />
 
       {/* Community strip */}
-      <section className="md:ml-80 mx-auto max-w-7xl px-6 pb-4 pt-4">
+      <section className="md:ml-80 px-6 pb-4 pt-4">
         <CommunityStrip />
       </section>
 
       {/* Toolbelt: Live Session Modules */}
-      <section className="md:ml-80 mx-auto max-w-7xl px-6 py-6">
+      <section className="md:ml-80 px-6 py-6">
         <SectionHeader
           title="Live Session Modules"
           subtitle="Your facilitator toolkit—fast access during sessions."
@@ -419,7 +419,7 @@ export default function StoryLabLanding() {
       </section>
 
       {/* Development: Character + World */}
-      <section className="md:ml-80 mx-auto max-w-7xl px-6 pb-16">
+      <section className="md:ml-80 px-6 pb-16">
         <SectionHeader
           title="Character Development"
           subtitle="Deeper craft tools for focused work outside live sessions."
@@ -451,7 +451,7 @@ export default function StoryLabLanding() {
       </section>
 
       {/* Footer */}
-      <footer className="md:ml-80 mx-auto max-w-7xl px-6 pb-16 text-xs text-muted">
+      <footer className="md:ml-80 px-6 pb-16 text-xs text-muted">
         © {new Date().getFullYear()} DahTruth • Where Truth is Written
       </footer>
     </div>
