@@ -94,7 +94,7 @@ function useChapterSentences() {
 function QuoteBarTop() {
   const { line, refresh } = useChapterSentences();
   return (
-    <div className="md:ml-[21rem] px-4 pt-4">
+    <div className="md:ml-80 px-4 pt-4">
       <div className="glass-soft px-5 py-4 flex items-center justify-between">
         <div className="italic text-ink">"{line}"</div>
         <button
@@ -245,9 +245,9 @@ function DarkModeToggle() {
 
 function BannerHeader({ onDashboard, onSettings, navigate }) {
   return (
-    <div className="md:ml-[21rem] mt-1 sticky top-1 z-40 bg-gradient-to-r from-brand-navy/[.06] via-brand-gold/[.05] to-brand-rose/[.06] backdrop-blur-md rounded-lg ml-2 mr-2">
+    <div className="md:ml-80 sticky top-0 z-40 bg-gradient-to-r from-brand-navy/[.06] via-brand-gold/[.05] to-brand-rose/[.06] backdrop-blur-md">
       {/* Main hero banner */}
-      <div className="px-4 pt-8 pb-6">
+      <div className="pl-4 pr-4 pt-8 pb-6">
         <motion.h1
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
@@ -379,12 +379,12 @@ export default function StoryLabLanding() {
       <QuoteBarTop />
 
       {/* Community strip */}
-      <section className="md:ml-[21rem] px-4 pb-4 pt-4">
+      <section className="md:ml-80 px-4 pb-4 pt-4">
         <CommunityStrip />
       </section>
 
       {/* Toolbelt: Live Session Modules */}
-      <section className="md:ml-[21rem] px-4 py-6">
+      <section className="md:ml-80 px-4 py-6">
         <SectionHeader
           title="Live Session Modules"
           subtitle="Your facilitator toolkit—fast access during sessions."
@@ -419,7 +419,7 @@ export default function StoryLabLanding() {
       </section>
 
       {/* Development: Character + World */}
-      <section className="md:ml-[21rem] px-4 pb-16">
+      <section className="md:ml-80 px-4 pb-16">
         <SectionHeader
           title="Character Development"
           subtitle="Deeper craft tools for focused work outside live sessions."
@@ -451,7 +451,7 @@ export default function StoryLabLanding() {
       </section>
 
       {/* Footer */}
-      <footer className="md:ml-[21rem] px-4 pb-16 text-xs text-muted">
+      <footer className="md:ml-80 px-4 pb-16 text-xs text-muted">
         © {new Date().getFullYear()} DahTruth • Where Truth is Written
       </footer>
     </div>
