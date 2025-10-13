@@ -1,5 +1,5 @@
 // src/components/Profile.jsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import {
   User,
@@ -145,6 +145,7 @@ async function downscaleDataUrl(dataUrl, maxDim = 2000, quality = 0.9) {
 /* ---------- Main Component ---------- */
 export default function Profile() {
   const navigate = useNavigate();
+  const fileInputRef = useRef(null);
 
   // ✅ Always call the hook unconditionally
   const store = useUserSafe();
@@ -175,6 +176,7 @@ export default function Profile() {
       const maxSize = 10 * 1024 * 1024;
       if (file.size > maxSize) {
         alert("Image is too large. Please choose an image under 10MB.");
+        setUploadingAvatar(false);
         return;
       }
 
@@ -206,6 +208,16 @@ export default function Profile() {
       alert("Failed to upload image. Please try again or use a different image.");
     } finally {
       setUploadingAvatar(false);
+      // Clear the input so the same file can be selected again
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    }
+  };
+
+  const handleUploadClick = () => {
+    if (fileInputRef.current && !uploadingAvatar) {
+      fileInputRef.current.click();
     }
   };
 
@@ -298,7 +310,11 @@ export default function Profile() {
               </div>
 
               <div className="flex gap-2">
-                <label className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-[color:var(--color-primary)] border border-[hsl(var(--border))] hover:opacity-90 text-sm cursor-pointer disabled:opacity-50">
+                <button
+                  onClick={handleUploadClick}
+                  disabled={uploadingAvatar}
+                  className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-[color:var(--color-primary)] border border-[hsl(var(--border))] hover:opacity-90 text-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                >
                   {uploadingAvatar ? (
                     <>
                       <Loader2 size={16} className="animate-spin" /> Processing
@@ -308,15 +324,19 @@ export default function Profile() {
                       <Image size={16} /> Upload
                     </>
                   )}
-                  <input
-                    type="file"
-                    accept="image/*,.heic,.heif"
-                    capture="environment"
-                    className="hidden"
-                    onChange={(e) => e.target.files?.[0] && onPickAvatar(e.target.files[0])}
-                    disabled={uploadingAvatar}
-                  />
-                </label>
+                </button>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*,.heic,.heif"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      onPickAvatar(file);
+                    }
+                  }}
+                />
                 {avatar && !uploadingAvatar && (
                   <button
                     onClick={removeAvatar}
