@@ -1408,32 +1408,20 @@ export default function Publishing(): JSX.Element {
             </main>
 
             {/* SIDEBAR (FIRST TWO SECTIONS) – sticky on desktop */}
-            {isXL && (
-              <PublishingSidebar
-                meta={meta}
-                setMeta={setMeta}
-                matter={matter}
-                setMatter={setMatter}
-                manuscriptPreset={manuscriptPreset}
-                setManuscriptPreset={setManuscriptPreset}
-                platformPreset={platformPreset}
-                setPlatformPreset={setPlatformPreset}
-                includeHeadersFooters={includeHeadersFooters}
-                wordCount={wordCount}
-                ms={ms}
-                setMsOverrides={setMsOverrides}
-                manuscriptEntries={manuscriptEntries}
-                platformEntries={platformEntries}
-                googleMode={googleMode}
-                setGoogleMode={setGoogleMode}
-              />
-            )}
-          </div>
-        </div>
-      </div>
-    </PageShell>
-  );
-}
+          {isWide && (
+  <PublishingSidebar
+    meta={meta} setMeta={setMeta}
+    matter={matter} setMatter={setMatter}
+    manuscriptPreset={manuscriptPreset} setManuscriptPreset={setManuscriptPreset}
+    platformPreset={platformPreset} setPlatformPreset={setPlatformPreset}
+    includeHeadersFooters={includeHeadersFooters}
+    wordCount={wordCount}
+    ms={ms} setMsOverrides={setMsOverrides}
+    manuscriptEntries={Object.entries(MANUSCRIPT_PRESETS).map(([k,v]) => [k, v.label] as const)}
+    platformEntries={Object.entries(PLATFORM_PRESETS).map(([k,v]) => [k, v.label] as const)}
+    googleMode={googleMode} setGoogleMode={setGoogleMode}
+  />
+)}
 
 /* ---------- utilities ---------- */
 function safeFile(name: string): string {
