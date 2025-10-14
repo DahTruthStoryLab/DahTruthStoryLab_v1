@@ -1522,13 +1522,14 @@ export default function Publishing(): JSX.Element {
             ms={ms} setMsOverrides={setMsOverrides}
             manuscriptEntries={manuscriptEntries}
             platformEntries={platformEntries}
-            googleMode={googleMode} setGoogleMode={setGoogleMode}
+              googleMode={googleMode} setGoogleMode={setGoogleMode}
           />
         )}
-      </div>
-    </div>
-    </PageShell>
-  );
+      </div>        {/* closes the grid */}
+    </div>          {/* closes styles.inner + sectionShell */}
+  </div>            {/* closes styles.outer  ← this was missing */}
+</PageShell>
+);
 }
 
 /* ---------- utilities ---------- */
