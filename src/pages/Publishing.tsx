@@ -1443,13 +1443,3 @@ function stripHtml(html: string): string {
   div.innerHTML = html;
   return (div.textContent || div.innerText || "").trim();
 }
-
-/* ---------- utilities ---------- */
-function safeFile(name: string): string {
-  return (name || "manuscript").replace(/[^\w\-]+/g, "_");
-}
-function stripHtml(html: string): string {
-  const div = document.createElement("div");
-  div.innerHTML = html;
-  return (div.textContent || div.innerText || "").trim();
-}
