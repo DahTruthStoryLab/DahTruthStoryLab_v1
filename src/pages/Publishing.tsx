@@ -1054,8 +1054,25 @@ export default function Publishing(): JSX.Element {
           </div>
         </div>
 
-        {/* Optional banner */}
-        <AeroBanner size="md" title="Publishing Suite" subtitle="Presets • Page Breaks • Headers & Footers" />
+       {/* Header Bar (uses brand gradient) */} 
+
+    {/* Keep ONLY this */}
+        <AeroBanner
+          size="md"
+          title="Publishing Suite"
+          subtitle="Presets • Page Breaks • Headers & Footers"
+        />
+        
+        {/* (Optional) Back button just below the banner */}
+        <div style={{ ...styles.sectionShell, padding: "8px 24px 0" }}>
+          <button
+            onClick={() => navigate(-1)}
+            style={{ ...styles.btn, background: "transparent" }}
+            aria-label="Go back"
+          >
+            ← Back
+          </button>
+        </div>
 
         {/* NEW LAYOUT: Sidebar + Main */}
         <div style={{ ...styles.inner, ...styles.sectionShell }}>
