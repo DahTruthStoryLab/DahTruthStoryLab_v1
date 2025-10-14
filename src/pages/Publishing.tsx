@@ -1096,32 +1096,36 @@ export default function Publishing(): JSX.Element {
 
        {/* Header Bar (uses brand gradient) */} 
 
-    {/* Keep ONLY this */}
-        <AeroBanner
-          size="md"
-          title="Publishing Suite"
-          subtitle="Presets • Page Breaks • Headers & Footers"
-        />
-        
-        {/* (Optional) Back button just below the banner */}
-        <div style={{ ...styles.sectionShell, padding: "8px 24px 0" }}>
-          <button
-            onClick={() => navigate(-1)}
-            style={{ ...styles.btn, background: "transparent" }}
-            aria-label="Go back"
-          >
-            ← Back
-          </button>
-        </div>
-
-        {/* NEW LAYOUT: Sidebar + Main */}
-        <div style={{ ...styles.inner, ...styles.sectionShell }}>
+           <div style={{ ...styles.inner, ...styles.sectionShell }}>
           <div
             style={{
               display: "grid",
               gridTemplateColumns: isWide ? "1fr 320px" : "1fr", // main first; sidebar on right when wide
               gap: 16,
             }}
+          >
+            {/* MAIN */}
+            <main>
+              {/* tabs + step content + chapter cards + footer nav */}
+            </main>
+        
+            {/* SIDEBAR */}
+            {isWide && (
+              <PublishingSidebar
+                meta={meta} setMeta={setMeta}
+                matter={matter} setMatter={setMatter}
+                manuscriptPreset={manuscriptPreset} setManuscriptPreset={setManuscriptPreset}
+                platformPreset={platformPreset} setPlatformPreset={setPlatformPreset}
+                includeHeadersFooters={includeHeadersFooters}
+                wordCount={wordCount}
+                ms={ms} setMsOverrides={setMsOverrides}
+                manuscriptEntries={manuscriptEntries}
+                platformEntries={platformEntries}
+                googleMode={googleMode} setGoogleMode={setGoogleMode}
+              />
+            )}
+          </div>
+        </div>
           >
             {/* MAIN */}
             <main>
