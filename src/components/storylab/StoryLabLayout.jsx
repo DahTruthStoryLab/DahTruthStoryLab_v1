@@ -2,8 +2,6 @@
 import React from "react";
 import { Outlet } from "react-router-dom";
 
-function DarkModeToggle() {
-  const [dark, setDark] = React.useState(() =>
-    document.documentElement.classList.contains("theme-dark")
-  );
-  
+export default function StoryLabLayout() {
+  return <Outlet />;
+}
