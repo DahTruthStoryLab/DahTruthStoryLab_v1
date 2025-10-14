@@ -990,13 +990,13 @@ export default function Publishing(): JSX.Element {
       }}
     >
       <div style={styles.outer}>
-        {/* Rose/Pink gradient header with transparency */}
+        {/* Rose/Pink gradient header - EVEN BIGGER */}
         <div
           style={{
-            background: `linear-gradient(135deg, rgba(236, 72, 153, 0.85), rgba(249, 168, 212, 0.85))`,
-            backdropFilter: "blur(10px)",
+            background: `linear-gradient(135deg, rgba(236, 72, 153, 0.65), rgba(249, 168, 212, 0.65))`,
+            backdropFilter: "blur(12px)",
             color: theme.white,
-            padding: "8px 16px",
+            padding: "20px 24px",
           }}
           aria-label="Publishing banner"
         >
@@ -1015,42 +1015,42 @@ export default function Publishing(): JSX.Element {
               style={{
                 ...styles.btn,
                 border: "none",
-                background: "rgba(255,255,255,0.14)",
+                background: "rgba(255,255,255,0.2)",
                 color: theme.white,
-                padding: "5px 10px",
-                fontSize: 12,
+                padding: "10px 18px",
+                fontSize: 15,
               }}
               aria-label="Go back"
             >
               ← Back
             </button>
 
-            {/* Center title - even smaller */}
+            {/* Center title - EVEN BIGGER */}
             <div
               style={{
                 textAlign: "center",
                 display: "flex",
-                gap: 6,
+                gap: 12,
                 alignItems: "center",
               }}
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                 <path d="M6 2h9a3 3 0 0 1 3 3v12.5a1.5 1.5 0 0 1-1.5 1.5H7a3 3 0 0 0-3 3V5a3 3 0 0 1 3-3zm0 2a1 1 0 0 0-1 1v13.764A4.99 4.99 0 0 1 7 18h9V5a1 1 0 0 0-1-1H6z" />
               </svg>
-              <h1 style={{ margin: 0, fontSize: 13, fontWeight: 600, letterSpacing: 0.2 }}>
+              <h1 style={{ margin: 0, fontSize: 22, fontWeight: 600, letterSpacing: 0.4 }}>
                 Publishing Suite
               </h1>
             </div>
-            <div style={{ width: 70 }} />
+            <div style={{ width: 110 }} />
           </div>
         </div>
 
-        {/* NEW LAYOUT: Sidebar + Main */}
+        {/* NEW LAYOUT: Main + Smaller Sidebar */}
         <div style={{ ...styles.inner, ...styles.sectionShell }}>
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: isWide ? "1fr 240px" : "1fr",
+              gridTemplateColumns: isWide ? "1fr 220px" : "1fr",
               gap: 24,
             }}
           >
