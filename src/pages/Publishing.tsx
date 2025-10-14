@@ -990,12 +990,13 @@ export default function Publishing(): JSX.Element {
       }}
     >
       <div style={styles.outer}>
-        {/* Rose/Pink gradient header */}
+        {/* Rose/Pink gradient header with transparency */}
         <div
           style={{
-            background: `linear-gradient(135deg, var(--brand-rose, #ec4899), var(--brand-pink, #f9a8d4))`,
+            background: `linear-gradient(135deg, rgba(236, 72, 153, 0.85), rgba(249, 168, 212, 0.85))`,
+            backdropFilter: "blur(10px)",
             color: theme.white,
-            padding: "10px 18px",
+            padding: "8px 16px",
           }}
           aria-label="Publishing banner"
         >
@@ -1016,31 +1017,31 @@ export default function Publishing(): JSX.Element {
                 border: "none",
                 background: "rgba(255,255,255,0.14)",
                 color: theme.white,
-                padding: "6px 12px",
-                fontSize: 13,
+                padding: "5px 10px",
+                fontSize: 12,
               }}
               aria-label="Go back"
             >
               ← Back
             </button>
 
-            {/* Center title - smaller */}
+            {/* Center title - even smaller */}
             <div
               style={{
                 textAlign: "center",
                 display: "flex",
-                gap: 8,
+                gap: 6,
                 alignItems: "center",
               }}
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                 <path d="M6 2h9a3 3 0 0 1 3 3v12.5a1.5 1.5 0 0 1-1.5 1.5H7a3 3 0 0 0-3 3V5a3 3 0 0 1 3-3zm0 2a1 1 0 0 0-1 1v13.764A4.99 4.99 0 0 1 7 18h9V5a1 1 0 0 0-1-1H6z" />
               </svg>
-              <h1 style={{ margin: 0, fontSize: 15, fontWeight: 600, letterSpacing: 0.3 }}>
+              <h1 style={{ margin: 0, fontSize: 13, fontWeight: 600, letterSpacing: 0.2 }}>
                 Publishing Suite
               </h1>
             </div>
-            <div style={{ width: 80 }} />
+            <div style={{ width: 70 }} />
           </div>
         </div>
 
@@ -1049,8 +1050,8 @@ export default function Publishing(): JSX.Element {
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: isWide ? "1fr 280px" : "1fr",
-              gap: 20,
+              gridTemplateColumns: isWide ? "1fr 240px" : "1fr",
+              gap: 24,
             }}
           >
             {/* MAIN */}
