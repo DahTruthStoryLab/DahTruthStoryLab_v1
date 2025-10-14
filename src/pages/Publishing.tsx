@@ -1094,10 +1094,7 @@ export default function Publishing(): JSX.Element {
           </div>
         </div>
 
-      {/* MAIN CONTENT: Sidebar + Main */}
-   {/* Keep ONLY the AeroBanner + optional back button above this point */}
-
-{/* MAIN CONTENT: Sidebar + Main */}
+     {/* MAIN CONTENT: Sidebar + Main */}
 <div style={{ ...styles.inner, ...styles.sectionShell }}>
   <div
     style={{
@@ -1123,7 +1120,9 @@ export default function Publishing(): JSX.Element {
             <button
               key={s.key}
               id={id}
-              ref={(el) => { if (el) tabRefs.current[i] = el; }}
+              ref={(el) => {
+                if (el) tabRefs.current[i] = el;
+              }}
               role="tab"
               aria-selected={isActive}
               aria-controls={panelId}
@@ -1143,7 +1142,9 @@ export default function Publishing(): JSX.Element {
                 boxShadow: isActive ? "0 1px 0 rgba(0,0,0,0.04) inset" : "none",
               }}
             >
-              <span aria-hidden="true" style={{ marginRight: 8 }}>{i + 1}</span>
+              <span aria-hidden="true" style={{ marginRight: 8 }}>
+                {i + 1}
+              </span>
               {s.label}
             </button>
           );
