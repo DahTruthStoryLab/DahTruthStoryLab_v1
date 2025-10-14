@@ -990,22 +990,58 @@ export default function Publishing(): JSX.Element {
       }}
     >
       <div style={styles.outer}>
-        {/* Use AeroBanner component */}
-        <AeroBanner
-          size="md"
-          title="Publishing Suite"
-          subtitle="Presets • Page Breaks • Headers & Footers"
-        />
-        
-        {/* Back button below banner */}
-        <div style={{ ...styles.sectionShell, padding: "8px 24px 0" }}>
-          <button
-            onClick={() => navigate(-1)}
-            style={{ ...styles.btn, background: "transparent" }}
-            aria-label="Go back"
+        {/* Rose/Pink gradient header */}
+        <div
+          style={{
+            background: `linear-gradient(135deg, var(--brand-rose, #ec4899), var(--brand-pink, #f9a8d4))`,
+            color: theme.white,
+            padding: "10px 18px",
+          }}
+          aria-label="Publishing banner"
+        >
+          <div
+            style={{
+              maxWidth: 1120,
+              margin: "0 auto",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
+            }}
           >
-            ← Back
-          </button>
+            {/* Back */}
+            <button
+              onClick={() => navigate(-1)}
+              style={{
+                ...styles.btn,
+                border: "none",
+                background: "rgba(255,255,255,0.14)",
+                color: theme.white,
+                padding: "6px 12px",
+                fontSize: 13,
+              }}
+              aria-label="Go back"
+            >
+              ← Back
+            </button>
+
+            {/* Center title - smaller */}
+            <div
+              style={{
+                textAlign: "center",
+                display: "flex",
+                gap: 8,
+                alignItems: "center",
+              }}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M6 2h9a3 3 0 0 1 3 3v12.5a1.5 1.5 0 0 1-1.5 1.5H7a3 3 0 0 0-3 3V5a3 3 0 0 1 3-3zm0 2a1 1 0 0 0-1 1v13.764A4.99 4.99 0 0 1 7 18h9V5a1 1 0 0 0-1-1H6z" />
+              </svg>
+              <h1 style={{ margin: 0, fontSize: 15, fontWeight: 600, letterSpacing: 0.3 }}>
+                Publishing Suite
+              </h1>
+            </div>
+            <div style={{ width: 80 }} />
+          </div>
         </div>
 
         {/* NEW LAYOUT: Sidebar + Main */}
@@ -1013,8 +1049,8 @@ export default function Publishing(): JSX.Element {
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: isWide ? "1fr 320px" : "1fr",
-              gap: 16,
+              gridTemplateColumns: isWide ? "1fr 280px" : "1fr",
+              gap: 20,
             }}
           >
             {/* MAIN */}
