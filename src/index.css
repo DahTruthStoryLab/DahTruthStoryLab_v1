@@ -212,3 +212,20 @@ iframe {
   outline: 2px solid var(--brand-accent);
   outline-offset: 2px;
 }
+
+/* --- Publishing header + brand tune --- */
+:root {
+  /* Softer blush tones for header + accents */
+  --brand-rose:  #e48aa8;   /* soft rose */
+  --brand-peach: #f6c0b3;   /* gentle peach */
+
+  /* Align primary/accent with softer scheme */
+  --brand-primary:  #d46d92;                 /* muted rose used by buttons */
+  --brand-accent:   #f1a3bf;                 /* blush accent */
+  --brand-highlight: rgba(212,109,146,.12);  /* light page tint */
+
+  /* Keep existing tokens, just ensure these override earlier definitions */
+}
+
+/* If you prefer to keep your existing --brand-pink token, alias it: */
+:root { --brand-peach: var(--brand-pink); }
