@@ -1408,20 +1408,41 @@ export default function Publishing(): JSX.Element {
             </main>
 
             {/* SIDEBAR (FIRST TWO SECTIONS) – sticky on desktop */}
-          {isWide && (
-  <PublishingSidebar
-    meta={meta} setMeta={setMeta}
-    matter={matter} setMatter={setMatter}
-    manuscriptPreset={manuscriptPreset} setManuscriptPreset={setManuscriptPreset}
-    platformPreset={platformPreset} setPlatformPreset={setPlatformPreset}
-    includeHeadersFooters={includeHeadersFooters}
-    wordCount={wordCount}
-    ms={ms} setMsOverrides={setMsOverrides}
-    manuscriptEntries={Object.entries(MANUSCRIPT_PRESETS).map(([k,v]) => [k, v.label] as const)}
-    platformEntries={Object.entries(PLATFORM_PRESETS).map(([k,v]) => [k, v.label] as const)}
-    googleMode={googleMode} setGoogleMode={setGoogleMode}
-  />
-)}
+             {/* ← LEFT COLUMN: sidebar */}
+      {isWide && (
+        <PublishingSidebar
+          meta={meta} setMeta={setMeta}
+          matter={matter} setMatter={setMatter}
+          manuscriptPreset={manuscriptPreset} setManuscriptPreset={setManuscriptPreset}
+          platformPreset={platformPreset} setPlatformPreset={setPlatformPreset}
+          includeHeadersFooters={includeHeadersFooters}
+          wordCount={wordCount}
+          ms={ms} setMsOverrides={setMsOverrides}
+          manuscriptEntries={Object.entries(MANUSCRIPT_PRESETS).map(([k,v]) => [k, v.label] as const)}
+          platformEntries={Object.entries(PLATFORM_PRESETS).map(([k,v]) => [k, v.label] as const)}
+          googleMode={googleMode} setGoogleMode={setGoogleMode}
+        />
+      )}
+
+      {/* CENTER + RIGHT columns go here... */}
+    </div> {/* end grid */}
+
+    {/* Legacy Chapter cards + Footer nav were above... */}
+  </div> {/* end sectionShell inner */}
+</div> {/* end styles.outer */}
+</PageShell>
+);
+}
+
+/* ---------- utilities ---------- */
+function safeFile(name: string): string {
+  return (name || "manuscript").replace(/[^\w\-]+/g, "_");
+}
+function stripHtml(html: string): string {
+  const div = document.createElement("div");
+  div.innerHTML = html;
+  return (div.textContent || div.innerText || "").trim();
+}
 
 /* ---------- utilities ---------- */
 function safeFile(name: string): string {
