@@ -17,14 +17,14 @@ const theme = {
   highlight: "var(--brand-highlight)",
   primary: "var(--brand-primary)",
   white: "var(--brand-white)",
-};
+} as const;
 
-// Optional Google palette we can inject via CSS vars
+// Optional Google palette (used only if you wire it later via CSS var overrides)
 const GOOGLE_PALETTE = {
   primary: "#1a73e8", // Google Blue 600
   accent: "#34a853",  // Google Green 600
   highlight: "rgba(26,115,232,0.10)",
-};
+} as const;
 
 /* ---------- Types ---------- */
 type StepKey = "builder" | "proof" | "format" | "export" | "prep";
@@ -267,7 +267,7 @@ const styles = {
     height: 360,
     overflow: "auto",
   } as React.CSSProperties,
-};
+} as const;
 
 /* ---------- Small UI helpers (restored) ---------- */
 type ToggleProps = {
@@ -292,6 +292,7 @@ const Toggle: React.FC<ToggleProps> = ({ checked, onChange, label }) => {
       }}
       aria-pressed={checked}
       title={label}
+      type="button"
     >
       <span
         style={{
@@ -333,7 +334,7 @@ const Field: React.FC<FieldProps> = ({ label, value, onChange, placeholder }) =>
       <div style={{ color: theme.subtext, fontSize: 12 }}>{label}</div>
       <textarea
         value={value}
-        onChange={(e) => onChange(e.target.value)}
+        onChange={(e) => onChange(e.currentTarget.value)}
         rows={label.length > 12 ? 3 : 2}
         placeholder={placeholder}
         style={{
@@ -452,22 +453,21 @@ export default function Publishing(): JSX.Element {
   const includeHeadersFooters = pf.headers || pf.footers;
 
   // options for dropdowns (smaller to pass to sidebar)
-  const manuscriptEntries = useMemo(() => Object.entries(MANUSCRIPT_PRESETS).map(([k,v]) => [k, v.label] as const), []);
-  const platformEntries = useMemo(() => Object.entries(PLATFORM_PRESETS).map(([k,v]) => [k, v.label] as const), []);
+  const manuscriptEntries = useMemo(
+    () => Object.entries(MANUSCRIPT_PRESETS).map(([k, v]) => [k, v.label] as const),
+    []
+  );
+  const platformEntries = useMemo(
+    () => Object.entries(PLATFORM_PRESETS).map(([k, v]) => [k, v.label] as const),
+    []
+  );
 
   /* --------------------- Builder: Word-like Editor --------------------- */
   const [activeChapterId, setActiveChapterId] = useState(chapters[0]?.id || "");
   const activeIdx = Math.max(0, chapters.findIndex((c) => c.id === activeChapterId));
   const editorRef = useRef<HTMLDivElement>(null);
 
-  // Layout breakpoint: put PUBLISHING front & center on mobile
-  const [isXL, setIsXL] = useState<boolean>(window.innerWidth >= 1100);
-  useEffect(() => {
-    const onResize = () => setIsXL(window.innerWidth >= 1100);
-    window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
-  }, []);
-
+  // Single breakpoint controlling sidebar visibility
   const [isWide, setIsWide] = useState<boolean>(window.innerWidth >= 1280);
   useEffect(() => {
     const onResize = () => setIsWide(window.innerWidth >= 1280);
@@ -533,10 +533,14 @@ export default function Publishing(): JSX.Element {
     });
   };
 
+  const genId = () =>
+    (typeof crypto !== "undefined" && "randomUUID" in crypto
+      ? (crypto as any).randomUUID()
+      : `c_${Date.now()}_${Math.random().toString(36).slice(2)}`);
+
   const addChapter = () => {
     setChapters((prev) => {
-      // @ts-ignore
-      const id = crypto && "randomUUID" in crypto ? (crypto as any).randomUUID() : `c_${Date.now()}`;
+      const id = genId();
       const ch: Chapter = {
         id,
         title: `Chapter ${prev.length + 1} – Untitled`,
@@ -549,86 +553,101 @@ export default function Publishing(): JSX.Element {
   };
 
   /* ----- Import: DOCX (.docx) and HTML (.html) ----- */
-  const importDocx = useCallback(async (file: File, asNewChapter = true) => {
-    const JSZip = (await import("jszip")).default;
-    const zip = await JSZip.loadAsync(file);
-    const docXml = await zip.file("word/document.xml")?.async("string");
-    if (!docXml) {
-      alert("Could not read Word document.xml");
-      return;
-    }
-    const xml = new DOMParser().parseFromString(docXml, "text/xml");
-    const paras = Array.from(xml.getElementsByTagName("*"))
-      .filter((n) => n.localName === "p");
-    const out: string[] = [];
-    for (const p of paras) {
-      let styleVal = "";
-      const pPr = Array.from(p.children).find((n) => n.localName === "pPr");
-      if (pPr) {
-        const pStyle = Array.from(pPr.children).find((n) => n.localName === "pStyle");
-        if (pStyle) styleVal = pStyle.getAttribute("w:val") || pStyle.getAttribute("val") || "";
+  const importDocx = useCallback(
+    async (file: File, asNewChapter = true) => {
+      const JSZip = (await import("jszip")).default;
+      const zip = await JSZip.loadAsync(file);
+      const docXml = await zip.file("word/document.xml")?.async("string");
+      if (!docXml) {
+        alert("Could not read Word document.xml");
+        return;
       }
-      const runs = Array.from(p.getElementsByTagName("*"))
-        .filter((n) => n.localName === "t");
-      const text = runs.map((r) => r.textContent || "").join("");
-      if (!text.trim()) { out.push("<p><br/></p>"); continue; }
-      if (/Heading1/i.test(styleVal)) out.push(`<h1>${htmlEscape(text)}</h1>`);
-      else if (/Heading2/i.test(styleVal)) out.push(`<h2>${htmlEscape(text)}</h2>`);
-      else if (/Heading3/i.test(styleVal)) out.push(`<h3>${htmlEscape(text)}</h3>`);
-      else out.push(`<p>${htmlEscape(text)}</p>`);
-    }
-    const html = out.join("\n");
+      const xml = new DOMParser().parseFromString(docXml, "text/xml");
+      const paras = Array.from(xml.getElementsByTagName("*")).filter((n) => n.localName === "p");
+      const out: string[] = [];
+      for (const p of paras) {
+        let styleVal = "";
+        const pPr = Array.from(p.children).find((n) => n.localName === "pPr");
+        if (pPr) {
+          const pStyle = Array.from(pPr.children).find((n) => n.localName === "pStyle");
+          if (pStyle) styleVal = pStyle.getAttribute("w:val") || pStyle.getAttribute("val") || "";
+        }
+        const runs = Array.from(p.getElementsByTagName("*")).filter((n) => n.localName === "t");
+        const text = runs.map((r) => r.textContent || "").join("");
+        if (!text.trim()) {
+          out.push("<p><br/></p>");
+          continue;
+        }
+        if (/Heading1/i.test(styleVal)) out.push(`<h1>${htmlEscape(text)}</h1>`);
+        else if (/Heading2/i.test(styleVal)) out.push(`<h2>${htmlEscape(text)}</h2>`);
+        else if (/Heading3/i.test(styleVal)) out.push(`<h3>${htmlEscape(text)}</h3>`);
+        else out.push(`<p>${htmlEscape(text)}</p>`);
+      }
+      const html = out.join("\n");
 
-    if (asNewChapter) {
-      setChapters((prev) => {
-        // @ts-ignore
-        const id = crypto && "randomUUID" in crypto ? (crypto as any).randomUUID() : `c_${Date.now()}`;
-        const ch: Chapter = {
-          id,
-          title: file.name.replace(/\.docx$/i, ""),
-          included: true,
-          text: "",
-          textHTML: html,
-        };
-        setActiveChapterId(id);
-        return [...prev, ch];
-      });
-    } else {
-      setChapters((prev) => {
-        const next = [...prev];
-        const ch = next[activeIdx];
-        if (ch) next[activeIdx] = { ...ch, textHTML: html, title: ch.title || file.name.replace(/\.docx$/i, "") };
-        return next;
-      });
-    }
-  }, [activeIdx]);
+      if (asNewChapter) {
+        setChapters((prev) => {
+          const id = genId();
+          const ch: Chapter = {
+            id,
+            title: file.name.replace(/\.docx$/i, ""),
+            included: true,
+            text: "",
+            textHTML: html,
+          };
+          setActiveChapterId(id);
+          return [...prev, ch];
+        });
+      } else {
+        setChapters((prev) => {
+          const next = [...prev];
+          const ch = next[activeIdx];
+          if (ch)
+            next[activeIdx] = {
+              ...ch,
+              textHTML: html,
+              title: ch.title || file.name.replace(/\.docx$/i, ""),
+            };
+          return next;
+        });
+      }
+    },
+    [activeIdx]
+  );
 
-  const importHTML = useCallback(async (file: File, asNewChapter = true) => {
-    const text = await file.text();
-    const html = text;
-    if (asNewChapter) {
-      setChapters((prev) => {
-        // @ts-ignore
-        const id = crypto && "randomUUID" in crypto ? (crypto as any).randomUUID() : `c_${Date.now()}`;
-        const ch: Chapter = {
-          id,
-          title: file.name.replace(/\.(html?|xhtml)$/i, ""),
-          included: true,
-          text: "",
-          textHTML: html,
-        };
-        setActiveChapterId(id);
-        return [...prev, ch];
-      });
-    } else {
-      setChapters((prev) => {
-        const next = [...prev];
-        const ch = next[activeIdx];
-        if (ch) next[activeIdx] = { ...ch, textHTML: html, title: ch.title || file.name.replace(/\.(html?|xhtml)$/i, "") };
-        return next;
-      });
-    }
-  }, [activeIdx]);
+  const importHTML = useCallback(
+    async (file: File, asNewChapter = true) => {
+      const text = await file.text();
+      const html = text;
+      if (asNewChapter) {
+        setChapters((prev) => {
+          const id = genId();
+          const ch: Chapter = {
+            id,
+            title: file.name.replace(/\.(html?|xhtml)$/i, ""),
+            included: true,
+            text: "",
+            textHTML: html,
+          };
+          setActiveChapterId(id);
+          return [...prev, ch];
+        });
+      } else {
+        setChapters((prev) => {
+          const next = [...prev];
+          const ch = next[activeIdx];
+          if (ch)
+            next[activeIdx] = {
+              ...ch,
+              textHTML: html,
+              title: ch.title || file.name.replace(/\.(html?|xhtml)$/i, ""),
+            };
+          return next;
+        });
+      }
+    },
+    [activeIdx]
+  );
 
   /* ---------- Compile (Preview/Export) ---------- */
 
@@ -669,9 +688,7 @@ export default function Publishing(): JSX.Element {
 
     chapters.forEach((c) => {
       if (!c.included) return;
-      const textNoTags = c.textHTML
-        ? stripHtml(c.textHTML)
-        : c.text;
+      const textNoTags = c.textHTML ? stripHtml(c.textHTML) : c.text;
       parts.push("\n\n" + c.title + "\n" + textNoTags);
     });
 
@@ -682,10 +699,7 @@ export default function Publishing(): JSX.Element {
     return parts.join("\n").trim();
   }, [chapters, matter, meta, tocFromHeadings]);
 
-  const wordCount = useMemo(
-    () => compiledPlain.split(/\s+/).filter(Boolean).length,
-    [compiledPlain]
-  );
+  const wordCount = useMemo(() => compiledPlain.split(/\s+/).filter(Boolean).length, [compiledPlain]);
 
   // Rich HTML preview
   const compiledHTML: string = useMemo(() => {
@@ -702,7 +716,9 @@ export default function Publishing(): JSX.Element {
       .map((s) => `<p>${htmlEscape(String(s)).replaceAll("\n", "<br/>")}</p>`)
       .join("\n");
 
-    const toc = matter.toc
+    // ⬇️ Your next line in the file should be:  const toc = ...
+
+        const toc = matter.toc
       ? `<h2 class="chapter" style="page-break-before: always">Contents</h2><p>${
           (matter.tocFromHeadings
             ? tocFromHeadings
@@ -782,7 +798,7 @@ export default function Publishing(): JSX.Element {
     setAiBusy(false);
   }
 
-  /* ---------- Exports (minor tweak: use compiledPlain) ---------- */
+  /* ---------- Exports ---------- */
   const exportPDF = () => {
     const w = window.open("", "_blank");
     if (!w) return;
@@ -962,16 +978,24 @@ export default function Publishing(): JSX.Element {
 
   /* ---------- UI ---------- */
   return (
-    <PageShell style={{ background: theme.bg, minHeight: "100vh", ...(googleMode ? ({
-          ['--brand-primary' as any]: GOOGLE_PALETTE.primary,
-          ['--brand-accent' as any]: GOOGLE_PALETTE.accent,
-          ['--brand-highlight' as any]: GOOGLE_PALETTE.highlight,
-        }) : ({})) }}>
+    <PageShell
+      style={{
+        background: theme.bg,
+        minHeight: "100vh",
+        ...(googleMode
+          ? ({
+              ["--brand-primary" as any]: GOOGLE_PALETTE.primary,
+              ["--brand-accent" as any]: GOOGLE_PALETTE.accent,
+              ["--brand-highlight" as any]: GOOGLE_PALETTE.highlight,
+            } as React.CSSProperties)
+          : {}),
+      }}
+    >
       <div style={styles.outer}>
-        {/* Header Bar (uses brand gradient) */}
+        {/* Header Bar — rose/pink gradient */}
         <div
           style={{
-            background: `linear-gradient(135deg, var(--brand-primary), var(--brand-accent))`,
+            background: `linear-gradient(135deg, var(--brand-rose, #ec4899), var(--brand-pink, #f9a8d4))`,
             color: theme.white,
             padding: "14px 18px",
           }}
@@ -1004,7 +1028,15 @@ export default function Publishing(): JSX.Element {
             </div>
 
             {/* Center title with icon */}
-            <div style={{ textAlign: "center", display: "flex", gap: 10, justifyContent: "center", alignItems: "center" }}>
+            <div
+              style={{
+                textAlign: "center",
+                display: "flex",
+                gap: 10,
+                justifyContent: "center",
+                alignItems: "center",
+              }}
+            >
               <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" focusable="false">
                 <path d="M6 2h9a3 3 0 0 1 3 3v12.5a1.5 1.5 0 0 1-1.5 1.5H7a3 3 0 0 0-3 3V5a3 3 0 0 1 3-3zm0 2a1 1 0 0 0-1 1v13.764A4.99 4.99 0 0 1 7 18h9V5a1 1 0 0 0-1-1H6z" />
               </svg>
@@ -1025,20 +1057,24 @@ export default function Publishing(): JSX.Element {
         {/* Optional banner */}
         <AeroBanner size="md" title="Publishing Suite" subtitle="Presets • Page Breaks • Headers & Footers" />
 
-        {/* NEW LAYOUT: Sidebar (first two sections) + Main (Publishing front & center) */}
+        {/* NEW LAYOUT: Sidebar + Main */}
         <div style={{ ...styles.inner, ...styles.sectionShell }}>
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: isXL ? "320px 1fr" : "1fr",
+              gridTemplateColumns: isWide ? "1fr 320px" : "1fr", // main first; sidebar on right when wide
               gap: 16,
             }}
           >
-            {/* MAIN FIRST on mobile to keep Publishing front & center */}
+            {/* MAIN */}
             <main>
               {/* Tabs */}
-              <div role="tablist" aria-label="Publishing steps" onKeyDown={onKeyDownTabs}
-                   style={{ display: "flex", gap: 8, marginBottom: 20, overflowX: "auto", paddingBottom: 2 }}>
+              <div
+                role="tablist"
+                aria-label="Publishing steps"
+                onKeyDown={onKeyDownTabs}
+                style={{ display: "flex", gap: 8, marginBottom: 20, overflowX: "auto", paddingBottom: 2 }}
+              >
                 {STEPS.map((s, i) => {
                   const isActive = s.key === step;
                   const id = `tab-${s.key}`;
@@ -1047,7 +1083,9 @@ export default function Publishing(): JSX.Element {
                     <button
                       key={s.key}
                       id={id}
-                      ref={(el) => { if (el) tabRefs.current[i] = el; }}
+                      ref={(el) => {
+                        if (el) tabRefs.current[i] = el;
+                      }}
                       role="tab"
                       aria-selected={isActive}
                       aria-controls={panelId}
@@ -1067,7 +1105,9 @@ export default function Publishing(): JSX.Element {
                         boxShadow: isActive ? "0 1px 0 rgba(0,0,0,0.04) inset" : "none",
                       }}
                     >
-                      <span aria-hidden="true" style={{ marginRight: 8 }}>{i + 1}</span>
+                      <span aria-hidden="true" style={{ marginRight: 8 }}>
+                        {i + 1}
+                      </span>
                       {s.label}
                     </button>
                   );
@@ -1080,11 +1120,11 @@ export default function Publishing(): JSX.Element {
                   <div
                     style={{
                       display: "grid",
-                      gridTemplateColumns: isWide ? "260px 1fr 320px" : "1fr",
+                      gridTemplateColumns: isWide ? "260px 1fr" : "1fr", // chapters rail + editor
                       gap: 16,
                     }}
                   >
-                    {/* Side: Chapters (shown on wide) */}
+                    {/* Chapters rail (collapses on narrow) */}
                     {isWide && (
                       <aside
                         style={{
@@ -1116,12 +1156,14 @@ export default function Publishing(): JSX.Element {
                               {c.included ? "✅ " : "🚫 "} {c.title}
                             </button>
                           ))}
-                          <button onClick={addChapter} style={{ ...styles.btnPrimary, marginTop: 6 }}>+ Add Chapter</button>
+                          <button onClick={addChapter} style={{ ...styles.btnPrimary, marginTop: 6 }}>
+                            + Add Chapter
+                          </button>
                         </div>
                       </aside>
                     )}
 
-                    {/* Center: Word-like editor */}
+                    {/* Editor */}
                     <section>
                       {/* Toolbar */}
                       <div
@@ -1145,7 +1187,11 @@ export default function Publishing(): JSX.Element {
                           <option>Arial</option>
                           <option>Courier New</option>
                         </select>
-                        <select onChange={(e) => setFontSizePt(parseInt(e.target.value, 10))} defaultValue="16" style={{ ...styles.input as any, width: 90 }}>
+                        <select
+                          onChange={(e) => setFontSizePt(parseInt(e.target.value, 10))}
+                          defaultValue="16"
+                          style={{ ...(styles.input as any), width: 90 }}
+                        >
                           <option value="14">14</option>
                           <option value="16">16</option>
                           <option value="18">18</option>
@@ -1153,46 +1199,88 @@ export default function Publishing(): JSX.Element {
                           <option value="22">22</option>
                         </select>
                         <div style={{ display: "flex", gap: 6 }}>
-                          <button style={styles.btn} onClick={() => exec("bold")} title="Bold">B</button>
-                          <button style={styles.btn} onClick={() => exec("italic")} title="Italic"><em>I</em></button>
-                          <button style={styles.btn} onClick={() => exec("underline")} title="Underline"><u>U</u></button>
+                          <button style={styles.btn} onClick={() => exec("bold")} title="Bold">
+                            B
+                          </button>
+                          <button style={styles.btn} onClick={() => exec("italic")} title="Italic">
+                            <em>I</em>
+                          </button>
+                          <button style={styles.btn} onClick={() => exec("underline")} title="Underline">
+                            <u>U</u>
+                          </button>
                         </div>
                         <div style={{ display: "flex", gap: 6 }}>
-                          <button style={styles.btn} onClick={() => setBlock("P")} title="Paragraph">¶</button>
-                          <button style={styles.btn} onClick={() => setBlock("H1")} title="Heading 1">H1</button>
-                          <button style={styles.btn} onClick={() => setBlock("H2")} title="Heading 2">H2</button>
-                          <button style={styles.btn} onClick={() => setBlock("H3")} title="Heading 3">H3</button>
+                          <button style={styles.btn} onClick={() => setBlock("P")} title="Paragraph">
+                            ¶
+                          </button>
+                          <button style={styles.btn} onClick={() => setBlock("H1")} title="Heading 1">
+                            H1
+                          </button>
+                          <button style={styles.btn} onClick={() => setBlock("H2")} title="Heading 2">
+                            H2
+                          </button>
+                          <button style={styles.btn} onClick={() => setBlock("H3")} title="Heading 3">
+                            H3
+                          </button>
                         </div>
                         <div style={{ display: "flex", gap: 6 }}>
-                          <button style={styles.btn} onClick={() => exec("insertUnorderedList")} title="Bulleted List">• List</button>
-                          <button style={styles.btn} onClick={() => exec("insertOrderedList")} title="Numbered List">1. List</button>
+                          <button style={styles.btn} onClick={() => exec("insertUnorderedList")} title="Bulleted List">
+                            • List
+                          </button>
+                          <button style={styles.btn} onClick={() => exec("insertOrderedList")} title="Numbered List">
+                            1. List
+                          </button>
                         </div>
                         <div style={{ display: "flex", gap: 6 }}>
-                          <button style={styles.btn} onClick={() => exec("justifyLeft")} title="Align Left">⟸</button>
-                          <button style={styles.btn} onClick={() => exec("justifyCenter")} title="Center">⇔</button>
-                          <button style={styles.btn} onClick={() => exec("justifyRight")} title="Align Right">⟹</button>
-                          <button style={styles.btn} onClick={() => exec("justifyFull")} title="Justify">≋</button>
+                          <button style={styles.btn} onClick={() => exec("justifyLeft")} title="Align Left">
+                            ⟸
+                          </button>
+                          <button style={styles.btn} onClick={() => exec("justifyCenter")} title="Center">
+                            ⇔
+                          </button>
+                          <button style={styles.btn} onClick={() => exec("justifyRight")} title="Align Right">
+                            ⟹
+                          </button>
+                          <button style={styles.btn} onClick={() => exec("justifyFull")} title="Justify">
+                            ≋
+                          </button>
                         </div>
                         <div style={{ display: "flex", gap: 6 }}>
-                          <button style={styles.btn} onClick={() => exec("undo")} title="Undo">↶</button>
-                          <button style={styles.btn} onClick={() => exec("redo")} title="Redo">↷</button>
+                          <button style={styles.btn} onClick={() => exec("undo")} title="Undo">
+                            ↶
+                          </button>
+                          <button style={styles.btn} onClick={() => exec("redo")} title="Redo">
+                            ↷
+                          </button>
                         </div>
                         <div style={{ display: "flex", gap: 6 }}>
-                          <button style={styles.btn} onClick={insertPageBreak} title="Insert Page Break">⤓ Break</button>
+                          <button style={styles.btn} onClick={insertPageBreak} title="Insert Page Break">
+                            ⤓ Break
+                          </button>
                         </div>
                         <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
                           {/* Import: Word + HTML */}
                           <label style={{ ...styles.btn, display: "inline-flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
                             Import Word (.docx)
-                            <input type="file" accept=".docx" style={{ display: "none" }}
-                                   onChange={(e) => e.target.files && importDocx(e.target.files[0], true)} />
+                            <input
+                              type="file"
+                              accept=".docx"
+                              style={{ display: "none" }}
+                              onChange={(e) => e.target.files && importDocx(e.target.files[0], true)}
+                            />
                           </label>
                           <label style={{ ...styles.btn, display: "inline-flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
                             Import HTML (.html)
-                            <input type="file" accept=".html,.htm,.xhtml" style={{ display: "none" }}
-                                   onChange={(e) => e.target.files && importHTML(e.target.files[0], true)} />
+                            <input
+                              type="file"
+                              accept=".html,.htm,.xhtml"
+                              style={{ display: "none" }}
+                              onChange={(e) => e.target.files && importHTML(e.target.files[0], true)}
+                            />
                           </label>
-                          <button style={styles.btnPrimary} onClick={saveActiveChapterHTML}>Save</button>
+                          <button style={styles.btnPrimary} onClick={saveActiveChapterHTML}>
+                            Save
+                          </button>
                         </div>
                       </div>
 
@@ -1232,28 +1320,6 @@ export default function Publishing(): JSX.Element {
                         Tip: Use H1/H2/H3 for sections — if “Build Contents from Headings” is on, your TOC will include them.
                       </div>
                     </section>
-
-                    {/* Right: Front/Back Matter */}
-                    {isWide && (
-                      <aside style={{ display: "grid", gap: 12 }}>
-                        <div style={{ ...styles.glassCard }}>
-                          <h3 style={{ margin: "0 0 10px 0", fontSize: 16, color: theme.text }}>Front & Back Matter</h3>
-                          <div style={{ display: "grid", gap: 12 }}>
-                            <Field label="Title Page" value={matter.titlePage} onChange={(v) => setMatter({ ...matter, titlePage: v })} />
-                            <Field label="Copyright" value={matter.copyright} onChange={(v) => setMatter({ ...matter, copyright: v })} />
-                            <Field label="Dedication" value={matter.dedication} onChange={(v) => setMatter({ ...matter, dedication: v })} />
-                            <Field label="Epigraph" value={matter.epigraph} onChange={(v) => setMatter({ ...matter, epigraph: v })} />
-                            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 14, color: theme.text }}>
-                              <input type="checkbox" checked={matter.toc}
-                                     onChange={(e) => setMatter({ ...matter, toc: e.target.checked })} /> Include Table of Contents
-                            </label>
-                            <Field label="Acknowledgments" value={matter.acknowledgments} onChange={(v) => setMatter({ ...matter, acknowledgments: v })} />
-                            <Field label="About the Author" value={matter.aboutAuthor} onChange={(v) => setMatter({ ...matter, aboutAuthor: v })} />
-                            <Field label="Author Notes" value={matter.notes} onChange={(v) => setMatter({ ...matter, notes: v })} />
-                          </div>
-                        </div>
-                      </aside>
-                    )}
                   </div>
                 )}
 
@@ -1407,31 +1473,26 @@ export default function Publishing(): JSX.Element {
               </div>
             </main>
 
-            {/* SIDEBAR (FIRST TWO SECTIONS) – sticky on desktop */}
-             {/* ← LEFT COLUMN: sidebar */}
-      {isWide && (
-        <PublishingSidebar
-          meta={meta} setMeta={setMeta}
-          matter={matter} setMatter={setMatter}
-          manuscriptPreset={manuscriptPreset} setManuscriptPreset={setManuscriptPreset}
-          platformPreset={platformPreset} setPlatformPreset={setPlatformPreset}
-          includeHeadersFooters={includeHeadersFooters}
-          wordCount={wordCount}
-          ms={ms} setMsOverrides={setMsOverrides}
-          manuscriptEntries={Object.entries(MANUSCRIPT_PRESETS).map(([k,v]) => [k, v.label] as const)}
-          platformEntries={Object.entries(PLATFORM_PRESETS).map(([k,v]) => [k, v.label] as const)}
-          googleMode={googleMode} setGoogleMode={setGoogleMode}
-        />
-      )}
-
-      {/* CENTER + RIGHT columns go here... */}
-    </div> {/* end grid */}
-
-    {/* Legacy Chapter cards + Footer nav were above... */}
-  </div> {/* end sectionShell inner */}
-</div> {/* end styles.outer */}
-</PageShell>
-);
+            {/* Sidebar (sticky on wide screens) */}
+            {isWide && (
+              <PublishingSidebar
+                meta={meta} setMeta={setMeta}
+                matter={matter} setMatter={setMatter}
+                manuscriptPreset={manuscriptPreset} setManuscriptPreset={setManuscriptPreset}
+                platformPreset={platformPreset} setPlatformPreset={setPlatformPreset}
+                includeHeadersFooters={includeHeadersFooters}
+                wordCount={wordCount}
+                ms={ms} setMsOverrides={setMsOverrides}
+                manuscriptEntries={Object.entries(MANUSCRIPT_PRESETS).map(([k, v]) => [k, v.label] as const)}
+                platformEntries={Object.entries(PLATFORM_PRESETS).map(([k, v]) => [k, v.label] as const)}
+                googleMode={googleMode} setGoogleMode={setGoogleMode}
+              />
+            )}
+          </div>
+        </div>
+      </div>
+    </PageShell>
+  );
 }
 
 /* ---------- utilities ---------- */
