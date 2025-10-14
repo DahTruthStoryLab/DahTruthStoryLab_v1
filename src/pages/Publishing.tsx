@@ -321,6 +321,56 @@ const Toggle: React.FC<ToggleProps> = ({ checked, onChange, label }) => {
     </button>
   );
 };
+// put this near your styles or just inline as shown
+const smallBtn = { ...styles.btn, padding: "6px 8px" };
+
+// Toolbar (replace your existing toolbar block)
+<div
+  style={{
+    display: "flex",
+    flexWrap: "wrap",
+    gap: 6,                      // was 8
+    padding: 8,                  // was 10
+    border: `1px solid ${theme.border}`,
+    borderRadius: 10,            // was 12
+    marginBottom: 10,
+    background: `linear-gradient(180deg, ${theme.white}, ${theme.highlight})`,
+  }}
+>
+  <select
+    onChange={(e) => setFont(e.target.value)}
+    defaultValue="Times New Roman"
+    style={{ ...styles.input as any, height: 34, padding: "6px 10px", width: 180 }}
+  >
+    <option>Times New Roman</option>
+    <option>Georgia</option>
+    <option>Garamond</option>
+    <option>Palatino Linotype</option>
+    <option>Calibri</option>
+    <option>Arial</option>
+    <option>Courier New</option>
+  </select>
+
+  <select
+    onChange={(e) => setFontSizePt(parseInt(e.target.value, 10))}
+    defaultValue="16"
+    style={{ ...styles.input as any, height: 34, padding: "6px 10px", width: 90 }}
+  >
+    <option value="14">14</option>
+    <option value="16">16</option>
+    <option value="18">18</option>
+    <option value="20">20</option>
+    <option value="22">22</option>
+  </select>
+
+  {/* Use smallBtn for the toolbar buttons */}
+  <div style={{ display: "flex", gap: 6 }}>
+    <button style={smallBtn} onClick={() => exec("bold")} title="Bold">B</button>
+    <button style={smallBtn} onClick={() => exec("italic")} title="Italic"><em>I</em></button>
+    <button style={smallBtn} onClick={() => exec("underline")} title="Underline"><u>U</u></button>
+  </div>
+  {/* ...and the rest of your toolbar groups, using smallBtn ... */}
+</div>
 
 type FieldProps = {
   label: string;
@@ -991,16 +1041,6 @@ export default function Publishing(): JSX.Element {
           : {}),
       }}
     >
-      <div style={styles.outer}>
-        {/* Header Bar — rose/pink gradient */}
-        <div
-          style={{
-            background: `linear-gradient(135deg, var(--brand-rose, #ec4899), var(--brand-pink, #f9a8d4))`,
-            color: theme.white,
-            padding: "14px 18px",
-          }}
-          aria-label="Publishing banner"
-        >
           <div
             style={{
               maxWidth: 1120,
