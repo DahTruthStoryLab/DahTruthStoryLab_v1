@@ -1094,464 +1094,439 @@ export default function Publishing(): JSX.Element {
           </div>
         </div>
 
-       {/* Header Bar (uses brand gradient) */} 
-
-           <div style={{ ...styles.inner, ...styles.sectionShell }}>
+      {/* MAIN CONTENT: Sidebar + Main */}
+    <div style={{ ...styles.inner, ...styles.sectionShell }}>
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: isWide ? "1fr 320px" : "1fr", // main first; sidebar on right when wide
+          gap: 16,
+        }}
+      >
+        {/* MAIN */}
+        <main>
+          {/* Tabs */}
           <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: isWide ? "1fr 320px" : "1fr", // main first; sidebar on right when wide
-              gap: 16,
-            }}
+            role="tablist"
+            aria-label="Publishing steps"
+            onKeyDown={onKeyDownTabs}
+            style={{ display: "flex", gap: 8, marginBottom: 20, overflowX: "auto", paddingBottom: 2 }}
           >
-            {/* MAIN */}
-            <main>
-              {/* tabs + step content + chapter cards + footer nav */}
-            </main>
-        
-            {/* SIDEBAR */}
-            {isWide && (
-              <PublishingSidebar
-                meta={meta} setMeta={setMeta}
-                matter={matter} setMatter={setMatter}
-                manuscriptPreset={manuscriptPreset} setManuscriptPreset={setManuscriptPreset}
-                platformPreset={platformPreset} setPlatformPreset={setPlatformPreset}
-                includeHeadersFooters={includeHeadersFooters}
-                wordCount={wordCount}
-                ms={ms} setMsOverrides={setMsOverrides}
-                manuscriptEntries={manuscriptEntries}
-                platformEntries={platformEntries}
-                googleMode={googleMode} setGoogleMode={setGoogleMode}
-              />
-            )}
+            {STEPS.map((s, i) => {
+              const isActive = s.key === step;
+              const id = `tab-${s.key}`;
+              const panelId = `panel-${s.key}`;
+              return (
+                <button
+                  key={s.key}
+                  id={id}
+                  ref={(el) => {
+                    if (el) tabRefs.current[i] = el;
+                  }}
+                  role="tab"
+                  aria-selected={isActive}
+                  aria-controls={panelId}
+                  tabIndex={isActive ? 0 : -1}
+                  onClick={() => setStep(s.key)}
+                  style={{
+                    padding: "12px 18px",
+                    borderRadius: 12,
+                    border: isActive ? `2px solid ${theme.accent}` : `2px solid ${theme.border}`,
+                    background: isActive ? theme.highlight : theme.white,
+                    color: isActive ? theme.primary : theme.subtext,
+                    fontWeight: isActive ? 700 : 500,
+                    cursor: "pointer",
+                    whiteSpace: "nowrap",
+                    fontSize: 14,
+                    outline: "none",
+                    boxShadow: isActive ? "inset 0 1px 0 rgba(0,0,0,0.04)" : "none",
+                  }}
+                >
+                  <span aria-hidden="true" style={{ marginRight: 8 }}>
+                    {i + 1}
+                  </span>
+                  {s.label}
+                </button>
+              );
+            })}
           </div>
-        </div>
-          >
-            {/* MAIN */}
-            <main>
-              {/* Tabs */}
+    
+          {/* Step body */}
+          <div style={{ ...styles.glassCard, marginBottom: 20, minHeight: 400 }}>
+            {step === "builder" && (
               <div
-                role="tablist"
-                aria-label="Publishing steps"
-                onKeyDown={onKeyDownTabs}
-                style={{ display: "flex", gap: 8, marginBottom: 20, overflowX: "auto", paddingBottom: 2 }}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: isWide ? "260px 1fr" : "1fr", // chapters rail + editor
+                  gap: 16,
+                }}
               >
-                {STEPS.map((s, i) => {
-                  const isActive = s.key === step;
-                  const id = `tab-${s.key}`;
-                  const panelId = `panel-${s.key}`;
-                  return (
-                    <button
-                      key={s.key}
-                      id={id}
-                      ref={(el) => {
-                        if (el) tabRefs.current[i] = el;
-                      }}
-                      role="tab"
-                      aria-selected={isActive}
-                      aria-controls={panelId}
-                      tabIndex={isActive ? 0 : -1}
-                      onClick={() => setStep(s.key)}
-                      style={{
-                        padding: "12px 18px",
-                        borderRadius: 12,
-                        border: isActive ? `2px solid ${theme.accent}` : `2px solid ${theme.border}`,
-                        background: isActive ? theme.highlight : theme.white,
-                        color: isActive ? theme.primary : theme.subtext,
-                        fontWeight: isActive ? 700 : 500,
-                        cursor: "pointer",
-                        whiteSpace: "nowrap",
-                        fontSize: 14,
-                        outline: "none",
-                        boxShadow: isActive ? "0 1px 0 rgba(0,0,0,0.04) inset" : "none",
-                      }}
-                    >
-                      <span aria-hidden="true" style={{ marginRight: 8 }}>
-                        {i + 1}
-                      </span>
-                      {s.label}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Step body */}
-              <div style={{ ...styles.glassCard, marginBottom: 20, minHeight: 400 }}>
-                {step === "builder" && (
-                  <div
+                {/* Chapters rail (collapses on narrow) */}
+                {isWide && (
+                  <aside
                     style={{
-                      display: "grid",
-                      gridTemplateColumns: isWide ? "260px 1fr" : "1fr", // chapters rail + editor
-                      gap: 16,
+                      border: `1px solid ${theme.border}`,
+                      borderRadius: 12,
+                      padding: 12,
+                      background: theme.white,
+                      maxHeight: 560,
+                      overflow: "auto",
                     }}
                   >
-                    {/* Chapters rail (collapses on narrow) */}
-                    {isWide && (
-                      <aside
-                        style={{
-                          border: `1px solid ${theme.border}`,
-                          borderRadius: 12,
-                          padding: 12,
-                          background: theme.white,
-                          maxHeight: 560,
-                          overflow: "auto",
-                        }}
-                      >
-                        <div style={{ fontWeight: 700, marginBottom: 8, color: theme.text }}>Chapters</div>
-                        <div style={{ display: "grid", gap: 6 }}>
-                          {chapters.map((c) => (
-                            <button
-                              key={c.id}
-                              onClick={() => setActiveChapterId(c.id)}
-                              style={{
-                                textAlign: "left",
-                                padding: "8px 10px",
-                                borderRadius: 10,
-                                border: `1px solid ${c.id === activeChapterId ? theme.accent : theme.border}`,
-                                background: c.id === activeChapterId ? theme.highlight : theme.white,
-                                color: theme.text,
-                                cursor: "pointer",
-                              }}
-                              title={c.title}
-                            >
-                              {c.included ? "✅ " : "🚫 "} {c.title}
-                            </button>
-                          ))}
-                          <button onClick={addChapter} style={{ ...styles.btnPrimary, marginTop: 6 }}>
-                            + Add Chapter
-                          </button>
-                        </div>
-                      </aside>
-                    )}
-
-                    {/* Editor */}
-                    <section>
-                      {/* Toolbar */}
-                      <div
-                        style={{
-                          display: "flex",
-                          flexWrap: "wrap",
-                          gap: 8,
-                          padding: 10,
-                          border: `1px solid ${theme.border}`,
-                          borderRadius: 12,
-                          marginBottom: 10,
-                          background: `linear-gradient(180deg, ${theme.white}, ${theme.highlight})`,
-                        }}
-                      >
-                        <select onChange={(e) => setFont(e.target.value)} defaultValue="Times New Roman" style={styles.input as any}>
-                          <option>Times New Roman</option>
-                          <option>Georgia</option>
-                          <option>Garamond</option>
-                          <option>Palatino Linotype</option>
-                          <option>Calibri</option>
-                          <option>Arial</option>
-                          <option>Courier New</option>
-                        </select>
-                        <select
-                          onChange={(e) => setFontSizePt(parseInt(e.target.value, 10))}
-                          defaultValue="16"
-                          style={{ ...(styles.input as any), width: 90 }}
-                        >
-                          <option value="14">14</option>
-                          <option value="16">16</option>
-                          <option value="18">18</option>
-                          <option value="20">20</option>
-                          <option value="22">22</option>
-                        </select>
-                        <div style={{ display: "flex", gap: 6 }}>
-                          <button style={styles.btn} onClick={() => exec("bold")} title="Bold">
-                            B
-                          </button>
-                          <button style={styles.btn} onClick={() => exec("italic")} title="Italic">
-                            <em>I</em>
-                          </button>
-                          <button style={styles.btn} onClick={() => exec("underline")} title="Underline">
-                            <u>U</u>
-                          </button>
-                        </div>
-                        <div style={{ display: "flex", gap: 6 }}>
-                          <button style={styles.btn} onClick={() => setBlock("P")} title="Paragraph">
-                            ¶
-                          </button>
-                          <button style={styles.btn} onClick={() => setBlock("H1")} title="Heading 1">
-                            H1
-                          </button>
-                          <button style={styles.btn} onClick={() => setBlock("H2")} title="Heading 2">
-                            H2
-                          </button>
-                          <button style={styles.btn} onClick={() => setBlock("H3")} title="Heading 3">
-                            H3
-                          </button>
-                        </div>
-                        <div style={{ display: "flex", gap: 6 }}>
-                          <button style={styles.btn} onClick={() => exec("insertUnorderedList")} title="Bulleted List">
-                            • List
-                          </button>
-                          <button style={styles.btn} onClick={() => exec("insertOrderedList")} title="Numbered List">
-                            1. List
-                          </button>
-                        </div>
-                        <div style={{ display: "flex", gap: 6 }}>
-                          <button style={styles.btn} onClick={() => exec("justifyLeft")} title="Align Left">
-                            ⟸
-                          </button>
-                          <button style={styles.btn} onClick={() => exec("justifyCenter")} title="Center">
-                            ⇔
-                          </button>
-                          <button style={styles.btn} onClick={() => exec("justifyRight")} title="Align Right">
-                            ⟹
-                          </button>
-                          <button style={styles.btn} onClick={() => exec("justifyFull")} title="Justify">
-                            ≋
-                          </button>
-                        </div>
-                        <div style={{ display: "flex", gap: 6 }}>
-                          <button style={styles.btn} onClick={() => exec("undo")} title="Undo">
-                            ↶
-                          </button>
-                          <button style={styles.btn} onClick={() => exec("redo")} title="Redo">
-                            ↷
-                          </button>
-                        </div>
-                        <div style={{ display: "flex", gap: 6 }}>
-                          <button style={styles.btn} onClick={insertPageBreak} title="Insert Page Break">
-                            ⤓ Break
-                          </button>
-                        </div>
-                        <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
-                          {/* Import: Word + HTML */}
-                          <label style={{ ...styles.btn, display: "inline-flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
-                            Import Word (.docx)
-                            <input
-                              type="file"
-                              accept=".docx"
-                              style={{ display: "none" }}
-                              onChange={(e) => e.target.files && importDocx(e.target.files[0], true)}
-                            />
-                          </label>
-                          <label style={{ ...styles.btn, display: "inline-flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
-                            Import HTML (.html)
-                            <input
-                              type="file"
-                              accept=".html,.htm,.xhtml"
-                              style={{ display: "none" }}
-                              onChange={(e) => e.target.files && importHTML(e.target.files[0], true)}
-                            />
-                          </label>
-                          <button style={styles.btnPrimary} onClick={saveActiveChapterHTML}>
-                            Save
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* Desk background + White page */}
-                      <div
-                        style={{
-                          padding: 16,
-                          background: `linear-gradient(180deg, ${theme.bg}, #e6ebf2)`,
-                          borderRadius: 12,
-                          border: `1px solid ${theme.border}`,
-                        }}
-                      >
-                        <div
-                          ref={editorRef}
-                          contentEditable
-                          suppressContentEditableWarning
+                    <div style={{ fontWeight: 700, marginBottom: 8, color: theme.text }}>Chapters</div>
+                    <div style={{ display: "grid", gap: 6 }}>
+                      {chapters.map((c) => (
+                        <button
+                          key={c.id}
+                          onClick={() => setActiveChapterId(c.id)}
                           style={{
-                            margin: "0 auto",
-                            width: 800,
-                            minHeight: 1040,
-                            background: "#ffffff",
-                            color: "#111",
-                            border: "1px solid #e5e7eb",
-                            boxShadow: "0 8px 30px rgba(2,20,40,0.10)",
-                            borderRadius: 6,
-                            padding: "96px 80px",
-                            lineHeight: ms.lineHeight,
-                            fontFamily: ms.fontFamily,
-                            fontSize: ms.fontSizePt * (96 / 72),
-                            outline: "none",
+                            textAlign: "left",
+                            padding: "8px 10px",
+                            borderRadius: 10,
+                            border: `1px solid ${c.id === activeChapterId ? theme.accent : theme.border}`,
+                            background: c.id === activeChapterId ? theme.highlight : theme.white,
+                            color: theme.text,
+                            cursor: "pointer",
                           }}
-                          onInput={saveActiveChapterHTML}
-                          dangerouslySetInnerHTML={{ __html: chapters[activeIdx]?.textHTML || "<p></p>" }}
-                        />
-                      </div>
-                      <div style={{ color: theme.subtext, fontSize: 12, marginTop: 6 }}>
-                        Tip: Use H1/H2/H3 for sections — if “Build Contents from Headings” is on, your TOC will include them.
-                      </div>
-                    </section>
-                  </div>
-                )}
-
-                {step === "proof" && (
-                  <div>
-                    <h3 style={{ margin: "0 0 8px 0", fontSize: 18, color: theme.text }}>Proof & Consistency</h3>
-                    <p style={{ color: theme.subtext, fontSize: 14, marginTop: 0 }}>
-                      Local quick checks now. You can wire these buttons to your server-side AI later.
-                    </p>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12, marginTop: 16 }}>
-                      <button style={styles.btn} onClick={runLocalChecks}>Grammar Check (Local)</button>
-                      <button style={styles.btn} onClick={runLocalChecks}>Style Analysis (Local)</button>
-                      <button style={styles.btn} onClick={runLocalChecks}>Character Consistency (Local)</button>
-                      <button style={styles.btn} onClick={runLocalChecks}>Timeline Validation (Local)</button>
-                      <button style={styles.btnPrimary} onClick={runAIChecks} disabled={aiBusy}>
-                        {aiBusy ? "AI Proof… " : "AI Proof (Local Suggestions)"}
+                          title={c.title}
+                        >
+                          {c.included ? "✅ " : "🚫 "} {c.title}
+                        </button>
+                      ))}
+                      <button onClick={addChapter} style={{ ...styles.btnPrimary, marginTop: 6 }}>
+                        + Add Chapter
                       </button>
                     </div>
-                    {!!proofResults.length && (
-                      <div style={{ marginTop: 16, ...styles.glassCard }}>
-                        <ul style={{ margin: 0, paddingLeft: 18, color: theme.text }}>
-                          {proofResults.map((r, i) => <li key={i}>{r}</li>)}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
+                  </aside>
                 )}
-
-                {step === "format" && (
-                  <div>
-                    <h3 style={{ margin: "0 0 16px 0", fontSize: 18, color: theme.text }}>Format Preview</h3>
-                    <div style={styles.preview}>
-                      <iframe title="format-preview" style={{ width: "100%", height: 328, border: 0 }} srcDoc={compiledHTML} />
+    
+                {/* Editor */}
+                <section>
+                  {/* Toolbar */}
+                  <div
+                    style={{
+                      display: "flex",
+                      flexWrap: "wrap",
+                      gap: 8,
+                      padding: 10,
+                      border: `1px solid ${theme.border}`,
+                      borderRadius: 12,
+                      marginBottom: 10,
+                      background: `linear-gradient(180deg, ${theme.white}, ${theme.highlight})`,
+                    }}
+                  >
+                    <select onChange={(e) => setFont(e.target.value)} defaultValue="Times New Roman" style={styles.input as any}>
+                      <option>Times New Roman</option>
+                      <option>Georgia</option>
+                      <option>Garamond</option>
+                      <option>Palatino Linotype</option>
+                      <option>Calibri</option>
+                      <option>Arial</option>
+                      <option>Courier New</option>
+                    </select>
+                    <select
+                      onChange={(e) => setFontSizePt(parseInt(e.target.value, 10))}
+                      defaultValue="16"
+                      style={{ ...(styles.input as any), width: 90 }}
+                    >
+                      <option value="14">14</option>
+                      <option value="16">16</option>
+                      <option value="18">18</option>
+                      <option value="20">20</option>
+                      <option value="22">22</option>
+                    </select>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <button style={styles.btn} onClick={() => exec("bold")} title="Bold">
+                        B
+                      </button>
+                      <button style={styles.btn} onClick={() => exec("italic")} title="Italic">
+                        <em>I</em>
+                      </button>
+                      <button style={styles.btn} onClick={() => exec("underline")} title="Underline">
+                        <u>U</u>
+                      </button>
                     </div>
-                    <p style={{ color: theme.subtext, fontSize: 12, marginTop: 8 }}>
-                      * For true headers/footers + page numbers, export DOCX and finalize in Word/LibreOffice (then save as PDF).
-                    </p>
-                  </div>
-                )}
-
-                {step === "export" && (
-                  <div>
-                    <h3 style={{ margin: "0 0 16px 0", fontSize: 18, color: theme.text }}>Export</h3>
-                    <p style={{ color: theme.subtext, fontSize: 14 }}>
-                      DOCX includes page margins; EPUB is packaged, and XHTML is a simple ePub-friendly HTML.
-                    </p>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12, marginTop: 16 }}>
-                      <button style={styles.btn} onClick={exportPDF}>📄 Export PDF (Print dialog)</button>
-                      <button style={styles.btn} onClick={exportDOCX}>📝 Export DOCX</button>
-                      <button style={styles.btnPrimary} onClick={exportEPUB}>📖 Export EPUB (.epub)</button>
-                      <button style={styles.btnDark} onClick={exportEPUBXHTML}>📑 Export EPUB XHTML</button>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <button style={styles.btn} onClick={() => setBlock("P")} title="Paragraph">
+                        ¶
+                      </button>
+                      <button style={styles.btn} onClick={() => setBlock("H1")} title="Heading 1">
+                        H1
+                      </button>
+                      <button style={styles.btn} onClick={() => setBlock("H2")} title="Heading 2">
+                        H2
+                      </button>
+                      <button style={styles.btn} onClick={() => setBlock("H3")} title="Heading 3">
+                        H3
+                      </button>
+                    </div>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <button style={styles.btn} onClick={() => exec("insertUnorderedList")} title="Bulleted List">
+                        • List
+                      </button>
+                      <button style={styles.btn} onClick={() => exec("insertOrderedList")} title="Numbered List">
+                        1. List
+                      </button>
+                    </div>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <button style={styles.btn} onClick={() => exec("justifyLeft")} title="Align Left">
+                        ⟸
+                      </button>
+                      <button style={styles.btn} onClick={() => exec("justifyCenter")} title="Center">
+                        ⇔
+                      </button>
+                      <button style={styles.btn} onClick={() => exec("justifyRight")} title="Align Right">
+                        ⟹
+                      </button>
+                      <button style={styles.btn} onClick={() => exec("justifyFull")} title="Justify">
+                        ≋
+                      </button>
+                    </div>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <button style={styles.btn} onClick={() => exec("undo")} title="Undo">
+                        ↶
+                      </button>
+                      <button style={styles.btn} onClick={() => exec("redo")} title="Redo">
+                        ↷
+                      </button>
+                    </div>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <button style={styles.btn} onClick={insertPageBreak} title="Insert Page Break">
+                        ⤓ Break
+                      </button>
+                    </div>
+                    <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+                      {/* Import: Word + HTML */}
+                      <label style={{ ...styles.btn, display: "inline-flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+                        Import Word (.docx)
+                        <input
+                          type="file"
+                          accept=".docx"
+                          style={{ display: "none" }}
+                          onChange={(e) => e.target.files && importDocx(e.target.files[0], true)}
+                        />
+                      </label>
+                      <label style={{ ...styles.btn, display: "inline-flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+                        Import HTML (.html)
+                        <input
+                          type="file"
+                          accept=".html,.htm,.xhtml"
+                          style={{ display: "none" }}
+                          onChange={(e) => e.target.files && importHTML(e.target.files[0], true)}
+                        />
+                      </label>
+                      <button style={styles.btnPrimary} onClick={saveActiveChapterHTML}>
+                        Save
+                      </button>
                     </div>
                   </div>
-                )}
-
-                {step === "prep" && (
-                  <div>
-                    <h3 style={{ margin: "0 0 16px 0", fontSize: 18, color: theme.text }}>Publishing Preparation</h3>
-                    <p style={{ color: theme.subtext, fontSize: 14 }}>Get your submission assets ready.</p>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12, marginTop: 16 }}>
-                      <button style={styles.btn}>📝 Synopsis Generator</button>
-                      <button style={styles.btn}>✉️ Query Letter Builder</button>
-                      <button style={styles.btn}>✅ Self-Publishing Checklist</button>
-                      <button style={styles.btn}>📊 Marketing Kit</button>
-                      <button style={styles.btn}>🏷️ Genre Guidelines</button>
-                      <button style={styles.btn}>💰 Pricing Calculator</button>
-                    </div>
+    
+                  {/* Desk background + White page */}
+                  <div
+                    style={{
+                      padding: 16,
+                      background: `linear-gradient(180deg, ${theme.bg}, #e6ebf2)`,
+                      borderRadius: 12,
+                      border: `1px solid ${theme.border}`,
+                    }}
+                  >
+                    <div
+                      ref={editorRef}
+                      contentEditable
+                      suppressContentEditableWarning
+                      style={{
+                        margin: "0 auto",
+                        width: 800,
+                        minHeight: 1040,
+                        background: "#ffffff",
+                        color: "#111",
+                        border: "1px solid #e5e7eb",
+                        boxShadow: "0 8px 30px rgba(2,20,40,0.10)",
+                        borderRadius: 6,
+                        padding: "96px 80px",
+                        lineHeight: ms.lineHeight,
+                        fontFamily: ms.fontFamily,
+                        fontSize: ms.fontSizePt * (96 / 72),
+                        outline: "none",
+                      }}
+                      onInput={saveActiveChapterHTML}
+                      dangerouslySetInnerHTML={{ __html: chapters[activeIdx]?.textHTML || "<p></p>" }}
+                    />
                   </div>
-                )}
+                  <div style={{ color: theme.subtext, fontSize: 12, marginTop: 6 }}>
+                    Tip: Use H1/H2/H3 for sections — if “Build Contents from Headings” is on, your TOC will include them.
+                  </div>
+                </section>
               </div>
-
-              {/* Legacy Chapter cards (kept) */}
-              <div style={styles.glassCard}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-                  <h3 style={{ margin: 0, fontSize: 18, color: theme.text }}>Chapter Management</h3>
-                  <button style={styles.btnPrimary} onClick={addChapter}>+ Add Chapter</button>
+            )}
+    
+            {step === "proof" && (
+              <div>
+                <h3 style={{ margin: "0 0 8px 0", fontSize: 18, color: theme.text }}>Proof & Consistency</h3>
+                <p style={{ color: theme.subtext, fontSize: 14, marginTop: 0 }}>
+                  Local quick checks now. You can wire these buttons to your server-side AI later.
+                </p>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12, marginTop: 16 }}>
+                  <button style={styles.btn} onClick={runLocalChecks}>Grammar Check (Local)</button>
+                  <button style={styles.btn} onClick={runLocalChecks}>Style Analysis (Local)</button>
+                  <button style={styles.btn} onClick={runLocalChecks}>Character Consistency (Local)</button>
+                  <button style={styles.btn} onClick={runLocalChecks}>Timeline Validation (Local)</button>
+                  <button style={styles.btnPrimary} onClick={runAIChecks} disabled={aiBusy}>
+                    {aiBusy ? "AI Proof… " : "AI Proof (Local Suggestions)"}
+                  </button>
                 </div>
-
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
-                  {chapters.map((c, i) => (
-                    <div key={c.id} style={{ border: `1px solid ${theme.border}`, borderRadius: 12, padding: 14, background: c.included ? theme.white : "#F9FBFD" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontSize: 14, fontWeight: 700, color: theme.text }}>{c.title}</div>
-                          <div style={{ fontSize: 12, color: theme.subtext, marginTop: 4 }}>
-                            {(c.textHTML ? stripHtml(c.textHTML) : c.text).slice(0, 100)}…
-                          </div>
-                        </div>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                            <button
-                              style={{ ...styles.btn, padding: "6px 8px" }}
-                              onClick={() =>
-                                setChapters((prev) => {
-                                  const next = [...prev];
-                                  const to = Math.max(0, Math.min(next.length - 1, i - 1));
-                                  const [item] = next.splice(i, 1);
-                                  next.splice(to, 0, item);
-                                  return next;
-                                })
-                              }
-                              title="Move up"
-                            >
-                              ↑
-                            </button>
-                            <button
-                              style={{ ...styles.btn, padding: "6px 8px" }}
-                              onClick={() =>
-                                setChapters((prev) => {
-                                  const next = [...prev];
-                                  const to = Math.max(0, Math.min(next.length - 1, i + 1));
-                                  const [item] = next.splice(i, 1);
-                                  next.splice(to, 0, item);
-                                  return next;
-                                })
-                              }
-                              title="Move down"
-                            >
-                              ↓
-                            </button>
-                          </div>
-                          <Toggle
-                            checked={c.included}
-                            onChange={(v) => setChapters((prev) => prev.map((x) => (x.id === c.id ? { ...x, included: v } : x)))}
-                            label={c.included ? "Included" : "Excluded"}
-                          />
-                        </div>
-                      </div>
-                      <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                        <button className="small" style={styles.btn} onClick={() => setActiveChapterId(c.id)}>Open</button>
-                        <label style={{ ...styles.btn, cursor: "pointer" }}>
-                          Replace with .docx
-                          <input type="file" accept=".docx" style={{ display: "none" }}
-                                 onChange={(e) => e.target.files && importDocx(e.target.files[0], false)} />
-                        </label>
-                        <label style={{ ...styles.btn, cursor: "pointer" }}>
-                          Replace with .html
-                          <input type="file" accept=".html,.htm,.xhtml" style={{ display: "none" }}
-                                 onChange={(e) => e.target.files && importHTML(e.target.files[0], false)} />
-                        </label>
-                      </div>
-                    </div>
-                  ))}
+                {!!proofResults.length && (
+                  <div style={{ marginTop: 16, ...styles.glassCard }}>
+                    <ul style={{ margin: 0, paddingLeft: 18, color: theme.text }}>
+                      {proofResults.map((r, i) => <li key={i}>{r}</li>)}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
+    
+            {step === "format" && (
+              <div>
+                <h3 style={{ margin: "0 0 16px 0", fontSize: 18, color: theme.text }}>Format Preview</h3>
+                <div style={styles.preview}>
+                  <iframe title="format-preview" style={{ width: "100%", height: 328, border: 0 }} srcDoc={compiledHTML} />
+                </div>
+                <p style={{ color: theme.subtext, fontSize: 12, marginTop: 8 }}>
+                  * For true headers/footers + page numbers, export DOCX and finalize in Word/LibreOffice (then save as PDF).
+                </p>
+              </div>
+            )}
+    
+            {step === "export" && (
+              <div>
+                <h3 style={{ margin: "0 0 16px 0", fontSize: 18, color: theme.text }}>Export</h3>
+                <p style={{ color: theme.subtext, fontSize: 14 }}>
+                  DOCX includes page margins; EPUB is packaged, and XHTML is a simple ePub-friendly HTML.
+                </p>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12, marginTop: 16 }}>
+                  <button style={styles.btn} onClick={exportPDF}>📄 Export PDF (Print dialog)</button>
+                  <button style={styles.btn} onClick={exportDOCX}>📝 Export DOCX</button>
+                  <button style={styles.btnPrimary} onClick={exportEPUB}>📖 Export EPUB (.epub)</button>
+                  <button style={styles.btnDark} onClick={exportEPUBXHTML}>📑 Export EPUB XHTML</button>
                 </div>
               </div>
-
-              {/* Footer nav */}
-              <div style={{ display: "flex", justifyContent: "space-between", marginTop: 16 }}>
-                <button style={styles.btn} onClick={goBack} disabled={stepIndex === 0}>← Back</button>
-                <button style={styles.btnPrimary} onClick={goNext} disabled={stepIndex === STEPS.length - 1}>Next →</button>
+            )}
+    
+            {step === "prep" && (
+              <div>
+                <h3 style={{ margin: "0 0 16px 0", fontSize: 18, color: theme.text }}>Publishing Preparation</h3>
+                <p style={{ color: theme.subtext, fontSize: 14 }}>Get your submission assets ready.</p>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12, marginTop: 16 }}>
+                  <button style={styles.btn}>📝 Synopsis Generator</button>
+                  <button style={styles.btn}>✉️ Query Letter Builder</button>
+                  <button style={styles.btn}>✅ Self-Publishing Checklist</button>
+                  <button style={styles.btn}>📊 Marketing Kit</button>
+                  <button style={styles.btn}>🏷️ Genre Guidelines</button>
+                  <button style={styles.btn}>💰 Pricing Calculator</button>
+                </div>
               </div>
-            </main>
-
-            {/* Sidebar (sticky on wide screens) */}
-            {isWide && (
-              <PublishingSidebar
-                meta={meta} setMeta={setMeta}
-                matter={matter} setMatter={setMatter}
-                manuscriptPreset={manuscriptPreset} setManuscriptPreset={setManuscriptPreset}
-                platformPreset={platformPreset} setPlatformPreset={setPlatformPreset}
-                includeHeadersFooters={includeHeadersFooters}
-                wordCount={wordCount}
-                ms={ms} setMsOverrides={setMsOverrides}
-                manuscriptEntries={Object.entries(MANUSCRIPT_PRESETS).map(([k, v]) => [k, v.label] as const)}
-                platformEntries={Object.entries(PLATFORM_PRESETS).map(([k, v]) => [k, v.label] as const)}
-                googleMode={googleMode} setGoogleMode={setGoogleMode}
-              />
             )}
           </div>
-        </div>
+    
+          {/* Legacy Chapter cards (kept) */}
+          <div style={styles.glassCard}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+              <h3 style={{ margin: 0, fontSize: 18, color: theme.text }}>Chapter Management</h3>
+              <button style={styles.btnPrimary} onClick={addChapter}>+ Add Chapter</button>
+            </div>
+    
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
+              {chapters.map((c, i) => (
+                <div key={c.id} style={{ border: `1px solid ${theme.border}`, borderRadius: 12, padding: 14, background: c.included ? theme.white : "#F9FBFD" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: theme.text }}>{c.title}</div>
+                      <div style={{ fontSize: 12, color: theme.subtext, marginTop: 4 }}>
+                        {(c.textHTML ? stripHtml(c.textHTML) : c.text).slice(0, 100)}…
+                      </div>
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                        <button
+                          style={{ ...styles.btn, padding: "6px 8px" }}
+                          onClick={() =>
+                            setChapters((prev) => {
+                              const next = [...prev];
+                              const to = Math.max(0, Math.min(next.length - 1, i - 1));
+                              const [item] = next.splice(i, 1);
+                              next.splice(to, 0, item);
+                              return next;
+                            })
+                          }
+                          title="Move up"
+                        >
+                          ↑
+                        </button>
+                        <button
+                          style={{ ...styles.btn, padding: "6px 8px" }}
+                          onClick={() =>
+                            setChapters((prev) => {
+                              const next = [...prev];
+                              const to = Math.max(0, Math.min(next.length - 1, i + 1));
+                              const [item] = next.splice(i, 1);
+                              next.splice(to, 0, item);
+                              return next;
+                            })
+                          }
+                          title="Move down"
+                        >
+                          ↓
+                        </button>
+                      </div>
+                      <Toggle
+                        checked={c.included}
+                        onChange={(v) => setChapters((prev) => prev.map((x) => (x.id === c.id ? { ...x, included: v } : x)))}
+                        label={c.included ? "Included" : "Excluded"}
+                      />
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                    <button className="small" style={styles.btn} onClick={() => setActiveChapterId(c.id)}>Open</button>
+                    <label style={{ ...styles.btn, cursor: "pointer" }}>
+                      Replace with .docx
+                      <input type="file" accept=".docx" style={{ display: "none" }}
+                             onChange={(e) => e.target.files && importDocx(e.target.files[0], false)} />
+                    </label>
+                    <label style={{ ...styles.btn, cursor: "pointer" }}>
+                      Replace with .html
+                      <input type="file" accept=".html,.htm,.xhtml" style={{ display: "none" }}
+                             onChange={(e) => e.target.files && importHTML(e.target.files[0], false)} />
+                    </label>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+    
+          {/* Footer nav */}
+          <div style={{ display: "flex", justifyContent: "space-between", marginTop: 16 }}>
+            <button style={styles.btn} onClick={goBack} disabled={stepIndex === 0}>← Back</button>
+            <button style={styles.btnPrimary} onClick={goNext} disabled={stepIndex === STEPS.length - 1}>Next →</button>
+          </div>
+        </main>
+    
+        {/* SIDEBAR (sticky on wide screens) */}
+        {isWide && (
+          <PublishingSidebar
+            meta={meta} setMeta={setMeta}
+            matter={matter} setMatter={setMatter}
+            manuscriptPreset={manuscriptPreset} setManuscriptPreset={setManuscriptPreset}
+            platformPreset={platformPreset} setPlatformPreset={setPlatformPreset}
+            includeHeadersFooters={includeHeadersFooters}
+            wordCount={wordCount}
+            ms={ms} setMsOverrides={setMsOverrides}
+            manuscriptEntries={manuscriptEntries}
+            platformEntries={platformEntries}
+            googleMode={googleMode} setGoogleMode={setGoogleMode}
+          />
+        )}
       </div>
+    </div>
     </PageShell>
   );
 }
