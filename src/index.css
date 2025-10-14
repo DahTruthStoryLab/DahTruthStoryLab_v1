@@ -158,3 +158,57 @@
   border-color: #4F46E5 !important;
   background-color: rgba(79, 70, 229, 0.1) !important;
 }
+/* ---------- Brand tokens (safe defaults) ---------- */
+:root {
+  /* Core surfaces */
+  --brand-bg: #faf7fb;                     /* page background */
+  --brand-white: #ffffff;
+  --brand-surface: #ffffff;
+
+  /* Borders */
+  --brand-border: #ead9e5;                 /* soft rose-ish border */
+  --brand-border-strong: #e3cfe0;
+
+  /* Text */
+  --brand-text: #2b2330;                   /* deep plum */
+  --brand-subtext: #6b5a68;                /* muted plum */
+
+  /* Primary brand (used by buttons, tabs active border, etc.) */
+  --brand-primary: #ec4899;                /* rose-500 */
+  --brand-accent: #f472b6;                 /* pink-ish accent */
+  --brand-highlight: rgba(236, 72, 153, 0.10); /* light rose tint */
+
+  /* Optional: explicit rose/pink tokens for the header gradient */
+  --brand-rose: #ec4899;                   /* start color */
+  --brand-pink: #f9a8d4;                   /* end color */
+}
+
+/* Optional: subtle page smoothing & resets that help the editor look crisp */
+html, body, #root {
+  min-height: 100%;
+  background: var(--brand-bg);
+  color: var(--brand-text);
+}
+button {
+  font: inherit;
+}
+select, input, textarea {
+  font: inherit;
+  color: var(--brand-text);
+}
+iframe {
+  background: transparent;
+}
+
+/* Make sticky sidebars feel right on iOS/Safari */
+@supports (position: sticky) {
+  aside[aria-label="Publishing sidebar"] {
+    will-change: transform;
+  }
+}
+
+/* Optional: nicer focus ring for accessibility */
+:focus-visible {
+  outline: 2px solid var(--brand-accent);
+  outline-offset: 2px;
+}
