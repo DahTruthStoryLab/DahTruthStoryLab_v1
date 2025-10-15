@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import PageShell from "../components/layout/PageShell.tsx";
 import PublishingSidebar from "../components/publishing/PublishingSidebar.tsx";
 
-/* ---------- Theme via CSS variables (from your brand.css) ---------- */
+/* ---------- Theme via CSS variables ---------- */
 const theme = {
   bg: "var(--brand-bg)",
   surface: "var(--brand-surface, var(--brand-white))",
@@ -18,23 +18,19 @@ const theme = {
   white: "var(--brand-white)",
 } as const;
 
-// Optional Google palette (used only if you wire it later via CSS var overrides)
 const GOOGLE_PALETTE = {
-  primary: "#1a73e8", // Google Blue 600
-  accent: "#34a853",  // Google Green 600
+  primary: "#1a73e8",
+  accent: "#34a853",
   highlight: "rgba(26,115,232,0.10)",
 } as const;
 
 /* ---------- Types ---------- */
-// No more tabs - just the builder page
-
-/** Now supports HTML text for rich editing */
 type Chapter = {
   id: string;
   title: string;
   included: boolean;
-  text: string;        // legacy plain text
-  textHTML?: string;   // new: rich HTML (preferred if present)
+  text: string;
+  textHTML?: string;
 };
 
 type Matter = {
@@ -46,7 +42,7 @@ type Matter = {
   acknowledgments: string;
   aboutAuthor: string;
   notes: string;
-  tocFromHeadings?: boolean; // new: build TOC from <h1>-<h3>
+  tocFromHeadings?: boolean;
 };
 
 type Meta = { title: string; author: string; year: string; authorLast?: string };
@@ -73,7 +69,7 @@ const MANUSCRIPT_PRESETS: Record<
     label: string;
     fontFamily: string;
     fontSizePt: number;
-    lineHeight: number; // 2.0 = double, 1.5 = single-ish
+    lineHeight: number;
     firstLineIndentInches: number;
     paragraphSpacingPt: number;
     align: "left" | "justify";
@@ -224,7 +220,6 @@ const styles = {
     padding: 20,
     boxShadow: "0 8px 30px rgba(2,20,40,.06)",
   } as React.CSSProperties,
-  label: { fontSize: 12, color: theme.subtext } as React.CSSProperties,
   input: {
     border: `1px solid ${theme.border}`,
     borderRadius: 12,
@@ -250,14 +245,6 @@ const styles = {
     color: theme.white,
     cursor: "pointer",
   } as React.CSSProperties,
-  btnDark: {
-    padding: "10px 14px",
-    borderRadius: 12,
-    border: "none",
-    background: theme.primary,
-    color: theme.white,
-    cursor: "pointer",
-  } as React.CSSProperties,
   preview: {
     border: `1px solid ${theme.border}`,
     borderRadius: 12,
@@ -268,88 +255,75 @@ const styles = {
   } as React.CSSProperties,
 } as const;
 
-/* ---------- Small UI helpers (restored) ---------- */
-type ToggleProps = {
-  checked: boolean;
-  onChange: (v: boolean) => void;
-  label?: string;
-};
-const Toggle: React.FC<ToggleProps> = ({ checked, onChange, label }) => {
-  return (
-    <button
-      onClick={() => onChange(!checked)}
+/* ---------- Small UI helpers ---------- */
+type ToggleProps = { checked: boolean; onChange: (v: boolean) => void; label?: string };
+const Toggle: React.FC<ToggleProps> = ({ checked, onChange, label }) => (
+  <button
+    onClick={() => onChange(!checked)}
+    style={{
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 10,
+      padding: "8px 12px",
+      borderRadius: 999,
+      border: `1px solid ${theme.border}`,
+      background: checked ? theme.highlight : theme.white,
+      color: theme.text,
+      cursor: "pointer",
+    }}
+    aria-pressed={checked}
+    title={label}
+    type="button"
+  >
+    <span
       style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 10,
-        padding: "8px 12px",
+        width: 36,
+        height: 20,
         borderRadius: 999,
-        border: `1px solid ${theme.border}`,
-        background: checked ? theme.highlight : theme.white,
-        color: theme.text,
-        cursor: "pointer",
+        background: checked ? theme.accent : "#CBD5E1",
+        position: "relative",
+        display: "inline-block",
       }}
-      aria-pressed={checked}
-      title={label}
-      type="button"
     >
       <span
         style={{
-          width: 36,
-          height: 20,
+          position: "absolute",
+          top: 2,
+          left: checked ? 18 : 2,
+          width: 16,
+          height: 16,
           borderRadius: 999,
-          background: checked ? theme.accent : "#CBD5E1",
-          position: "relative",
-          display: "inline-block",
-        }}
-      >
-        <span
-          style={{
-            position: "absolute",
-            top: 2,
-            left: checked ? 18 : 2,
-            width: 16,
-            height: 16,
-            borderRadius: 999,
-            background: theme.white,
-            transition: "left .15s ease",
-          }}
-        />
-      </span>
-      {label && <span style={{ fontSize: 14 }}>{label}</span>}
-    </button>
-  );
-};
-
-type FieldProps = {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-};
-const Field: React.FC<FieldProps> = ({ label, value, onChange, placeholder }) => {
-  return (
-    <div>
-      <div style={{ color: theme.subtext, fontSize: 12 }}>{label}</div>
-      <textarea
-        value={value}
-        onChange={(e) => onChange(e.currentTarget.value)}
-        rows={label.length > 12 ? 3 : 2}
-        placeholder={placeholder}
-        style={{
-          width: "100%",
-          marginTop: 6,
-          fontSize: 14,
-          padding: 10,
-          border: `1px solid ${theme.border}`,
-          borderRadius: 12,
           background: theme.white,
-          color: theme.text,
+          transition: "left .15s ease",
         }}
       />
-    </div>
-  );
-};
+    </span>
+    {label && <span style={{ fontSize: 14 }}>{label}</span>}
+  </button>
+);
+
+type FieldProps = { label: string; value: string; onChange: (v: string) => void; placeholder?: string };
+const Field: React.FC<FieldProps> = ({ label, value, onChange, placeholder }) => (
+  <div>
+    <div style={{ color: theme.subtext, fontSize: 12 }}>{label}</div>
+    <textarea
+      value={value}
+      onChange={(e) => onChange(e.currentTarget.value)}
+      rows={label.length > 12 ? 3 : 2}
+      placeholder={placeholder}
+      style={{
+        width: "100%",
+        marginTop: 6,
+        fontSize: 14,
+        padding: 10,
+        border: `1px solid ${theme.border}`,
+        borderRadius: 12,
+        background: theme.white,
+        color: theme.text,
+      }}
+    />
+  </div>
+);
 
 /* ---------- Tiny helpers ---------- */
 const htmlEscape = (s: string) =>
@@ -357,11 +331,9 @@ const htmlEscape = (s: string) =>
 
 /* ---------- Component ---------- */
 export default function Publishing(): JSX.Element {
-  // Brand/Google toggle
   const [googleMode, setGoogleMode] = useState<boolean>(false);
   const navigate = useNavigate();
 
-  // meta + content (SIDEBAR SECTIONS)
   const [meta, setMeta] = useState<Meta>({
     title: "Working Title",
     author: "Your Name",
@@ -370,24 +342,9 @@ export default function Publishing(): JSX.Element {
   });
 
   const [chapters, setChapters] = useState<Chapter[]>([
-    {
-      id: "c1",
-      title: "Chapter 1 – Beginnings",
-      included: true,
-      text: "The morning held the kind of quiet that asks for a first sentence...",
-    },
-    {
-      id: "c2",
-      title: "Chapter 2 – Turning",
-      included: true,
-      text: "Change arrived softly, a hinge on a well-oiled door...",
-    },
-    {
-      id: "c3",
-      title: "Chapter 3 – Night Watch",
-      included: false,
-      text: "They counted the hours by the cooling of the tea...",
-    },
+    { id: "c1", title: "Chapter 1 – Beginnings", included: true, text: "The morning held the kind of quiet that asks for a first sentence..." },
+    { id: "c2", title: "Chapter 2 – Turning", included: true, text: "Change arrived softly, a hinge on a well-oiled door..." },
+    { id: "c3", title: "Chapter 3 – Night Watch", included: false, text: "They counted the hours by the cooling of the tea..." },
   ]);
 
   const [matter, setMatter] = useState<Matter>({
@@ -402,7 +359,6 @@ export default function Publishing(): JSX.Element {
     tocFromHeadings: true,
   });
 
-  // presets + overrides (SIDEBAR SECTION)
   const [manuscriptPreset, setManuscriptPreset] =
     useState<ManuscriptPresetKey>("Agents_Standard_12pt_TNR_Double");
   const [platformPreset, setPlatformPreset] =
@@ -422,7 +378,6 @@ export default function Publishing(): JSX.Element {
   const pf = PLATFORM_PRESETS[platformPreset];
   const includeHeadersFooters = pf.headers || pf.footers;
 
-  // options for dropdowns (smaller to pass to sidebar)
   const manuscriptEntries = useMemo(
     () => Object.entries(MANUSCRIPT_PRESETS).map(([k, v]) => [k, v.label] as const),
     []
@@ -432,20 +387,18 @@ export default function Publishing(): JSX.Element {
     []
   );
 
-  /* --------------------- Builder: Word-like Editor --------------------- */
+  /* --------------------- Builder: Editor --------------------- */
   const [activeChapterId, setActiveChapterId] = useState(chapters[0]?.id || "");
   const activeIdx = Math.max(0, chapters.findIndex((c) => c.id === activeChapterId));
   const editorRef = useRef<HTMLDivElement>(null);
 
-  // Single breakpoint controlling sidebar visibility
-  const [isWide, setIsWide] = useState<boolean>(window.innerWidth >= 1280);
+  const [isWide, setIsWide] = useState<boolean>(typeof window !== "undefined" ? window.innerWidth >= 1280 : true);
   useEffect(() => {
     const onResize = () => setIsWide(window.innerWidth >= 1280);
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
-  // Ensure active chapter has editable HTML loaded
   useEffect(() => {
     const chap = chapters[activeIdx];
     if (!chap) return;
@@ -522,7 +475,6 @@ export default function Publishing(): JSX.Element {
     });
   };
 
-  /* ----- Import: DOCX (.docx) and HTML (.html) ----- */
   const importDocx = useCallback(
     async (file: File, asNewChapter = true) => {
       const JSZip = (await import("jszip")).default;
@@ -620,8 +572,6 @@ export default function Publishing(): JSX.Element {
   );
 
   /* ---------- Compile (Preview/Export) ---------- */
-
-  // Build a TOC from headings if enabled
   const tocFromHeadings: string[] = useMemo(() => {
     if (!matter.tocFromHeadings) return [];
     const items: string[] = [];
@@ -639,7 +589,6 @@ export default function Publishing(): JSX.Element {
     return items.filter(Boolean);
   }, [chapters, matter.tocFromHeadings]);
 
-  // Plain-text compilation
   const compiledPlain: string = useMemo(() => {
     const parts: string[] = [];
     const vars = (s: string) =>
@@ -671,8 +620,6 @@ export default function Publishing(): JSX.Element {
 
   const wordCount = useMemo(() => compiledPlain.split(/\s+/).filter(Boolean).length, [compiledPlain]);
 
-  /* ---------- Exports - Removed (now in Export page) ---------- */
-
   /* ---------- UI ---------- */
   return (
     <PageShell
@@ -689,7 +636,7 @@ export default function Publishing(): JSX.Element {
       }}
     >
       <div style={styles.outer}>
-        {/* Rose/Pink gradient header - BIGGER and MORE TRANSPARENT */}
+        {/* Gradient header (kept; you can swap to AeroBanner later if desired) */}
         <div
           style={{
             background: `linear-gradient(135deg, rgba(236, 72, 153, 0.65), rgba(249, 168, 212, 0.65))`,
@@ -707,7 +654,6 @@ export default function Publishing(): JSX.Element {
               alignItems: "center",
             }}
           >
-            {/* Back */}
             <button
               onClick={() => navigate(-1)}
               style={{
@@ -723,27 +669,17 @@ export default function Publishing(): JSX.Element {
               ← Back
             </button>
 
-            {/* Center title - EVEN BIGGER */}
-            <div
-              style={{
-                textAlign: "center",
-                display: "flex",
-                gap: 12,
-                alignItems: "center",
-              }}
-            >
+            <div style={{ textAlign: "center", display: "flex", gap: 12, alignItems: "center" }}>
               <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                 <path d="M6 2h9a3 3 0 0 1 3 3v12.5a1.5 1.5 0 0 1-1.5 1.5H7a3 3 0 0 0-3 3V5a3 3 0 0 1 3-3zm0 2a1 1 0 0 0-1 1v13.764A4.99 4.99 0 0 1 7 18h9V5a1 1 0 0 0-1-1H6z" />
               </svg>
-              <h1 style={{ margin: 0, fontSize: 22, fontWeight: 600, letterSpacing: 0.4 }}>
-                Publishing Suite
-              </h1>
+              <h1 style={{ margin: 0, fontSize: 22, fontWeight: 600, letterSpacing: 0.4 }}>Publishing Suite</h1>
             </div>
             <div style={{ width: 110 }} />
           </div>
         </div>
 
-        {/* NEW LAYOUT: Main + Smaller Sidebar */}
+        {/* Main + thinner sidebar */}
         <div style={{ ...styles.inner, ...styles.sectionShell }}>
           <div
             style={{
@@ -754,21 +690,14 @@ export default function Publishing(): JSX.Element {
           >
             {/* MAIN */}
             <main>
-              {/* Quick Access Navigation */}
+              {/* Quick links */}
               <div style={{ ...styles.glassCard, marginBottom: 16 }}>
                 <h3 style={{ margin: "0 0 12px 0", fontSize: 16, color: theme.text, fontWeight: 600 }}>
                   📚 Publishing Tools
                 </h3>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 10 }}>
                   <button
-                    style={{
-                      ...styles.btn,
-                      padding: "10px 14px",
-                      textAlign: "left",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 10,
-                    }}
+                    style={{ ...styles.btn, padding: "10px 14px", textAlign: "left", display: "flex", alignItems: "center", gap: 10 }}
                     onClick={() => navigate("/proof")}
                   >
                     <span style={{ fontSize: 20 }}>✅</span>
@@ -778,14 +707,7 @@ export default function Publishing(): JSX.Element {
                     </div>
                   </button>
                   <button
-                    style={{
-                      ...styles.btn,
-                      padding: "10px 14px",
-                      textAlign: "left",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 10,
-                    }}
+                    style={{ ...styles.btn, padding: "10px 14px", textAlign: "left", display: "flex", alignItems: "center", gap: 10 }}
                     onClick={() => navigate("/format")}
                   >
                     <span style={{ fontSize: 20 }}>🎨</span>
@@ -795,14 +717,7 @@ export default function Publishing(): JSX.Element {
                     </div>
                   </button>
                   <button
-                    style={{
-                      ...styles.btn,
-                      padding: "10px 14px",
-                      textAlign: "left",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 10,
-                    }}
+                    style={{ ...styles.btn, padding: "10px 14px", textAlign: "left", display: "flex", alignItems: "center", gap: 10 }}
                     onClick={() => navigate("/export")}
                   >
                     <span style={{ fontSize: 20 }}>📦</span>
@@ -812,14 +727,7 @@ export default function Publishing(): JSX.Element {
                     </div>
                   </button>
                   <button
-                    style={{
-                      ...styles.btn,
-                      padding: "10px 14px",
-                      textAlign: "left",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 10,
-                    }}
+                    style={{ ...styles.btn, padding: "10px 14px", textAlign: "left", display: "flex", alignItems: "center", gap: 10 }}
                     onClick={() => navigate("/publishing-prep")}
                   >
                     <span style={{ fontSize: 20 }}>🚀</span>
@@ -833,13 +741,7 @@ export default function Publishing(): JSX.Element {
 
               {/* Manuscript Builder */}
               <div style={{ ...styles.glassCard, marginBottom: 20, minHeight: 400 }}>
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: isWide ? "240px 1fr" : "1fr",
-                    gap: 16,
-                  }}
-                >
+                <div style={{ display: "grid", gridTemplateColumns: isWide ? "240px 1fr" : "1fr", gap: 16 }}>
                   {/* Chapters rail */}
                   {isWide && (
                     <aside
@@ -880,171 +782,145 @@ export default function Publishing(): JSX.Element {
                     </aside>
                   )}
 
-                  {/* Editor - Full width paper */}
-                  {/* VERY THIN Toolbar Bar (compact + scrollable) */}
-{/* VERY THIN Toolbar Bar (compact + scrollable) */}
-<div
-  role="toolbar"
-  aria-label="Formatting toolbar"
-  style={{
-    display: "flex",
-    alignItems: "center",
-    gap: 6,
-    padding: "6px 8px",
-    border: `1px solid ${theme.border}`,
-    borderRadius: 8,
-    marginBottom: 12,
-    background: theme.white,
-    fontSize: 11,
-    /* prevent cutoff + allow horizontal scroll */
-    flexWrap: "nowrap",
-    overflowX: "auto",
-    whiteSpace: "nowrap",
-    scrollbarWidth: "thin",
-    WebkitOverflowScrolling: "touch",
-  }}
->
-  {/* Font dropdown — compact */}
-  <select
-    onChange={(e) => setFont(e.target.value)}
-    defaultValue="Times New Roman"
-    style={{
-      ...(styles.input as any),
-      width: 150,
-      padding: "4px 6px",
-      fontSize: 11,
-      height: 28,
-      minWidth: 130,
-      display: "inline-block",
-    }}
-  >
-    <option>Times New Roman</option>
-    <option>Georgia</option>
-    <option>Garamond</option>
-    <option>Palatino</option>
-    <option>Calibri</option>
-    <option>Arial</option>
-  </select>
+                  {/* Editor + toolbar */}
+                  <section>
+                    {/* Thin toolbar (scrollable so nothing gets cut off) */}
+                    <div
+                      role="toolbar"
+                      aria-label="Formatting toolbar"
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                        padding: "6px 8px",
+                        border: `1px solid ${theme.border}`,
+                        borderRadius: 8,
+                        marginBottom: 12,
+                        background: theme.white,
+                        fontSize: 11,
+                        flexWrap: "nowrap",
+                        overflowX: "auto",
+                        whiteSpace: "nowrap",
+                        scrollbarWidth: "thin",
+                        WebkitOverflowScrolling: "touch",
+                      }}
+                    >
+                      <select
+                        onChange={(e) => setFont(e.target.value)}
+                        defaultValue="Times New Roman"
+                        style={{ ...(styles.input as any), width: 150, padding: "4px 6px", fontSize: 11, height: 28, minWidth: 130, display: "inline-block" }}
+                      >
+                        <option>Times New Roman</option>
+                        <option>Georgia</option>
+                        <option>Garamond</option>
+                        <option>Palatino</option>
+                        <option>Calibri</option>
+                        <option>Arial</option>
+                      </select>
 
-  {/* Size — compact */}
-  <select
-    onChange={(e) => setFontSizePt(parseInt(e.target.value, 10))}
-    defaultValue="16"
-    style={{
-      ...(styles.input as any),
-      width: 56,
-      padding: "4px 6px",
-      fontSize: 11,
-      height: 28,
-      minWidth: 52,
-      display: "inline-block",
-    }}
-  >
-    <option value="14">14</option>
-    <option value="16">16</option>
-    <option value="18">18</option>
-    <option value="20">20</option>
-    <option value="22">22</option>
-  </select>
+                      <select
+                        onChange={(e) => setFontSizePt(parseInt(e.target.value, 10))}
+                        defaultValue="16"
+                        style={{ ...(styles.input as any), width: 56, padding: "4px 6px", fontSize: 11, height: 28, minWidth: 52, display: "inline-block" }}
+                      >
+                        <option value="14">14</option>
+                        <option value="16">16</option>
+                        <option value="18">18</option>
+                        <option value="20">20</option>
+                        <option value="22">22</option>
+                      </select>
 
-  <div style={{ width: 1, height: 16, background: theme.border, margin: "0 4px" }} />
+                      <div style={{ width: 1, height: 16, background: theme.border, margin: "0 4px" }} />
 
-  {/* Basic styles */}
-  <button style={{ ...styles.btn, padding: "4px 8px", fontSize: 11, minWidth: 26, height: 28 }} onClick={() => exec("bold")} title="Bold">B</button>
-  <button style={{ ...styles.btn, padding: "4px 8px", fontSize: 11, minWidth: 26, height: 28 }} onClick={() => exec("italic")} title="Italic"><em>I</em></button>
-  <button style={{ ...styles.btn, padding: "4px 8px", fontSize: 11, minWidth: 26, height: 28 }} onClick={() => exec("underline")} title="Underline"><u>U</u></button>
+                      <button style={{ ...styles.btn, padding: "4px 8px", fontSize: 11, minWidth: 26, height: 28 }} onClick={() => exec("bold")} title="Bold">B</button>
+                      <button style={{ ...styles.btn, padding: "4px 8px", fontSize: 11, minWidth: 26, height: 28 }} onClick={() => exec("italic")} title="Italic"><em>I</em></button>
+                      <button style={{ ...styles.btn, padding: "4px 8px", fontSize: 11, minWidth: 26, height: 28 }} onClick={() => exec("underline")} title="Underline"><u>U</u></button>
 
-  <div style={{ width: 1, height: 16, background: theme.border, margin: "0 4px" }} />
+                      <div style={{ width: 1, height: 16, background: theme.border, margin: "0 4px" }} />
 
-  {/* Headings */}
-  <button style={{ ...styles.btn, padding: "4px 7px", fontSize: 10, minWidth: 26, height: 28 }} onClick={() => setBlock("H1")} title="Heading 1">H1</button>
-  <button style={{ ...styles.btn, padding: "4px 7px", fontSize: 10, minWidth: 26, height: 28 }} onClick={() => setBlock("H2")} title="Heading 2">H2</button>
-  <button style={{ ...styles.btn, padding: "4px 7px", fontSize: 10, minWidth: 26, height: 28 }} onClick={() => setBlock("H3")} title="Heading 3">H3</button>
+                      <button style={{ ...styles.btn, padding: "4px 7px", fontSize: 10, minWidth: 26, height: 28 }} onClick={() => setBlock("H1")} title="Heading 1">H1</button>
+                      <button style={{ ...styles.btn, padding: "4px 7px", fontSize: 10, minWidth: 26, height: 28 }} onClick={() => setBlock("H2")} title="Heading 2">H2</button>
+                      <button style={{ ...styles.btn, padding: "4px 7px", fontSize: 10, minWidth: 26, height: 28 }} onClick={() => setBlock("H3")} title="Heading 3">H3</button>
 
-  <div style={{ width: 1, height: 16, background: theme.border, margin: "0 4px" }} />
+                      <div style={{ width: 1, height: 16, background: theme.border, margin: "0 4px" }} />
 
-  {/* Lists */}
-  <button style={{ ...styles.btn, padding: "4px 7px", fontSize: 10, minWidth: 26, height: 28 }} onClick={() => exec("insertUnorderedList")} title="Bulleted list">•</button>
-  <button style={{ ...styles.btn, padding: "4px 7px", fontSize: 10, minWidth: 26, height: 28 }} onClick={() => exec("insertOrderedList")} title="Numbered list">1.</button>
+                      <button style={{ ...styles.btn, padding: "4px 7px", fontSize: 10, minWidth: 26, height: 28 }} onClick={() => exec("insertUnorderedList")} title="Bulleted list">•</button>
+                      <button style={{ ...styles.btn, padding: "4px 7px", fontSize: 10, minWidth: 26, height: 28 }} onClick={() => exec("insertOrderedList")} title="Numbered list">1.</button>
 
-  <div style={{ width: 1, height: 16, background: theme.border, margin: "0 4px" }} />
+                      <div style={{ width: 1, height: 16, background: theme.border, margin: "0 4px" }} />
 
-  {/* Align */}
-  <button style={{ ...styles.btn, padding: "4px 7px", fontSize: 10, minWidth: 26, height: 28 }} onClick={() => exec("justifyLeft")} title="Align left">⟸</button>
-  <button style={{ ...styles.btn, padding: "4px 7px", fontSize: 10, minWidth: 26, height: 28 }} onClick={() => exec("justifyCenter")} title="Center">⇔</button>
-  <button style={{ ...styles.btn, padding: "4px 7px", fontSize: 10, minWidth: 26, height: 28 }} onClick={() => exec("justifyRight")} title="Align right">⟹</button>
-  <button style={{ ...styles.btn, padding: "4px 7px", fontSize: 10, minWidth: 26, height: 28 }} onClick={() => exec("justifyFull")} title="Justify">≋</button>
+                      <button style={{ ...styles.btn, padding: "4px 7px", fontSize: 10, minWidth: 26, height: 28 }} onClick={() => exec("justifyLeft")} title="Align left">⟸</button>
+                      <button style={{ ...styles.btn, padding: "4px 7px", fontSize: 10, minWidth: 26, height: 28 }} onClick={() => exec("justifyCenter")} title="Center">⇔</button>
+                      <button style={{ ...styles.btn, padding: "4px 7px", fontSize: 10, minWidth: 26, height: 28 }} onClick={() => exec("justifyRight")} title="Align right">⟹</button>
+                      <button style={{ ...styles.btn, padding: "4px 7px", fontSize: 10, minWidth: 26, height: 28 }} onClick={() => exec("justifyFull")} title="Justify">≋</button>
 
-  <div style={{ width: 1, height: 16, background: theme.border, margin: "0 4px" }} />
+                      <div style={{ width: 1, height: 16, background: theme.border, margin: "0 4px" }} />
 
-  {/* Undo/Redo */}
-  <button style={{ ...styles.btn, padding: "4px 8px", fontSize: 11, minWidth: 26, height: 28 }} onClick={() => exec("undo")} title="Undo">↶</button>
-  <button style={{ ...styles.btn, padding: "4px 8px", fontSize: 11, minWidth: 26, height: 28 }} onClick={() => exec("redo")} title="Redo">↷</button>
+                      <button style={{ ...styles.btn, padding: "4px 8px", fontSize: 11, minWidth: 26, height: 28 }} onClick={() => exec("undo")} title="Undo">↶</button>
+                      <button style={{ ...styles.btn, padding: "4px 8px", fontSize: 11, minWidth: 26, height: 28 }} onClick={() => exec("redo")} title="Redo">↷</button>
 
-  <div style={{ width: 1, height: 16, background: theme.border, margin: "0 4px" }} />
+                      <div style={{ width: 1, height: 16, background: theme.border, margin: "0 4px" }} />
 
-  {/* Page break */}
-  <button style={{ ...styles.btn, padding: "4px 8px", fontSize: 10, height: 28 }} onClick={insertPageBreak} title="Insert page break">⤓</button>
+                      <button style={{ ...styles.btn, padding: "4px 8px", fontSize: 10, height: 28 }} onClick={insertPageBreak} title="Insert page break">⤓</button>
 
-  {/* Right side — imports & save */}
-  <div style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
-    <label style={{ ...styles.btn, padding: "4px 9px", fontSize: 10, cursor: "pointer", height: 28, display: "flex", alignItems: "center" }}>
-      📄 Word
-      <input type="file" accept=".docx" style={{ display: "none" }} onChange={(e) => e.target.files && importDocx(e.target.files[0], true)} />
-    </label>
-    <label style={{ ...styles.btn, padding: "4px 9px", fontSize: 10, cursor: "pointer", height: 28, display: "flex", alignItems: "center" }}>
-      🌐 HTML
-      <input type="file" accept=".html,.htm,.xhtml" style={{ display: "none" }} onChange={(e) => e.target.files && importHTML(e.target.files[0], true)} />
-    </label>
-    <button style={{ ...styles.btnPrimary, padding: "4px 10px", fontSize: 11, height: 28 }} onClick={saveActiveChapterHTML}>Save</button>
-  </div>
-</div>
+                      <div style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
+                        <label style={{ ...styles.btn, padding: "4px 9px", fontSize: 10, cursor: "pointer", height: 28, display: "flex", alignItems: "center" }}>
+                          📄 Word
+                          <input type="file" accept=".docx" style={{ display: "none" }} onChange={(e) => e.target.files && importDocx(e.target.files[0], true)} />
+                        </label>
+                        <label style={{ ...styles.btn, padding: "4px 9px", fontSize: 10, cursor: "pointer", height: 28, display: "flex", alignItems: "center" }}>
+                          🌐 HTML
+                          <input type="file" accept=".html,.htm,.xhtml" style={{ display: "none" }} onChange={(e) => e.target.files && importHTML(e.target.files[0], true)} />
+                        </label>
+                        <button style={{ ...styles.btnPrimary, padding: "4px 10px", fontSize: 11, height: 28 }} onClick={saveActiveChapterHTML}>Save</button>
+                      </div>
+                    </div>
 
-               {/* Desk background (outer) */}
-<div
-  style={{
-    padding: 14,                                      // slimmer than before
-    background: `linear-gradient(180deg, var(--brand-bg), #eef2f7)`,
-    borderRadius: 12,
-    border: `1px solid ${theme.border}`,
-    overflow: "auto",                                 // prevents toolbar/page cut-off
-  }}
->
-  {/* White page (editor) — compact, LTR, typeable */}
-  <div
-    ref={editorRef}
-    contentEditable
-    suppressContentEditableWarning
-    dir="ltr"
-    spellCheck={true}
-    style={{
-      margin: "0 auto",
-      width: "min(760px, 92vw)",                      // narrower + responsive
-      minHeight: 900,
-      background: "#ffffff",
-      color: "#111",
-      border: "1px solid #e5e7eb",
-      boxShadow: "0 8px 30px rgba(2,20,40,0.10)",
-      borderRadius: 8,
-      padding: "64px 64px",                           // tighter to show more white
-      lineHeight: ms.lineHeight,
-      fontFamily: ms.fontFamily,
-      fontSize: Math.max(14, Math.round(ms.fontSizePt * (96 / 72))),
-      outline: "none",
-      direction: "ltr",                               // fix “backwards” typing
-      unicodeBidi: "plaintext",
-      textAlign: "left",
-      caretColor: "#111",
-      wordBreak: "break-word",
-    }}
-    onInput={saveActiveChapterHTML}
-    dangerouslySetInnerHTML={{
-      __html: chapters[activeIdx]?.textHTML || "<p></p>",
-    }}
-  />
-</div>
+                    {/* Desk background + white page */}
+                    <div
+                      style={{
+                        padding: 14,
+                        background: `linear-gradient(180deg, var(--brand-bg), #eef2f7)`,
+                        borderRadius: 12,
+                        border: `1px solid ${theme.border}`,
+                        overflow: "auto",
+                      }}
+                    >
+                      <div
+                        ref={editorRef}
+                        contentEditable
+                        suppressContentEditableWarning
+                        dir="ltr"
+                        spellCheck={true}
+                        style={{
+                          margin: "0 auto",
+                          width: "min(760px, 92vw)",
+                          minHeight: 900,
+                          background: "#ffffff",
+                          color: "#111",
+                          border: "1px solid #e5e7eb",
+                          boxShadow: "0 8px 30px rgba(2,20,40,0.10)",
+                          borderRadius: 8,
+                          padding: "64px 64px",
+                          lineHeight: ms.lineHeight,
+                          fontFamily: ms.fontFamily,
+                          fontSize: Math.max(14, Math.round(ms.fontSizePt * (96 / 72))),
+                          outline: "none",
+                          direction: "ltr",
+                          unicodeBidi: "plaintext",
+                          textAlign: "left",
+                          caretColor: "#111",
+                          wordBreak: "break-word",
+                        }}
+                        onInput={saveActiveChapterHTML}
+                        dangerouslySetInnerHTML={{ __html: chapters[activeIdx]?.textHTML || "<p></p>" }}
+                      />
+                    </div>
+                  </section>
+                </div>
+              </div>
 
-              {/* Legacy Chapter cards (kept) */}
+              {/* Legacy Chapter cards */}
               <div style={styles.glassCard}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
                   <h3 style={{ margin: 0, fontSize: 18, color: theme.text }}>Chapter Management</h3>
@@ -1105,13 +981,11 @@ export default function Publishing(): JSX.Element {
                         <button className="small" style={styles.btn} onClick={() => setActiveChapterId(c.id)}>Open</button>
                         <label style={{ ...styles.btn, cursor: "pointer" }}>
                           Replace with .docx
-                          <input type="file" accept=".docx" style={{ display: "none" }}
-                                 onChange={(e) => e.target.files && importDocx(e.target.files[0], false)} />
+                          <input type="file" accept=".docx" style={{ display: "none" }} onChange={(e) => e.target.files && importDocx(e.target.files[0], false)} />
                         </label>
                         <label style={{ ...styles.btn, cursor: "pointer" }}>
                           Replace with .html
-                          <input type="file" accept=".html,.htm,.xhtml" style={{ display: "none" }}
-                                 onChange={(e) => e.target.files && importHTML(e.target.files[0], false)} />
+                          <input type="file" accept=".html,.htm,.xhtml" style={{ display: "none" }} onChange={(e) => e.target.files && importHTML(e.target.files[0], false)} />
                         </label>
                       </div>
                     </div>
@@ -1135,8 +1009,8 @@ export default function Publishing(): JSX.Element {
                 wordCount={wordCount}
                 ms={ms}
                 setMsOverrides={setMsOverrides}
-                manuscriptEntries={Object.entries(MANUSCRIPT_PRESETS).map(([k, v]) => [k, v.label] as const)}
-                platformEntries={Object.entries(PLATFORM_PRESETS).map(([k, v]) => [k, v.label] as const)}
+                manuscriptEntries={manuscriptEntries}
+                platformEntries={platformEntries}
                 googleMode={googleMode}
                 setGoogleMode={setGoogleMode}
               />
