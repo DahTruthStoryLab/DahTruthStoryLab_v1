@@ -16,6 +16,7 @@ const theme = {
   highlight: "var(--brand-highlight)",
   primary: "var(--brand-primary)",
   white: "var(--brand-white)",
+  gold: "var(--brand-gold)",
 } as const;
 
 // Optional Google palette (used only if you wire it later via CSS var overrides)
@@ -671,6 +672,12 @@ export default function Publishing(): JSX.Element {
 
   const wordCount = useMemo(() => compiledPlain.split(/\s+/).filter(Boolean).length, [compiledPlain]);
 
+  function stripHtml(html: string): string {
+    const div = document.createElement("div");
+    div.innerHTML = html;
+    return (div.textContent || div.innerText || "").trim();
+  }
+
   /* ---------- Exports - Removed (now in Export page) ---------- */
 
   /* ---------- UI ---------- */
@@ -689,10 +696,10 @@ export default function Publishing(): JSX.Element {
       }}
     >
       <div style={styles.outer}>
-        {/* Rose/Pink gradient header - BIGGER and MORE TRANSPARENT */}
+        {/* CHANGED: Transparent rose/pink header, gold back button, Garamond font */}
         <div
           style={{
-            background: `linear-gradient(135deg, rgba(236, 72, 153, 0.65), rgba(249, 168, 212, 0.65))`,
+            background: "rgba(202, 177, 214, 0.4)",
             backdropFilter: "blur(12px)",
             color: theme.white,
             padding: "20px 24px",
@@ -707,23 +714,24 @@ export default function Publishing(): JSX.Element {
               alignItems: "center",
             }}
           >
-            {/* Back */}
+            {/* CHANGED: Gold back button */}
             <button
               onClick={() => navigate(-1)}
               style={{
                 ...styles.btn,
                 border: "none",
-                background: "rgba(255,255,255,0.2)",
+                background: theme.gold,
                 color: theme.white,
                 padding: "10px 18px",
                 fontSize: 15,
+                fontWeight: 600,
               }}
               aria-label="Go back"
             >
               ← Back
             </button>
 
-            {/* Center title - EVEN BIGGER */}
+            {/* CHANGED: Garamond font */}
             <div
               style={{
                 textAlign: "center",
@@ -735,7 +743,7 @@ export default function Publishing(): JSX.Element {
               <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                 <path d="M6 2h9a3 3 0 0 1 3 3v12.5a1.5 1.5 0 0 1-1.5 1.5H7a3 3 0 0 0-3 3V5a3 3 0 0 1 3-3zm0 2a1 1 0 0 0-1 1v13.764A4.99 4.99 0 0 1 7 18h9V5a1 1 0 0 0-1-1H6z" />
               </svg>
-              <h1 style={{ margin: 0, fontSize: 22, fontWeight: 600, letterSpacing: 0.4 }}>
+              <h1 style={{ margin: 0, fontSize: 22, fontWeight: 600, letterSpacing: 0.4, fontFamily: "Garamond, Georgia, serif" }}>
                 Publishing Suite
               </h1>
             </div>
@@ -1068,7 +1076,7 @@ export default function Publishing(): JSX.Element {
                         </div>
                       </div>
                       <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                        <button className="small" style={styles.btn} onClick={() => setActiveChapterId(c.id)}>Open</button>
+                        <button style={styles.btn} onClick={() => setActiveChapterId(c.id)}>Open</button>
                         <label style={{ ...styles.btn, cursor: "pointer" }}>
                           Replace with .docx
                           <input type="file" accept=".docx" style={{ display: "none" }}
