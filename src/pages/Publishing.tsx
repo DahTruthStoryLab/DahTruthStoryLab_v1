@@ -27,7 +27,7 @@ const GOOGLE_PALETTE = {
 } as const;
 
 /* ---------- Types ---------- */
-type StepKey = "builder" | "proof" | "format" | "export" | "prep";
+// No more tabs - just the builder page
 
 /** Now supports HTML text for rich editing */
 type Chapter = {
@@ -357,39 +357,10 @@ const htmlEscape = (s: string) =>
   s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 
 /* ---------- Component ---------- */
-const STEPS: { key: StepKey; label: string }[] = [
-  { key: "builder", label: "Manuscript Builder" },
-  { key: "proof", label: "Proof & Consistency" },
-  { key: "format", label: "Format & Styles" },
-  { key: "export", label: "Export" },
-  { key: "prep", label: "Publishing Prep" },
-];
-
 export default function Publishing(): JSX.Element {
   // Brand/Google toggle
   const [googleMode, setGoogleMode] = useState<boolean>(false);
   const navigate = useNavigate();
-
-  // nav tabs
-  const [step, setStep] = useState<StepKey>("builder");
-  const stepIndex = STEPS.findIndex((s) => s.key === step);
-  const tabRefs = useRef<HTMLButtonElement[]>([]);
-  function onKeyDownTabs(e: React.KeyboardEvent<HTMLDivElement>) {
-    const current = STEPS.findIndex((s) => s.key === step);
-    if (current < 0) return;
-    let next = current;
-    if (e.key === "ArrowRight") next = (current + 1) % STEPS.length;
-    if (e.key === "ArrowLeft") next = (current - 1 + STEPS.length) % STEPS.length;
-    if (e.key === "Home") next = 0;
-    if (e.key === "End") next = STEPS.length - 1;
-    if (next !== current) {
-      e.preventDefault();
-      setStep(STEPS[next].key);
-      tabRefs.current[next]?.focus();
-    }
-  }
-  const goNext = () => setStep(STEPS[Math.min(stepIndex + 1, STEPS.length - 1)].key);
-  const goBack = () => setStep(STEPS[Math.max(stepIndex - 1, 0)].key);
 
   // meta + content (SIDEBAR SECTIONS)
   const [meta, setMeta] = useState<Meta>({
@@ -701,102 +672,7 @@ export default function Publishing(): JSX.Element {
 
   const wordCount = useMemo(() => compiledPlain.split(/\s+/).filter(Boolean).length, [compiledPlain]);
 
-  // Rich HTML preview
-  const compiledHTML: string = useMemo(() => {
-    const vars = (s: string) =>
-      s.replaceAll("{title}", meta.title).replaceAll("{author}", meta.author).replaceAll("{year}", meta.year);
-
-    const front = [
-      vars(matter.titlePage),
-      vars(matter.copyright),
-      matter.dedication && `Dedication\n${matter.dedication}`,
-      matter.epigraph && `Epigraph\n${matter.epigraph}`,
-    ]
-      .filter(Boolean)
-      .map((s) => `<p>${htmlEscape(String(s)).replaceAll("\n", "<br/>")}</p>`)
-      .join("\n");
-
-    const toc = matter.toc
-      ? `<h2 class="chapter" style="page-break-before: always">Contents</h2><p>${
-          (matter.tocFromHeadings
-            ? tocFromHeadings
-            : chapters.filter((c) => c.included).map((c) => c.title)
-          )
-            .map((t, i) => `${i + 1}. ${htmlEscape(t)}`)
-            .join("<br/>")
-        }</p>`
-      : "";
-
-    const chapterized = chapters
-      .filter((c) => c.included)
-      .map((c) => {
-        const title = c.title;
-        const bodyHTML =
-          c.textHTML ??
-          `<p>${htmlEscape(c.text).replaceAll("\n\n", "</p><p>").replaceAll("\n", "<br/>")}</p>`;
-        return `<h2 class="chapter">${htmlEscape(title)}</h2>${bodyHTML}`;
-      })
-      .join("\n");
-
-    const back = [
-      matter.acknowledgments && `<h2 class="chapter">Acknowledgments</h2><p>${htmlEscape(matter.acknowledgments).replaceAll("\n", "<br/>")}</p>`,
-      matter.aboutAuthor && `<h2 class="chapter">About the Author</h2><p>${htmlEscape(matter.aboutAuthor).replaceAll("\n", "<br/>")}</p>`,
-      matter.notes && `<h2 class="chapter">Notes</h2><p>${htmlEscape(matter.notes).replaceAll("\n", "<br/>")}</p>`,
-    ]
-      .filter(Boolean)
-      .join("\n");
-
-    const css = `
-      @page { margin: ${pf.margins.top}in ${pf.margins.right}in ${pf.margins.bottom}in ${pf.margins.left}in; }
-      body { font-family: ${ms.fontFamily}; font-size: ${ms.fontSizePt}pt; margin: 0; line-height: ${ms.lineHeight}; color: #111; }
-      p { orphans: 3; widows: 3; ${ms.align === "justify" ? "text-align: justify;" : ""} ${
-      ms.firstLineIndentInches ? `text-indent: ${ms.firstLineIndentInches}in;` : ""
-    } ${ms.paragraphSpacingPt ? `margin: 0 0 ${ms.paragraphSpacingPt}pt 0;` : ""} }
-      h1, h2, h3 { margin: 0 0 0.6em 0; }
-      h2.chapter { ${ms.chapterStartsOnNewPage ? "page-break-before: always;" : ""} text-align:center; margin: 0 0 1.2em 0; font-weight: bold; }
-      hr { border: 0; border-top: 1px dashed #e5e7eb; margin: 1.2em 0; }
-    `;
-
-    const titleBlock = `
-      <div style="text-align:center; font-size:${ms.fontSizePt + 4}pt; font-weight:bold; margin-bottom: 1.5em;">${htmlEscape(meta.title)}</div>
-      <div style="text-align:center; margin-bottom: 2em;">by ${htmlEscape(meta.author)} • ${htmlEscape(meta.year)}</div>
-    `;
-
-    return `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${htmlEscape(
-      meta.title
-    )}</title><style>${css}</style></head><body>${titleBlock}${front}${toc}${chapterized}${back}</body></html>`;
-  }, [chapters, matter, meta, ms, pf, tocFromHeadings]);
-
-  /* ---------- Proof helpers (unchanged) ---------- */
-  const [proofResults, setProofResults] = useState<string[]>([]);
-  const [aiBusy, setAiBusy] = useState(false);
-
-  function runLocalChecks() {
-    const issues: string[] = [];
-    const compiled = compiledPlain;
-    if (compiled.match(/ {2,}/)) issues.push("Multiple consecutive spaces found.");
-    if (compiled.match(/[""]/) && !compiled.match(/['']/))
-      issues.push("Smart quotes present; ensure consistency of curly quotes.");
-    if (compiled.match(/--/)) issues.push("Double hyphen found; consider an em dash (—) or a period.");
-    const longParas = compiled.split("\n\n").filter((p) => p.split(/\s+/).length > 250).length;
-    if (longParas) issues.push(`${longParas} very long paragraph(s); consider breaking them up.`);
-    setProofResults(issues.length ? issues : ["No basic issues found."]);
-  }
-
-  async function runAIChecks() {
-    setAiBusy(true);
-    const compiled = compiledPlain;
-    const suggestions: string[] = [];
-    if (compiled.match(/\bi\b(?![a-zA-Z])/g)) suggestions.push("Pronoun 'I' should be capitalized.");
-    if (compiled.match(/\s[,.!?;:]/g)) suggestions.push("Punctuation spacing: remove spaces before , . ! ? ; :");
-    if (compiled.match(/\bvery\b/gi)) suggestions.push("Style: Consider replacing 'very' with stronger wording.");
-    if (meta.title.length < 3) suggestions.push("Title seems short—consider something more descriptive.");
-    runLocalChecks();
-    setProofResults((prev) => [...prev, ...suggestions]);
-    setAiBusy(false);
-  }
-
-  /* ---------- Exports ---------- */
+  /* ---------- Exports - Removed (now in Export page) ---------- */
   const exportPDF = () => {
     const w = window.open("", "_blank");
     if (!w) return;
@@ -1307,31 +1183,6 @@ export default function Publishing(): JSX.Element {
                         Tip: Use H1/H2/H3 for sections — if "Build Contents from Headings" is on, your TOC will include them.
                       </div>
                     </section>
-                  </div>
-                )}
-
-                {step === "proof" && (
-                  <div>
-                    <h3 style={{ margin: "0 0 8px 0", fontSize: 18, color: theme.text }}>Proof & Consistency</h3>
-                    <p style={{ color: theme.subtext, fontSize: 14, marginTop: 0 }}>
-                      Local quick checks now. You can wire these buttons to your server-side AI later.
-                    </p>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12, marginTop: 16 }}>
-                      <button style={styles.btn} onClick={runLocalChecks}>Grammar Check (Local)</button>
-                      <button style={styles.btn} onClick={runLocalChecks}>Style Analysis (Local)</button>
-                      <button style={styles.btn} onClick={runLocalChecks}>Character Consistency (Local)</button>
-                      <button style={styles.btn} onClick={runLocalChecks}>Timeline Validation (Local)</button>
-                      <button style={styles.btnPrimary} onClick={runAIChecks} disabled={aiBusy}>
-                        {aiBusy ? "AI Proof… " : "AI Proof (Local Suggestions)"}
-                      </button>
-                    </div>
-                    {!!proofResults.length && (
-                      <div style={{ marginTop: 16, ...styles.glassCard }}>
-                        <ul style={{ margin: 0, paddingLeft: 18, color: theme.text }}>
-                          {proofResults.map((r, i) => <li key={i}>{r}</li>)}
-                        </ul>
-                      </div>
-                    )}
                   </div>
                 )}
 
