@@ -16,7 +16,7 @@ import { MultiBackend, TouchTransition, MouseTransition } from "dnd-multi-backen
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { TouchBackend } from "react-dnd-touch-backend";
 import { UserProvider } from "./lib/userStore.jsx";
-import Publishing from "./pages/Publishing.tsx";  // ADD THIS LINE
+
 import Proof from "./pages/Proof.tsx";
 import Format from "./pages/Format.tsx";
 import Export from "./pages/Export.tsx";
