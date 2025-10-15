@@ -17,37 +17,35 @@ import { HTML5Backend } from "react-dnd-html5-backend";
 import { TouchBackend } from "react-dnd-touch-backend";
 
 import { UserProvider } from "./lib/userStore.jsx";
+
+// If these four are separate pages, keep them as direct imports (not lazy) since you already have .tsx
 import Proof from "./pages/Proof.tsx";
 import Format from "./pages/Format.tsx";
 import Export from "./pages/Export.tsx";
-import PublishingPrep from "./pages/PublishingPrep.tsx"; 
+import PublishingPrep from "./pages/PublishingPrep.tsx";
 
-/* =========================
-   DnD Backend Configuration
-   ========================= */
+// =========================
+// DnD Backend Configuration
+// =========================
 const BACKENDS = {
   backends: [
     {
       id: "html5",
       backend: HTML5Backend,
-      transition: MouseTransition,         // desktop / mouse / pointer
+      transition: MouseTransition,
     },
     {
       id: "touch",
       backend: TouchBackend,
-      options: {
-        enableMouseEvents: true,           // allows hybrid devices
-        delayTouchStart: 0,                // drag starts immediately
-        ignoreContextMenu: true,
-      },
-      transition: TouchTransition,         // phones & tablets
+      options: { enableMouseEvents: true, delayTouchStart: 0, ignoreContextMenu: true },
+      transition: TouchTransition,
     },
   ],
 };
 
-/* =========================
-   Lazy-loaded pages
-   ========================= */
+// =========================
+// Lazy-loaded pages
+// =========================
 const LandingPage          = lazy(() => import("./components/LandingPage"));
 const RegistrationPage     = lazy(() => import("./components/RegistrationPage"));
 const SignInPage           = lazy(() => import("./components/SignInPage"));
@@ -70,15 +68,13 @@ const Publishing           = lazy(() => import("./pages/Publishing.tsx"));
 const Profile              = lazy(() => import("./components/Profile"));
 const PlansPage            = lazy(() => import("./components/PlansPage"));
 const BillingSuccess       = lazy(() => import("./pages/BillingSuccess.jsx"));
-const AiTools              = lazy(() => import("./pages/AiTools")); // if present
-// NEW: StoryLab layout + Narrative Arc page
+const AiTools              = lazy(() => import("./pages/AiTools"));
 const StoryLabLayout       = lazy(() => import("./components/storylab/StoryLabLayout.jsx"));
 const NarrativeArc         = lazy(() => import("./components/storylab/NarrativeArc.jsx"));
 
-
-/* =========================
-   Global UI helpers
-   ========================= */
+// =========================
+// Global UI helpers
+// =========================
 const Fallback = () => (
   <div className="min-h-[60vh] grid place-items-center text-[color:var(--color-ink)]">
     <div className="text-center">
@@ -96,9 +92,9 @@ function ScrollToTop() {
   return null;
 }
 
-/* =========================
-   Auth gate (toggleable)
-   ========================= */
+// =========================
+// Auth gate (toggleable)
+// =========================
 const BYPASS_AUTH = true;
 function ProtectedRoute({ children }) {
   if (BYPASS_AUTH) return children;
@@ -106,9 +102,9 @@ function ProtectedRoute({ children }) {
   return user ? children : <Navigate to="/signin" replace />;
 }
 
-/* =========================
-   TOC version selector
-   ========================= */
+// =========================
+// TOC version selector
+// =========================
 function TableOfContentsRouter() {
   const [params] = useSearchParams();
   const paramV = params.get("v");
@@ -119,13 +115,12 @@ function TableOfContentsRouter() {
   return chosen === "1" ? <TOCPage /> : <TOCPage2 />;
 }
 
-/* =========================
-   App
-   ========================= */
+// =========================
+// App
+// =========================
 export default function App() {
   return (
     <UserProvider>
-      {/* ✅ Multi-backend DnD support (mouse + touch) */}
       <DndProvider backend={MultiBackend} options={BACKENDS}>
         <Router>
           <ScrollToTop />
@@ -146,51 +141,28 @@ export default function App() {
                 }
               />
 
-              {/* Writer/Writing */}
-              <Route
-                path="/writer"
-                element={
-                  <ProtectedRoute>
-                    <ComposePage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/write"
-                element={
-                  <ProtectedRoute>
-                    <ComposePage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/writing"
-                element={
-                  <ProtectedRoute>
-                    <ComposePage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/compose"
-                element={
-                  <ProtectedRoute>
-                    <ComposePage />
-                  </ProtectedRoute>
-                }
-              />
+              {/* Writer routes */}
+              {["/writer", "/write", "/writing", "/compose"].map((p) => (
+                <Route
+                  key={p}
+                  path={p}
+                  element={
+                    <ProtectedRoute>
+                      <ComposePage />
+                    </ProtectedRoute>
+                  }
+                />
+              ))}
 
-              {/* ================= STORYLAB under layout ================= */}
-             <Route
-                path="/story-lab/*"
+              {/* ===== STORYLAB (Layout with <Outlet/>) ===== */}
+              <Route
+                path="/story-lab"
                 element={
                   <ProtectedRoute>
                     <StoryLabLayout />
                   </ProtectedRoute>
                 }
               >
-               {/* /story-lab/* parent */}
-                <Route path="/story-lab/*" element={<StoryLabLayout />}>
                 <Route index element={<StoryLabLanding />} />
                 <Route path="narrative-arc" element={<NarrativeArc />} />
                 <Route path="workshop" element={<StoryWorkshop />} />
@@ -200,16 +172,16 @@ export default function App() {
                 <Route path="workshop/hfl" element={<HopesFearsLegacy />} />
                 <Route path="prompts" element={<StoryPromptsWorkshop />} />
                 <Route path="community" element={<WorkshopCohort />} />
-              
-                {/* ✅ make these relative */}
+
+                {/* Publishing flow pages as children */}
                 <Route path="publishing" element={<Publishing />} />
                 <Route path="proof" element={<Proof />} />
                 <Route path="format" element={<Format />} />
                 <Route path="export" element={<Export />} />
                 <Route path="publishing-prep" element={<PublishingPrep />} />
               </Route>
-              
-              {/* Typo/alias redirect */}
+
+              {/* Typo/alias redirect (top-level) */}
               <Route path="/storylab/*" element={<Navigate to="/story-lab" replace />} />
 
               {/* TOC */}
@@ -268,7 +240,7 @@ export default function App() {
                 }
               />
 
-              {/* Publishing */}
+              {/* Optional direct top-level Publishing entry */}
               <Route
                 path="/publishing"
                 element={
@@ -283,7 +255,23 @@ export default function App() {
               <Route path="/publish/*" element={<Navigate to="/publishing" replace />} />
               <Route path="/publishing-suite/*" element={<Navigate to="/publishing" replace />} />
 
-              {/* AI Tools (optional) */}
+              {/* Plans / Billing / Tools */}
+              <Route
+                path="/plans"
+                element={
+                  <ProtectedRoute>
+                    <PlansPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/billing/success"
+                element={
+                  <ProtectedRoute>
+                    <BillingSuccess />
+                  </ProtectedRoute>
+                }
+              />
               <Route
                 path="/ai-tools"
                 element={
