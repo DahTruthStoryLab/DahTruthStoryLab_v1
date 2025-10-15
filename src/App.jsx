@@ -154,46 +154,60 @@ export default function App() {
                 />
               ))}
 
-              {/* ===== STORYLAB (Layout with <Outlet/>) ===== */}
-            <Route
-              path="/story-lab/*"
-              element={
-                <ProtectedRoute>
-                  <StoryLabLayout />
-                </ProtectedRoute>
-              }
-            >
-              <Route index element={<StoryLabLanding />} />
-              <Route path="narrative-arc" element={<NarrativeArc />} />
-              <Route path="workshop" element={<StoryWorkshop />} />
-              <Route path="workshop/priorities" element={<PriorityCards />} />
-              <Route path="workshop/roadmap" element={<CharacterRoadmap />} />
-              <Route path="workshop/clothesline" element={<Clothesline />} />
-              <Route path="workshop/hfl" element={<HopesFearsLegacy />} />
-              <Route path="prompts" element={<StoryPromptsWorkshop />} />
-              <Route path="community" element={<WorkshopCohort />} />
-            </Route>
+            {/* ================= STORY-LAB (no publishing pages here) ================= */}
+<Route
+  path="/story-lab/*"
+  element={
+    <ProtectedRoute>
+      <StoryLabLayout />
+    </ProtectedRoute>
+  }
+>
+  <Route index element={<StoryLabLanding />} />
+  <Route path="narrative-arc" element={<NarrativeArc />} />
+  <Route path="workshop" element={<StoryWorkshop />} />
+  <Route path="workshop/priorities" element={<PriorityCards />} />
+  <Route path="workshop/roadmap" element={<CharacterRoadmap />} />
+  <Route path="workshop/clothesline" element={<Clothesline />} />
+  <Route path="workshop/hfl" element={<HopesFearsLegacy />} />
+  <Route path="prompts" element={<StoryPromptsWorkshop />} />
+  <Route path="community" element={<WorkshopCohort />} />
+</Route>
 
-            {/* Typo/alias redirect for old links */}
-            <Route path="/storylab/*" element={<Navigate to="/story-lab" replace />} />
+{/* Typo/alias redirect for old /storylab base (no hyphen) */}
+<Route path="/storylab/*" element={<Navigate to="/story-lab" replace />} />
 
-             <Route
-              path="/publishing"
-              element={
-                <ProtectedRoute>
-                  <Publishing />
-                </ProtectedRoute>
-              }
-            />
-            <Route path="/proof" element={<ProtectedRoute><Proof /></ProtectedRoute>} />
-            <Route path="/format" element={<ProtectedRoute><Format /></ProtectedRoute>} />
-            <Route path="/export" element={<ProtectedRoute><Export /></ProtectedRoute>} />
-            <Route path="/publishing-prep" element={<ProtectedRoute><PublishingPrep /></ProtectedRoute>} />
-            
-            {/* Aliases that all point to /publishing */}
-            <Route path="/publish" element={<Navigate to="/publishing" replace />} />
-            <Route path="/publishing-suite" element={<Navigate to="/publishing" replace />} />
-            <Route path="/storylab/publishing" element={<Navigate to="/publishing" replace />} />
+{/* ================= TOP-LEVEL PUBLISHING PAGES (src/pages/*.tsx) ================= */}
+<Route
+  path="/publishing"
+  element={
+    <ProtectedRoute>
+      <Publishing />
+    </ProtectedRoute>
+  }
+/>
+<Route path="/proof"            element={<ProtectedRoute><Proof /></ProtectedRoute>} />
+<Route path="/format"           element={<ProtectedRoute><Format /></ProtectedRoute>} />
+<Route path="/export"           element={<ProtectedRoute><Export /></ProtectedRoute>} />
+<Route path="/publishing-prep"  element={<ProtectedRoute><PublishingPrep /></ProtectedRoute>} />
+
+{/* Aliases that all point to the top-level publishing routes */}
+<Route path="/publish"                 element={<Navigate to="/publishing" replace />} />
+<Route path="/publishing-suite"        element={<Navigate to="/publishing" replace />} />
+
+{/* Legacy Story-Lab URLs → new top-level pages */}
+<Route path="/story-lab/publishing"       element={<Navigate to="/publishing" replace />} />
+<Route path="/story-lab/proof"            element={<Navigate to="/proof" replace />} />
+<Route path="/story-lab/format"           element={<Navigate to="/format" replace />} />
+<Route path="/story-lab/export"           element={<Navigate to="/export" replace />} />
+<Route path="/story-lab/publishing-prep"  element={<Navigate to="/publishing-prep" replace />} />
+
+{/* Legacy without hyphen, just in case */}
+<Route path="/storylab/publishing"       element={<Navigate to="/publishing" replace />} />
+<Route path="/storylab/proof"            element={<Navigate to="/proof" replace />} />
+<Route path="/storylab/format"           element={<Navigate to="/format" replace />} />
+<Route path="/storylab/export"           element={<Navigate to="/export" replace />} />
+<Route path="/storylab/publishing-prep"  element={<Navigate to="/publishing-prep" replace />} />
 
               {/* TOC */}
               <Route
