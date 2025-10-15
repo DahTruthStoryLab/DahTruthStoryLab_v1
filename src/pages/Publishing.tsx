@@ -639,7 +639,7 @@ export default function Publishing(): JSX.Element {
         {/* Gradient header (kept; you can swap to AeroBanner later if desired) */}
         <div
           style={{
-            background: `linear-gradient(135deg, rgba(236, 72, 153, 0.65), rgba(249, 168, 212, 0.65))`,
+           background: `linear-gradient(135deg, var(--brand-rose), var(--brand-accent))`,
             backdropFilter: "blur(12px)",
             color: theme.white,
             padding: "20px 24px",
