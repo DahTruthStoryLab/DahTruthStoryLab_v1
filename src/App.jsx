@@ -15,10 +15,8 @@ import { DndProvider } from "react-dnd";
 import { MultiBackend, TouchTransition, MouseTransition } from "dnd-multi-backend";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { TouchBackend } from "react-dnd-touch-backend";
-
 import { UserProvider } from "./lib/userStore.jsx";
-
-// If these four are separate pages, keep them as direct imports (not lazy) since you already have .tsx
+import Publishing from "./pages/Publishing.tsx";  // ADD THIS LINE
 import Proof from "./pages/Proof.tsx";
 import Format from "./pages/Format.tsx";
 import Export from "./pages/Export.tsx";
