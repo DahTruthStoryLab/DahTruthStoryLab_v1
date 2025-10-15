@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import PageShell from "../components/layout/PageShell.tsx";
 import PublishingSidebar from "../components/publishing/PublishingSidebar.tsx";
 
-/* ---------- Theme via CSS variables ---------- */
+/* ---------- Theme via CSS variables (from your brand.css) ---------- */
 const theme = {
   bg: "var(--brand-bg)",
   surface: "var(--brand-surface, var(--brand-white))",
@@ -18,19 +18,21 @@ const theme = {
   white: "var(--brand-white)",
 } as const;
 
+// Optional Google palette (used only if you wire it later via CSS var overrides)
 const GOOGLE_PALETTE = {
-  primary: "#1a73e8",
-  accent: "#34a853",
+  primary: "#1a73e8", // Google Blue 600
+  accent: "#34a853",  // Google Green 600
   highlight: "rgba(26,115,232,0.10)",
 } as const;
 
 /* ---------- Types ---------- */
+/** Now supports HTML text for rich editing */
 type Chapter = {
   id: string;
   title: string;
   included: boolean;
-  text: string;
-  textHTML?: string;
+  text: string;        // legacy plain text
+  textHTML?: string;   // new: rich HTML (preferred if present)
 };
 
 type Matter = {
@@ -42,7 +44,7 @@ type Matter = {
   acknowledgments: string;
   aboutAuthor: string;
   notes: string;
-  tocFromHeadings?: boolean;
+  tocFromHeadings?: boolean; // new: build TOC from <h1>-<h3>
 };
 
 type Meta = { title: string; author: string; year: string; authorLast?: string };
@@ -69,7 +71,7 @@ const MANUSCRIPT_PRESETS: Record<
     label: string;
     fontFamily: string;
     fontSizePt: number;
-    lineHeight: number;
+    lineHeight: number; // 2.0 = double, 1.5 = single-ish
     firstLineIndentInches: number;
     paragraphSpacingPt: number;
     align: "left" | "justify";
@@ -220,6 +222,7 @@ const styles = {
     padding: 20,
     boxShadow: "0 8px 30px rgba(2,20,40,.06)",
   } as React.CSSProperties,
+  label: { fontSize: 12, color: theme.subtext } as React.CSSProperties,
   input: {
     border: `1px solid ${theme.border}`,
     borderRadius: 12,
@@ -245,6 +248,14 @@ const styles = {
     color: theme.white,
     cursor: "pointer",
   } as React.CSSProperties,
+  btnDark: {
+    padding: "10px 14px",
+    borderRadius: 12,
+    border: "none",
+    background: theme.primary,
+    color: theme.white,
+    cursor: "pointer",
+  } as React.CSSProperties,
   preview: {
     border: `1px solid ${theme.border}`,
     borderRadius: 12,
@@ -256,74 +267,87 @@ const styles = {
 } as const;
 
 /* ---------- Small UI helpers ---------- */
-type ToggleProps = { checked: boolean; onChange: (v: boolean) => void; label?: string };
-const Toggle: React.FC<ToggleProps> = ({ checked, onChange, label }) => (
-  <button
-    onClick={() => onChange(!checked)}
-    style={{
-      display: "inline-flex",
-      alignItems: "center",
-      gap: 10,
-      padding: "8px 12px",
-      borderRadius: 999,
-      border: `1px solid ${theme.border}`,
-      background: checked ? theme.highlight : theme.white,
-      color: theme.text,
-      cursor: "pointer",
-    }}
-    aria-pressed={checked}
-    title={label}
-    type="button"
-  >
-    <span
+type ToggleProps = {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  label?: string;
+};
+const Toggle: React.FC<ToggleProps> = ({ checked, onChange, label }) => {
+  return (
+    <button
+      onClick={() => onChange(!checked)}
       style={{
-        width: 36,
-        height: 20,
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 10,
+        padding: "8px 12px",
         borderRadius: 999,
-        background: checked ? theme.accent : "#CBD5E1",
-        position: "relative",
-        display: "inline-block",
+        border: `1px solid ${theme.border}`,
+        background: checked ? theme.highlight : theme.white,
+        color: theme.text,
+        cursor: "pointer",
       }}
+      aria-pressed={checked}
+      title={label}
+      type="button"
     >
       <span
         style={{
-          position: "absolute",
-          top: 2,
-          left: checked ? 18 : 2,
-          width: 16,
-          height: 16,
+          width: 36,
+          height: 20,
           borderRadius: 999,
+          background: checked ? theme.accent : "#CBD5E1",
+          position: "relative",
+          display: "inline-block",
+        }}
+      >
+        <span
+          style={{
+            position: "absolute",
+            top: 2,
+            left: checked ? 18 : 2,
+            width: 16,
+            height: 16,
+            borderRadius: 999,
+            background: theme.white,
+            transition: "left .15s ease",
+          }}
+        />
+      </span>
+      {label && <span style={{ fontSize: 14 }}>{label}</span>}
+    </button>
+  );
+};
+
+type FieldProps = {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+};
+const Field: React.FC<FieldProps> = ({ label, value, onChange, placeholder }) => {
+  return (
+    <div>
+      <div style={{ color: theme.subtext, fontSize: 12 }}>{label}</div>
+      <textarea
+        value={value}
+        onChange={(e) => onChange(e.currentTarget.value)}
+        rows={label.length > 12 ? 3 : 2}
+        placeholder={placeholder}
+        style={{
+          width: "100%",
+          marginTop: 6,
+          fontSize: 14,
+          padding: 10,
+          border: `1px solid ${theme.border}`,
+          borderRadius: 12,
           background: theme.white,
-          transition: "left .15s ease",
+          color: theme.text,
         }}
       />
-    </span>
-    {label && <span style={{ fontSize: 14 }}>{label}</span>}
-  </button>
-);
-
-type FieldProps = { label: string; value: string; onChange: (v: string) => void; placeholder?: string };
-const Field: React.FC<FieldProps> = ({ label, value, onChange, placeholder }) => (
-  <div>
-    <div style={{ color: theme.subtext, fontSize: 12 }}>{label}</div>
-    <textarea
-      value={value}
-      onChange={(e) => onChange(e.currentTarget.value)}
-      rows={label.length > 12 ? 3 : 2}
-      placeholder={placeholder}
-      style={{
-        width: "100%",
-        marginTop: 6,
-        fontSize: 14,
-        padding: 10,
-        border: `1px solid ${theme.border}`,
-        borderRadius: 12,
-        background: theme.white,
-        color: theme.text,
-      }}
-    />
-  </div>
-);
+    </div>
+  );
+};
 
 /* ---------- Tiny helpers ---------- */
 const htmlEscape = (s: string) =>
@@ -334,6 +358,7 @@ export default function Publishing(): JSX.Element {
   const [googleMode, setGoogleMode] = useState<boolean>(false);
   const navigate = useNavigate();
 
+  // meta + content (SIDEBAR SECTIONS)
   const [meta, setMeta] = useState<Meta>({
     title: "Working Title",
     author: "Your Name",
@@ -343,7 +368,7 @@ export default function Publishing(): JSX.Element {
 
   const [chapters, setChapters] = useState<Chapter[]>([
     { id: "c1", title: "Chapter 1 – Beginnings", included: true, text: "The morning held the kind of quiet that asks for a first sentence..." },
-    { id: "c2", title: "Chapter 2 – Turning", included: true, text: "Change arrived softly, a hinge on a well-oiled door..." },
+    { id: "c2", title: "Chapter 2 – Turning",   included: true, text: "Change arrived softly, a hinge on a well-oiled door..." },
     { id: "c3", title: "Chapter 3 – Night Watch", included: false, text: "They counted the hours by the cooling of the tea..." },
   ]);
 
@@ -359,6 +384,7 @@ export default function Publishing(): JSX.Element {
     tocFromHeadings: true,
   });
 
+  // presets + overrides (SIDEBAR SECTION)
   const [manuscriptPreset, setManuscriptPreset] =
     useState<ManuscriptPresetKey>("Agents_Standard_12pt_TNR_Double");
   const [platformPreset, setPlatformPreset] =
@@ -378,6 +404,7 @@ export default function Publishing(): JSX.Element {
   const pf = PLATFORM_PRESETS[platformPreset];
   const includeHeadersFooters = pf.headers || pf.footers;
 
+  // options for dropdowns (smaller to pass to sidebar)
   const manuscriptEntries = useMemo(
     () => Object.entries(MANUSCRIPT_PRESETS).map(([k, v]) => [k, v.label] as const),
     []
@@ -387,18 +414,20 @@ export default function Publishing(): JSX.Element {
     []
   );
 
-  /* --------------------- Builder: Editor --------------------- */
+  /* --------------------- Builder: Word-like Editor --------------------- */
   const [activeChapterId, setActiveChapterId] = useState(chapters[0]?.id || "");
   const activeIdx = Math.max(0, chapters.findIndex((c) => c.id === activeChapterId));
   const editorRef = useRef<HTMLDivElement>(null);
 
-  const [isWide, setIsWide] = useState<boolean>(typeof window !== "undefined" ? window.innerWidth >= 1280 : true);
+  // Single breakpoint controlling sidebar visibility
+  const [isWide, setIsWide] = useState<boolean>(window.innerWidth >= 1280);
   useEffect(() => {
     const onResize = () => setIsWide(window.innerWidth >= 1280);
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
+  // Ensure active chapter has editable HTML loaded
   useEffect(() => {
     const chap = chapters[activeIdx];
     if (!chap) return;
@@ -475,6 +504,7 @@ export default function Publishing(): JSX.Element {
     });
   };
 
+  /* ----- Import: DOCX (.docx) and HTML (.html) ----- */
   const importDocx = useCallback(
     async (file: File, asNewChapter = true) => {
       const JSZip = (await import("jszip")).default;
@@ -572,6 +602,8 @@ export default function Publishing(): JSX.Element {
   );
 
   /* ---------- Compile (Preview/Export) ---------- */
+
+  // Build a TOC from headings if enabled
   const tocFromHeadings: string[] = useMemo(() => {
     if (!matter.tocFromHeadings) return [];
     const items: string[] = [];
@@ -589,6 +621,7 @@ export default function Publishing(): JSX.Element {
     return items.filter(Boolean);
   }, [chapters, matter.tocFromHeadings]);
 
+  // Plain-text compilation
   const compiledPlain: string = useMemo(() => {
     const parts: string[] = [];
     const vars = (s: string) =>
@@ -636,13 +669,13 @@ export default function Publishing(): JSX.Element {
       }}
     >
       <div style={styles.outer}>
-        {/* Gradient header (kept; you can swap to AeroBanner later if desired) */}
+        {/* Header (subtle) */}
         <div
           style={{
-           background: `linear-gradient(135deg, var(--brand-rose), var(--brand-accent))`,
-            backdropFilter: "blur(12px)",
+            background: `linear-gradient(135deg, rgba(236,72,153,.35), rgba(249,168,212,.35))`,
+            backdropFilter: "blur(10px)",
             color: theme.white,
-            padding: "20px 24px",
+            padding: "16px 22px",
           }}
         >
           <div
@@ -656,25 +689,11 @@ export default function Publishing(): JSX.Element {
           >
             <button
               onClick={() => navigate(-1)}
-              style={{
-                ...styles.btn,
-                border: "none",
-                background: "rgba(255,255,255,0.2)",
-                color: theme.white,
-                padding: "10px 18px",
-                fontSize: 15,
-              }}
-              aria-label="Go back"
+              style={{ ...styles.btn, border: "none", background: "rgba(255,255,255,0.2)", color: theme.white }}
             >
               ← Back
             </button>
-
-            <div style={{ textAlign: "center", display: "flex", gap: 12, alignItems: "center" }}>
-              <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                <path d="M6 2h9a3 3 0 0 1 3 3v12.5a1.5 1.5 0 0 1-1.5 1.5H7a3 3 0 0 0-3 3V5a3 3 0 0 1 3-3zm0 2a1 1 0 0 0-1 1v13.764A4.99 4.99 0 0 1 7 18h9V5a1 1 0 0 0-1-1H6z" />
-              </svg>
-              <h1 style={{ margin: 0, fontSize: 22, fontWeight: 600, letterSpacing: 0.4 }}>Publishing Suite</h1>
-            </div>
+            <h1 style={{ margin: 0, fontSize: 20, fontWeight: 600, letterSpacing: 0.3 }}>Publishing Suite</h1>
             <div style={{ width: 110 }} />
           </div>
         </div>
@@ -684,57 +703,28 @@ export default function Publishing(): JSX.Element {
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: isWide ? "1fr 220px" : "1fr",
+              gridTemplateColumns: isWide ? "minmax(0,1fr) 220px" : "1fr", // ✅ prevent overflow
               gap: 24,
+              minWidth: 0, // ✅ key for overflow containment
             }}
           >
             {/* MAIN */}
-            <main>
-              {/* Quick links */}
+            <main style={{ minWidth: 0 }}>
+              {/* Quick nav */}
               <div style={{ ...styles.glassCard, marginBottom: 16 }}>
-                <h3 style={{ margin: "0 0 12px 0", fontSize: 16, color: theme.text, fontWeight: 600 }}>
-                  📚 Publishing Tools
-                </h3>
+                <h3 style={{ margin: "0 0 12px 0", fontSize: 16, color: theme.text, fontWeight: 600 }}>📚 Publishing Tools</h3>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 10 }}>
-                  <button
-                    style={{ ...styles.btn, padding: "10px 14px", textAlign: "left", display: "flex", alignItems: "center", gap: 10 }}
-                    onClick={() => navigate("/proof")}
-                  >
-                    <span style={{ fontSize: 20 }}>✅</span>
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 600 }}>Proof & Consistency</div>
-                      <div style={{ fontSize: 11, color: theme.subtext }}>Grammar, style, timeline</div>
-                    </div>
+                  <button style={{ ...styles.btn, padding: "10px 14px", textAlign: "left" }} onClick={() => navigate("/proof")}>
+                    ✅ <span style={{ marginLeft: 8 }}>Proof & Consistency</span>
                   </button>
-                  <button
-                    style={{ ...styles.btn, padding: "10px 14px", textAlign: "left", display: "flex", alignItems: "center", gap: 10 }}
-                    onClick={() => navigate("/format")}
-                  >
-                    <span style={{ fontSize: 20 }}>🎨</span>
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 600 }}>Format & Styles</div>
-                      <div style={{ fontSize: 11, color: theme.subtext }}>Fonts, spacing, margins</div>
-                    </div>
+                  <button style={{ ...styles.btn, padding: "10px 14px", textAlign: "left" }} onClick={() => navigate("/format")}>
+                    🎨 <span style={{ marginLeft: 8 }}>Format & Styles</span>
                   </button>
-                  <button
-                    style={{ ...styles.btn, padding: "10px 14px", textAlign: "left", display: "flex", alignItems: "center", gap: 10 }}
-                    onClick={() => navigate("/export")}
-                  >
-                    <span style={{ fontSize: 20 }}>📦</span>
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 600 }}>Export</div>
-                      <div style={{ fontSize: 11, color: theme.subtext }}>PDF, DOCX, EPUB</div>
-                    </div>
+                  <button style={{ ...styles.btn, padding: "10px 14px", textAlign: "left" }} onClick={() => navigate("/export")}>
+                    📦 <span style={{ marginLeft: 8 }}>Export</span>
                   </button>
-                  <button
-                    style={{ ...styles.btn, padding: "10px 14px", textAlign: "left", display: "flex", alignItems: "center", gap: 10 }}
-                    onClick={() => navigate("/publishing-prep")}
-                  >
-                    <span style={{ fontSize: 20 }}>🚀</span>
-                    <div>
-                      <div style={{ fontSize: 13, fontWeight: 600 }}>Publishing Prep</div>
-                      <div style={{ fontSize: 11, color: theme.subtext }}>Query, synopsis, marketing</div>
-                    </div>
+                  <button style={{ ...styles.btn, padding: "10px 14px", textAlign: "left" }} onClick={() => navigate("/publishing-prep")}>
+                    🚀 <span style={{ marginLeft: 8 }}>Publishing Prep</span>
                   </button>
                 </div>
               </div>
@@ -775,16 +765,13 @@ export default function Publishing(): JSX.Element {
                             {c.included ? "✅ " : "🚫 "} {c.title}
                           </button>
                         ))}
-                        <button onClick={addChapter} style={{ ...styles.btnPrimary, marginTop: 6, fontSize: 12 }}>
-                          + Add Chapter
-                        </button>
+                        <button onClick={addChapter} style={{ ...styles.btnPrimary, marginTop: 6, fontSize: 12 }}>+ Add Chapter</button>
                       </div>
                     </aside>
                   )}
 
-                  {/* Editor + toolbar */}
+                  {/* Toolbar — compact & scrollable */}
                   <section>
-                    {/* Thin toolbar (scrollable so nothing gets cut off) */}
                     <div
                       role="toolbar"
                       aria-label="Formatting toolbar"
@@ -805,11 +792,7 @@ export default function Publishing(): JSX.Element {
                         WebkitOverflowScrolling: "touch",
                       }}
                     >
-                      <select
-                        onChange={(e) => setFont(e.target.value)}
-                        defaultValue="Times New Roman"
-                        style={{ ...(styles.input as any), width: 150, padding: "4px 6px", fontSize: 11, height: 28, minWidth: 130, display: "inline-block" }}
-                      >
+                      <select onChange={(e) => setFont(e.target.value)} defaultValue="Times New Roman" style={{ ...(styles.input as any), width: 150, padding: "4px 6px", fontSize: 11, height: 28, minWidth: 130, display: "inline-block" }}>
                         <option>Times New Roman</option>
                         <option>Georgia</option>
                         <option>Garamond</option>
@@ -818,11 +801,7 @@ export default function Publishing(): JSX.Element {
                         <option>Arial</option>
                       </select>
 
-                      <select
-                        onChange={(e) => setFontSizePt(parseInt(e.target.value, 10))}
-                        defaultValue="16"
-                        style={{ ...(styles.input as any), width: 56, padding: "4px 6px", fontSize: 11, height: 28, minWidth: 52, display: "inline-block" }}
-                      >
+                      <select onChange={(e) => setFontSizePt(parseInt(e.target.value, 10))} defaultValue="16" style={{ ...(styles.input as any), width: 56, padding: "4px 6px", fontSize: 11, height: 28, minWidth: 52, display: "inline-block" }}>
                         <option value="14">14</option>
                         <option value="16">16</option>
                         <option value="18">18</option>
@@ -876,16 +855,17 @@ export default function Publishing(): JSX.Element {
                       </div>
                     </div>
 
-                    {/* Desk background + white page */}
+                    {/* Desk background (outer) */}
                     <div
                       style={{
                         padding: 14,
                         background: `linear-gradient(180deg, var(--brand-bg), #eef2f7)`,
                         borderRadius: 12,
                         border: `1px solid ${theme.border}`,
-                        overflow: "auto",
+                        overflow: "auto", // ✅ prevents cut-off
                       }}
                     >
+                      {/* White page (editor) */}
                       <div
                         ref={editorRef}
                         contentEditable
@@ -894,7 +874,7 @@ export default function Publishing(): JSX.Element {
                         spellCheck={true}
                         style={{
                           margin: "0 auto",
-                          width: "min(760px, 92vw)",
+                          width: "min(760px, 92vw)", // ✅ responsive, slimmer
                           minHeight: 900,
                           background: "#ffffff",
                           color: "#111",
