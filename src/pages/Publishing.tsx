@@ -929,54 +929,7 @@ export default function Publishing(): JSX.Element {
               gridTemplateColumns: isWide ? "1fr 220px" : "1fr",
               gap: 24,
             }}
-          >
-            {/* MAIN */}
-            <main>
-              {/* Tabs */}
-              <div
-                role="tablist"
-                aria-label="Publishing steps"
-                style={{ display: "flex", gap: 8, marginBottom: 20, overflowX: "auto", paddingBottom: 2 }}
-              >
-                {STEPS.map((s, i) => {
-                  const isActive = s.key === step;
-                  const id = `tab-${s.key}`;
-                  const panelId = `panel-${s.key}`;
-                  return (
-                    <button
-                      key={s.key}
-                      id={id}
-                      ref={(el) => {
-                        if (el) tabRefs.current[i] = el;
-                      }}
-                      role="tab"
-                      aria-selected={isActive}
-                      aria-controls={panelId}
-                      tabIndex={isActive ? 0 : -1}
-                      onClick={() => setStep(s.key)}
-                      style={{
-                        padding: "12px 18px",
-                        borderRadius: 12,
-                        border: isActive ? `2px solid ${theme.accent}` : `2px solid ${theme.border}`,
-                        background: isActive ? theme.highlight : theme.white,
-                        color: isActive ? theme.primary : theme.subtext,
-                        fontWeight: isActive ? 700 : 500,
-                        cursor: "pointer",
-                        whiteSpace: "nowrap",
-                        fontSize: 14,
-                        outline: "none",
-                        boxShadow: isActive ? "0 1px 0 rgba(0,0,0,0.04) inset" : "none",
-                      }}
-                    >
-                      <span aria-hidden="true" style={{ marginRight: 8 }}>
-                        {i + 1}
-                      </span>
-                      {s.label}
-                    </button>
-                  );
-                })}
-              </div>
-
+         
               {/* Step body */}
               <div style={{ ...styles.glassCard, marginBottom: 20, minHeight: 400 }}>
                 {step === "builder" && (
