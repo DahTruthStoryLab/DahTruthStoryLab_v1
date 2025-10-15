@@ -66,6 +66,10 @@ const Clothesline          = lazy(() => import("./components/storylab/Clotheslin
 const HopesFearsLegacy     = lazy(() => import("./components/storylab/HopesFearsLegacy"));
 const WorkshopCohort       = lazy(() => import("./components/storylab/WorkshopCohort.jsx"));
 const Publishing           = lazy(() => import("./pages/Publishing.tsx"));
+const Proof                = lazy(() => import("./pages/Proof.tsx"));
+const Format               = lazy(() => import("./pages/Format.tsx"));
+const Export               = lazy(() => import("./pages/Export.tsx"));
+const PublishingPrep       = lazy(() => import("./pages/PublishingPrep.tsx"));
 const Profile              = lazy(() => import("./components/Profile"));
 const PlansPage            = lazy(() => import("./components/PlansPage"));
 const BillingSuccess       = lazy(() => import("./pages/BillingSuccess.jsx"));
