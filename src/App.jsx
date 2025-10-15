@@ -72,8 +72,8 @@ const PlansPage            = lazy(() => import("./components/PlansPage"));
 const BillingSuccess       = lazy(() => import("./pages/BillingSuccess.jsx"));
 const AiTools              = lazy(() => import("./pages/AiTools")); // if present
 // NEW: StoryLab layout + Narrative Arc page
-const StoryLabLayout   = lazy(() => import("./components/storylab/StoryLabLayout.jsx"));
-const NarrativeArc     = lazy(() => import("./components/storylab/NarrativeArc.jsx"));
+const StoryLabLayout       = lazy(() => import("./components/storylab/StoryLabLayout.jsx"));
+const NarrativeArc         = lazy(() => import("./components/storylab/NarrativeArc.jsx"));
 
 
 /* =========================
@@ -189,6 +189,8 @@ export default function App() {
                   </ProtectedRoute>
                 }
               >
+               {/* /story-lab/* parent */}
+                <Route path="/story-lab/*" element={<StoryLabLayout />}>
                 <Route index element={<StoryLabLanding />} />
                 <Route path="narrative-arc" element={<NarrativeArc />} />
                 <Route path="workshop" element={<StoryWorkshop />} />
@@ -198,13 +200,15 @@ export default function App() {
                 <Route path="workshop/hfl" element={<HopesFearsLegacy />} />
                 <Route path="prompts" element={<StoryPromptsWorkshop />} />
                 <Route path="community" element={<WorkshopCohort />} />
-                <Route path="/publishing" element={<Publishing />} />
-                <Route path="/proof" element={<Proof />} />
-                <Route path="/format" element={<Format />} />
-                <Route path="/export" element={<Export />} />
-                <Route path="/publishing-prep" element={<PublishingPrep />} />
+              
+                {/* ✅ make these relative */}
+                <Route path="publishing" element={<Publishing />} />
+                <Route path="proof" element={<Proof />} />
+                <Route path="format" element={<Format />} />
+                <Route path="export" element={<Export />} />
+                <Route path="publishing-prep" element={<PublishingPrep />} />
               </Route>
-
+              
               {/* Typo/alias redirect */}
               <Route path="/storylab/*" element={<Navigate to="/story-lab" replace />} />
 
