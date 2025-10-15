@@ -921,25 +921,96 @@ export default function Publishing(): JSX.Element {
           </div>
         </div>
 
-        {/* NEW LAYOUT: Main + Smaller Sidebar */}
-        <div style={{ ...styles.inner, ...styles.sectionShell }}>
-          <div
+      {/* NEW LAYOUT: Main + Smaller Sidebar */}
+<div style={{ ...styles.inner, ...styles.sectionShell }}>
+  <div
+    style={{
+      display: "grid",
+      gridTemplateColumns: isWide ? "1fr 220px" : "1fr",
+      gap: 24,
+    }}
+  >
+    {/* MAIN */}
+    <main>
+      {/* Quick Access Navigation */}
+      <div style={{ ...styles.glassCard, marginBottom: 16 }}>
+        <h3 style={{ margin: "0 0 12px 0", fontSize: 16, color: theme.text, fontWeight: 600 }}>
+          📚 Publishing Tools
+        </h3>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 10 }}>
+          <button
             style={{
-              display: "grid",
-              gridTemplateColumns: isWide ? "1fr 220px" : "1fr",
-              gap: 24,
+              ...styles.btn,
+              padding: "10px 14px",
+              textAlign: "left",
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
             }}
-         
-              {/* Step body */}
-              <div style={{ ...styles.glassCard, marginBottom: 20, minHeight: 400 }}>
-                {step === "builder" && (
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: isWide ? "260px 1fr" : "1fr",
-                      gap: 16,
-                    }}
-                  >
+            onClick={() => navigate("/proof")}
+          >
+            <span style={{ fontSize: 20 }}>✅</span>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 600 }}>Proof & Consistency</div>
+              <div style={{ fontSize: 11, color: theme.subtext }}>Grammar, style, timeline</div>
+            </div>
+          </button>
+          <button
+            style={{
+              ...styles.btn,
+              padding: "10px 14px",
+              textAlign: "left",
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+            }}
+            onClick={() => navigate("/format")}
+          >
+            <span style={{ fontSize: 20 }}>🎨</span>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 600 }}>Format & Styles</div>
+              <div style={{ fontSize: 11, color: theme.subtext }}>Fonts, spacing, margins</div>
+            </div>
+          </button>
+          <button
+            style={{
+              ...styles.btn,
+              padding: "10px 14px",
+              textAlign: "left",
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+            }}
+            onClick={() => navigate("/export")}
+          >
+            <span style={{ fontSize: 20 }}>📦</span>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 600 }}>Export</div>
+              <div style={{ fontSize: 11, color: theme.subtext }}>PDF, DOCX, EPUB</div>
+            </div>
+          </button>
+          <button
+            style={{
+              ...styles.btn,
+              padding: "10px 14px",
+              textAlign: "left",
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+            }}
+            onClick={() => navigate("/publishing-prep")}
+          >
+            <span style={{ fontSize: 20 }}>🚀</span>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 600 }}>Publishing Prep</div>
+              <div style={{ fontSize: 11, color: theme.subtext }}>Query, synopsis, marketing</div>
+            </div>
+          </button>
+        </div>
+      </div>
+
+      {/* Manuscript Builder */}
+      <div style={{ ...styles.glassCard, marginBottom: 20, minHeight: 400 }}>
                     {/* Chapters rail (collapses on narrow) */}
                     {isWide && (
                       <aside
