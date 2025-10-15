@@ -1,5 +1,5 @@
 // src/pages/Proof.tsx
-import React, { useState, useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import PageShell from "../components/layout/PageShell.tsx";
 
@@ -46,7 +46,7 @@ const styles = {
     cursor: "pointer",
     fontSize: 14,
     fontWeight: 500,
-    transition: "all 0.2s ease",
+    transition: "background-color 0.2s ease, transform 0.05s ease",
   } as React.CSSProperties,
   btnPrimary: {
     padding: "12px 16px",
@@ -57,16 +57,21 @@ const styles = {
     cursor: "pointer",
     fontSize: 14,
     fontWeight: 600,
-    transition: "all 0.2s ease",
+    transition: "opacity 0.2s ease",
   } as React.CSSProperties,
 } as const;
 
-/* ---------- Helper to strip HTML ---------- */
+/* ---------- Helpers ---------- */
 function stripHtml(html: string): string {
   const div = document.createElement("div");
   div.innerHTML = html;
   return (div.textContent || div.innerText || "").trim();
 }
+
+/* Light types only for loading */
+type ChapterLocal = { id: string; title: string; included?: boolean; text?: string; textHTML?: string };
+type MatterLocal = { toc?: boolean; acknowledgments?: string; aboutAuthor?: string; notes?: string };
+type MetaLocal = { title?: string; author?: string; year?: string };
 
 /* ---------- Component ---------- */
 export default function Proof(): JSX.Element {
@@ -74,110 +79,156 @@ export default function Proof(): JSX.Element {
   const [proofResults, setProofResults] = useState<string[]>([]);
   const [aiBusy, setAiBusy] = useState(false);
 
-  // Mock manuscript text - in real app, you'd pass this via props/context/state
-  const mockManuscriptText = `
-    The morning held the kind of quiet that asks for a first sentence...
-    Change arrived softly, a hinge on a well-oiled door...
-    They counted the hours by the cooling of the tea...
-  `.trim();
+  // Load manuscript saved by Publishing.tsx
+  const { manuscriptText, meta } = useMemo(() => {
+    let chapters: ChapterLocal[] = [];
+    let matter: MatterLocal = {};
+    let meta: MetaLocal = {};
+
+    try {
+      chapters = JSON.parse(localStorage.getItem("dt_publishing_chapters") || "[]");
+    } catch {}
+    try {
+      matter = JSON.parse(localStorage.getItem("dt_publishing_matter") || "{}");
+    } catch {}
+    try {
+      meta = JSON.parse(localStorage.getItem("dt_publishing_meta") || "{}");
+    } catch {}
+
+    const included = (chapters || []).filter((c) => c.included !== false);
+    const pieces: string[] = [];
+
+    // Optional front matter
+    if (meta?.title || meta?.author || meta?.year) {
+      pieces.push(
+        [meta?.title, meta?.author ? `by ${meta.author}` : "", meta?.year].filter(Boolean).join("\n")
+      );
+    }
+
+    // Chapters
+    included.forEach((c) => {
+      const body = c.textHTML ? stripHtml(c.textHTML) : c.text || "";
+      pieces.push([c.title, body].filter(Boolean).join("\n"));
+    });
+
+    // Optional back matter
+    if (matter?.acknowledgments) pieces.push("Acknowledgments\n" + matter.acknowledgments);
+    if (matter?.aboutAuthor) pieces.push("About the Author\n" + matter.aboutAuthor);
+    if (matter?.notes) pieces.push("Notes\n" + matter.notes);
+
+    const manuscriptText = pieces.join("\n\n").trim();
+    return { manuscriptText, meta };
+  }, []);
 
   const wordCount = useMemo(
-    () => mockManuscriptText.split(/\s+/).filter(Boolean).length,
-    [mockManuscriptText]
+    () => (manuscriptText ? manuscriptText.split(/\s+/).filter(Boolean).length : 0),
+    [manuscriptText]
   );
 
+  /* ---------- Local checks ---------- */
   function runLocalChecks() {
     const issues: string[] = [];
-    const compiled = mockManuscriptText;
+    const compiled = manuscriptText;
+
+    if (!compiled) {
+      setProofResults(["No manuscript found. Open Publishing and click Save (or type to autosave)."]);
+      return;
+    }
 
     if (compiled.match(/ {2,}/)) issues.push("Multiple consecutive spaces found.");
-    if (compiled.match(/[""]/) && !compiled.match(/['']/))
+    if (/[“”]/.test(compiled) && !/[‘’]/.test(compiled))
       issues.push("Smart quotes present; ensure consistency of curly quotes.");
-    if (compiled.match(/--/)) issues.push("Double hyphen found; consider an em dash (—) or a period.");
-    
-    const longParas = compiled.split("\n\n").filter((p) => p.split(/\s+/).length > 250).length;
+    if (/--/.test(compiled)) issues.push("Double hyphen found; consider an em dash (—) or a period.");
+
+    const longParas = compiled.split(/\n\n+/).filter((p) => p.trim().split(/\s+/).length > 250).length;
     if (longParas) issues.push(`${longParas} very long paragraph(s); consider breaking them up.`);
-    
+
     setProofResults(issues.length ? issues : ["No basic issues found."]);
   }
 
   async function runAIChecks() {
     setAiBusy(true);
-    const compiled = mockManuscriptText;
+    const compiled = manuscriptText;
     const suggestions: string[] = [];
 
-    // Simulated AI checks
-    await new Promise((resolve) => setTimeout(resolve, 1500)); // Simulate API call
+    if (!compiled) {
+      setProofResults(["No manuscript found. Open Publishing and click Save (or type to autosave)."]);
+      setAiBusy(false);
+      return;
+    }
 
-    if (compiled.match(/\bi\b(?![a-zA-Z])/g)) suggestions.push("Pronoun 'I' should be capitalized.");
-    if (compiled.match(/\s[,.!?;:]/g)) suggestions.push("Punctuation spacing: remove spaces before punctuation marks.");
-    if (compiled.match(/\bvery\b/gi)) suggestions.push("Style: Consider replacing 'very' with stronger wording.");
-    if (compiled.length < 100) suggestions.push("Manuscript seems short—consider expanding content.");
+    // Simulate async call
+    await new Promise((r) => setTimeout(r, 800));
 
+    if (/\bi\b(?![a-zA-Z])/g.test(compiled)) suggestions.push("Pronoun 'I' should be capitalized.");
+    if (/\s[,.!?;:]/g.test(compiled)) suggestions.push("Punctuation spacing: remove spaces before punctuation.");
+    if (/\bvery\b/gi.test(compiled)) suggestions.push("Style: Consider replacing 'very' with stronger wording.");
+    if (compiled.length < 400) suggestions.push("Manuscript seems short—consider expanding content.");
+
+    // Merge with local checks
+    const before = proofResults.length ? proofResults : [];
     runLocalChecks();
-    setProofResults((prev) => [...prev, ...suggestions]);
+    setProofResults((prev) => [...(prev.length ? prev : before), ...suggestions]);
     setAiBusy(false);
   }
 
   function runGrammarCheck() {
-    const issues: string[] = [];
-    const text = mockManuscriptText;
+    const compiled = manuscriptText;
+    if (!compiled) {
+      setProofResults(["No manuscript found. Open Publishing and click Save (or type to autosave)."]);
+      return;
+    }
 
-    // Basic grammar checks
-    if (text.match(/\btheir\b.*\bthere\b|\bthere\b.*\btheir\b/i)) {
+    const issues: string[] = [];
+    if (/\btheir\b.*\bthere\b|\bthere\b.*\btheir\b/i.test(compiled)) {
       issues.push("Possible their/there confusion detected.");
     }
-    if (text.match(/\bits\b.*\bit's\b|\bit's\b.*\bits\b/i)) {
+    if (/\bits\b.*\bit's\b|\bit's\b.*\bits\b/i.test(compiled)) {
       issues.push("Possible its/it's confusion detected.");
     }
-
     setProofResults(issues.length ? issues : ["No grammar issues detected."]);
   }
 
   function runStyleAnalysis() {
+    const compiled = manuscriptText;
+    if (!compiled) {
+      setProofResults(["No manuscript found. Open Publishing and click Save (or type to autosave)."]);
+      return;
+    }
+
     const issues: string[] = [];
-    const text = mockManuscriptText;
+    const adverbs = compiled.match(/\b\w+ly\b/gi) || [];
+    if (adverbs.length > 20) issues.push(`Found ${adverbs.length} adverbs. Consider reducing for stronger prose.`);
 
-    // Style checks
-    const adverbs = text.match(/\b\w+ly\b/gi) || [];
-    if (adverbs.length > 10) {
-      issues.push(`Found ${adverbs.length} adverbs. Consider reducing for stronger prose.`);
-    }
-
-    const passiveVoice = text.match(/\b(was|were|been|being)\s+\w+ed\b/gi) || [];
-    if (passiveVoice.length > 5) {
-      issues.push(`Found ${passiveVoice.length} instances of passive voice. Consider active voice.`);
-    }
+    const passiveVoice = compiled.match(/\b(was|were|been|being)\s+\w+ed\b/gi) || [];
+    if (passiveVoice.length > 10) issues.push(`Found ${passiveVoice.length} instances of passive voice. Consider active voice.`);
 
     setProofResults(issues.length ? issues : ["Style looks good!"]);
   }
 
   function runCharacterConsistency() {
-    setProofResults([
-      "Character consistency check placeholder - wire to your character database.",
-      "Tip: Track character names, descriptions, and traits across chapters.",
-    ]);
+    const msg = [
+      "Character consistency placeholder — wire this to your character bible.",
+      "Tip: Track names, traits, ages, and relationships across chapters.",
+    ];
+    setProofResults(msg);
   }
 
   function runTimelineValidation() {
-    setProofResults([
-      "Timeline validation placeholder - wire to your timeline tracking system.",
-      "Tip: Ensure dates, seasons, and event sequences remain consistent.",
-    ]);
+    const msg = [
+      "Timeline validation placeholder — wire to your scene/event tracker.",
+      "Tip: Check dates, seasons, time-of-day, and age progressions.",
+    ];
+    setProofResults(msg);
   }
 
   return (
-    <PageShell
-      style={{
-        background: theme.bg,
-        minHeight: "100vh",
-      }}
-    >
+    <PageShell style={{ background: theme.bg, minHeight: "100vh" }}>
       <div style={styles.outer}>
-        {/* Header */}
+        {/* Header — rose/pink (no dark/blue) */}
         <div
           style={{
-            background: `linear-gradient(135deg, rgba(236, 72, 153, 0.65), rgba(249, 168, 212, 0.65))`,
+            background: `linear-gradient(135deg, rgba(236,72,153,0.65), rgba(249,168,212,0.65))`,
             backdropFilter: "blur(12px)",
             color: theme.white,
             padding: "20px 24px",
@@ -196,7 +247,7 @@ export default function Proof(): JSX.Element {
               onClick={() => navigate("/publishing")}
               style={{
                 border: "none",
-                background: "rgba(255,255,255,0.2)",
+                background: "rgba(255,255,255,0.22)",
                 color: theme.white,
                 padding: "10px 18px",
                 fontSize: 15,
@@ -208,10 +259,10 @@ export default function Proof(): JSX.Element {
             </button>
 
             <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-              <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+              <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
               </svg>
-              <h1 style={{ margin: 0, fontSize: 22, fontWeight: 600 }}>Proof & Consistency</h1>
+              <h1 style={{ margin: 0, fontSize: 22, fontWeight: 600 }}>Proof &amp; Consistency</h1>
             </div>
             <div style={{ width: 150 }} />
           </div>
@@ -221,22 +272,20 @@ export default function Proof(): JSX.Element {
         <div style={{ ...styles.inner, ...styles.sectionShell }}>
           {/* Stats Card */}
           <div style={{ ...styles.glassCard, marginBottom: 20 }}>
-            <div style={{ display: "flex", gap: 32, alignItems: "center" }}>
+            <div style={{ display: "flex", gap: 32, alignItems: "center", flexWrap: "wrap" }}>
               <div>
                 <div style={{ fontSize: 12, color: theme.subtext, marginBottom: 4 }}>Word Count</div>
-                <div style={{ fontSize: 24, fontWeight: 700, color: theme.primary }}>{wordCount.toLocaleString()}</div>
+                <div style={{ fontSize: 24, fontWeight: 700, color: theme.primary }}>
+                  {wordCount.toLocaleString()}
+                </div>
               </div>
               <div>
-                <div style={{ fontSize: 12, color: theme.subtext, marginBottom: 4 }}>Issues Found</div>
+                <div style={{ fontSize: 12, color: theme.subtext, marginBottom: 4 }}>Issues Listed</div>
                 <div style={{ fontSize: 24, fontWeight: 700, color: theme.accent }}>{proofResults.length}</div>
               </div>
               <div style={{ marginLeft: "auto" }}>
-                <button
-                  style={styles.btnPrimary}
-                  onClick={runAIChecks}
-                  disabled={aiBusy}
-                >
-                  {aiBusy ? "Running AI Proof..." : "🤖 AI Proof (All Checks)"}
+                <button style={styles.btnPrimary} onClick={runAIChecks} disabled={aiBusy}>
+                  {aiBusy ? "Running AI Proof…" : "🤖 AI Proof (All Checks)"}
                 </button>
               </div>
             </div>
@@ -246,51 +295,20 @@ export default function Proof(): JSX.Element {
           <div style={{ ...styles.glassCard, marginBottom: 20 }}>
             <h3 style={{ margin: "0 0 16px 0", fontSize: 18, color: theme.text }}>Quick Checks</h3>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
-              <button
-                style={{
-                  ...styles.btn,
-                  ":hover": { background: theme.highlight },
-                }}
-                onClick={runGrammarCheck}
-              >
-                📝 Grammar Check
-              </button>
-              <button
-                style={styles.btn}
-                onClick={runStyleAnalysis}
-              >
-                ✨ Style Analysis
-              </button>
-              <button
-                style={styles.btn}
-                onClick={runCharacterConsistency}
-              >
-                👤 Character Consistency
-              </button>
-              <button
-                style={styles.btn}
-                onClick={runTimelineValidation}
-              >
-                📅 Timeline Validation
-              </button>
-              <button
-                style={styles.btn}
-                onClick={runLocalChecks}
-              >
-                🔍 Basic Issues
-              </button>
+              <button style={styles.btn} onClick={runGrammarCheck}>📝 Grammar Check</button>
+              <button style={styles.btn} onClick={runStyleAnalysis}>✨ Style Analysis</button>
+              <button style={styles.btn} onClick={runCharacterConsistency}>👤 Character Consistency</button>
+              <button style={styles.btn} onClick={runTimelineValidation}>📅 Timeline Validation</button>
+              <button style={styles.btn} onClick={runLocalChecks}>🔍 Basic Issues</button>
             </div>
           </div>
 
           {/* Results */}
-          {proofResults.length > 0 && (
+          {proofResults.length > 0 ? (
             <div style={styles.glassCard}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
                 <h3 style={{ margin: 0, fontSize: 18, color: theme.text }}>Results</h3>
-                <button
-                  style={{ ...styles.btn, padding: "8px 12px", fontSize: 12 }}
-                  onClick={() => setProofResults([])}
-                >
+                <button style={{ ...styles.btn, padding: "8px 12px", fontSize: 12 }} onClick={() => setProofResults([])}>
                   Clear
                 </button>
               </div>
@@ -302,18 +320,11 @@ export default function Proof(): JSX.Element {
                 ))}
               </ul>
             </div>
-          )}
-
-          {/* Placeholder for no results */}
-          {proofResults.length === 0 && (
+          ) : (
             <div style={{ ...styles.glassCard, textAlign: "center", padding: 60 }}>
               <div style={{ fontSize: 48, marginBottom: 16 }}>🔍</div>
-              <div style={{ fontSize: 18, color: theme.subtext, marginBottom: 8 }}>
-                No checks run yet
-              </div>
-              <div style={{ fontSize: 14, color: theme.subtext }}>
-                Click any button above to analyze your manuscript
-              </div>
+              <div style={{ fontSize: 18, color: theme.subtext, marginBottom: 8 }}>No checks run yet</div>
+              <div style={{ fontSize: 14, color: theme.subtext }}>Click any button above to analyze your manuscript</div>
             </div>
           )}
         </div>
