@@ -936,7 +936,6 @@ export default function Publishing(): JSX.Element {
               <div
                 role="tablist"
                 aria-label="Publishing steps"
-                onKeyDown={onKeyDownTabs}
                 style={{ display: "flex", gap: 8, marginBottom: 20, overflowX: "auto", paddingBottom: 2 }}
               >
                 {STEPS.map((s, i) => {
