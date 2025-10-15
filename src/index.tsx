@@ -1,30 +1,26 @@
-// src/main.tsx (or src/index.tsx)
 import React from "react";
-import { createRoot } from "react-dom/client";
-import { BrowserRouter as Router } from "react-router-dom";
+import ReactDOM from "react-dom/client";
+import { BrowserRouter } from "react-router-dom";
+import { DndProvider } from "react-dnd";
+import { HTML5Backend } from "react-dnd-html5-backend";
+// If you *actually* use a user context, keep this import; otherwise delete the next line.
+import { UserProvider } from "./state/UserProvider";
 import App from "./App";
 
-// If you use global providers, uncomment and import them:
-// import { UserProvider } from "./state/UserProvider";
-// import { DndProvider } from "react-dnd";
-// import { HTML5Backend } from "react-dnd-html5-backend";
-
-const container = document.getElementById("root");
-if (!container) {
-  throw new Error('Root element #root not found. Ensure public/index.html has <div id="root"></div>.');
+const rootEl = document.getElementById("root");
+if (!rootEl) {
+  throw new Error('Root element #root not found. Make sure public/index.html has <div id="root"></div>.');
 }
 
-createRoot(container).render(
+ReactDOM.createRoot(rootEl).render(
   <React.StrictMode>
-    {/* Uncomment providers here if your app expects them at the top level */}
-    {/* <UserProvider> */}
-    {/*   <DndProvider backend={HTML5Backend}> */}
-        <Router>
-          <React.Suspense fallback={<div />}>
-            <App />
-          </React.Suspense>
-        </Router>
-    {/*   </DndProvider> */}
-    {/* </UserProvider> */}
+    <BrowserRouter>
+      {/* If you do NOT have a UserProvider, remove this wrapper */}
+      <UserProvider>
+        <DndProvider backend={HTML5Backend}>
+          <App />
+        </DndProvider>
+      </UserProvider>
+    </BrowserRouter>
   </React.StrictMode>
 );
