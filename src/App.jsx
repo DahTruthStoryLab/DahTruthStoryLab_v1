@@ -17,6 +17,10 @@ import { HTML5Backend } from "react-dnd-html5-backend";
 import { TouchBackend } from "react-dnd-touch-backend";
 
 import { UserProvider } from "./lib/userStore.jsx";
+import Proof from "./pages/Proof.tsx";
+import Format from "./pages/Format.tsx";
+import Export from "./pages/Export.tsx";
+import PublishingPrep from "./pages/PublishingPrep.tsx"; 
 
 /* =========================
    DnD Backend Configuration
@@ -194,6 +198,11 @@ export default function App() {
                 <Route path="workshop/hfl" element={<HopesFearsLegacy />} />
                 <Route path="prompts" element={<StoryPromptsWorkshop />} />
                 <Route path="community" element={<WorkshopCohort />} />
+                <Route path="/publishing" element={<Publishing />} />
+                <Route path="/proof" element={<Proof />} />
+                <Route path="/format" element={<Format />} />
+                <Route path="/export" element={<Export />} />
+                <Route path="/publishing-prep" element={<PublishingPrep />} />
               </Route>
 
               {/* Typo/alias redirect */}
