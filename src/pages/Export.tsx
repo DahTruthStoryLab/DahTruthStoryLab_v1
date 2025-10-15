@@ -430,26 +430,4 @@ export default function Export(): JSX.Element {
     </PageShell>
   );
 }
-: 18, color: theme.text }}>PDF</h3>
-              <p style={{ margin: "0 0 16px 0", fontSize: 13, color: theme.subtext, lineHeight: 1.6 }}>
-                Print-ready format. Opens print dialog to save as PDF. Ideal for submissions and physical copies.
-              </p>
-              <button style={styles.btn} onClick={exportPDF}>
-                Export PDF
-              </button>
-            </div>
-
-            {/* DOCX Export */}
-            <div
-              style={styles.exportCard}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.boxShadow = "0 8px 24px rgba(2,20,40,0.12)";
-                e.currentTarget.style.transform = "translateY(-2px)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.boxShadow = "none";
-                e.currentTarget.style.transform = "translateY(0)";
-              }}
-            >
-              <div style={{ fontSize: 48, marginBottom: 12 }}>📝</div>
-              <h3 style={{ margin: "0 0 8px 0", fontSize
+       
