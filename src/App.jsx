@@ -173,13 +173,15 @@ export default function App() {
                 <Route path="prompts" element={<StoryPromptsWorkshop />} />
                 <Route path="community" element={<WorkshopCohort />} />
 
-                {/* Publishing flow pages as children */}
-                <Route path="publishing" element={<Publishing />} />
-                <Route path="proof" element={<Proof />} />
-                <Route path="format" element={<Format />} />
-                <Route path="export" element={<Export />} />
-                <Route path="publishing-prep" element={<PublishingPrep />} />
-              </Route>
+             <Route path="/story-lab/*" element={<ProtectedRoute><StoryLabLayout/></ProtectedRoute>}>
+              <Route index element={<StoryLabLanding/>} />
+              <Route path="publishing" element={<Publishing/>} />
+              <Route path="proof" element={<Proof/>} />
+              <Route path="format" element={<Format/>} />
+              <Route path="export" element={<Export/>} />
+              <Route path="publishing-prep" element={<PublishingPrep/>} />
+            </Route>
+
 
               {/* Typo/alias redirect (top-level) */}
               <Route path="/storylab/*" element={<Navigate to="/story-lab" replace />} />
