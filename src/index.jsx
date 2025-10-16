@@ -1,14 +1,28 @@
 // src/index.jsx
 import React from "react";
 import { createRoot } from "react-dom/client";
-import { Amplify } from 'aws-amplify';
-import awsconfig from './aws-exports';
+import { Amplify } from "aws-amplify";
 import App from "./App";
 import "./index.css";
 import { AiProvider } from "./lib/AiProvider";
 
-// Configure Amplify with your AWS settings
-Amplify.configure(awsconfig);
+// ---- Configure Amplify (safe) ----
+try {
+  // If aws-exports exists and is valid, this will work.
+  // If not, we'll log a warning but keep the app running.
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const awsconfig = require("./aws-exports").default || require("./aws-exports");
+  if (awsconfig) {
+    Amplify.configure(awsconfig);
+    // Optional: log once so we know configuration happened
+    // console.info("Amplify configured.");
+  }
+} catch (err) {
+  console.warn(
+    "[Amplify] aws-exports not found or invalid. Skipping Amplify.configure().",
+    err
+  );
+}
 
 /** Simple error boundary to avoid blank white screen */
 class ErrorBoundary extends React.Component {
@@ -16,15 +30,12 @@ class ErrorBoundary extends React.Component {
     super(props);
     this.state = { hasError: false, error: null };
   }
-
   static getDerivedStateFromError(error) {
     return { hasError: true, error };
   }
-
   componentDidCatch(error, info) {
     console.error("App crashed:", error, info);
   }
-
   render() {
     if (this.state.hasError) {
       return (
@@ -54,7 +65,13 @@ class ErrorBoundary extends React.Component {
   }
 }
 
-const root = createRoot(document.getElementById("root"));
+// Ensure root element exists
+const rootEl = document.getElementById("root");
+if (!rootEl) {
+  throw new Error('Root element #root not found. Make sure public/index.html has <div id="root"></div>.');
+}
+
+const root = createRoot(rootEl);
 
 root.render(
   <React.StrictMode>
