@@ -3,6 +3,13 @@ import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import PageShell from "../components/layout/PageShell.tsx";
 
+/* ---------- Where to call your backend ---------- */
+/** If you proxy /api -> API Gateway in dev/hosting, keep "/api".
+ *  Otherwise set your deployed API Gateway base URL, e.g.:
+ *  const API_BASE = "https://572brq9d46.execute-api.us-east-1.amazonaws.com/dev";
+ */
+const API_BASE = "/api";
+
 /* ---------- Theme ---------- */
 const theme = {
   bg: "var(--brand-bg)",
@@ -100,9 +107,7 @@ export default function Proof(): JSX.Element {
 
     // Optional front matter
     if (meta?.title || meta?.author || meta?.year) {
-      pieces.push(
-        [meta?.title, meta?.author ? `by ${meta.author}` : "", meta?.year].filter(Boolean).join("\n")
-      );
+      pieces.push([meta?.title, meta?.author ? `by ${meta.author}` : "", meta?.year].filter(Boolean).join("\n"));
     }
 
     // Chapters
@@ -146,30 +151,53 @@ export default function Proof(): JSX.Element {
     setProofResults(issues.length ? issues : ["No basic issues found."]);
   }
 
+  /* ---------- AI checks (calls your API) ---------- */
   async function runAIChecks() {
     setAiBusy(true);
-    const compiled = manuscriptText;
-    const suggestions: string[] = [];
+    try {
+      const compiled = manuscriptText;
+      if (!compiled) {
+        setProofResults(["No manuscript found. Open Publishing and click Save (or type to autosave)."]);
+        return;
+      }
 
-    if (!compiled) {
-      setProofResults(["No manuscript found. Open Publishing and click Save (or type to autosave)."]);
+      const resp = await fetch(`${API_BASE}/ai/proof`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: compiled,
+          meta, // optional extra context for the model
+        }),
+      });
+
+      if (!resp.ok) {
+        const text = await resp.text().catch(() => "");
+        throw new Error(`HTTP ${resp.status} ${resp.statusText} ${text ? `— ${text}` : ""}`.trim());
+      }
+
+      const data = await resp.json().catch(() => ({}));
+      // Expecting { issues: string[] } or { suggestions: string[] }
+      const suggestions: string[] =
+        (Array.isArray(data?.issues) && data.issues) ||
+        (Array.isArray(data?.suggestions) && data.suggestions) ||
+        [];
+
+      // If server returns nothing, fall back to a friendly message
+      const aiList = suggestions.length ? suggestions : ["AI found no issues to report."];
+
+      // Merge with local checks (runs fresh so the list isn’t stale)
+      runLocalChecks();
+      setProofResults((prev) => [...(prev.length ? prev : []), ...aiList]);
+    } catch (err: any) {
+      console.error("AI proof error:", err);
+      setProofResults([
+        `AI check failed: ${err?.message || String(err)}`,
+        "If this is a CORS issue, add your site origin in API Gateway/Lambda response headers.",
+        `Tried: ${API_BASE}/ai/proof`,
+      ]);
+    } finally {
       setAiBusy(false);
-      return;
     }
-
-    // Simulate async call
-    await new Promise((r) => setTimeout(r, 800));
-
-    if (/\bi\b(?![a-zA-Z])/g.test(compiled)) suggestions.push("Pronoun 'I' should be capitalized.");
-    if (/\s[,.!?;:]/g.test(compiled)) suggestions.push("Punctuation spacing: remove spaces before punctuation.");
-    if (/\bvery\b/gi.test(compiled)) suggestions.push("Style: Consider replacing 'very' with stronger wording.");
-    if (compiled.length < 400) suggestions.push("Manuscript seems short—consider expanding content.");
-
-    // Merge with local checks
-    const before = proofResults.length ? proofResults : [];
-    runLocalChecks();
-    setProofResults((prev) => [...(prev.length ? prev : before), ...suggestions]);
-    setAiBusy(false);
   }
 
   function runGrammarCheck() {
