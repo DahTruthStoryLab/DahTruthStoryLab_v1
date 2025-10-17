@@ -23,6 +23,40 @@ try {
     err
   );
 }
+// src/index.jsx (after Amplify.configure(awsconfig))
+import { Auth, Logger } from 'aws-amplify';
+Logger.LOG_LEVEL = 'DEBUG'; // TEMP: shows detailed auth logs in browser console
+
+function describeAuthError(e) {
+  const code = e?.code || e?.name || 'AuthError';
+  switch (code) {
+    case 'UserNotConfirmedException':
+      return 'Your account is not confirmed. Check email for code.';
+    case 'NotAuthorizedException':
+      return 'Incorrect email or password.';
+    case 'UserNotFoundException':
+      return 'No account found for that email.';
+    case 'PasswordResetRequiredException':
+      return 'Password reset required.';
+    default:
+      return e?.message || 'Authentication failed.';
+  }
+}
+
+async function testSignIn(email, password) {
+  try {
+    const user = await Auth.signIn(email, password);
+    console.log('Signed in OK:', user);
+    alert('Sign-in OK');
+  } catch (e) {
+    console.error('SIGN-IN ERROR:', e);
+    alert(describeAuthError(e));
+  }
+}
+
+// make available in the devtools console
+window.testSignIn = testSignIn;
+
 
 /** Simple error boundary to avoid blank white screen */
 class ErrorBoundary extends React.Component {
