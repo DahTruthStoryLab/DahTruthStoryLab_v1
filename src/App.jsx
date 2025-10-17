@@ -1,4 +1,4 @@
-// src/App.jsx
+// src/App.tsx
 import React, { Suspense, lazy, useEffect } from "react";
 import {
   BrowserRouter as Router,
@@ -8,6 +8,13 @@ import {
   useLocation,
   Navigate,
 } from "react-router-dom";
+
+// ADD THESE TWO LINES:
+import { Amplify } from 'aws-amplify';
+import awsconfig from './aws-exports';
+
+// CONFIGURE AMPLIFY (ADD THIS LINE):
+Amplify.configure(awsconfig);
 
 // ---------------------------
 // DnD Multi-backend (desktop + mobile)
