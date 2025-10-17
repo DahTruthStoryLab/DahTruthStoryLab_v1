@@ -152,53 +152,39 @@ export default function Proof(): JSX.Element {
   }
 
   /* ---------- AI checks (calls your API) ---------- */
-  async function runAIChecks() {
-    setAiBusy(true);
-    try {
-      const compiled = manuscriptText;
-      if (!compiled) {
-        setProofResults(["No manuscript found. Open Publishing and click Save (or type to autosave)."]);
-        return;
-      }
-
-      const resp = await fetch(`${API_BASE}/ai/proof`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          text: compiled,
-          meta, // optional extra context for the model
-        }),
-      });
-
-      if (!resp.ok) {
-        const text = await resp.text().catch(() => "");
-        throw new Error(`HTTP ${resp.status} ${resp.statusText} ${text ? `— ${text}` : ""}`.trim());
-      }
-
-      const data = await resp.json().catch(() => ({}));
-      // Expecting { issues: string[] } or { suggestions: string[] }
-      const suggestions: string[] =
-        (Array.isArray(data?.issues) && data.issues) ||
-        (Array.isArray(data?.suggestions) && data.suggestions) ||
-        [];
-
-      // If server returns nothing, fall back to a friendly message
-      const aiList = suggestions.length ? suggestions : ["AI found no issues to report."];
-
-      // Merge with local checks (runs fresh so the list isn’t stale)
-      runLocalChecks();
-      setProofResults((prev) => [...(prev.length ? prev : []), ...aiList]);
-    } catch (err: any) {
-      console.error("AI proof error:", err);
-      setProofResults([
-        `AI check failed: ${err?.message || String(err)}`,
-        "If this is a CORS issue, add your site origin in API Gateway/Lambda response headers.",
-        `Tried: ${API_BASE}/ai/proof`,
-      ]);
-    } finally {
-      setAiBusy(false);
+ async function runAIChecks() {
+  setAiBusy(true);
+  try {
+    if (!manuscriptText) {
+      setProofResults(["No manuscript found. Open Publishing and click Save (or type to autosave)."]);
+      return;
     }
+
+    const res = await fetch("https://572brq9d46.execute-api.us-east-1.amazonaws.com/dev/ai/proof", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: manuscriptText }),
+      // no credentials; CORS is handled by the API response headers
+    });
+
+    if (!res.ok) {
+      const msg = `AI service error (${res.status})`;
+      setProofResults([msg]);
+      return;
+    }
+
+    const data = await res.json();
+    const ai = Array.isArray(data?.suggestions) ? data.suggestions : [];
+    // keep your local checks too
+    runLocalChecks();
+    setProofResults(prev => [...(prev.length ? prev : []), ...ai]);
+  } catch (e: any) {
+    console.error(e);
+    setProofResults(["Network error calling AI endpoint."]);
+  } finally {
+    setAiBusy(false);
   }
+}
 
   function runGrammarCheck() {
     const compiled = manuscriptText;
