@@ -152,35 +152,39 @@ export default function Proof(): JSX.Element {
   }
 
   /* ---------- AI checks (calls your API) ---------- */
- async function runAIChecks() {
-  setAiBusy(true);
-  try {
-    if (!manuscriptText) {
-      setProofResults(["No manuscript found. Open Publishing and click Save (or type to autosave)."]);
-      return;
-    }
+// put this near the top of Proof.tsx
+const API_URL = "https://572brq9d46.execute-api.us-east-1.amazonaws.com/dev/ai/proof";
 
-    const res = await fetch("https://572brq9d46.execute-api.us-east-1.amazonaws.com/dev/ai/proof", {
+async function runAIChecks() {
+  setAiBusy(true);
+  const compiled = manuscriptText;
+
+  if (!compiled) {
+    setProofResults(["No manuscript found. Open Publishing and click Save (or type to autosave)."]);
+    setAiBusy(false);
+    return;
+  }
+
+  try {
+    const res = await fetch(API_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: manuscriptText }),
-      // no credentials; CORS is handled by the API response headers
+      body: JSON.stringify({ text: compiled })
     });
 
-    if (!res.ok) {
-      const msg = `AI service error (${res.status})`;
-      setProofResults([msg]);
-      return;
-    }
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json(); // { ok: true, received: "...", suggestions: [...] }
 
-    const data = await res.json();
-    const ai = Array.isArray(data?.suggestions) ? data.suggestions : [];
-    // keep your local checks too
-    runLocalChecks();
-    setProofResults(prev => [...(prev.length ? prev : []), ...ai]);
+    // keep local checks + add API suggestions
+    const local: string[] = [];
+    if (/ {2,}/.test(compiled)) local.push("Multiple consecutive spaces found.");
+    if (/--/.test(compiled)) local.push("Double hyphen found; consider an em dash (—) or a period.");
+
+    const apiSuggestions: string[] = Array.isArray(data?.suggestions) ? data.suggestions : [];
+    setProofResults([...local, ...apiSuggestions]);
+
   } catch (e: any) {
-    console.error(e);
-    setProofResults(["Network error calling AI endpoint."]);
+    setProofResults([`AI check failed: ${e.message}. Try again or check API Gateway logs.`]);
   } finally {
     setAiBusy(false);
   }
