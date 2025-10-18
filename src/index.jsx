@@ -1,13 +1,15 @@
 // src/index.jsx
 import React from "react";
 import { createRoot } from "react-dom/client";
-import { Amplify } from "aws-amplify";
-import awsconfig from "./aws-exports";
 import App from "./App";
 import "./index.css";
 import { AiProvider } from "./lib/AiProvider";
 
-// Configure Amplify ONCE, right here
+// Import Amplify BEFORE configuring
+import { Amplify } from "aws-amplify";
+import awsconfig from "./aws-exports";
+
+// NOW configure it
 Amplify.configure(awsconfig);
 
 // Optional: Enable debug logging for auth issues
