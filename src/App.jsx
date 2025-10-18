@@ -9,12 +9,9 @@ import {
   Navigate,
 } from "react-router-dom";
 
-// ADD THESE TWO LINES:
-import { Amplify } from 'aws-amplify';
-import awsconfig from './aws-exports';
-
 // CONFIGURE AMPLIFY (ADD THIS LINE):
 Amplify.configure(awsconfig);
+
 
 // ---------------------------
 // DnD Multi-backend (desktop + mobile)
