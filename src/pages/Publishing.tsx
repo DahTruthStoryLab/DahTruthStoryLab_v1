@@ -596,18 +596,15 @@ export default function Publishing(): JSX.Element {
   };
 
   /* ----- Import: DOCX (.docx) and HTML (.html) ----- */
-import { useCallback } from "react";
+// helper (module scope, only once)
+const htmlEscape = (s: string) =>
+  s
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
 
-// If you don't already have this helper in scope, keep this version.
-// Otherwise, remove this and use your existing htmlEscape.
-function htmlEscape(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-}
 
 type NumFmt =
   | "bullet"
