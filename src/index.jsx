@@ -8,9 +8,14 @@ import { AiProvider } from "./lib/AiProvider";
 
 // ---- Configure Amplify (safe) ----
 try {
+  // If aws-exports exists and is valid, this will work.
+  // If not, we'll log a warning but keep the app running.
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
   const awsconfig = require("./aws-exports").default || require("./aws-exports");
   if (awsconfig) {
     Amplify.configure(awsconfig);
+    // Optional: log once so we know configuration happened
+    // console.info("Amplify configured.");
   }
 } catch (err) {
   console.warn(
@@ -18,6 +23,40 @@ try {
     err
   );
 }
+
+// src/index.jsx (after Amplify.configure(awsconfig))
+import { Auth, Logger } from 'aws-amplify';
+Logger.LOG_LEVEL = 'DEBUG'; // TEMP: shows detailed auth logs in browser console
+
+function describeAuthError(e) {
+  const code = e?.code || e?.name || 'AuthError';
+  switch (code) {
+    case 'UserNotConfirmedException':
+      return 'Your account is not confirmed. Check email for code.';
+    case 'NotAuthorizedException':
+      return 'Incorrect email or password.';
+    case 'UserNotFoundException':
+      return 'No account found for that email.';
+    case 'PasswordResetRequiredException':
+      return 'Password reset required.';
+    default:
+      return e?.message || 'Authentication failed.';
+  }
+}
+
+async function testSignIn(email, password) {
+  try {
+    const user = await Auth.signIn(email, password);
+    console.log('Signed in OK:', user);
+    alert('Sign-in OK');
+  } catch (e) {
+    console.error('SIGN-IN ERROR:', e);
+    alert(describeAuthError(e));
+  }
+}
+
+// make available in the devtools console
+window.testSignIn = testSignIn;
 
 /** Simple error boundary to avoid blank white screen */
 class ErrorBoundary extends React.Component {
@@ -60,9 +99,10 @@ class ErrorBoundary extends React.Component {
   }
 }
 
+// Ensure root element exists
 const rootEl = document.getElementById("root");
 if (!rootEl) {
-  throw new Error('Root element #root not found.');
+  throw new Error('Root element #root not found. Make sure public/index.html has <div id="root"></div>.');
 }
 
 const root = createRoot(rootEl);
