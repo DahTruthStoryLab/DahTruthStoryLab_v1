@@ -1,20 +1,23 @@
 // src/index.jsx
 import React from "react";
 import { createRoot } from "react-dom/client";
+import { Amplify } from "aws-amplify";
 import App from "./App";
 import "./index.css";
 import { AiProvider } from "./lib/AiProvider";
 
-// Import Amplify BEFORE configuring
-import { Amplify } from "aws-amplify";
-import awsconfig from "./aws-exports";
-
-// NOW configure it
-Amplify.configure(awsconfig);
-
-// Optional: Enable debug logging for auth issues
-import { Logger } from 'aws-amplify';
-Logger.LOG_LEVEL = 'DEBUG';
+// ---- Configure Amplify (safe) ----
+try {
+  const awsconfig = require("./aws-exports").default || require("./aws-exports");
+  if (awsconfig) {
+    Amplify.configure(awsconfig);
+  }
+} catch (err) {
+  console.warn(
+    "[Amplify] aws-exports not found or invalid. Skipping Amplify.configure().",
+    err
+  );
+}
 
 /** Simple error boundary to avoid blank white screen */
 class ErrorBoundary extends React.Component {
@@ -22,15 +25,12 @@ class ErrorBoundary extends React.Component {
     super(props);
     this.state = { hasError: false, error: null };
   }
-  
   static getDerivedStateFromError(error) {
     return { hasError: true, error };
   }
-  
   componentDidCatch(error, info) {
     console.error("App crashed:", error, info);
   }
-  
   render() {
     if (this.state.hasError) {
       return (
@@ -38,7 +38,7 @@ class ErrorBoundary extends React.Component {
           <div style={{ textAlign: "center", maxWidth: 520 }}>
             <h1 style={{ margin: 0 }}>Something went wrong.</h1>
             <p style={{ color: "#64748b" }}>
-              Please refresh the page. If the issue persists, check the browser console.
+              Please refresh the page. If the issue persists, check the browser console for the first red error.
             </p>
             <button
               onClick={() => window.location.reload()}
@@ -60,7 +60,6 @@ class ErrorBoundary extends React.Component {
   }
 }
 
-// Ensure root element exists
 const rootEl = document.getElementById("root");
 if (!rootEl) {
   throw new Error('Root element #root not found.');
