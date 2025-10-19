@@ -524,101 +524,392 @@ export default function Publishing(): JSX.Element {
   };
 
   /* ----- Import: DOCX (.docx) and HTML (.html) ----- */
-  const importDocx = useCallback(
-    async (file: File, asNewChapter = true) => {
-      const JSZip = (await import("jszip")).default;
-      const zip = await JSZip.loadAsync(file);
-      const docXml = await zip.file("word/document.xml")?.async("string");
-      if (!docXml) {
-        alert("Could not read Word document.xml");
+  const import { useCallback } from "react";
+
+// If you don't already have this helper in scope, keep this version.
+// Otherwise, remove this and use your existing htmlEscape.
+function htmlEscape(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+type NumFmt =
+  | "bullet"
+  | "decimal"
+  | "lowerLetter"
+  | "upperLetter"
+  | "lowerRoman"
+  | "upperRoman"
+  | string;
+
+type ChapterGroup = { title: string; content: string[] };
+
+const importDocx = useCallback(
+  async (file: File, asNewChapter: boolean = true) => {
+    try {
+      if (!file.name.toLowerCase().endsWith(".docx")) {
+        alert("Please select a .docx (Word) file.");
         return;
       }
-      const xml = new DOMParser().parseFromString(docXml, "text/xml");
-      const paras = Array.from(xml.getElementsByTagName("*")).filter((n) => n.localName === "p");
-      const out: string[] = [];
+
+      const JSZip = (await import("jszip")).default;
+      const zip = await JSZip.loadAsync(file);
+
+      // ---- Load document.xml
+      let docEntry = zip.file("word/document.xml");
+      if (!docEntry) {
+        const altKey = Object.keys(zip.files).find((k) =>
+          /(^|\/)word\/document\.xml$/i.test(k)
+        );
+        docEntry = altKey ? zip.file(altKey)! : null;
+      }
+      if (!docEntry) {
+        alert("Could not find word/document.xml inside the file.");
+        return;
+      }
+      const docXml = await docEntry.async("string");
+      const xml = new DOMParser().parseFromString(docXml, "application/xml");
+
+      // ---- Load relationships for images
+      let relsEntry = zip.file("word/_rels/document.xml.rels");
+      if (!relsEntry) {
+        const altRel = Object.keys(zip.files).find((k) =>
+          /(^|\/)word\/_rels\/document\.xml\.rels$/i.test(k)
+        );
+        relsEntry = altRel ? zip.file(altRel)! : null;
+      }
+      const relsXmlStr = relsEntry ? await relsEntry.async("string") : "";
+      const relsXml = relsXmlStr
+        ? new DOMParser().parseFromString(relsXmlStr, "application/xml")
+        : null;
+      const relMap = new Map<string, string>(); // rId -> path
+      if (relsXml) {
+        Array.from(relsXml.getElementsByTagName("*"))
+          .filter((n) => n.localName === "Relationship")
+          .forEach((rel) => {
+            const id = rel.getAttribute("Id") || rel.getAttribute("r:id") || "";
+            let target = rel.getAttribute("Target") || "";
+            if (!id || !target) return;
+            if (!/^([a-z]+:)?\/\//i.test(target)) {
+              if (!target.startsWith("word/")) target = `word/${target.replace(/^\.?\//, "")}`;
+            }
+            relMap.set(id, target);
+          });
+      }
+
+      // ---- Load numbering.xml for list detection
+      let numberingEntry = zip.file("word/numbering.xml");
+      if (!numberingEntry) {
+        const altNum = Object.keys(zip.files).find((k) =>
+          /(^|\/)word\/numbering\.xml$/i.test(k)
+        );
+        numberingEntry = altNum ? zip.file(altNum)! : null;
+      }
+      const numberingXmlStr = numberingEntry ? await numberingEntry.async("string") : "";
+      const numberingXml = numberingXmlStr
+        ? new DOMParser().parseFromString(numberingXmlStr, "application/xml")
+        : null;
+
+      const numIdToAbstract = new Map<string, string>();
+      const abstractToFmt = new Map<string, NumFmt>();
+
+      if (numberingXml) {
+        const nums = Array.from(numberingXml.getElementsByTagName("*")).filter(
+          (n) => n.localName === "num"
+        );
+        for (const num of nums) {
+          const numId = num.getAttribute("w:numId") || num.getAttribute("numId") || "";
+          const abs = Array.from(num.children).find((c) => c.localName === "abstractNumId");
+          const absId = abs?.getAttribute("w:val") || abs?.getAttribute("val") || "";
+          if (numId && absId) numIdToAbstract.set(numId, absId);
+        }
+        const abNums = Array.from(numberingXml.getElementsByTagName("*")).filter(
+          (n) => n.localName === "abstractNum"
+        );
+        for (const a of abNums) {
+          const absId = a.getAttribute("w:abstractNumId") || a.getAttribute("abstractNumId") || "";
+          const lvl = Array.from(a.getElementsByTagName("*")).find((x) => x.localName === "lvl");
+          const fmtNode = lvl
+            ? Array.from(lvl!.children).find((x) => x.localName === "numFmt")
+            : null;
+          const fmt = fmtNode?.getAttribute("w:val") || fmtNode?.getAttribute("val") || "";
+          if (absId && fmt) abstractToFmt.set(absId, fmt as NumFmt);
+        }
+      }
+
+      async function imageDataUrlFromRid(rId: string): Promise<string | null> {
+        const path = relMap.get(rId);
+        if (!path) return null;
+        const f = zip.file(path);
+        if (!f) return null;
+        const ext = path.toLowerCase().split(".").pop() || "";
+        const mime =
+          ext === "png"
+            ? "image/png"
+            : ext === "jpg" || ext === "jpeg"
+            ? "image/jpeg"
+            : ext === "gif"
+            ? "image/gif"
+            : ext === "bmp"
+            ? "image/bmp"
+            : ext === "webp"
+            ? "image/webp"
+            : "application/octet-stream";
+        const base64 = await f.async("base64");
+        return `data:${mime};base64,${base64}`;
+      }
+
+      async function renderParagraphInner(p: Element): Promise<string> {
+        const parts: string[] = [];
+        const imagePromises: Promise<void>[] = [];
+
+        const walk = (node: Element) => {
+          if (node.localName === "t") {
+            parts.push(htmlEscape(node.textContent || ""));
+          } else if (node.localName === "br") {
+            parts.push("<br/>");
+          } else if (node.localName === "drawing") {
+            const blips = Array.from(node.getElementsByTagName("*")).filter(
+              (n) => n.localName === "blip"
+            );
+            imagePromises.push(
+              (async () => {
+                for (const b of blips) {
+                  const rid = b.getAttribute("r:embed") || b.getAttribute("embed");
+                  if (!rid) continue;
+                  const url = await imageDataUrlFromRid(rid);
+                  if (url) parts.push(`<img src="${url}" alt="image"/>`);
+                }
+              })()
+            );
+          } else {
+            for (const c of Array.from(node.children)) walk(c);
+          }
+        };
+
+        for (const c of Array.from(p.children)) walk(c);
+        if (imagePromises.length) await Promise.all(imagePromises);
+
+        const html = parts.join("");
+        return html || "<br/>";
+      }
+
+      const paras = Array.from(xml.getElementsByTagName("*")).filter(
+        (n) => n.localName === "p"
+      );
+
+      // ---- List state
+      let listOpenType: "ul" | "ol" | null = null;
+      let listBuffer: string[] = [];
+      function flushListIfOpen(target: string[]) {
+        if (listOpenType && listBuffer.length) {
+          target.push(
+            listOpenType === "ul"
+              ? `<ul>${listBuffer.join("")}</ul>`
+              : `<ol>${listBuffer.join("")}</ol>`
+          );
+        }
+        listOpenType = null;
+        listBuffer = [];
+      }
+
+      // ---- Chapter grouping (by Heading 1)
+      const chapterGroups: ChapterGroup[] = [];
+      let currentChapter: ChapterGroup | null = null;
+
       for (const p of paras) {
         let styleVal = "";
+        let numId = "";
         const pPr = Array.from(p.children).find((n) => n.localName === "pPr");
         if (pPr) {
           const pStyle = Array.from(pPr.children).find((n) => n.localName === "pStyle");
           if (pStyle) styleVal = pStyle.getAttribute("w:val") || pStyle.getAttribute("val") || "";
+          const numPr = Array.from(pPr.children).find((n) => n.localName === "numPr");
+          if (numPr) {
+            const numIdNode = Array.from(numPr.children).find((n) => n.localName === "numId");
+            if (numIdNode)
+              numId = numIdNode.getAttribute("w:val") || numIdNode.getAttribute("val") || "";
+          }
         }
+
+        // Plain text for decisions
         const runs = Array.from(p.getElementsByTagName("*")).filter((n) => n.localName === "t");
-        const text = runs.map((r) => r.textContent || "").join("");
-        if (!text.trim()) {
-          out.push("<p><br/></p>");
+        const plainText = runs.map((r) => r.textContent || "").join("");
+        const isBlank = !plainText.trim();
+
+        const isH1 = /heading\s*1/i.test(styleVal);
+        const isH2 = /heading\s*2/i.test(styleVal);
+        const isH3 = /heading\s*3/i.test(styleVal);
+
+        // List detection
+        let isListItem = false;
+        let listType: "ul" | "ol" | null = null;
+        if (numId) {
+          isListItem = true;
+          const abs = numIdToAbstract.get(numId) || "";
+          const fmt = (abs && abstractToFmt.get(abs)) || "";
+          listType = /^bullet$/i.test(fmt) ? "ul" : "ol";
+        } else if (/listparagraph/i.test(styleVal)) {
+          isListItem = true;
+          listType = "ul";
+        }
+
+        if (isH1) {
+          if (currentChapter) flushListIfOpen(currentChapter.content);
+          if (currentChapter) chapterGroups.push(currentChapter);
+          currentChapter = { title: plainText || "Untitled", content: [] };
+          currentChapter.content.push(`<h1>${htmlEscape(plainText || "Untitled")}</h1>`);
           continue;
         }
-        if (/Heading1/i.test(styleVal)) out.push(`<h1>${htmlEscape(text)}</h1>`);
-        else if (/Heading2/i.test(styleVal)) out.push(`<h2>${htmlEscape(text)}</h2>`);
-        else if (/Heading3/i.test(styleVal)) out.push(`<h3>${htmlEscape(text)}</h3>`);
-        else out.push(`<p>${htmlEscape(text)}</p>`);
+
+        if (!currentChapter) currentChapter = { title: "Imported Content", content: [] };
+
+        if (isBlank) {
+          flushListIfOpen(currentChapter.content);
+          currentChapter.content.push("<p><br/></p>");
+          continue;
+        }
+
+        const innerHtml = await renderParagraphInner(p);
+
+        if (isListItem && listType) {
+          if (listOpenType !== listType) {
+            flushListIfOpen(currentChapter.content);
+            listOpenType = listType;
+          }
+          listBuffer.push(`<li>${innerHtml}</li>`);
+        } else {
+          flushListIfOpen(currentChapter.content);
+          if (isH2) currentChapter.content.push(`<h2>${htmlEscape(plainText)}</h2>`);
+          else if (isH3) currentChapter.content.push(`<h3>${htmlEscape(plainText)}</h3>`);
+          else currentChapter.content.push(`<p>${innerHtml}</p>`);
+        }
       }
-      const html = out.join("\n");
+
+      if (currentChapter) {
+        flushListIfOpen(currentChapter.content);
+        chapterGroups.push(currentChapter);
+      }
+
+      // If no headings were found, fall back to one big HTML blob (like your old behavior)
+      const fallbackHtml =
+        chapterGroups.length === 1 &&
+        chapterGroups[0].title === "Imported Content" &&
+        !/^<h1>/i.test(chapterGroups[0].content[0] || "")
+          ? chapterGroups[0].content.join("\n")
+          : null;
+
+      if (!chapterGroups.length && !fallbackHtml) {
+        alert("No content found in document.");
+        return;
+      }
 
       if (asNewChapter) {
-        setChapters((prev) => {
-          const id = genId();
-          const ch: Chapter = {
-            id,
+        // Create new chapter(s)
+        if (fallbackHtml) {
+          const newId = genId();
+          const newChapter = {
+            id: newId,
             title: file.name.replace(/\.docx$/i, ""),
             included: true,
             text: "",
-            textHTML: html,
+            textHTML: fallbackHtml,
           };
-          setActiveChapterId(id);
-          return [...prev, ch];
-        });
-      } else {
-        setChapters((prev) => {
-          const next = [...prev];
-          const ch = next[activeIdx];
-          if (ch)
-            next[activeIdx] = {
-              ...ch,
-              textHTML: html,
-              title: ch.title || file.name.replace(/\.docx$/i, ""),
-            };
-          return next;
-        });
-      }
-    },
-    [activeIdx]
-  );
-
-  const importHTML = useCallback(
-    async (file: File, asNewChapter = true) => {
-      const text = await file.text();
-      const html = text;
-      if (asNewChapter) {
-        setChapters((prev) => {
-          const id = genId();
-          const ch: Chapter = {
-            id,
-            title: file.name.replace(/\.(html?|xhtml)$/i, ""),
+          setChapters((prev) => [...prev, newChapter]);
+          setActiveChapterId(newId);
+        } else {
+          const newChapters = chapterGroups.map((g) => ({
+            id: genId(),
+            title: g.title,
             included: true,
             text: "",
-            textHTML: html,
-          };
-          setActiveChapterId(id);
-          return [...prev, ch];
-        });
+            textHTML: g.content.join("\n"),
+          }));
+          setChapters((prev) => [...prev, ...newChapters]);
+          setActiveChapterId(newChapters[0].id);
+        }
       } else {
+        // Replace the active chapter's HTML (single blob)
+        const htmlToUse = fallbackHtml ?? chapterGroups.map((g) => g.content.join("\n")).join("\n");
         setChapters((prev) => {
           const next = [...prev];
           const ch = next[activeIdx];
-          if (ch)
+          if (ch) {
             next[activeIdx] = {
               ...ch,
-              textHTML: html,
-              title: ch.title || file.name.replace(/\.(html?|xhtml)$/i, ""),
+              textHTML: htmlToUse,
+              title: ch.title || file.name.replace(/\.docx$/i, ""),
             };
+          }
           return next;
         });
       }
-    },
-    [activeIdx]
-  );
+    } catch (err) {
+      console.error(err);
+      alert("Sorry—import failed. The file may be malformed or not a valid .docx.");
+    }
+  },
+  [activeIdx, setChapters, setActiveChapterId]
+);
+
+export default importDocx;
+
+  const import { useCallback } from "react";
+
+// Assumes genId, setChapters, setActiveChapterId, activeIdx, and Chapter type are in scope.
+
+const importHTML = useCallback(
+  async (file: File, asNewChapter: boolean = true) => {
+    try {
+      // Light guard (optional—remove if you want to allow any extension)
+      const isHtml = /\.(html?|xhtml)$/i.test(file.name);
+      if (!isHtml) {
+        // Still proceed, but you could alert/return instead:
+        // alert("Please select an .html or .xhtml file.");
+        // return;
+      }
+
+      const html = await file.text();
+
+      if (asNewChapter) {
+        const id = genId();
+        const ch: Chapter = {
+          id,
+          title: file.name.replace(/\.(html?|xhtml)$/i, "") || "Imported HTML",
+          included: true,
+          text: "",
+          textHTML: html, // raw HTML by design
+        };
+        setChapters((prev) => [...prev, ch]);
+        // ✅ Set active to the chapter we just created
+        setActiveChapterId(id);
+      } else {
+        // Replace the currently active chapter's HTML
+        setChapters((prev) => {
+          const next = [...prev];
+          const cur = next[activeIdx];
+          if (cur) {
+            next[activeIdx] = {
+              ...cur,
+              textHTML: html,
+              title: cur.title || file.name.replace(/\.(html?|xhtml)$/i, "") || "Imported HTML",
+            };
+          }
+          return next;
+        });
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Sorry—import failed. The file may be malformed or unreadable.");
+    }
+  },
+  [activeIdx, setChapters, setActiveChapterId]
+);
+
 
   /* ---------- Compile (Preview/Export) ---------- */
 
@@ -839,6 +1130,84 @@ export default function Publishing(): JSX.Element {
                 </div>
               </div>
 
+              // ---- Place these near the top of your component file (inside the component or module scope) ----
+import { useState } from "react";
+
+type AIKey = "grammar" | "style" | "assistant" | "readability";
+
+const AI_ACTIONS: Array<{
+  key: AIKey;
+  icon: string;         // keeping emojis to avoid new deps
+  title: string;
+  subtitle: string;
+}> = [
+  { key: "grammar",     icon: "✍️", title: "Grammar & Clarity",  subtitle: "Check grammar, spelling" },
+  { key: "style",       icon: "🎭", title: "Style Suggestions",   subtitle: "Improve flow, tone" },
+  { key: "assistant",   icon: "✨", title: "AI Writing Assistant",subtitle: "Generate, rewrite text" },
+  { key: "readability", icon: "📊", title: "Readability Analysis",subtitle: "Grade level, metrics" },
+];
+
+// Reusable button (keeps your inline style approach)
+function AIActionButton({
+  icon,
+  title,
+  subtitle,
+  onClick,
+  busy,
+  theme,
+  styles,
+}: {
+  icon: string;
+  title: string;
+  subtitle: string;
+  onClick: () => void;
+  busy?: boolean;
+  theme: any;
+  styles: any;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={title}
+      disabled={busy}
+      onClick={onClick}
+      data-testid={`ai-btn-${title.replace(/\s+/g, "-").toLowerCase()}`}
+      style={{
+        ...styles.btn,
+        padding: "10px 14px",
+        textAlign: "left",
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        opacity: busy ? 0.7 : 1,
+        cursor: busy ? "progress" : "pointer",
+        outline: "none",
+      }}
+      onKeyDown={(e) => {
+        // Accessible “Enter”/“Space” activation for some screen readers
+        if ((e.key === "Enter" || e.key === " ") && !busy) {
+          e.preventDefault();
+          onClick();
+        }
+      }}
+    >
+      <span aria-hidden style={{ fontSize: 20, lineHeight: 1 }}>{icon}</span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: theme.text, whiteSpace: "nowrap", textOverflow: "ellipsis", overflow: "hidden" }}>
+          {title}
+        </div>
+        <div style={{ fontSize: 11, color: theme.subtext, whiteSpace: "nowrap", textOverflow: "ellipsis", overflow: "hidden" }}>
+          {subtitle}
+        </div>
+      </div>
+      {busy && (
+        <span aria-hidden style={{ fontSize: 12, color: theme.subtext }}>Working…</span>
+      )}
+    </button>
+  );
+}
+
+              
               {/* Manuscript Builder */}
               <div style={{ ...styles.glassCard, marginBottom: 20, minHeight: 400 }}>
                 <div
