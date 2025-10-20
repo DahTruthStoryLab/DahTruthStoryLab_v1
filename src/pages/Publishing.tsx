@@ -1106,24 +1106,7 @@ export default function Publishing(): JSX.Element {
                 </div>
               </div>
 
-              {/* 🤖 AI Tools */}
-              <div style={{ ...styles.glassCard, marginBottom: 16 }}>
-                <h3
-                  style={{
-                    margin: "0 0 12px 0",
-                    fontSize: 16,
-                    color: theme.text,
-                    fontWeight: 600,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                  }}
-                >
-                 <h3>
-  <span aria-hidden>🤖</span> AI Tools
-</h3>
-
-<div
+             <div
   role="group"
   aria-label="AI tools"
   style={{
@@ -1153,6 +1136,7 @@ export default function Publishing(): JSX.Element {
             meta,
           });
           const improved = res?.html ?? currentHtml;
+
           if (editorRef.current) editorRef.current.innerHTML = improved;
           setChapters((prev) => {
             const next = [...prev];
@@ -1168,9 +1152,8 @@ export default function Publishing(): JSX.Element {
       }}
     />
   ))}
-</div>  {/* ← end of grid */}
+</div>
 
-/* ↓↓↓ INSERT THIS RIGHT HERE ↓↓↓ */
 <div style={{ marginTop: 10, display: "flex", justifyContent: "flex-end" }}>
   <button
     style={{ ...styles.btnDark }}
@@ -1205,7 +1188,7 @@ export default function Publishing(): JSX.Element {
     ✨ Generate Publishing Prep
   </button>
 </div>
-/* ↑↑↑ END INSERT ↑↑↑ */
+
 
 
                           if (!resp.ok) {
