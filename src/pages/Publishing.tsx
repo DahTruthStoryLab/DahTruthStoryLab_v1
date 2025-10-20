@@ -1183,57 +1183,60 @@ useEffect(() => {
                 >
                   <span aria-hidden>🤖</span> AI Tools
                 </h3>
-
-              {AI_ACTIONS.map((a) => (
+<div
+  role="group"
+  aria-label="AI tools"
+  style={{
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+    gap: 10,
+  }}
+>
   {AI_ACTIONS.map((a) => (
-  <AIActionButton
-    key={a.key}
-    icon={a.icon}
-    title={a.title}
-    subtitle={a.subtitle}
-    busy={working === a.key}
-    theme={theme}
-    styles={styles}
-    onClick={async () => {
-      if (working) return;
-      setWorking(a.key);
-      try {
-        // 1) Read current editor HTML
-        const currentHtml = editorRef.current?.innerHTML || "";
+    <AIActionButton
+      key={a.key}
+      icon={a.icon}
+      title={a.title}
+      subtitle={a.subtitle}
+      busy={working === a.key}
+      theme={theme}
+      styles={styles}
+      onClick={async () => {
+        if (working) return;
+        setWorking(a.key);
+        try {
+          const currentHtml = editorRef.current?.innerHTML || "";
+          const url = `${AI_API_BASE}/${a.key}`; // grammar | style | assistant | readability
 
-        // 2) Build endpoint from the button key
-        const url = `${AI_API_BASE}/${a.key}`; // grammar | style | assistant | readability
+          const resp = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              chapterId: chapters[activeIdx]?.id,
+              title: chapters[activeIdx]?.title,
+              html: currentHtml,
+            }),
+          });
 
-        // 3) Call your API
-        const resp = await fetch(url, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            chapterId: chapters[activeIdx]?.id,
-            title: chapters[activeIdx]?.title,
-            html: currentHtml,
-          }),
-        });
+          if (!resp.ok) {
+            const errText = await resp.text();
+            throw new Error(`AI endpoint error (${resp.status}): ${errText}`);
+          }
 
-        if (!resp.ok) {
-          const errText = await resp.text();
-          throw new Error(`AI endpoint error (${resp.status}): ${errText}`);
+          const data = await resp.json(); // expect { html: "<improved html>" }
+          const improved = data?.html || currentHtml;
+
+          if (editorRef.current) editorRef.current.innerHTML = improved;
+        } catch (e) {
+          console.error(e);
+          alert("Sorry—something went wrong running that AI tool.");
+        } finally {
+          setWorking(null);
         }
-
-        const data = await resp.json(); // expect { html: "<improved html>" }
-        const improved = data?.html || currentHtml;
-
-        // 4) Update the live editor contents
-        if (editorRef.current) editorRef.current.innerHTML = improved;
-      } catch (e) {
-        console.error(e);
-        alert("Sorry—something went wrong running that AI tool.");
-      } finally {
-        setWorking(null);
-      }
-    }}
-  />
-))}
+      }}
+    />
+  ))}
+</div>
 
 onClick={async () => {
   if (working) return;
