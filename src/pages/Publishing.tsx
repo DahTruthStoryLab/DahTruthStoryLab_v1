@@ -428,6 +428,33 @@ export default function Publishing(): JSX.Element {
     []
   );
 
+  const platformEntries = useMemo(
+    () => Object.entries(PLATFORM_PRESETS).map(([k, v]) => [k, v.label] as const),
+    []
+  );
+
+  // ↓↓↓ ADD THIS HERE ↓↓↓
+  async function runAI<T = any>(path: string, payload: any): Promise<T> {
+    const base = AI_API_BASE?.trim();
+    if (!base) {
+      alert("AI API base is not configured. Set VITE_AI_API_BASE.");
+      throw new Error("Missing VITE_AI_API_BASE");
+    }
+    const url = `${base.replace(/\/$/, "")}/${path.replace(/^\//, "")}`;
+    const resp = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!resp.ok) {
+      const text = await resp.text().catch(() => "");
+      throw new Error(`AI error ${resp.status}: ${text || resp.statusText}`);
+    }
+    return resp.json();
+  }
+  // ↑↑↑ ADD THIS HERE ↑↑↑
+
+  
   /* --------------------- Builder: Word-like Editor --------------------- */
   const [activeChapterId, setActiveChapterId] = useState(chapters[0]?.id || "");
   const activeIdx = Math.max(0, chapters.findIndex((c) => c.id === activeChapterId));
@@ -528,304 +555,311 @@ export default function Publishing(): JSX.Element {
 
   /* ----- Import: DOCX (.docx) and HTML (.html) ----- */
   const importDocx = useCallback(
-    async (file: File, asNewChapter: boolean = true) => {
-      try {
-        if (!file.name.toLowerCase().endsWith(".docx")) {
-          alert("Please select a .docx (Word) file.");
-          return;
-        }
-
-        const JSZip = (await import("jszip")).default;
-        const zip = await JSZip.loadAsync(file);
-
-        let docEntry = zip.file("word/document.xml");
-        if (!docEntry) {
-          const altKey = Object.keys(zip.files).find((k) =>
-            /(^|\/)word\/document\.xml$/i.test(k)
-          );
-          docEntry = altKey ? zip.file(altKey)! : null;
-        }
-        if (!docEntry) {
-          alert("Could not find word/document.xml inside the file.");
-          return;
-        }
-        const docXml = await docEntry.async("string");
-        const xml = new DOMParser().parseFromString(docXml, "application/xml");
-
-        let relsEntry = zip.file("word/_rels/document.xml.rels");
-        if (!relsEntry) {
-          const altRel = Object.keys(zip.files).find((k) =>
-            /(^|\/)word\/_rels\/document\.xml\.rels$/i.test(k)
-          );
-          relsEntry = altRel ? zip.file(altRel)! : null;
-        }
-        const relsXmlStr = relsEntry ? await relsEntry.async("string") : "";
-        const relsXml = relsXmlStr
-          ? new DOMParser().parseFromString(relsXmlStr, "application/xml")
-          : null;
-        const relMap = new Map<string, string>();
-        if (relsXml) {
-          Array.from(relsXml.getElementsByTagName("*"))
-            .filter((n) => n.localName === "Relationship")
-            .forEach((rel) => {
-              const id = rel.getAttribute("Id") || rel.getAttribute("r:id") || "";
-              let target = rel.getAttribute("Target") || "";
-              if (!id || !target) return;
-              if (!/^([a-z]+:)?\/\//i.test(target)) {
-                if (!target.startsWith("word/")) target = `word/${target.replace(/^\.?\//, "")}`;
-              }
-              relMap.set(id, target);
-            });
-        }
-
-        let numberingEntry = zip.file("word/numbering.xml");
-        if (!numberingEntry) {
-          const altNum = Object.keys(zip.files).find((k) =>
-            /(^|\/)word\/numbering\.xml$/i.test(k)
-          );
-          numberingEntry = altNum ? zip.file(altNum)! : null;
-        }
-        const numberingXmlStr = numberingEntry ? await numberingEntry.async("string") : "";
-        const numberingXml = numberingXmlStr
-          ? new DOMParser().parseFromString(numberingXmlStr, "application/xml")
-          : null;
-
-        const numIdToAbstract = new Map<string, string>();
-        const abstractToFmt = new Map<string, NumFmt>();
-
-        if (numberingXml) {
-          const nums = Array.from(numberingXml.getElementsByTagName("*")).filter(
-            (n) => n.localName === "num"
-          );
-          for (const num of nums) {
-            const numId = num.getAttribute("w:numId") || num.getAttribute("numId") || "";
-            const abs = Array.from(num.children).find((c) => c.localName === "abstractNumId");
-            const absId = abs?.getAttribute("w:val") || abs?.getAttribute("val") || "";
-            if (numId && absId) numIdToAbstract.set(numId, absId);
-          }
-          const abNums = Array.from(numberingXml.getElementsByTagName("*")).filter(
-            (n) => n.localName === "abstractNum"
-          );
-          for (const a of abNums) {
-            const absId = a.getAttribute("w:abstractNumId") || a.getAttribute("abstractNumId") || "";
-            const lvl = Array.from(a.getElementsByTagName("*")).find((x) => x.localName === "lvl");
-            const fmtNode = lvl
-              ? Array.from(lvl!.children).find((x) => x.localName === "numFmt")
-              : null;
-            const fmt = fmtNode?.getAttribute("w:val") || fmtNode?.getAttribute("val") || "";
-            if (absId && fmt) abstractToFmt.set(absId, fmt as NumFmt);
-          }
-        }
-
-        async function imageDataUrlFromRid(rId: string): Promise<string | null> {
-          const path = relMap.get(rId);
-          if (!path) return null;
-          const f = zip.file(path);
-          if (!f) return null;
-          const ext = path.toLowerCase().split(".").pop() || "";
-          const mime =
-            ext === "png"
-              ? "image/png"
-              : ext === "jpg" || ext === "jpeg"
-              ? "image/jpeg"
-              : ext === "gif"
-              ? "image/gif"
-              : ext === "bmp"
-              ? "image/bmp"
-              : ext === "webp"
-              ? "image/webp"
-              : "application/octet-stream";
-          const base64 = await f.async("base64");
-          return `data:${mime};base64,${base64}`;
-        }
-
-        async function renderParagraphInner(p: Element): Promise<string> {
-          const parts: string[] = [];
-          const imagePromises: Promise<void>[] = [];
-
-          const walk = (node: Element) => {
-            if (node.localName === "t") {
-              parts.push(htmlEscape(node.textContent || ""));
-            } else if (node.localName === "br") {
-              parts.push("<br/>");
-            } else if (node.localName === "drawing") {
-              const blips = Array.from(node.getElementsByTagName("*")).filter(
-                (n) => n.localName === "blip"
-              );
-              imagePromises.push(
-                (async () => {
-                  for (const b of blips) {
-                    const rid = b.getAttribute("r:embed") || b.getAttribute("embed");
-                    if (!rid) continue;
-                    const url = await imageDataUrlFromRid(rid);
-                    if (url) parts.push(`<img src="${url}" alt="image"/>`);
-                  }
-                })()
-              );
-            } else {
-              for (const c of Array.from(node.children)) walk(c);
-            }
-          };
-
-          for (const c of Array.from(p.children)) walk(c);
-          if (imagePromises.length) await Promise.all(imagePromises);
-
-          const html = parts.join("");
-          return html || "<br/>";
-        }
-
-        const paras = Array.from(xml.getElementsByTagName("*")).filter(
-          (n) => n.localName === "p"
-        );
-
-        // ---- List state
-        let listOpenType: "ul" | "ol" | null = null;
-        let listBuffer: string[] = [];
-        function flushListIfOpen(target: string[]) {
-          if (listOpenType && listBuffer.length) {
-            target.push(
-              listOpenType === "ul"
-                ? `<ul>${listBuffer.join("")}</ul>`
-                : `<ol>${listBuffer.join("")}</ol>`
-            );
-          }
-          listOpenType = null;
-          listBuffer = [];
-        }
-
-        // ---- Chapter grouping (by Heading 1)
-        const chapterGroups: ChapterGroup[] = [];
-        let currentChapter: ChapterGroup | null = null;
-
-        for (const p of paras) {
-          let styleVal = "";
-          let numId = "";
-          const pPr = Array.from(p.children).find((n) => n.localName === "pPr");
-          if (pPr) {
-            const pStyle = Array.from(pPr.children).find((n) => n.localName === "pStyle");
-            if (pStyle) styleVal = pStyle.getAttribute("w:val") || pStyle.getAttribute("val") || "";
-            const numPr = Array.from(pPr.children).find((n) => n.localName === "numPr");
-            if (numPr) {
-              const numIdNode = Array.from(numPr.children).find((n) => n.localName === "numId");
-              if (numIdNode)
-                numId = numIdNode.getAttribute("w:val") || numIdNode.getAttribute("val") || "";
-            }
-          }
-
-          const runs = Array.from(p.getElementsByTagName("*")).filter((n) => n.localName === "t");
-          const plainText = runs.map((r) => r.textContent || "").join("");
-          const isBlank = !plainText.trim();
-
-          const isH1 = /heading\s*1/i.test(styleVal);
-          const isH2 = /heading\s*2/i.test(styleVal);
-          const isH3 = /heading\s*3/i.test(styleVal);
-
-          let isListItem = false;
-          let listType: "ul" | "ol" | null = null;
-          if (numId) {
-            isListItem = true;
-            const abs = numIdToAbstract.get(numId) || "";
-            const fmt = (abs && abstractToFmt.get(abs)) || "";
-            listType = /^bullet$/i.test(fmt) ? "ul" : "ol";
-          } else if (/listparagraph/i.test(styleVal)) {
-            isListItem = true;
-            listType = "ul";
-          }
-
-          if (isH1) {
-            if (currentChapter) flushListIfOpen(currentChapter.content);
-            if (currentChapter) chapterGroups.push(currentChapter);
-            currentChapter = { title: plainText || "Untitled", content: [] };
-            currentChapter.content.push(`<h1>${htmlEscape(plainText || "Untitled")}</h1>`);
-            continue;
-          }
-
-          if (!currentChapter) currentChapter = { title: "Imported Content", content: [] };
-
-          if (isBlank) {
-            flushListIfOpen(currentChapter.content);
-            currentChapter.content.push("<p><br/></p>");
-            continue;
-          }
-
-          const innerHtml = await renderParagraphInner(p);
-
-          if (isListItem && listType) {
-            if (listOpenType !== listType) {
-              flushListIfOpen(currentChapter.content);
-              listOpenType = listType;
-            }
-            listBuffer.push(`<li>${innerHtml}</li>`);
-          } else {
-            flushListIfOpen(currentChapter.content);
-            if (isH2) currentChapter.content.push(`<h2>${htmlEscape(plainText)}</h2>`);
-            else if (isH3) currentChapter.content.push(`<h3>${htmlEscape(plainText)}</h3>`);
-            else currentChapter.content.push(`<p>${innerHtml}</p>`);
-          }
-        }
-
-        if (currentChapter) {
-          flushListIfOpen(currentChapter.content);
-          chapterGroups.push(currentChapter);
-        }
-
-        const fallbackHtml =
-          chapterGroups.length === 1 &&
-          chapterGroups[0].title === "Imported Content" &&
-          !(chapterGroups[0].content[0] || "").startsWith("<h1")
-            ? chapterGroups[0].content.join("\n")
-            : null;
-
-        if (!chapterGroups.length && !fallbackHtml) {
-          alert("No content found in document.");
-          return;
-        }
-
-        if (asNewChapter) {
-          if (fallbackHtml) {
-            const id = genId();
-            const ch: Chapter = {
-              id,
-              title: file.name.replace(/\.docx$/i, "") || "Imported DOCX",
-              included: true,
-              text: "",
-              textHTML: fallbackHtml,
-            };
-            setChapters((prev) => [...prev, ch]);
-            setActiveChapterId(id);
-          } else {
-            const newChapters = chapterGroups.map((g) => ({
-              id: genId(),
-              title: g.title,
-              included: true,
-              text: "",
-              textHTML: g.content.join("\n"),
-            }));
-            setChapters((prev) => [...prev, ...newChapters]);
-            setActiveChapterId(newChapters[0].id);
-          }
-        } else {
-          const htmlToUse = fallbackHtml ?? chapterGroups.map((g) => g.content.join("\n")).join("\n");
-          setChapters((prev) => {
-            const next = [...prev];
-            const ch = next[activeIdx];
-            if (ch) {
-              next[activeIdx] = {
-                ...ch,
-                textHTML: htmlToUse,
-                title: ch.title || file.name.replace(/\.docx$/i, "") || "Imported DOCX",
-              };
-            }
-            return next;
-          });
-        }
-      } catch (err) {
-        console.error(err);
-        alert("Sorry—import failed. The file may be malformed or not a valid .docx.");
+  async (file: File, asNewChapter: boolean = true) => {
+    try {
+      if (!file.name.toLowerCase().endsWith(".docx")) {
+        alert("Please select a .docx (Word) file.");
+        return;
       }
-    },
-    [activeIdx, setChapters, setActiveChapterId]
-  );
+
+      const JSZip = (await import("jszip")).default;
+      const zip = await JSZip.loadAsync(file);
+
+      // -------- Load main document --------
+      let docEntry = zip.file("word/document.xml");
+      if (!docEntry) {
+        const altKey = Object.keys(zip.files).find((k) =>
+          /(^|\/)word\/document\.xml$/i.test(k)
+        );
+        docEntry = altKey ? zip.file(altKey)! : null;
+      }
+      if (!docEntry) {
+        alert("Could not find word/document.xml inside the file.");
+        return;
+      }
+      const docXml = await docEntry.async("string");
+      const xml = new DOMParser().parseFromString(docXml, "application/xml");
+
+      // -------- Relationships (for images) --------
+      let relsEntry = zip.file("word/_rels/document.xml.rels");
+      if (!relsEntry) {
+        const altRel = Object.keys(zip.files).find((k) =>
+          /(^|\/)word\/_rels\/document\.xml\.rels$/i.test(k)
+        );
+        relsEntry = altRel ? zip.file(altRel)! : null;
+      }
+      const relsXmlStr = relsEntry ? await relsEntry.async("string") : "";
+      const relsXml = relsXmlStr
+        ? new DOMParser().parseFromString(relsXmlStr, "application/xml")
+        : null;
+      const relMap = new Map<string, string>();
+      if (relsXml) {
+        Array.from(relsXml.getElementsByTagName("*"))
+          .filter((n) => n.localName === "Relationship")
+          .forEach((rel) => {
+            const id = rel.getAttribute("Id") || rel.getAttribute("r:id") || "";
+            let target = rel.getAttribute("Target") || "";
+            if (!id || !target) return;
+            if (!/^([a-z]+:)?\/\//i.test(target)) {
+              if (!target.startsWith("word/")) target = `word/${target.replace(/^\.?\//, "")}`;
+            }
+            relMap.set(id, target);
+          });
+      }
+
+      // -------- Numbering (lists) --------
+      let numberingEntry = zip.file("word/numbering.xml");
+      if (!numberingEntry) {
+        const altNum = Object.keys(zip.files).find((k) =>
+          /(^|\/)word\/numbering\.xml$/i.test(k)
+        );
+        numberingEntry = altNum ? zip.file(altNum)! : null;
+      }
+      const numberingXmlStr = numberingEntry ? await numberingEntry.async("string") : "";
+      const numberingXml = numberingXmlStr
+        ? new DOMParser().parseFromString(numberingXmlStr, "application/xml")
+        : null;
+
+      const numIdToAbstract = new Map<string, string>();
+      const abstractToFmt = new Map<string, NumFmt>();
+      if (numberingXml) {
+        const nums = Array.from(numberingXml.getElementsByTagName("*")).filter(
+          (n) => n.localName === "num"
+        );
+        for (const num of nums) {
+          const numId = num.getAttribute("w:numId") || num.getAttribute("numId") || "";
+          const abs = Array.from(num.children).find((c) => c.localName === "abstractNumId");
+          const absId = abs?.getAttribute("w:val") || abs?.getAttribute("val") || "";
+          if (numId && absId) numIdToAbstract.set(numId, absId);
+        }
+        const abNums = Array.from(numberingXml.getElementsByTagName("*")).filter(
+          (n) => n.localName === "abstractNum"
+        );
+        for (const a of abNums) {
+          const absId = a.getAttribute("w:abstractNumId") || a.getAttribute("abstractNumId") || "";
+          const lvl = Array.from(a.getElementsByTagName("*")).find((x) => x.localName === "lvl");
+          const fmtNode = lvl
+            ? Array.from(lvl!.children).find((x) => x.localName === "numFmt")
+            : null;
+          const fmt = fmtNode?.getAttribute("w:val") || fmtNode?.getAttribute("val") || "";
+          if (absId && fmt) abstractToFmt.set(absId, fmt as NumFmt);
+        }
+      }
+
+      async function imageDataUrlFromRid(rId: string): Promise<string | null> {
+        const path = relMap.get(rId);
+        if (!path) return null;
+        const f = zip.file(path);
+        if (!f) return null;
+        const ext = path.toLowerCase().split(".").pop() || "";
+        const mime =
+          ext === "png"
+            ? "image/png"
+            : ext === "jpg" || ext === "jpeg"
+            ? "image/jpeg"
+            : ext === "gif"
+            ? "image/gif"
+            : ext === "bmp"
+            ? "image/bmp"
+            : ext === "webp"
+            ? "image/webp"
+            : "application/octet-stream";
+        const base64 = await f.async("base64");
+        return `data:${mime};base64,${base64}`;
+      }
+
+      async function renderParagraphInner(p: Element): Promise<string> {
+        const parts: string[] = [];
+        const imagePromises: Promise<void>[] = [];
+
+        const walk = (node: Element) => {
+          if (node.localName === "t") {
+            parts.push(htmlEscape(node.textContent || ""));
+          } else if (node.localName === "br") {
+            parts.push("<br/>");
+          } else if (node.localName === "drawing") {
+            const blips = Array.from(node.getElementsByTagName("*")).filter(
+              (n) => n.localName === "blip"
+            );
+            imagePromises.push(
+              (async () => {
+                for (const b of blips) {
+                  const rid = b.getAttribute("r:embed") || b.getAttribute("embed");
+                  if (!rid) continue;
+                  const url = await imageDataUrlFromRid(rid);
+                  if (url) parts.push(`<img src="${url}" alt="image"/>`);
+                }
+              })()
+            );
+          } else {
+            for (const c of Array.from(node.children)) walk(c);
+          }
+        };
+
+        for (const c of Array.from(p.children)) walk(c);
+        if (imagePromises.length) await Promise.all(imagePromises);
+
+        const html = parts.join("");
+        return html || "<br/>";
+      }
+
+      // -------- Parse paragraphs into chapters (by Heading 1) --------
+      const paras = Array.from(xml.getElementsByTagName("*")).filter((n) => n.localName === "p");
+
+      let listOpenType: "ul" | "ol" | null = null;
+      let listBuffer: string[] = [];
+      function flushListIfOpen(target: string[]) {
+        if (listOpenType && listBuffer.length) {
+          target.push(
+            listOpenType === "ul"
+              ? `<ul>${listBuffer.join("")}</ul>`
+              : `<ol>${listBuffer.join("")}</ol>`
+          );
+        }
+        listOpenType = null;
+        listBuffer = [];
+      }
+
+      const chapterGroups: ChapterGroup[] = [];
+      let currentChapter: ChapterGroup | null = null;
+
+      for (const p of paras) {
+        let styleVal = "";
+        let numId = "";
+        const pPr = Array.from(p.children).find((n) => n.localName === "pPr");
+        if (pPr) {
+          const pStyle = Array.from(pPr.children).find((n) => n.localName === "pStyle");
+          if (pStyle) styleVal = pStyle.getAttribute("w:val") || pStyle.getAttribute("val") || "";
+          const numPr = Array.from(pPr.children).find((n) => n.localName === "numPr");
+          if (numPr) {
+            const numIdNode = Array.from(numPr.children).find((n) => n.localName === "numId");
+            if (numIdNode)
+              numId = numIdNode.getAttribute("w:val") || numIdNode.getAttribute("val") || "";
+          }
+        }
+
+        const runs = Array.from(p.getElementsByTagName("*")).filter((n) => n.localName === "t");
+        const plainText = runs.map((r) => r.textContent || "").join("");
+        const isBlank = !plainText.trim();
+
+        const isH1 = /heading\s*1/i.test(styleVal);
+        const isH2 = /heading\s*2/i.test(styleVal);
+        const isH3 = /heading\s*3/i.test(styleVal);
+
+        let isListItem = false;
+        let listType: "ul" | "ol" | null = null;
+        if (numId) {
+          isListItem = true;
+          const abs = numIdToAbstract.get(numId) || "";
+          const fmt = (abs && abstractToFmt.get(abs)) || "";
+          listType = /^bullet$/i.test(fmt) ? "ul" : "ol";
+        } else if (/listparagraph/i.test(styleVal)) {
+          isListItem = true;
+          listType = "ul";
+        }
+
+        if (isH1) {
+          if (currentChapter) flushListIfOpen(currentChapter.content);
+          if (currentChapter) chapterGroups.push(currentChapter);
+          currentChapter = { title: plainText || "Untitled", content: [] };
+          currentChapter.content.push(`<h1>${htmlEscape(plainText || "Untitled")}</h1>`);
+          continue;
+        }
+
+        if (!currentChapter) currentChapter = { title: "Imported Content", content: [] };
+
+        if (isBlank) {
+          flushListIfOpen(currentChapter.content);
+          currentChapter.content.push("<p><br/></p>");
+          continue;
+        }
+
+        const innerHtml = await renderParagraphInner(p);
+
+        if (isListItem && listType) {
+          if (listOpenType !== listType) {
+            flushListIfOpen(currentChapter.content);
+            listOpenType = listType;
+          }
+          listBuffer.push(`<li>${innerHtml}</li>`);
+        } else {
+          flushListIfOpen(currentChapter.content);
+          if (isH2) currentChapter.content.push(`<h2>${htmlEscape(plainText)}</h2>`);
+          else if (isH3) currentChapter.content.push(`<h3>${htmlEscape(plainText)}</h3>`);
+          else currentChapter.content.push(`<p>${innerHtml}</p>`);
+        }
+      }
+
+      if (currentChapter) {
+        flushListIfOpen(currentChapter.content);
+        chapterGroups.push(currentChapter);
+      }
+
+      const fallbackHtml =
+        chapterGroups.length === 1 &&
+        chapterGroups[0].title === "Imported Content" &&
+        !(chapterGroups[0].content[0] || "").startsWith("<h1")
+          ? chapterGroups[0].content.join("\n")
+          : null;
+
+      if (!chapterGroups.length && !fallbackHtml) {
+        alert("No content found in document.");
+        return;
+      }
+
+      // -------- Insert into app state --------
+      if (asNewChapter) {
+        if (fallbackHtml) {
+          // One chapter
+          const id = genId();
+          const ch: Chapter = {
+            id,
+            title: file.name.replace(/\.docx$/i, "") || "Imported DOCX",
+            included: true,
+            text: "",
+            textHTML: fallbackHtml,
+          };
+          setChapters((prev) => [...prev, ch]);
+          setActiveChapterId(id);
+          navigate("/format"); // ← jump to Manuscript page
+        } else {
+          // Multiple chapters grouped by H1
+          const newChapters = chapterGroups.map((g) => ({
+            id: genId(),
+            title: g.title,
+            included: true,
+            text: "",
+            textHTML: g.content.join("\n"),
+          }));
+          setChapters((prev) => [...prev, ...newChapters]);
+          setActiveChapterId(newChapters[0].id);
+          navigate("/format"); // ← jump to Manuscript page
+        }
+      } else {
+        // Replace current chapter
+        const htmlToUse =
+          fallbackHtml ?? chapterGroups.map((g) => g.content.join("\n")).join("\n");
+        setChapters((prev) => {
+          const next = [...prev];
+          const ch = next[activeIdx];
+          if (ch) {
+            next[activeIdx] = {
+              ...ch,
+              textHTML: htmlToUse,
+              title: ch.title || file.name.replace(/\.docx$/i, "") || "Imported DOCX",
+            };
+          }
+          return next;
+        });
+        navigate("/format"); // ← jump to Manuscript page
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Sorry—import failed. The file may be malformed or not a valid .docx.");
+    }
+  },
+  [activeIdx, navigate, setChapters, setActiveChapterId]
+);
 
   // ---- HTML import ----
   const importHTML = useCallback(
@@ -1085,42 +1119,94 @@ export default function Publishing(): JSX.Element {
                     gap: 8,
                   }}
                 >
-                  <span aria-hidden>🤖</span> AI Tools
-                </h3>
+                 <h3>
+  <span aria-hidden>🤖</span> AI Tools
+</h3>
 
-                <div
-                  role="group"
-                  aria-label="AI tools"
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-                    gap: 10,
-                  }}
-                >
-                  {AI_ACTIONS.map((a) => (
-                    <AIActionButton
-                      key={a.key}
-                      icon={a.icon}
-                      title={a.title}
-                      subtitle={a.subtitle}
-                      busy={working === a.key}
-                      theme={theme}
-                      styles={styles}
-                      onClick={async () => {
-                        if (working) return;
-                        setWorking(a.key);
-                        try {
-                          const currentHtml = editorRef.current?.innerHTML ?? "";
-                          const url = `${AI_API_BASE}/${a.key}`;
-                          const resp = await fetch(url, {
-                            method: "POST",
-                            headers: { "Content-Type": "application/json" },
-                            body: JSON.stringify({
-                              chapterId: chapters[activeIdx]?.id,
-                              title: chapters[activeIdx]?.title,
-                              html: currentHtml,
-                            }),
-                          });
+<div
+  role="group"
+  aria-label="AI tools"
+  style={{
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+    gap: 10,
+  }}
+>
+  {AI_ACTIONS.map((a) => (
+    <AIActionButton
+      key={a.key}
+      icon={a.icon}
+      title={a.title}
+      subtitle={a.subtitle}
+      busy={working === a.key}
+      theme={theme}
+      styles={styles}
+      onClick={async () => {
+        if (working) return;
+        setWorking(a.key);
+        try {
+          const currentHtml = editorRef.current?.innerHTML ?? "";
+          const res = await runAI<{ html?: string }>(a.key, {
+            chapterId: chapters[activeIdx]?.id,
+            title: chapters[activeIdx]?.title,
+            html: currentHtml,
+            meta,
+          });
+          const improved = res?.html ?? currentHtml;
+          if (editorRef.current) editorRef.current.innerHTML = improved;
+          setChapters((prev) => {
+            const next = [...prev];
+            const ch = next[activeIdx];
+            if (ch) next[activeIdx] = { ...ch, textHTML: improved };
+            return next;
+          });
+        } catch (e: any) {
+          alert(e?.message || "Sorry—something went wrong running that AI tool.");
+        } finally {
+          setWorking(null);
+        }
+      }}
+    />
+  ))}
+</div>  {/* ← end of grid */}
+
+/* ↓↓↓ INSERT THIS RIGHT HERE ↓↓↓ */
+<div style={{ marginTop: 10, display: "flex", justifyContent: "flex-end" }}>
+  <button
+    style={{ ...styles.btnDark }}
+    disabled={working !== null}
+    onClick={async () => {
+      if (working) return;
+      setWorking("assistant");
+      try {
+        const chaptersPlain = chapters
+          .filter((c) => c.included)
+          .map((c) => ({
+            id: c.id,
+            title: c.title,
+            text: c.textHTML ? stripHtml(c.textHTML) : c.text,
+          }));
+
+        const res = await runAI<{ prep?: any }>("publishing-prep", {
+          meta,
+          matter,
+          chapters: chaptersPlain,
+          options: { tone: "professional/warm", audience: "agents_and_publishers" },
+        });
+        if (!res?.prep) throw new Error("No prep content returned from AI.");
+        navigate("/publishing-prep", { state: { generated: res.prep } });
+      } catch (e: any) {
+        alert(e?.message || "Couldn’t generate publishing prep.");
+      } finally {
+        setWorking(null);
+      }
+    }}
+  >
+    ✨ Generate Publishing Prep
+  </button>
+</div>
+/* ↑↑↑ END INSERT ↑↑↑ */
+
 
                           if (!resp.ok) {
                             const errText = await resp.text();
@@ -1191,12 +1277,17 @@ export default function Publishing(): JSX.Element {
                     </aside>
                   )}
 
-                  <section>
+                  <<section>
+                    {/* Toolbar (sticky) */}
                     <div
                       style={{
+                        position: "sticky",
+                        top: 0,
+                        zIndex: 20,
                         display: "flex",
                         alignItems: "center",
                         gap: 4,
+                        flexWrap: "wrap",
                         padding: "6px 10px",
                         border: `1px solid ${theme.border}`,
                         borderRadius: 8,
@@ -1205,7 +1296,11 @@ export default function Publishing(): JSX.Element {
                         fontSize: 11,
                       }}
                     >
-                      <select onChange={(e) => setFont(e.target.value)} defaultValue="Times New Roman" style={{ ...(styles.input as any), width: 120, padding: "3px 5px", fontSize: 10, height: 24 }}>
+                      <select
+                        onChange={(e) => setFont(e.target.value)}
+                        defaultValue="Times New Roman"
+                        style={{ ...(styles.input as any), width: 120, padding: "3px 5px", fontSize: 10, height: 24 }}
+                      >
                         <option>Times New Roman</option>
                         <option>Georgia</option>
                         <option>Garamond</option>
@@ -1213,7 +1308,7 @@ export default function Publishing(): JSX.Element {
                         <option>Calibri</option>
                         <option>Arial</option>
                       </select>
-
+                  
                       <select
                         onChange={(e) => setFontSizePt(parseInt(e.target.value, 10))}
                         defaultValue="16"
@@ -1225,47 +1320,142 @@ export default function Publishing(): JSX.Element {
                         <option value="20">20</option>
                         <option value="22">22</option>
                       </select>
-
+                  
                       <div style={{ width: 1, height: 16, background: theme.border, margin: "0 2px" }} />
-
-                      <button style={{ ...styles.btn, padding: "3px 6px", fontSize: 10, fontWeight: 700, minWidth: 24, height: 24 }} onClick={() => exec("bold")} title="Bold">B</button>
-                      <button style={{ ...styles.btn, padding: "3px 6px", fontSize: 10, minWidth: 24, height: 24 }} onClick={() => exec("italic")} title="Italic"><em>I</em></button>
-                      <button style={{ ...styles.btn, padding: "3px 6px", fontSize: 10, minWidth: 24, height: 24 }} onClick={() => exec("underline")} title="Underline"><u>U</u></button>
-
+                  
+                      <button
+                        style={{ ...styles.btn, padding: "3px 6px", fontSize: 10, fontWeight: 700, minWidth: 24, height: 24 }}
+                        onClick={() => exec("bold")}
+                        title="Bold"
+                      >
+                        B
+                      </button>
+                      <button
+                        style={{ ...styles.btn, padding: "3px 6px", fontSize: 10, minWidth: 24, height: 24 }}
+                        onClick={() => exec("italic")}
+                        title="Italic"
+                      >
+                        <em>I</em>
+                      </button>
+                      <button
+                        style={{ ...styles.btn, padding: "3px 6px", fontSize: 10, minWidth: 24, height: 24 }}
+                        onClick={() => exec("underline")}
+                        title="Underline"
+                      >
+                        <u>U</u>
+                      </button>
+                  
                       <div style={{ width: 1, height: 16, background: theme.border, margin: "0 2px" }} />
-
-                      <button style={{ ...styles.btn, padding: "3px 5px", fontSize: 9, minWidth: 24, height: 24 }} onClick={() => setBlock("H1")} title="H1">H1</button>
-                      <button style={{ ...styles.btn, padding: "3px 5px", fontSize: 9, minWidth: 24, height: 24 }} onClick={() => setBlock("H2")} title="H2">H2</button>
-                      <button style={{ ...styles.btn, padding: "3px 5px", fontSize: 9, minWidth: 24, height: 24 }} onClick={() => setBlock("H3")} title="H3">H3</button>
-
+                  
+                      <button
+                        style={{ ...styles.btn, padding: "3px 5px", fontSize: 9, minWidth: 24, height: 24 }}
+                        onClick={() => setBlock("H1")}
+                        title="H1"
+                      >
+                        H1
+                      </button>
+                      <button
+                        style={{ ...styles.btn, padding: "3px 5px", fontSize: 9, minWidth: 24, height: 24 }}
+                        onClick={() => setBlock("H2")}
+                        title="H2"
+                      >
+                        H2
+                      </button>
+                      <button
+                        style={{ ...styles.btn, padding: "3px 5px", fontSize: 9, minWidth: 24, height: 24 }}
+                        onClick={() => setBlock("H3")}
+                        title="H3"
+                      >
+                        H3
+                      </button>
+                  
                       <div style={{ width: 1, height: 16, background: theme.border, margin: "0 2px" }} />
-
-                      <button style={{ ...styles.btn, padding: "3px 5px", fontSize: 9, minWidth: 24, height: 24 }} onClick={() => exec("insertUnorderedList")} title="Bullet">•</button>
-                      <button style={{ ...styles.btn, padding: "3px 5px", fontSize: 9, minWidth: 24, height: 24 }} onClick={() => exec("insertOrderedList")} title="Number">1.</button>
-
+                  
+                      <button
+                        style={{ ...styles.btn, padding: "3px 5px", fontSize: 9, minWidth: 24, height: 24 }}
+                        onClick={() => exec("insertUnorderedList")}
+                        title="Bullet"
+                      >
+                        •
+                      </button>
+                      <button
+                        style={{ ...styles.btn, padding: "3px 5px", fontSize: 9, minWidth: 24, height: 24 }}
+                        onClick={() => exec("insertOrderedList")}
+                        title="Number"
+                      >
+                        1.
+                      </button>
+                  
                       <div style={{ width: 1, height: 16, background: theme.border, margin: "0 2px" }} />
-
-                      <button style={{ ...styles.btn, padding: "3px 5px", fontSize: 9, minWidth: 24, height: 24 }} onClick={() => exec("justifyLeft")} title="Left">⟸</button>
-                      <button style={{ ...styles.btn, padding: "3px 5px", fontSize: 9, minWidth: 24, height: 24 }} onClick={() => exec("justifyCenter")} title="Center">⇔</button>
-                      <button style={{ ...styles.btn, padding: "3px 5px", fontSize: 9, minWidth: 24, height: 24 }} onClick={() => exec("justifyRight")} title="Right">⟹</button>
-
+                  
+                      <button
+                        style={{ ...styles.btn, padding: "3px 5px", fontSize: 9, minWidth: 24, height: 24 }}
+                        onClick={() => exec("justifyLeft")}
+                        title="Left"
+                      >
+                        ⟸
+                      </button>
+                      <button
+                        style={{ ...styles.btn, padding: "3px 5px", fontSize: 9, minWidth: 24, height: 24 }}
+                        onClick={() => exec("justifyCenter")}
+                        title="Center"
+                      >
+                        ⇔
+                      </button>
+                      <button
+                        style={{ ...styles.btn, padding: "3px 5px", fontSize: 9, minWidth: 24, height: 24 }}
+                        onClick={() => exec("justifyRight")}
+                        title="Right"
+                      >
+                        ⟹
+                      </button>
+                  
                       <div style={{ width: 1, height: 16, background: theme.border, margin: "0 2px" }} />
-
-                      <button style={{ ...styles.btn, padding: "3px 7px", fontSize: 9, height: 24 }} onClick={insertPageBreak} title="Page Break">⤓</button>
-
-                      <div style={{ marginLeft: "auto", display: "flex", gap: 4 }}>
-                        <label style={{ ...styles.btn, padding: "3px 8px", fontSize: 9, cursor: "pointer", height: 24, display: "flex", alignItems: "center" }}>
+                  
+                      <button
+                        style={{ ...styles.btn, padding: "3px 7px", fontSize: 9, height: 24 }}
+                        onClick={insertPageBreak}
+                        title="Page Break"
+                      >
+                        ⤓
+                      </button>
+                  
+                      {/* Right-side: uploads + Save */}
+                      <div style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
+                        <label
+                          style={{ ...styles.btn, padding: "3px 8px", fontSize: 9, cursor: "pointer", height: 24, display: "flex", alignItems: "center" }}
+                        >
                           📄 Word
-                          <input type="file" accept=".docx" style={{ display: "none" }} onChange={(e) => e.target.files && importDocx(e.target.files[0], true)} />
+                          <input
+                            type="file"
+                            accept=".docx"
+                            style={{ display: "none" }}
+                            onChange={(e) => e.target.files && importDocx(e.target.files[0], true)}
+                          />
                         </label>
-                        <label style={{ ...styles.btn, padding: "3px 8px", fontSize: 9, cursor: "pointer", height: 24, display: "flex", alignItems: "center" }}>
+                  
+                        <label
+                          style={{ ...styles.btn, padding: "3px 8px", fontSize: 9, cursor: "pointer", height: 24, display: "flex", alignItems: "center" }}
+                        >
                           🌐 HTML
-                          <input type="file" accept=".html,.htm,.xhtml" style={{ display: "none" }} onChange={(e) => e.target.files && importHTML(e.target.files[0], true)} />
+                          <input
+                            type="file"
+                            accept=".html,.htm,.xhtml"
+                            style={{ display: "none" }}
+                            onChange={(e) => e.target.files && importHTML(e.target.files[0], true)}
+                          />
                         </label>
-                        <button style={{ ...styles.btnPrimary, padding: "3px 10px", fontSize: 10, height: 24 }} onClick={saveActiveChapterHTML}>Save</button>
+                  
+                        <button
+                          style={{ ...styles.btnPrimary, padding: "6px 12px", fontSize: 12, height: 28 }}
+                          onClick={saveActiveChapterHTML}
+                        >
+                          Save
+                        </button>
                       </div>
                     </div>
-
+                  
+                    {/* Editor canvas wrapper */}
                     <div
                       style={{
                         padding: 16,
@@ -1280,14 +1470,15 @@ export default function Publishing(): JSX.Element {
                         suppressContentEditableWarning
                         style={{
                           margin: "0 auto",
-                          width: 800,
+                          width: "100%",
+                          maxWidth: 800,
                           minHeight: 1040,
                           background: "#ffffff",
                           color: "#111",
                           border: "1px solid #e5e7eb",
                           boxShadow: "0 8px 30px rgba(2,20,40,0.10)",
                           borderRadius: 6,
-                          padding: "96px 80px",
+                          padding: "48px 48px",
                           lineHeight: ms.lineHeight,
                           fontFamily: ms.fontFamily,
                           fontSize: ms.fontSizePt * (96 / 72),
@@ -1298,12 +1489,11 @@ export default function Publishing(): JSX.Element {
                         }}
                       />
                     </div>
+                  
                     <div style={{ color: theme.subtext, fontSize: 12, marginTop: 6 }}>
                       Tip: Use H1/H2/H3 for sections — if "Build Contents from Headings" is on, your TOC will include them.
                     </div>
                   </section>
-                </div>
-              </div>
 
               <div style={styles.glassCard}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
