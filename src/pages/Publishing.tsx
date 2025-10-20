@@ -1192,63 +1192,51 @@ useEffect(() => {
     gap: 10,
   }}
 >
-  {AI_ACTIONS.map((a) => (
-    <AIActionButton
-      key={a.key}
-      icon={a.icon}
-      title={a.title}
-      subtitle={a.subtitle}
-      busy={working === a.key}
-      theme={theme}
-      styles={styles}
-      onClick={async () => {
-        if (working) return;
-        setWorking(a.key);
-        try {
-          const currentHtml = editorRef.current?.innerHTML || "";
-          const url = `${AI_API_BASE}/${a.key}`; // grammar | style | assistant | readability
-
-          const resp = await fetch(url, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              chapterId: chapters[activeIdx]?.id,
-              title: chapters[activeIdx]?.title,
-              html: currentHtml,
-            }),
-          });
-
-          if (!resp.ok) {
-            const errText = await resp.text();
-            throw new Error(`AI endpoint error (${resp.status}): ${errText}`);
-          }
-
-          const data = await resp.json(); // expect { html: "<improved html>" }
-          const improved = data?.html || currentHtml;
-
-          if (editorRef.current) editorRef.current.innerHTML = improved;
-        } catch (e) {
-          console.error(e);
-          alert("Sorry—something went wrong running that AI tool.");
-        } finally {
-          setWorking(null);
-        }
-      }}
-    />
-  ))}
-</div>
+<AIActionButton
+  key={a.key}
+  icon={a.icon}
+  title={a.title}
+  subtitle={a.subtitle}
+  busy={working === a.key}
+  theme={theme}
+  styles={styles}
+  onClick={async () => {
+    if (working) return;
+    setWorking(a.key);
+    try {
+      const currentHtml = editorRef.current?.innerHTML || "";
+      const url = `${AI_API_BASE}/${a.key}`;
+      const resp = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chapterId: chapters[activeIdx]?.id,
+          title: chapters[activeIdx]?.title,
+          html: currentHtml,
+        }),
+      });
+      if (!resp.ok) {
+        const errText = await resp.text();
+        throw new Error(`AI endpoint error (${resp.status}): ${errText}`);
+      }
+      const data = await resp.json();
+      const improved = data?.html || currentHtml;
+      if (editorRef.current) editorRef.current.innerHTML = improved;
+    } finally {
+      setWorking(null);
+    }
+  }}
+/>
 
 onClick={async () => {
   if (working) return;
   setWorking(a.key);
   try {
-    // 1) Read current editor HTML
-    const currentHtml = editorRef.current?.innerHTML || "";
+    // 1) Grab current editor HTML
+    const currentHtml = editorRef.current?.innerHTML ?? "";
 
-    // 2) Build the endpoint from the button key
+    // 2) Hit your API endpoint based on the button key
     const url = `${AI_API_BASE}/${a.key}`; // grammar | style | assistant | readability
-
-    // 3) Call your API
     const resp = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1264,11 +1252,21 @@ onClick={async () => {
       throw new Error(`AI endpoint error (${resp.status}): ${errText}`);
     }
 
-    const data = await resp.json(); // expect { html: "<improved html>" }
-    const improved = data?.html || currentHtml;
+    // 3) Apply the returned HTML (fallback to currentHtml if none)
+    const data: { html?: string } = await resp.json();
+    const improved = data?.html ?? currentHtml;
 
-    // 4) Update the live editor contents
-    if (editorRef.current) editorRef.current.innerHTML = improved;
+    if (editorRef.current) {
+      editorRef.current.innerHTML = improved;
+    }
+
+    // 4) Persist to chapters state so it doesn’t get lost
+    setChapters((prev) => {
+      const next = [...prev];
+      const ch = next[activeIdx];
+      if (ch) next[activeIdx] = { ...ch, textHTML: improved };
+      return next;
+    });
   } catch (e) {
     console.error(e);
     alert("Sorry—something went wrong running that AI tool.");
@@ -1276,34 +1274,6 @@ onClick={async () => {
     setWorking(null);
   }
 }}
-
-    theme={theme}
-    styles={styles}
-  />
-))}
-
-                
-                        if (!resp.ok) {
-                          const errText = await resp.text();
-                          throw new Error(`AI endpoint error (${resp.status}): ${errText}`);
-                        }
-                
-                        const data = await resp.json(); // expecting { html: "<improved html>" }
-                        const improved = data?.html || currentHtml;
-                
-                        // Update the live editor contents
-                        if (editorRef.current) editorRef.current.innerHTML = improved;
-                      } catch (e) {
-                        console.error(e);
-                        alert("Sorry—something went wrong running that AI tool.");
-                      } finally {
-                        setWorking(null);
-                      }
-                    }}
-                    theme={theme}
-                    styles={styles}
-                  />
-                ))}
 
                       <div style={{ fontWeight: 700, marginBottom: 8, color: theme.text, fontSize: 13 }}>Chapters</div>
                       <div style={{ display: "grid", gap: 6 }}>
