@@ -503,10 +503,6 @@ export default function Publishing(): JSX.Element {
     []
   );
 
-// END OF SECTION 1 - Ready for Section 2
-
- // SECTION 2 OF 6 - Append after Section 1
-
   /* --------------------- Builder: Word-like Editor --------------------- */
   const [activeChapterId, setActiveChapterId] = useState(chapters[0]?.id || "");
   const activeIdx = Math.max(0, chapters.findIndex((c) => c.id === activeChapterId));
@@ -519,19 +515,33 @@ export default function Publishing(): JSX.Element {
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
-  useEffect(() => {
-    const chap = chapters[activeIdx];
-    if (!chap) return;
-    if (!chap.textHTML) {
-      const html = `<p>${htmlEscape(chap.text).replaceAll("\n\n", "</p><p>").replaceAll("\n", "<br/>")}</p>`;
-      setChapters((prev) => {
-        const next = [...prev];
-        next[activeIdx] = { ...chap, textHTML: html };
-        return next;
-      });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeChapterId]);
+ // Load the chapter HTML into the contentEditable when the active chapter changes
+useEffect(() => {
+  const chap = chapters[activeIdx];
+  const el = editorRef.current;
+  if (!chap || !el) return;
+
+  // If chapter has no HTML yet, generate once from legacy plain text
+  if (!chap.textHTML) {
+    const html = `<p>${htmlEscape(chap.text)
+      .replaceAll("\n\n", "</p><p>")
+      .replaceAll("\n", "<br/>")}</p>`;
+
+    // Save once into state so future loads use HTML
+    setChapters((prev) => {
+      const next = [...prev];
+      next[activeIdx] = { ...chap, textHTML: html };
+      return next;
+    });
+
+    // Also set the editor now
+    el.innerHTML = html;
+  } else {
+    // Use existing HTML
+    el.innerHTML = chap.textHTML;
+  }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+}, [activeChapterId]);
 
   const exec = (command: string, value?: string) => {
     editorRef.current?.focus();
@@ -751,7 +761,6 @@ export default function Publishing(): JSX.Element {
           (n) => n.localName === "p"
         );
 
-// END OF SECTION 2 - Ready for Section 3
       // SECTION 3 OF 6 - Append after Section 2
 
         // ---- List state
@@ -903,16 +912,7 @@ export default function Publishing(): JSX.Element {
     [activeIdx, setChapters, setActiveChapterId]
   );
 
-  // REMOVED: Entire duplicate importDocx function (lines 66-240 in your section)
-  // This was causing the build error - it was a complete duplicate!
-
-// END OF SECTION 3 - Ready for Section 4
-
-       // SECTION 4 OF 6 - Append after Section 3
-
-  // REMOVED: First duplicate section (lines 1-68) - this was already in Section 3!
-
-  // ---- HTML import ----
+   // ---- HTML import ----
   const importHTML = useCallback(
     async (file: File, asNewChapter: boolean = true) => {
       try {
@@ -1374,10 +1374,12 @@ export default function Publishing(): JSX.Element {
                           fontSize: ms.fontSizePt * (96 / 72),
                           outline: "none",
                         }}
-                        onInput={saveActiveChapterHTML}
-                        dangerouslySetInnerHTML={{ __html: chapters[activeIdx]?.textHTML || "<p></p>" }}
-                      />
-                    </div>
+                         direction: "ltr",
+                         unicodeBidi: "plaintext",
+                         whiteSpace: "pre-wrap",
+                      }}
+                    />
+                   </div>
                     <div style={{ color: theme.subtext, fontSize: 12, marginTop: 6 }}>
                       Tip: Use H1/H2/H3 for sections — if "Build Contents from Headings" is on, your TOC will include them.
                     </div>
