@@ -1,4 +1,4 @@
-// src/pages/Publishing.tsx - SECTION 1 OF 6
+// src/pages/Publishing.tsx
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import PageShell from "../components/layout/PageShell.tsx";
@@ -28,7 +28,6 @@ const GOOGLE_PALETTE = {
 // --- AI API base (top-level/module scope) ---
 const AI_API_BASE: string =
   (import.meta as any).env?.VITE_AI_API_BASE ?? "/proof.api";
-
 
 /* ---------- Types ---------- */
 type Chapter = {
@@ -68,8 +67,15 @@ type PlatformPresetKey =
   | "Draft2Digital_Ebook"
   | "Generic_Manuscript_Submission";
 
-// ADDED: These types were missing
-type NumFmt = "bullet" | "decimal" | "lowerLetter" | "upperLetter" | "lowerRoman" | "upperRoman" | string;
+// Added helper types
+type NumFmt =
+  | "bullet"
+  | "decimal"
+  | "lowerLetter"
+  | "upperLetter"
+  | "lowerRoman"
+  | "upperRoman"
+  | string;
 type ChapterGroup = { title: string; content: string[] };
 
 /* ---------- Presets ---------- */
@@ -344,91 +350,6 @@ function AIActionButton({
   );
 }
 
-/* ---------- Small UI helpers ---------- */
-type ToggleProps = {
-  checked: boolean;
-  onChange: (v: boolean) => void;
-  label?: string;
-};
-
-const Toggle: React.FC<ToggleProps> = ({ checked, onChange, label }) => {
-  return (
-    <button
-      onClick={() => onChange(!checked)}
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 10,
-        padding: "8px 12px",
-        borderRadius: 999,
-        border: `1px solid ${theme.border}`,
-        background: checked ? theme.highlight : theme.white,
-        color: theme.text,
-        cursor: "pointer",
-      }}
-      aria-pressed={checked}
-      title={label}
-      type="button"
-    >
-      <span
-        style={{
-          width: 36,
-          height: 20,
-          borderRadius: 999,
-          background: checked ? theme.accent : "#CBD5E1",
-          position: "relative",
-          display: "inline-block",
-        }}
-      >
-        <span
-          style={{
-            position: "absolute",
-            top: 2,
-            left: checked ? 18 : 2,
-            width: 16,
-            height: 16,
-            borderRadius: 999,
-            background: theme.white,
-            transition: "left .15s ease",
-          }}
-        />
-      </span>
-      {label && <span style={{ fontSize: 14 }}>{label}</span>}
-    </button>
-  );
-};
-
-type FieldProps = {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  placeholder?: string;
-};
-
-const Field: React.FC<FieldProps> = ({ label, value, onChange, placeholder }) => {
-  return (
-    <div>
-      <div style={{ color: theme.subtext, fontSize: 12 }}>{label}</div>
-      <textarea
-        value={value}
-        onChange={(e) => onChange(e.currentTarget.value)}
-        rows={label.length > 12 ? 3 : 2}
-        placeholder={placeholder}
-        style={{
-          width: "100%",
-          marginTop: 6,
-          fontSize: 14,
-          padding: 10,
-          border: `1px solid ${theme.border}`,
-          borderRadius: 12,
-          background: theme.white,
-          color: theme.text,
-        }}
-      />
-    </div>
-  );
-};
-
 /* ---------- Tiny helpers ---------- */
 const htmlEscape = (s: string) =>
   s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
@@ -519,33 +440,29 @@ export default function Publishing(): JSX.Element {
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
- // Load the chapter HTML into the contentEditable when the active chapter changes
-useEffect(() => {
-  const chap = chapters[activeIdx];
-  const el = editorRef.current;
-  if (!chap || !el) return;
+  // Load the chapter HTML into the contentEditable when the active chapter changes
+  useEffect(() => {
+    const chap = chapters[activeIdx];
+    const el = editorRef.current;
+    if (!chap || !el) return;
 
-  // If chapter has no HTML yet, generate once from legacy plain text
-  if (!chap.textHTML) {
-    const html = `<p>${htmlEscape(chap.text)
-      .replaceAll("\n\n", "</p><p>")
-      .replaceAll("\n", "<br/>")}</p>`;
+    if (!chap.textHTML) {
+      const html = `<p>${htmlEscape(chap.text)
+        .replaceAll("\n\n", "</p><p>")
+        .replaceAll("\n", "<br/>")}</p>`;
 
-    // Save once into state so future loads use HTML
-    setChapters((prev) => {
-      const next = [...prev];
-      next[activeIdx] = { ...chap, textHTML: html };
-      return next;
-    });
+      setChapters((prev) => {
+        const next = [...prev];
+        next[activeIdx] = { ...chap, textHTML: html };
+        return next;
+      });
 
-    // Also set the editor now
-    el.innerHTML = html;
-  } else {
-    // Use existing HTML
-    el.innerHTML = chap.textHTML;
-  }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-}, [activeChapterId]);
+      el.innerHTML = html;
+    } else {
+      el.innerHTML = chap.textHTML;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeChapterId]);
 
   const exec = (command: string, value?: string) => {
     editorRef.current?.focus();
@@ -610,10 +527,6 @@ useEffect(() => {
   };
 
   /* ----- Import: DOCX (.docx) and HTML (.html) ----- */
-  // REMOVED: Duplicate htmlEscape definition (already defined in Section 1)
-  // REMOVED: Duplicate NumFmt type (already defined in Section 1)
-  // REMOVED: Duplicate ChapterGroup type (already defined in Section 1)
-
   const importDocx = useCallback(
     async (file: File, asNewChapter: boolean = true) => {
       try {
@@ -765,7 +678,7 @@ useEffect(() => {
           (n) => n.localName === "p"
         );
 
-         // ---- List state
+        // ---- List state
         let listOpenType: "ul" | "ol" | null = null;
         let listBuffer: string[] = [];
         function flushListIfOpen(target: string[]) {
@@ -914,7 +827,7 @@ useEffect(() => {
     [activeIdx, setChapters, setActiveChapterId]
   );
 
-   // ---- HTML import ----
+  // ---- HTML import ----
   const importHTML = useCallback(
     async (file: File, asNewChapter: boolean = true) => {
       try {
@@ -952,8 +865,6 @@ useEffect(() => {
     },
     [activeIdx, setChapters, setActiveChapterId]
   );
-
-  // REMOVED: Second duplicate importHTML function (lines 119-155) - this was causing build error!
 
   /* ---------- Compile (Preview/Export) ---------- */
   const tocFromHeadings: string[] = useMemo(() => {
@@ -1003,12 +914,6 @@ useEffect(() => {
   }, [chapters, matter, meta, tocFromHeadings]);
 
   const wordCount = useMemo(() => compiledPlain.split(/\s+/).filter(Boolean).length, [compiledPlain]);
-
-  function stripHtml(html: string): string {
-    const div = document.createElement("div");
-    div.innerHTML = html;
-    return (div.textContent || div.innerText || "").trim();
-  }
 
   /* ---------- UI ---------- */
   return (
@@ -1087,7 +992,6 @@ useEffect(() => {
             }}
           >
             <main>
-              {/* FIXED: Removed duplicate <<div and extra opening tags */}
               <div style={{ ...styles.glassCard, marginBottom: 16 }}>
                 <h3 style={{ margin: "0 0 12px 0", fontSize: 16, color: theme.text, fontWeight: 600 }}>
                   📚 Publishing Tools
@@ -1183,98 +1087,82 @@ useEffect(() => {
                 >
                   <span aria-hidden>🤖</span> AI Tools
                 </h3>
-<div
-  role="group"
-  aria-label="AI tools"
-  style={{
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-    gap: 10,
-  }}
->
-<AIActionButton
-  key={a.key}
-  icon={a.icon}
-  title={a.title}
-  subtitle={a.subtitle}
-  busy={working === a.key}
-  theme={theme}
-  styles={styles}
-  onClick={async () => {
-    if (working) return;
-    setWorking(a.key);
-    try {
-      const currentHtml = editorRef.current?.innerHTML || "";
-      const url = `${AI_API_BASE}/${a.key}`;
-      const resp = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          chapterId: chapters[activeIdx]?.id,
-          title: chapters[activeIdx]?.title,
-          html: currentHtml,
-        }),
-      });
-      if (!resp.ok) {
-        const errText = await resp.text();
-        throw new Error(`AI endpoint error (${resp.status}): ${errText}`);
-      }
-      const data = await resp.json();
-      const improved = data?.html || currentHtml;
-      if (editorRef.current) editorRef.current.innerHTML = improved;
-    } finally {
-      setWorking(null);
-    }
-  }}
-/>
 
-onClick={async () => {
-  if (working) return;
-  setWorking(a.key);
-  try {
-    // 1) Grab current editor HTML
-    const currentHtml = editorRef.current?.innerHTML ?? "";
+                <div
+                  role="group"
+                  aria-label="AI tools"
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                    gap: 10,
+                  }}
+                >
+                  {AI_ACTIONS.map((a) => (
+                    <AIActionButton
+                      key={a.key}
+                      icon={a.icon}
+                      title={a.title}
+                      subtitle={a.subtitle}
+                      busy={working === a.key}
+                      theme={theme}
+                      styles={styles}
+                      onClick={async () => {
+                        if (working) return;
+                        setWorking(a.key);
+                        try {
+                          const currentHtml = editorRef.current?.innerHTML ?? "";
+                          const url = `${AI_API_BASE}/${a.key}`;
+                          const resp = await fetch(url, {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                              chapterId: chapters[activeIdx]?.id,
+                              title: chapters[activeIdx]?.title,
+                              html: currentHtml,
+                            }),
+                          });
 
-    // 2) Hit your API endpoint based on the button key
-    const url = `${AI_API_BASE}/${a.key}`; // grammar | style | assistant | readability
-    const resp = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        chapterId: chapters[activeIdx]?.id,
-        title: chapters[activeIdx]?.title,
-        html: currentHtml,
-      }),
-    });
+                          if (!resp.ok) {
+                            const errText = await resp.text();
+                            throw new Error(`AI endpoint error (${resp.status}): ${errText}`);
+                          }
 
-    if (!resp.ok) {
-      const errText = await resp.text();
-      throw new Error(`AI endpoint error (${resp.status}): ${errText}`);
-    }
+                          const data: { html?: string } = await resp.json();
+                          const improved = data?.html ?? currentHtml;
 
-    // 3) Apply the returned HTML (fallback to currentHtml if none)
-    const data: { html?: string } = await resp.json();
-    const improved = data?.html ?? currentHtml;
+                          if (editorRef.current) {
+                            editorRef.current.innerHTML = improved;
+                          }
 
-    if (editorRef.current) {
-      editorRef.current.innerHTML = improved;
-    }
+                          setChapters((prev) => {
+                            const next = [...prev];
+                            const ch = next[activeIdx];
+                            if (ch) next[activeIdx] = { ...ch, textHTML: improved };
+                            return next;
+                          });
+                        } catch (e) {
+                          console.error(e);
+                          alert("Sorry—something went wrong running that AI tool.");
+                        } finally {
+                          setWorking(null);
+                        }
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
 
-    // 4) Persist to chapters state so it doesn’t get lost
-    setChapters((prev) => {
-      const next = [...prev];
-      const ch = next[activeIdx];
-      if (ch) next[activeIdx] = { ...ch, textHTML: improved };
-      return next;
-    });
-  } catch (e) {
-    console.error(e);
-    alert("Sorry—something went wrong running that AI tool.");
-  } finally {
-    setWorking(null);
-  }
-}}
-
+              {/* Editor + Chapters */}
+              <div style={{ ...styles.glassCard, marginBottom: 16 }}>
+                <div
+                  style={{
+                    display: "grid",
+                    gap: 16,
+                    gridTemplateColumns: isWide ? "220px 1fr" : "1fr",
+                  }}
+                >
+                  {isWide && (
+                    <aside>
                       <div style={{ fontWeight: 700, marginBottom: 8, color: theme.text, fontSize: 13 }}>Chapters</div>
                       <div style={{ display: "grid", gap: 6 }}>
                         {chapters.map((c) => (
@@ -1317,7 +1205,7 @@ onClick={async () => {
                         fontSize: 11,
                       }}
                     >
-                      <select onChange={(e) => setFont(e.target.value)} defaultValue="Times New Roman" style={{ ...styles.input as any, width: 120, padding: "3px 5px", fontSize: 10, height: 24 }}>
+                      <select onChange={(e) => setFont(e.target.value)} defaultValue="Times New Roman" style={{ ...(styles.input as any), width: 120, padding: "3px 5px", fontSize: 10, height: 24 }}>
                         <option>Times New Roman</option>
                         <option>Georgia</option>
                         <option>Garamond</option>
@@ -1325,11 +1213,11 @@ onClick={async () => {
                         <option>Calibri</option>
                         <option>Arial</option>
                       </select>
-                      
+
                       <select
                         onChange={(e) => setFontSizePt(parseInt(e.target.value, 10))}
                         defaultValue="16"
-                        style={{ ...styles.input as any, width: 45, padding: "3px 4px", fontSize: 10, height: 24 }}
+                        style={{ ...(styles.input as any), width: 45, padding: "3px 4px", fontSize: 10, height: 24 }}
                       >
                         <option value="14">14</option>
                         <option value="16">16</option>
@@ -1360,11 +1248,6 @@ onClick={async () => {
                       <button style={{ ...styles.btn, padding: "3px 5px", fontSize: 9, minWidth: 24, height: 24 }} onClick={() => exec("justifyLeft")} title="Left">⟸</button>
                       <button style={{ ...styles.btn, padding: "3px 5px", fontSize: 9, minWidth: 24, height: 24 }} onClick={() => exec("justifyCenter")} title="Center">⇔</button>
                       <button style={{ ...styles.btn, padding: "3px 5px", fontSize: 9, minWidth: 24, height: 24 }} onClick={() => exec("justifyRight")} title="Right">⟹</button>
-
-                      <div style={{ width: 1, height: 16, background: theme.border, margin: "0 2px" }} />
-
-                      <button style={{ ...styles.btn, padding: "3px 5px", fontSize: 10, minWidth: 24, height: 24 }} onClick={() => exec("undo")} title="Undo">↶</button>
-                      <button style={{ ...styles.btn, padding: "3px 5px", fontSize: 10, minWidth: 24, height: 24 }} onClick={() => exec("redo")} title="Redo">↷</button>
 
                       <div style={{ width: 1, height: 16, background: theme.border, margin: "0 2px" }} />
 
@@ -1409,13 +1292,12 @@ onClick={async () => {
                           fontFamily: ms.fontFamily,
                           fontSize: ms.fontSizePt * (96 / 72),
                           outline: "none",
+                          direction: "ltr",
+                          unicodeBidi: "plaintext",
+                          whiteSpace: "pre-wrap",
                         }}
-                         direction: "ltr",
-                         unicodeBidi: "plaintext",
-                         whiteSpace: "pre-wrap",
-                      }}
-                    />
-                   </div>
+                      />
+                    </div>
                     <div style={{ color: theme.subtext, fontSize: 12, marginTop: 6 }}>
                       Tip: Use H1/H2/H3 for sections — if "Build Contents from Headings" is on, your TOC will include them.
                     </div>
@@ -1483,13 +1365,21 @@ onClick={async () => {
                         <button style={styles.btn} onClick={() => setActiveChapterId(c.id)}>Open</button>
                         <label style={{ ...styles.btn, cursor: "pointer" }}>
                           Replace with .docx
-                          <input type="file" accept=".docx" style={{ display: "none" }}
-                                 onChange={(e) => e.target.files && importDocx(e.target.files[0], false)} />
+                          <input
+                            type="file"
+                            accept=".docx"
+                            style={{ display: "none" }}
+                            onChange={(e) => e.target.files && importDocx(e.target.files[0], false)}
+                          />
                         </label>
                         <label style={{ ...styles.btn, cursor: "pointer" }}>
                           Replace with .html
-                          <input type="file" accept=".html,.htm,.xhtml" style={{ display: "none" }}
-                                 onChange={(e) => e.target.files && importHTML(e.target.files[0], false)} />
+                          <input
+                            type="file"
+                            accept=".html,.htm,.xhtml"
+                            style={{ display: "none" }}
+                            onChange={(e) => e.target.files && importHTML(e.target.files[0], false)}
+                          />
                         </label>
                       </div>
                     </div>
@@ -1525,6 +1415,60 @@ onClick={async () => {
   );
 }
 
+/* ---------- Small UI helpers (kept at bottom for clarity) ---------- */
+type ToggleProps = {
+  checked: boolean;
+  onChange: (v: boolean) => void;
+  label?: string;
+};
+
+const Toggle: React.FC<ToggleProps> = ({ checked, onChange, label }) => {
+  return (
+    <button
+      onClick={() => onChange(!checked)}
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 10,
+        padding: "8px 12px",
+        borderRadius: 999,
+        border: `1px solid ${theme.border}`,
+        background: checked ? theme.highlight : theme.white,
+        color: theme.text,
+        cursor: "pointer",
+      }}
+      aria-pressed={checked}
+      title={label}
+      type="button"
+    >
+      <span
+        style={{
+          width: 36,
+          height: 20,
+          borderRadius: 999,
+          background: checked ? theme.accent : "#CBD5E1",
+          position: "relative",
+          display: "inline-block",
+        }}
+      >
+        <span
+          style={{
+            position: "absolute",
+            top: 2,
+            left: checked ? 18 : 2,
+            width: 16,
+            height: 16,
+            borderRadius: 999,
+            background: theme.white,
+            transition: "left .15s ease",
+          }}
+        />
+      </span>
+      {label && <span style={{ fontSize: 14 }}>{label}</span>}
+    </button>
+  );
+};
+
 /* ---------- utilities ---------- */
 function safeFile(name: string): string {
   return (name || "manuscript").replace(/[^\w\-]+/g, "_");
@@ -1535,5 +1479,3 @@ function stripHtml(html: string): string {
   div.innerHTML = html;
   return (div.textContent || div.innerText || "").trim();
 }
-
-// END OF FILE - Complete!
