@@ -1166,10 +1166,6 @@ export default function Publishing(): JSX.Element {
                 </div>
               </div>
 
-// END OF SECTION 4 - Ready for Section 5
-
-// SECTION 5 OF 5 - FINAL SECTION - Append after Section 4
-
               {/* 🤖 AI Tools */}
               <div style={{ ...styles.glassCard, marginBottom: 16 }}>
                 <h3
