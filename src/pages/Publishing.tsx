@@ -25,6 +25,11 @@ const GOOGLE_PALETTE = {
   highlight: "rgba(26,115,232,0.10)",
 } as const;
 
+// --- AI API base (top-level/module scope) ---
+const AI_API_BASE: string =
+  (import.meta as any).env?.VITE_AI_API_BASE ?? "/proof.api";
+
+
 /* ---------- Types ---------- */
 type Chapter = {
   id: string;
@@ -431,7 +436,6 @@ const htmlEscape = (s: string) =>
 /* ---------- Component ---------- */
 export default function Publishing(): JSX.Element {
   const [googleMode, setGoogleMode] = useState<boolean>(false);
-  // ADDED: This was missing
   const [working, setWorking] = useState<AIKey | null>(null);
   const navigate = useNavigate();
 
@@ -761,9 +765,7 @@ useEffect(() => {
           (n) => n.localName === "p"
         );
 
-      // SECTION 3 OF 6 - Append after Section 2
-
-        // ---- List state
+         // ---- List state
         let listOpenType: "ul" | "ol" | null = null;
         let listBuffer: string[] = [];
         function flushListIfOpen(target: string[]) {
@@ -1182,63 +1184,100 @@ useEffect(() => {
                   <span aria-hidden>🤖</span> AI Tools
                 </h3>
 
-                <div
-                  role="group"
-                  aria-label="AI tools"
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-                    gap: 10,
-                  }}
-                >
-                  {AI_ACTIONS.map((a) => (
-                    <AIActionButton
-                      key={a.key}
-                      icon={a.icon}
-                      title={a.title}
-                      subtitle={a.subtitle}
-                      busy={working === a.key}
-                      onClick={async () => {
-                        if (working) return;
-                        setWorking(a.key);
-                        try {
-                          console.log("Run AI tool:", a.key);
-                        } catch (e) {
-                          console.error(e);
-                          alert("Sorry—something went wrong running that AI tool.");
-                        } finally {
-                          setWorking(null);
+              {AI_ACTIONS.map((a) => (
+  <AIActionButton
+    key={a.key}
+    icon={a.icon}
+    title={a.title}
+    subtitle={a.subtitle}
+    busy={working === a.key}
+    onClick={async () => {
+      if (working) return;
+      setWorking(a.key);
+      try {
+        // 1) Read current editor HTML
+        const currentHtml = editorRef.current?.innerHTML || "";
+
+        // 2) Build the endpoint from the button key
+        const url = `${AI_API_BASE}/${a.key}`; // grammar | style | assistant | readability
+
+        // 3) Call your API
+        const resp = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            chapterId: chapters[activeIdx]?.id,
+            title: chapters[activeIdx]?.title,
+            html: currentHtml,
+          }),
+        });
+onClick={async () => {
+  if (working) return;
+  setWorking(a.key);
+  try {
+    // 1) Read current editor HTML
+    const currentHtml = editorRef.current?.innerHTML || "";
+
+    // 2) Build the endpoint from the button key
+    const url = `${AI_API_BASE}/${a.key}`; // grammar | style | assistant | readability
+
+    // 3) Call your API
+    const resp = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        chapterId: chapters[activeIdx]?.id,
+        title: chapters[activeIdx]?.title,
+        html: currentHtml,
+      }),
+    });
+
+    if (!resp.ok) {
+      const errText = await resp.text();
+      throw new Error(`AI endpoint error (${resp.status}): ${errText}`);
+    }
+
+    const data = await resp.json(); // expect { html: "<improved html>" }
+    const improved = data?.html || currentHtml;
+
+    // 4) Update the live editor contents
+    if (editorRef.current) editorRef.current.innerHTML = improved;
+  } catch (e) {
+    console.error(e);
+    alert("Sorry—something went wrong running that AI tool.");
+  } finally {
+    setWorking(null);
+  }
+}}
+
+    theme={theme}
+    styles={styles}
+  />
+))}
+
+                
+                        if (!resp.ok) {
+                          const errText = await resp.text();
+                          throw new Error(`AI endpoint error (${resp.status}): ${errText}`);
                         }
-                      }}
-                      theme={theme}
-                      styles={styles}
-                    />
-                  ))}
-                </div>
-              </div>
+                
+                        const data = await resp.json(); // expecting { html: "<improved html>" }
+                        const improved = data?.html || currentHtml;
+                
+                        // Update the live editor contents
+                        if (editorRef.current) editorRef.current.innerHTML = improved;
+                      } catch (e) {
+                        console.error(e);
+                        alert("Sorry—something went wrong running that AI tool.");
+                      } finally {
+                        setWorking(null);
+                      }
+                    }}
+                    theme={theme}
+                    styles={styles}
+                  />
+                ))}
 
-              {/* REMOVED: Duplicate AI type definitions and AIActionButton (lines 65-135) - already in Section 1! */}
-
-              {/* Manuscript Builder */}
-              <div style={{ ...styles.glassCard, marginBottom: 20, minHeight: 400 }}>
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: isWide ? "240px 1fr" : "1fr",
-                    gap: 16,
-                  }}
-                >
-                  {isWide && (
-                    <aside
-                      style={{
-                        border: `1px solid ${theme.border}`,
-                        borderRadius: 12,
-                        padding: 12,
-                        background: theme.white,
-                        maxHeight: 560,
-                        overflow: "auto",
-                      }}
-                    >
                       <div style={{ fontWeight: 700, marginBottom: 8, color: theme.text, fontSize: 13 }}>Chapters</div>
                       <div style={{ display: "grid", gap: 6 }}>
                         {chapters.map((c) => (
