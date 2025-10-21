@@ -1429,13 +1429,13 @@ async function runAI<T = any>(path: string, payload: any): Promise<T> {
     googleMode={googleMode}
     setGoogleMode={setGoogleMode}
   />
+)} {/* closes isWide && ( */}
 </div>{/* grid wrapper */}
 </div>{/* inner + sectionShell */}
 </div>{/* styles.outer */}
 </PageShell>
 ); // closes return ( ... )
 }  // closes export default function Publishing()
-
     <section>
       {/* Toolbar (sticky) */}
       <div
