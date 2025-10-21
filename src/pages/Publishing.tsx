@@ -79,20 +79,17 @@ type NumFmt =
 type ChapterGroup = { title: string; content: string[] };
 
 /* ---------- Presets ---------- */
-const MANUSCRIPT_PRESETS: Record
-  ManuscriptPresetKey,
-  {
-    label: string;
-    fontFamily: string;
-    fontSizePt: number;
-    lineHeight: number;
-    firstLineIndentInches: number;
-    paragraphSpacingPt: number;
-    align: "left" | "justify";
-    chapterTitleCase: "UPPER" | "Capitalize" | "AsIs";
-    chapterStartsOnNewPage: boolean;
-  }
-> = {
+const MANUSCRIPT_PRESETS: Record<ManuscriptPresetKey, {
+  label: string;
+  fontFamily: string;
+  fontSizePt: number;
+  lineHeight: number;
+  firstLineIndentInches: number;
+  paragraphSpacingPt: number;
+  align: "left" | "justify";
+  chapterTitleCase: "UPPER" | "Capitalize" | "AsIs";
+  chapterStartsOnNewPage: boolean;
+}> = {
   Agents_Standard_12pt_TNR_Double: {
     label: "Agents: Standard (TNR 12, Double)",
     fontFamily: "Times New Roman",
