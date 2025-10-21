@@ -1673,44 +1673,41 @@ async function runAI<T = any>(path: string, payload: any): Promise<T> {
         }}
       >
         <div
-          ref={editorRef}
-          contentEditable
-          suppressContentEditableWarning
-          style={{
-            margin: "0 auto",
-            width: "100%",
-            maxWidth: 800,
-            minHeight: 1040,
-            background: "#ffffff",
-            color: "#111",
-            border: "1px solid #e5e7eb",
-            boxShadow: "0 8px 30px rgba(2,20,40,0.10)",
-            borderRadius: 6,
-            padding: "48px 48px",
-            lineHeight: ms.lineHeight,
-            fontFamily: ms.fontFamily,
-            fontSize: ms.fontSizePt * (96 / 72),
-            outline: "none",
-            direction: "ltr",
-            unicodeBidi: "plaintext",
-            whiteSpace: "pre-wrap",
-          }}
-        />
-      </div>
-
-      <div style={{ color: theme.subtext, fontSize: 12, marginTop: 6 }}>
-        Tip: Use H1/H2/H3 for sections — if "Build Contents from Headings" is on,
-        your TOC will include them.
-      </div>
-    </section>
-  </div>
+  ref={editorRef}
+  contentEditable
+  suppressContentEditableWarning
+  style={{
+    margin: "0 auto",
+    width: "100%",
+    maxWidth: 800,
+    minHeight: 1040,
+    background: "#ffffff",
+    color: "#111",
+    border: "1px solid #e5e7eb",
+    boxShadow: "0 8px 30px rgba(2,20,40,0.10)",
+    borderRadius: 6,
+    padding: "48px 48px",
+    lineHeight: ms.lineHeight,
+    fontFamily: ms.fontFamily,
+    fontSize: ms.fontSizePt * (96 / 72),
+    outline: "none",
+    direction: "ltr",
+    unicodeBidi: "plaintext",
+    whiteSpace: "pre-wrap",
+  }}
+/>
 </div>
-             <div style={styles.glassCard}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-                  <h3 style={{ margin: 0, fontSize: 18, color: theme.text }}>Chapter Management</h3>
-                  <button style={styles.btnPrimary} onClick={addChapter}>+ Add Chapter</button>
-                </div>
-
+<div style={{ color: theme.subtext, fontSize: 12, marginTop: 6 }}>
+  Tip: Use H1/H2/H3 for sections — if "Build Contents from Headings" is on,
+  your TOC will include them.
+</div>
+</section>
+</div>
+<div style={styles.glassCard}>
+  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+    <h3 style={{ margin: 0, fontSize: 18, color: theme.text }}>Chapter Management</h3>
+    <button style={styles.btnPrimary} onClick={addChapter}>+ Add Chapter</button>
+  </div>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
                   {chapters.map((c, i) => (
                     <div key={c.id} style={{ border: `1px solid ${theme.border}`, borderRadius: 12, padding: 14, background: c.included ? theme.white : "#F9FBFD" }}>
