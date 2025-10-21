@@ -136,18 +136,15 @@ const MANUSCRIPT_PRESETS: Record<ManuscriptPresetKey, {
   },
 };
 
-const PLATFORM_PRESETS: Record
-  PlatformPresetKey,
-  {
-    label: string;
-    trim?: { widthInch: number; heightInch: number } | null;
-    margins: { top: number; right: number; bottom: number; left: number; gutter?: number };
-    headers: boolean;
-    footers: boolean;
-    pageNumbers: boolean;
-    showTOCInEbook: boolean;
-  }
-> = {
+const PLATFORM_PRESETS: Record<PlatformPresetKey, {
+  label: string;
+  trim?: { widthInch: number; heightInch: number } | null;
+  margins: { top: number; right: number; bottom: number; left: number; gutter?: number };
+  headers: boolean;
+  footers: boolean;
+  pageNumbers: boolean;
+  showTOCInEbook: boolean;
+}> = {
   KDP_Ebook: {
     label: "KDP eBook",
     trim: null,
