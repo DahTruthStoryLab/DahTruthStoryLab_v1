@@ -456,7 +456,6 @@ async function runAI<T = any>(path: string, payload: any): Promise<T> {
   return (
     <PageShell> ... </PageShell>
   );
-}
   
   /* --------------------- Builder: Word-like Editor --------------------- */
   const [activeChapterId, setActiveChapterId] = useState(chapters[0]?.id || "");
