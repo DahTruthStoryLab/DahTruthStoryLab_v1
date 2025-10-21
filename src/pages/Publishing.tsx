@@ -428,7 +428,6 @@ export default function Publishing(): JSX.Element {
     () => Object.entries(PLATFORM_PRESETS).map(([k, v]) => [k, v.label] as const),
     []
   );
-
 // ------------ AI helper ------------
   async function runAI<T = any>(path: string, payload: any): Promise<T> {
     const base = AI_API_BASE?.trim();
