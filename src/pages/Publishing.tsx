@@ -1109,14 +1109,108 @@ async function runAI<T = any>(path: string, payload: any): Promise<T> {
               </div>
 
             <div
-  role="group"
-  aria-label="AI tools"
-  style={{
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-    gap: 10,
-  }}
->
+{/* 🤖 AI Tools card */}
+<div style={{ ...styles.glassCard, marginBottom: 16 }}>
+  <h3
+    style={{
+      margin: "0 0 12px 0",
+      fontSize: 16,
+      color: theme.text,
+      fontWeight: 600,
+      display: "flex",
+      alignItems: "center",
+      gap: 8,
+    }}
+  >
+    <span aria-hidden>🤖</span> AI Tools
+  </h3>
+
+  <div
+    role="group"
+    aria-label="AI tools"
+    style={{
+      display: "grid",
+      gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+      gap: 10,
+    }}
+  >
+    {AI_ACTIONS.map((a) => (
+      <AIActionButton
+        key={a.key}
+        icon={a.icon}
+        title={a.title}
+        subtitle={a.subtitle}
+        busy={working === a.key}
+        theme={theme}
+        styles={styles}
+        onClick={async () => {
+          if (working) return;
+          setWorking(a.key);
+          try {
+            const currentHtml = editorRef.current?.innerHTML ?? "";
+            const res = await runAI<{ html?: string }>(a.key, {
+              chapterId: chapters[activeIdx]?.id,
+              title: chapters[activeIdx]?.title,
+              html: currentHtml,
+              meta,
+            });
+            const improved = res?.html ?? currentHtml;
+
+            if (editorRef.current) editorRef.current.innerHTML = improved;
+            setChapters((prev) => {
+              const next = [...prev];
+              const ch = next[activeIdx];
+              if (ch) next[activeIdx] = { ...ch, textHTML: improved };
+              return next;
+            });
+          } catch (e: any) {
+            alert(e?.message || "Sorry—something went wrong running that AI tool.");
+          } finally {
+            setWorking(null);
+          }
+        }}
+      />
+    ))}
+  </div>
+
+  {/* Generate Publishing Prep */}
+  <div style={{ marginTop: 10, display: "flex", justifyContent: "flex-end" }}>
+    <button
+      style={{ ...styles.btnDark }}
+      disabled={working !== null}
+      onClick={async () => {
+        if (working) return;
+        setWorking("assistant");
+        try {
+          const chaptersPlain = chapters
+            .filter((c) => c.included)
+            .map((c) => ({
+              id: c.id,
+              title: c.title,
+              text: c.textHTML ? stripHtml(c.textHTML) : c.text,
+            }));
+
+          const res = await runAI<{ prep?: any }>("publishing-prep", {
+            meta,
+            matter,
+            chapters: chaptersPlain,
+            options: { tone: "professional/warm", audience: "agents_and_publishers" },
+          });
+
+          if (!res?.prep) throw new Error("No prep content returned from AI.");
+          navigate("/publishing-prep", { state: { generated: res.prep } });
+        } catch (e: any) {
+          alert(e?.message || "Couldn’t generate publishing prep.");
+        } finally {
+          setWorking(null);
+        }
+      }}
+    >
+      ✨ Generate Publishing Prep
+    </button>
+  </div>
+</div>
+
   {AI_ACTIONS.map((a) => (
     <AIActionButton
       key={a.key}
@@ -1154,41 +1248,6 @@ async function runAI<T = any>(path: string, payload: any): Promise<T> {
       }}
     />
   ))}
-</div>
-
-<div style={{ marginTop: 10, display: "flex", justifyContent: "flex-end" }}>
-  <button
-    style={{ ...styles.btnDark }}
-    disabled={working !== null}
-    onClick={async () => {
-      if (working) return;
-      setWorking("assistant");
-      try {
-        const chaptersPlain = chapters
-          .filter((c) => c.included)
-          .map((c) => ({
-            id: c.id,
-            title: c.title,
-            text: c.textHTML ? stripHtml(c.textHTML) : c.text,
-          }));
-
-        const res = await runAI<{ prep?: any }>("publishing-prep", {
-          meta,
-          matter,
-          chapters: chaptersPlain,
-          options: { tone: "professional/warm", audience: "agents_and_publishers" },
-        });
-        if (!res?.prep) throw new Error("No prep content returned from AI.");
-        navigate("/publishing-prep", { state: { generated: res.prep } });
-      } catch (e: any) {
-        alert(e?.message || "Couldn’t generate publishing prep.");
-      } finally {
-        setWorking(null);
-      }
-    }}
-  >
-    ✨ Generate Publishing Prep
-  </button>
 </div>
 
              {/* Editor + Chapters */}
