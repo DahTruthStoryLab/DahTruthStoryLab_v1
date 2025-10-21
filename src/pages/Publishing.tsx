@@ -415,7 +415,7 @@ export default function Publishing(): JSX.Element {
     }));
   }, [manuscriptPreset]);
 
-    const ms = { ...MANUSCRIPT_PRESETS[manuscriptPreset], ...msOverrides };
+  const ms = { ...MANUSCRIPT_PRESETS[manuscriptPreset], ...msOverrides };
   const pf = PLATFORM_PRESETS[platformPreset];
   const includeHeadersFooters = pf.headers || pf.footers;
 
@@ -430,28 +430,34 @@ export default function Publishing(): JSX.Element {
     []
   );
 
-  // ------------ AI helper (inside the Publishing() component) ------------
-  async function runAI<T = any>(path: string, payload: any): Promise<T> {
-    const base = AI_API_BASE?.trim();
-    if (!base) {
-      alert("AI API base is not configured. Set VITE_AI_API_BASE.");
-      throw new Error("Missing VITE_AI_API_BASE");
-    }
-    const url = `${base.replace(/\/$/, "")}/${path.replace(/^\//, "")}`;
+// ------------ AI helper (inside the Publishing() component, top-level) ------------
+async function runAI<T = any>(path: string, payload: any): Promise<T> {
+  const base = AI_API_BASE?.trim();
+  if (!base) {
+    alert("AI API base is not configured. Set VITE_AI_API_BASE.");
+    throw new Error("Missing VITE_AI_API_BASE");
+  }
 
-    const resp = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-
-    if (!resp.ok) {
-      const text = await resp.text().catch(() => "");
+  const url = `${base.replace(/\/$/, "")}/${path.replace(/^\//, "")}`;
+  const resp = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+ if (!resp.ok) {
+      let text = "";
+      try { text = await resp.text(); } catch {}
       throw new Error(`AI error ${resp.status}: ${text || resp.statusText}`);
     }
-
     return (await resp.json()) as T;
   }
+
+  // ...the rest: editor refs, handlers, importDocx/HTML, UI return ...
+  return (
+    <PageShell> ... </PageShell>
+  );
+}
+
     if (!resp.ok) {
       const text = await resp.text().catch(() => "");
       throw new Error(`AI error ${resp.status}: ${text || resp.statusText}`);
