@@ -79,7 +79,7 @@ type NumFmt =
 type ChapterGroup = { title: string; content: string[] };
 
 /* ---------- Presets ---------- */
-const MANUSCRIPT_PRESETS: Record<
+const MANUSCRIPT_PRESETS: Record
   ManuscriptPresetKey,
   {
     label: string;
@@ -139,7 +139,7 @@ const MANUSCRIPT_PRESETS: Record<
   },
 };
 
-const PLATFORM_PRESETS: Record<
+const PLATFORM_PRESETS: Record
   PlatformPresetKey,
   {
     label: string;
@@ -404,7 +404,7 @@ export default function Publishing(): JSX.Element {
     useState<ManuscriptPresetKey>("Agents_Standard_12pt_TNR_Double");
   const [platformPreset, setPlatformPreset] =
     useState<PlatformPresetKey>("Generic_Manuscript_Submission");
-  const [msOverrides, setMsOverrides] = useState<
+  const [msOverrides, setMsOverrides] = useState
     Partial<(typeof MANUSCRIPT_PRESETS)[ManuscriptPresetKey]>
   >({});
 
@@ -424,27 +424,26 @@ export default function Publishing(): JSX.Element {
     []
   );
 
-  // Keep exactly ONE of these:
   const platformEntries = useMemo(
     () => Object.entries(PLATFORM_PRESETS).map(([k, v]) => [k, v.label] as const),
     []
   );
 
-// ------------ AI helper (inside the Publishing() component, top-level) ------------
-async function runAI<T = any>(path: string, payload: any): Promise<T> {
-  const base = AI_API_BASE?.trim();
-  if (!base) {
-    alert("AI API base is not configured. Set VITE_AI_API_BASE.");
-    throw new Error("Missing VITE_AI_API_BASE");
-  }
+// ------------ AI helper ------------
+  async function runAI<T = any>(path: string, payload: any): Promise<T> {
+    const base = AI_API_BASE?.trim();
+    if (!base) {
+      alert("AI API base is not configured. Set VITE_AI_API_BASE.");
+      throw new Error("Missing VITE_AI_API_BASE");
+    }
 
-  const url = `${base.replace(/\/$/, "")}/${path.replace(/^\//, "")}`;
-  const resp = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
- if (!resp.ok) {
+    const url = `${base.replace(/\/$/, "")}/${path.replace(/^\//, "")}`;
+    const resp = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    if (!resp.ok) {
       let text = "";
       try { text = await resp.text(); } catch {}
       throw new Error(`AI error ${resp.status}: ${text || resp.statusText}`);
@@ -452,11 +451,6 @@ async function runAI<T = any>(path: string, payload: any): Promise<T> {
     return (await resp.json()) as T;
   }
 
-  // ...the rest: editor refs, handlers, importDocx/HTML, UI return ...
-  return (
-    <PageShell> ... </PageShell>
-  );
-  
   /* --------------------- Builder: Word-like Editor --------------------- */
   const [activeChapterId, setActiveChapterId] = useState(chapters[0]?.id || "");
   const activeIdx = Math.max(0, chapters.findIndex((c) => c.id === activeChapterId));
@@ -808,8 +802,7 @@ async function runAI<T = any>(path: string, payload: any): Promise<T> {
         alert("No content found in document.");
         return;
       }
-
-      // -------- Insert into app state --------
+     // -------- Insert into app state --------
       if (asNewChapter) {
         if (fallbackHtml) {
           // One chapter
@@ -1019,690 +1012,569 @@ async function runAI<T = any>(path: string, payload: any): Promise<T> {
           </div>
         </div>
 
-      <div style={{ ...styles.inner, ...styles.sectionShell }}>
-  <div
-    style={{
-      display: "grid",
-      gridTemplateColumns: isWide ? "1fr 220px" : "1fr",
-      gap: 24,
-    }}
-  >
-   <main>
-  {/* 📚 Publishing Tools */}
-  <div style={{ ...styles.glassCard, marginBottom: 16 }}>
-    <h3 style={{ margin: "0 0 12px 0", fontSize: 16, color: theme.text, fontWeight: 600 }}>
-      📚 Publishing Tools
-    </h3>
-
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 10 }}>
-      <button
-        style={{ ...styles.btn, padding: "10px 14px", textAlign: "left", display: "flex", alignItems: "center", gap: 10 }}
-        onClick={() => navigate("/proof")}
-      >
-        <span style={{ fontSize: 20 }}>✅</span>
-        <div>
-          <div style={{ fontSize: 13, fontWeight: 600 }}>Proof & Consistency</div>
-          <div style={{ fontSize: 11, color: theme.subtext }}>Grammar, style, timeline</div>
-        </div>
-      </button>
-
-      <button
-        style={{ ...styles.btn, padding: "10px 14px", textAlign: "left", display: "flex", alignItems: "center", gap: 10 }}
-        onClick={() => navigate("/format")}
-      >
-        <span style={{ fontSize: 20 }}>🎨</span>
-        <div>
-          <div style={{ fontSize: 13, fontWeight: 600 }}>Format & Styles</div>
-          <div style={{ fontSize: 11, color: theme.subtext }}>Fonts, spacing, margins</div>
-        </div>
-      </button>
-
-      <button
-        style={{ ...styles.btn, padding: "10px 14px", textAlign: "left", display: "flex", alignItems: "center", gap: 10 }}
-        onClick={() => navigate("/export")}
-      >
-        <span style={{ fontSize: 20 }}>📦</span>
-        <div>
-          <div style={{ fontSize: 13, fontWeight: 600 }}>Export</div>
-          <div style={{ fontSize: 11, color: theme.subtext }}>PDF, DOCX, EPUB</div>
-        </div>
-      </button>
-
-      <button
-        style={{ ...styles.btn, padding: "10px 14px", textAlign: "left", display: "flex", alignItems: "center", gap: 10 }}
-        onClick={() => navigate("/publishing-prep")}
-      >
-        <span style={{ fontSize: 20 }}>🚀</span>
-        <div>
-          <div style={{ fontSize: 13, fontWeight: 600 }}>Publishing Prep</div>
-          <div style={{ fontSize: 11, color: theme.subtext }}>Query, synopsis, marketing</div>
-        </div>
-      </button>
-    </div>
-  </div>
-
-  {/* 🤖 AI Tools card */}
-  <div style={{ ...styles.glassCard, marginBottom: 16 }}>
-    <h3
-      style={{
-        margin: "0 0 12px 0",
-        fontSize: 16,
-        color: theme.text,
-        fontWeight: 600,
-        display: "flex",
-        alignItems: "center",
-        gap: 8,
-      }}
-    >
-      <span aria-hidden>🤖</span> AI Tools
-    </h3>
-
-    <div
-      role="group"
-      aria-label="AI tools"
-      style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 10 }}
-    >
-      {AI_ACTIONS.map((a) => (
-        <AIActionButton
-          key={a.key}
-          icon={a.icon}
-          title={a.title}
-          subtitle={a.subtitle}
-          busy={working === a.key}
-          theme={theme}
-          styles={styles}
-          onClick={async () => {
-            if (working) return;
-            setWorking(a.key);
-            try {
-              const currentHtml = editorRef.current?.innerHTML ?? "";
-              const res = await runAI<{ html?: string }>(a.key, {
-                chapterId: chapters[activeIdx]?.id,
-                title: chapters[activeIdx]?.title,
-                html: currentHtml,
-                meta,
-              });
-              const improved = res?.html ?? currentHtml;
-
-              if (editorRef.current) editorRef.current.innerHTML = improved;
-              setChapters((prev) => {
-                const next = [...prev];
-                const ch = next[activeIdx];
-                if (ch) next[activeIdx] = { ...ch, textHTML: improved };
-                return next;
-              });
-            } catch (e: any) {
-              alert(e?.message || "Sorry—something went wrong running that AI tool.");
-            } finally {
-              setWorking(null);
-            }
-          }}
-        />
-      ))}
-    </div>
-
-    {/* Generate Publishing Prep */}
-    <div style={{ marginTop: 10, display: "flex", justifyContent: "flex-end" }}>
-      <button
-        style={{ ...styles.btnDark }}
-        disabled={working !== null}
-        onClick={async () => {
-          if (working) return;
-          setWorking("assistant");
-          try {
-            const chaptersPlain = chapters
-              .filter((c) => c.included)
-              .map((c) => ({
-                id: c.id,
-                title: c.title,
-                text: c.textHTML ? stripHtml(c.textHTML) : c.text,
-              }));
-
-            const res = await runAI<{ prep?: any }>("publishing-prep", {
-              meta,
-              matter,
-              chapters: chaptersPlain,
-              options: { tone: "professional/warm", audience: "agents_and_publishers" },
-            });
-
-            if (!res?.prep) throw new Error("No prep content returned from AI.");
-            navigate("/publishing-prep", { state: { generated: res.prep } });
-          } catch (e: any) {
-            alert(e?.message || "Couldn’t generate publishing prep.");
-          } finally {
-            setWorking(null);
-          }
-        }}
-      >
-        ✨ Generate Publishing Prep
-      </button>
-    </div>
-  </div>
-
-  {/* ✍️ Editor + Chapters */}
-  <div style={{ ...styles.glassCard, marginBottom: 16 }}>
-    <div style={{ display: "grid", gap: 16, gridTemplateColumns: isWide ? "220px 1fr" : "1fr" }}>
-      {isWide && (
-        <aside>
-          <div style={{ fontWeight: 700, marginBottom: 8, color: theme.text, fontSize: 13 }}>Chapters</div>
-          <div style={{ display: "grid", gap: 6 }}>
-            {chapters.map((c) => (
-              <button
-                key={c.id}
-                onClick={() => setActiveChapterId(c.id)}
-                style={{
-                  textAlign: "left",
-                  padding: "8px 10px",
-                  borderRadius: 10,
-                  border: `1px solid ${c.id === activeChapterId ? theme.accent : theme.border}`,
-                  background: c.id === activeChapterId ? theme.highlight : theme.white,
-                  color: theme.text,
-                  cursor: "pointer",
-                  fontSize: 12,
-                }}
-                title={c.title}
-              >
-                {c.included ? "✅ " : "🚫 "} {c.title}
-              </button>
-            ))}
-            <button onClick={addChapter} style={{ ...styles.btnPrimary, marginTop: 6, fontSize: 12 }}>
-              + Add Chapter
-            </button>
-          </div>
-        </aside>
-      )}
-
-      <section>
-        {/* Toolbar */}
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 4,
-            padding: "6px 10px",
-            border: `1px solid ${theme.border}`,
-            borderRadius: 8,
-            marginBottom: 12,
-            background: theme.white,
-            fontSize: 11,
-          }}
-        >
-          <select
-            onChange={(e) => setFont(e.target.value)}
-            defaultValue="Times New Roman"
-            style={{ ...(styles.input as any), width: 120, padding: "3px 5px", fontSize: 10, height: 24 }}
-          >
-            <option>Times New Roman</option>
-            <option>Georgia</option>
-            <option>Garamond</option>
-            <option>Palatino</option>
-            <option>Calibri</option>
-            <option>Arial</option>
-          </select>
-
-          <select
-            onChange={(e) => setFontSizePt(parseInt(e.target.value, 10))}
-            defaultValue="16"
-            style={{ ...(styles.input as any), width: 45, padding: "3px 4px", fontSize: 10, height: 24 }}
-          >
-            <option value="14">14</option>
-            <option value="16">16</option>
-            <option value="18">18</option>
-            <option value="20">20</option>
-            <option value="22">22</option>
-          </select>
-
-          <div style={{ width: 1, height: 16, background: theme.border, margin: "0 2px" }} />
-
-          <button style={{ ...styles.btn, padding: "3px 6px", fontSize: 10, fontWeight: 700, minWidth: 24, height: 24 }} onClick={() => exec("bold")} title="Bold">B</button>
-          <button style={{ ...styles.btn, padding: "3px 6px", fontSize: 10, minWidth: 24, height: 24 }} onClick={() => exec("italic")} title="Italic"><em>I</em></button>
-          <button style={{ ...styles.btn, padding: "3px 6px", fontSize: 10, minWidth: 24, height: 24 }} onClick={() => exec("underline")} title="Underline"><u>U</u></button>
-
-          <div style={{ width: 1, height: 16, background: theme.border, margin: "0 2px" }} />
-
-          <button style={{ ...styles.btn, padding: "3px 5px", fontSize: 9, minWidth: 24, height: 24 }} onClick={() => setBlock("H1")} title="H1">H1</button>
-          <button style={{ ...styles.btn, padding: "3px 5px", fontSize: 9, minWidth: 24, height: 24 }} onClick={() => setBlock("H2")} title="H2">H2</button>
-          <button style={{ ...styles.btn, padding: "3px 5px", fontSize: 9, minWidth: 24, height: 24 }} onClick={() => setBlock("H3")} title="H3">H3</button>
-
-          <div style={{ width: 1, height: 16, background: theme.border, margin: "0 2px" }} />
-
-          <button style={{ ...styles.btn, padding: "3px 5px", fontSize: 9, minWidth: 24, height: 24 }} onClick={() => exec("insertUnorderedList")} title="Bullet">•</button>
-          <button style={{ ...styles.btn, padding: "3px 5px", fontSize: 9, minWidth: 24, height: 24 }} onClick={() => exec("insertOrderedList")} title="Number">1.</button>
-
-          <div style={{ width: 1, height: 16, background: theme.border, margin: "0 2px" }} />
-
-          <button style={{ ...styles.btn, padding: "3px 5px", fontSize: 9, minWidth: 24, height: 24 }} onClick={() => exec("justifyLeft")} title="Left">⟸</button>
-          <button style={{ ...styles.btn, padding: "3px 5px", fontSize: 9, minWidth: 24, height: 24 }} onClick={() => exec("justifyCenter")} title="Center">⇔</button>
-          <button style={{ ...styles.btn, padding: "3px 5px", fontSize: 9, minWidth: 24, height: 24 }} onClick={() => exec("justifyRight")} title="Right">⟹</button>
-
-          <div style={{ width: 1, height: 16, background: theme.border, margin: "0 2px" }} />
-
-          <button style={{ ...styles.btn, padding: "3px 7px", fontSize: 9, height: 24 }} onClick={insertPageBreak} title="Page Break">⤓</button>
-
-          <div style={{ marginLeft: "auto", display: "flex", gap: 4 }}>
-            <label style={{ ...styles.btn, padding: "3px 8px", fontSize: 9, cursor: "pointer", height: 24, display: "flex", alignItems: "center" }}>
-              📄 Word
-              <input type="file" accept=".docx" style={{ display: "none" }} onChange={(e) => e.target.files && importDocx(e.target.files[0], true)} />
-            </label>
-            <label style={{ ...styles.btn, padding: "3px 8px", fontSize: 9, cursor: "pointer", height: 24, display: "flex", alignItems: "center" }}>
-              🌐 HTML
-              <input type="file" accept=".html,.htm,.xhtml" style={{ display: "none" }} onChange={(e) => e.target.files && importHTML(e.target.files[0], true)} />
-            </label>
-            <button style={{ ...styles.btnPrimary, padding: "3px 10px", fontSize: 10, height: 24 }} onClick={saveActiveChapterHTML}>Save</button>
-          </div>
-        </div>
-
-      <section>
-  {/* Toolbar (sticky) */}
-  <div
-    style={{
-      position: "sticky",
-      top: 0,
-      zIndex: 20,
-      display: "flex",
-      alignItems: "center",
-      gap: 4,
-      flexWrap: "wrap",
-      padding: "6px 10px",
-      border: `1px solid ${theme.border}`,
-      borderRadius: 8,
-      marginBottom: 12,
-      background: theme.white,
-      fontSize: 11,
-    }}
-  >
-    <select
-      onChange={(e) => setFont(e.target.value)}
-      defaultValue="Times New Roman"
-      style={{
-        ...(styles.input as any),
-        width: 120,
-        padding: "3px 5px",
-        fontSize: 10,
-        height: 24,
-      }}
-    >
-      <option>Times New Roman</option>
-      <option>Georgia</option>
-      <option>Garamond</option>
-      <option>Palatino</option>
-      <option>Calibri</option>
-      <option>Arial</option>
-    </select>
-
-    <select
-      onChange={(e) => setFontSizePt(parseInt(e.target.value, 10))}
-      defaultValue="16"
-      style={{
-        ...(styles.input as any),
-        width: 45,
-        padding: "3px 4px",
-        fontSize: 10,
-        height: 24,
-      }}
-    >
-      <option value="14">14</option>
-      <option value="16">16</option>
-      <option value="18">18</option>
-      <option value="20">20</option>
-      <option value="22">22</option>
-    </select>
-
-    <div
-      style={{ width: 1, height: 16, background: theme.border, margin: "0 2px" }}
-    />
-
-    <button
-      style={{
-        ...styles.btn,
-        padding: "3px 6px",
-        fontSize: 10,
-        fontWeight: 700,
-        minWidth: 24,
-        height: 24,
-      }}
-      onClick={() => exec("bold")}
-      title="Bold"
-    >
-      B
-    </button>
-    <button
-      style={{ ...styles.btn, padding: "3px 6px", fontSize: 10, minWidth: 24, height: 24 }}
-      onClick={() => exec("italic")}
-      title="Italic"
-    >
-      <em>I</em>
-    </button>
-    <button
-      style={{ ...styles.btn, padding: "3px 6px", fontSize: 10, minWidth: 24, height: 24 }}
-      onClick={() => exec("underline")}
-      title="Underline"
-    >
-      <u>U</u>
-    </button>
-
-    <div
-      style={{ width: 1, height: 16, background: theme.border, margin: "0 2px" }}
-    />
-
-    <button
-      style={{ ...styles.btn, padding: "3px 5px", fontSize: 9, minWidth: 24, height: 24 }}
-      onClick={() => setBlock("H1")}
-      title="H1"
-    >
-      H1
-    </button>
-    <button
-      style={{ ...styles.btn, padding: "3px 5px", fontSize: 9, minWidth: 24, height: 24 }}
-      onClick={() => setBlock("H2")}
-      title="H2"
-    >
-      H2
-    </button>
-    <button
-      style={{ ...styles.btn, padding: "3px 5px", fontSize: 9, minWidth: 24, height: 24 }}
-      onClick={() => setBlock("H3")}
-      title="H3"
-    >
-      H3
-    </button>
-
-    <div
-      style={{ width: 1, height: 16, background: theme.border, margin: "0 2px" }}
-    />
-
-    <button
-      style={{ ...styles.btn, padding: "3px 5px", fontSize: 9, minWidth: 24, height: 24 }}
-      onClick={() => exec("insertUnorderedList")}
-      title="Bullet"
-    >
-      •
-    </button>
-    <button
-      style={{ ...styles.btn, padding: "3px 5px", fontSize: 9, minWidth: 24, height: 24 }}
-      onClick={() => exec("insertOrderedList")}
-      title="Number"
-    >
-      1.
-    </button>
-
-    <div
-      style={{ width: 1, height: 16, background: theme.border, margin: "0 2px" }}
-    />
-
-    <button
-      style={{ ...styles.btn, padding: "3px 5px", fontSize: 9, minWidth: 24, height: 24 }}
-      onClick={() => exec("justifyLeft")}
-      title="Left"
-    >
-      ⟸
-    </button>
-    <button
-      style={{ ...styles.btn, padding: "3px 5px", fontSize: 9, minWidth: 24, height: 24 }}
-      onClick={() => exec("justifyCenter")}
-      title="Center"
-    >
-      ⇔
-    </button>
-    <button
-      style={{ ...styles.btn, padding: "3px 5px", fontSize: 9, minWidth: 24, height: 24 }}
-      onClick={() => exec("justifyRight")}
-      title="Right"
-    >
-      ⟹
-    </button>
-
-    <div
-      style={{ width: 1, height: 16, background: theme.border, margin: "0 2px" }}
-    />
-
-    <button
-      style={{ ...styles.btn, padding: "3px 7px", fontSize: 9, height: 24 }}
-      onClick={insertPageBreak}
-      title="Page Break"
-    >
-      ⤓
-    </button>
-
-    {/* Right-side: uploads + Save */}
-    <div style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
-      <label
-        style={{
-          ...styles.btn,
-          padding: "3px 8px",
-          fontSize: 9,
-          cursor: "pointer",
-          height: 24,
-          display: "flex",
-          alignItems: "center",
-        }}
-      >
-        📄 Word
-        <input
-          type="file"
-          accept=".docx"
-          style={{ display: "none" }}
-          onChange={(e) =>
-            e.target.files && importDocx(e.target.files[0], true)
-          }
-        />
-      </label>
-
-      <label
-        style={{
-          ...styles.btn,
-          padding: "3px 8px",
-          fontSize: 9,
-          cursor: "pointer",
-          height: 24,
-          display: "flex",
-          alignItems: "center",
-        }}
-      >
-        🌐 HTML
-        <input
-          type="file"
-          accept=".html,.htm,.xhtml"
-          style={{ display: "none" }}
-          onChange={(e) =>
-            e.target.files && importHTML(e.target.files[0], true)
-          }
-        />
-      </label>
-
-      <button
-        style={{ ...styles.btnPrimary, padding: "6px 12px", fontSize: 12, height: 28 }}
-        onClick={saveActiveChapterHTML}
-      >
-        Save
-      </button>
-    </div>
-  </div>
-
-  {/* Editor canvas wrapper */}
-  <div
-    style={{
-      padding: 16,
-      background: `linear-gradient(180deg, ${theme.bg}, #e6ebf2)`,
-      borderRadius: 12,
-      border: `1px solid ${theme.border}`,
-    }}
-  >
-    <div
-      ref={editorRef}
-      contentEditable
-      suppressContentEditableWarning
-      style={{
-        margin: "0 auto",
-        width: "100%",
-        maxWidth: 800,
-        minHeight: 1040,
-        background: "#ffffff",
-        color: "#111",
-        border: "1px solid #e5e7eb",
-        boxShadow: "0 8px 30px rgba(2,20,40,0.10)",
-        borderRadius: 6,
-        padding: "48px 48px",
-        lineHeight: ms.lineHeight,
-        fontFamily: ms.fontFamily,
-        fontSize: ms.fontSizePt * (96 / 72),
-        outline: "none",
-        direction: "ltr",
-        unicodeBidi: "plaintext",
-        whiteSpace: "pre-wrap",
-      }}
-    />
-{/* Editor canvas wrapper */}
-        <div
-          style={{
-            padding: 16,
-            background: `linear-gradient(180deg, ${theme.bg}, #e6ebf2)`,
-            borderRadius: 12,
-            border: `1px solid ${theme.border}`,
-          }}
-        >
+        <div style={{ ...styles.inner, ...styles.sectionShell }}>
           <div
-            ref={editorRef}
-            contentEditable
-            suppressContentEditableWarning
             style={{
-              margin: "0 auto",
-              width: "100%",
-              maxWidth: 800,
-              minHeight: 1040,
-              background: "#ffffff",
-              color: "#111",
-              border: "1px solid #e5e7eb",
-              boxShadow: "0 8px 30px rgba(2,20,40,0.10)",
-              borderRadius: 6,
-              padding: "48px 48px",
-              lineHeight: ms.lineHeight,
-              fontFamily: ms.fontFamily,
-              fontSize: ms.fontSizePt * (96 / 72),
-              outline: "none",
-              direction: "ltr",
-              unicodeBidi: "plaintext",
-              whiteSpace: "pre-wrap",
+              display: "grid",
+              gridTemplateColumns: isWide ? "1fr 220px" : "1fr",
+              gap: 24,
             }}
-          />
-        </div>
+          >
+            <main>
+              {/* 📚 Publishing Tools */}
+              <div style={{ ...styles.glassCard, marginBottom: 16 }}>
+                <h3 style={{ margin: "0 0 12px 0", fontSize: 16, color: theme.text, fontWeight: 600 }}>
+                  📚 Publishing Tools
+                </h3>
 
-        <div style={{ color: theme.subtext, fontSize: 12, marginTop: 6 }}>
-          Tip: Use H1/H2/H3 for sections — if "Build Contents from Headings" is on,
-          your TOC will include them.
-        </div>
-      </section>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 10 }}>
+                  <button
+                    style={{ ...styles.btn, padding: "10px 14px", textAlign: "left", display: "flex", alignItems: "center", gap: 10 }}
+                    onClick={() => navigate("/proof")}
+                  >
+                    <span style={{ fontSize: 20 }}>✅</span>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 600 }}>Proof & Consistency</div>
+                      <div style={{ fontSize: 11, color: theme.subtext }}>Grammar, style, timeline</div>
+                    </div>
+                  </button>
 
-      {/* 📦 Chapter Management */}
-      <div style={styles.glassCard}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-          <h3 style={{ margin: 0, fontSize: 18, color: theme.text }}>Chapter Management</h3>
-          <button style={styles.btnPrimary} onClick={addChapter}>+ Add Chapter</button>
-        </div>
+                  <button
+                    style={{ ...styles.btn, padding: "10px 14px", textAlign: "left", display: "flex", alignItems: "center", gap: 10 }}
+                    onClick={() => navigate("/format")}
+                  >
+                    <span style={{ fontSize: 20 }}>🎨</span>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 600 }}>Format & Styles</div>
+                      <div style={{ fontSize: 11, color: theme.subtext }}>Fonts, spacing, margins</div>
+                    </div>
+                  </button>
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
-          {chapters.map((c, i) => (
-            <div key={c.id} style={{ border: `1px solid ${theme.border}`, borderRadius: 12, padding: 14, background: c.included ? theme.white : "#F9FBFD" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: theme.text }}>{c.title}</div>
-                  <div style={{ fontSize: 12, color: theme.subtext, marginTop: 4 }}>
-                    {(c.textHTML ? stripHtml(c.textHTML) : c.text).slice(0, 100)}…
-                  </div>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                    <button
-                      style={{ ...styles.btn, padding: "6px 8px" }}
-                      onClick={() =>
-                        setChapters((prev) => {
-                          const next = [...prev];
-                          const to = Math.max(0, Math.min(next.length - 1, i - 1));
-                          const [item] = next.splice(i, 1);
-                          next.splice(to, 0, item);
-                          return next;
-                        })
-                      }
-                      title="Move up"
-                    >
-                      ↑
-                    </button>
-                    <button
-                      style={{ ...styles.btn, padding: "6px 8px" }}
-                      onClick={() =>
-                        setChapters((prev) => {
-                          const next = [...prev];
-                          const to = Math.max(0, Math.min(next.length - 1, i + 1));
-                          const [item] = next.splice(i, 1);
-                          next.splice(to, 0, item);
-                          return next;
-                        })
-                      }
-                      title="Move down"
-                    >
-                      ↓
-                    </button>
-                  </div>
-                  <Toggle
-                    checked={c.included}
-                    onChange={(v) => setChapters((prev) => prev.map((x) => (x.id === c.id ? { ...x, included: v } : x)))}
-                    label={c.included ? "Included" : "Excluded"}
-                  />
+                  <button
+                    style={{ ...styles.btn, padding: "10px 14px", textAlign: "left", display: "flex", alignItems: "center", gap: 10 }}
+                    onClick={() => navigate("/export")}
+                  >
+                    <span style={{ fontSize: 20 }}>📦</span>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 600 }}>Export</div>
+                      <div style={{ fontSize: 11, color: theme.subtext }}>PDF, DOCX, EPUB</div>
+                    </div>
+                  </button>
+
+                  <button
+                    style={{ ...styles.btn, padding: "10px 14px", textAlign: "left", display: "flex", alignItems: "center", gap: 10 }}
+                    onClick={() => navigate("/publishing-prep")}
+                  >
+                    <span style={{ fontSize: 20 }}>🚀</span>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 600 }}>Publishing Prep</div>
+                      <div style={{ fontSize: 11, color: theme.subtext }}>Query, synopsis, marketing</div>
+                    </div>
+                  </button>
                 </div>
               </div>
-              <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                <button style={styles.btn} onClick={() => setActiveChapterId(c.id)}>Open</button>
-                <label style={{ ...styles.btn, cursor: "pointer" }}>
-                  Replace with .docx
-                  <input
-                    type="file"
-                    accept=".docx"
-                    style={{ display: "none" }}
-                    onChange={(e) => e.target.files && importDocx(e.target.files[0], false)}
-                  />
-                </label>
-                <label style={{ ...styles.btn, cursor: "pointer" }}>
-                  Replace with .html
-                  <input
-                    type="file"
-                    accept=".html,.htm,.xhtml"
-                    style={{ display: "none" }}
-                    onChange={(e) => e.target.files && importHTML(e.target.files[0], false)}
-                  />
-                </label>
+
+              {/* 🤖 AI Tools card */}
+              <div style={{ ...styles.glassCard, marginBottom: 16 }}>
+                <h3
+                  style={{
+                    margin: "0 0 12px 0",
+                    fontSize: 16,
+                    color: theme.text,
+                    fontWeight: 600,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                  }}
+                >
+                  <span aria-hidden>🤖</span> AI Tools
+                </h3>
+
+                <div
+                  role="group"
+                  aria-label="AI tools"
+                  style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 10 }}
+                >
+                  {AI_ACTIONS.map((a) => (
+                    <AIActionButton
+                      key={a.key}
+                      icon={a.icon}
+                      title={a.title}
+                      subtitle={a.subtitle}
+                      busy={working === a.key}
+                      theme={theme}
+                      styles={styles}
+                      onClick={async () => {
+                        if (working) return;
+                        setWorking(a.key);
+                        try {
+                          const currentHtml = editorRef.current?.innerHTML ?? "";
+                          const res = await runAI<{ html?: string }>(a.key, {
+                            chapterId: chapters[activeIdx]?.id,
+                            title: chapters[activeIdx]?.title,
+                            html: currentHtml,
+                            meta,
+                          });
+                          const improved = res?.html ?? currentHtml;
+
+                          if (editorRef.current) editorRef.current.innerHTML = improved;
+                          setChapters((prev) => {
+                            const next = [...prev];
+                            const ch = next[activeIdx];
+                            if (ch) next[activeIdx] = { ...ch, textHTML: improved };
+                            return next;
+                          });
+                        } catch (e: any) {
+                          alert(e?.message || "Sorry—something went wrong running that AI tool.");
+                        } finally {
+                          setWorking(null);
+                        }
+                      }}
+                    />
+                  ))}
+                </div>
+
+                {/* Generate Publishing Prep */}
+                <div style={{ marginTop: 10, display: "flex", justifyContent: "flex-end" }}>
+                  <button
+                    style={{ ...styles.btnDark }}
+                    disabled={working !== null}
+                    onClick={async () => {
+                      if (working) return;
+                      setWorking("assistant");
+                      try {
+                        const chaptersPlain = chapters
+                          .filter((c) => c.included)
+                          .map((c) => ({
+                            id: c.id,
+                            title: c.title,
+                            text: c.textHTML ? stripHtml(c.textHTML) : c.text,
+                          }));
+
+                        const res = await runAI<{ prep?: any }>("publishing-prep", {
+                          meta,
+                          matter,
+                          chapters: chaptersPlain,
+                          options: { tone: "professional/warm", audience: "agents_and_publishers" },
+                        });
+
+                        if (!res?.prep) throw new Error("No prep content returned from AI.");
+                        navigate("/publishing-prep", { state: { generated: res.prep } });
+                      } catch (e: any) {
+                        alert(e?.message || "Couldn't generate publishing prep.");
+                      } finally {
+                        setWorking(null);
+                      }
+                    }}
+                  >
+                    ✨ Generate Publishing Prep
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
+              
+ {/* ✍️ Editor + Chapters */}
+              <div style={{ ...styles.glassCard, marginBottom: 16 }}>
+                <div style={{ display: "grid", gap: 16, gridTemplateColumns: isWide ? "220px 1fr" : "1fr" }}>
+                  {isWide && (
+                    <aside>
+                      <div style={{ fontWeight: 700, marginBottom: 8, color: theme.text, fontSize: 13 }}>Chapters</div>
+                      <div style={{ display: "grid", gap: 6 }}>
+                        {chapters.map((c) => (
+                          <button
+                            key={c.id}
+                            onClick={() => setActiveChapterId(c.id)}
+                            style={{
+                              textAlign: "left",
+                              padding: "8px 10px",
+                              borderRadius: 10,
+                              border: `1px solid ${c.id === activeChapterId ? theme.accent : theme.border}`,
+                              background: c.id === activeChapterId ? theme.highlight : theme.white,
+                              color: theme.text,
+                              cursor: "pointer",
+                              fontSize: 12,
+                            }}
+                            title={c.title}
+                          >
+                            {c.included ? "✅ " : "🚫 "} {c.title}
+                          </button>
+                        ))}
+                        <button onClick={addChapter} style={{ ...styles.btnPrimary, marginTop: 6, fontSize: 12 }}>
+                          + Add Chapter
+                        </button>
+                      </div>
+                    </aside>
+                  )}
+
+                  <section>
+                    {/* Toolbar (sticky) */}
+                    <div
+                      style={{
+                        position: "sticky",
+                        top: 0,
+                        zIndex: 20,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 4,
+                        flexWrap: "wrap",
+                        padding: "6px 10px",
+                        border: `1px solid ${theme.border}`,
+                        borderRadius: 8,
+                        marginBottom: 12,
+                        background: theme.white,
+                        fontSize: 11,
+                      }}
+                    >
+                      <select
+                        onChange={(e) => setFont(e.target.value)}
+                        defaultValue="Times New Roman"
+                        style={{
+                          ...(styles.input as any),
+                          width: 120,
+                          padding: "3px 5px",
+                          fontSize: 10,
+                          height: 24,
+                        }}
+                      >
+                        <option>Times New Roman</option>
+                        <option>Georgia</option>
+                        <option>Garamond</option>
+                        <option>Palatino</option>
+                        <option>Calibri</option>
+                        <option>Arial</option>
+                      </select>
+
+                      <select
+                        onChange={(e) => setFontSizePt(parseInt(e.target.value, 10))}
+                        defaultValue="16"
+                        style={{
+                          ...(styles.input as any),
+                          width: 45,
+                          padding: "3px 4px",
+                          fontSize: 10,
+                          height: 24,
+                        }}
+                      >
+                        <option value="14">14</option>
+                        <option value="16">16</option>
+                        <option value="18">18</option>
+                        <option value="20">20</option>
+                        <option value="22">22</option>
+                      </select>
+
+                      <div style={{ width: 1, height: 16, background: theme.border, margin: "0 2px" }} />
+
+                      <button
+                        style={{
+                          ...styles.btn,
+                          padding: "3px 6px",
+                          fontSize: 10,
+                          fontWeight: 700,
+                          minWidth: 24,
+                          height: 24,
+                        }}
+                        onClick={() => exec("bold")}
+                        title="Bold"
+                      >
+                        B
+                      </button>
+                      <button
+                        style={{ ...styles.btn, padding: "3px 6px", fontSize: 10, minWidth: 24, height: 24 }}
+                        onClick={() => exec("italic")}
+                        title="Italic"
+                      >
+                        <em>I</em>
+                      </button>
+                      <button
+                        style={{ ...styles.btn, padding: "3px 6px", fontSize: 10, minWidth: 24, height: 24 }}
+                        onClick={() => exec("underline")}
+                        title="Underline"
+                      >
+                        <u>U</u>
+                      </button>
+
+                      <div style={{ width: 1, height: 16, background: theme.border, margin: "0 2px" }} />
+
+                      <button
+                        style={{ ...styles.btn, padding: "3px 5px", fontSize: 9, minWidth: 24, height: 24 }}
+                        onClick={() => setBlock("H1")}
+                        title="H1"
+                      >
+                        H1
+                      </button>
+                      <button
+                        style={{ ...styles.btn, padding: "3px 5px", fontSize: 9, minWidth: 24, height: 24 }}
+                        onClick={() => setBlock("H2")}
+                        title="H2"
+                      >
+                        H2
+                      </button>
+                      <button
+                        style={{ ...styles.btn, padding: "3px 5px", fontSize: 9, minWidth: 24, height: 24 }}
+                        onClick={() => setBlock("H3")}
+                        title="H3"
+                      >
+                        H3
+                      </button>
+
+                      <div style={{ width: 1, height: 16, background: theme.border, margin: "0 2px" }} />
+
+                      <button
+                        style={{ ...styles.btn, padding: "3px 5px", fontSize: 9, minWidth: 24, height: 24 }}
+                        onClick={() => exec("insertUnorderedList")}
+                        title="Bullet"
+                      >
+                        •
+                      </button>
+                      <button
+                        style={{ ...styles.btn, padding: "3px 5px", fontSize: 9, minWidth: 24, height: 24 }}
+                        onClick={() => exec("insertOrderedList")}
+                        title="Number"
+                      >
+                        1.
+                      </button>
+
+                      <div style={{ width: 1, height: 16, background: theme.border, margin: "0 2px" }} />
+
+                      <button
+                        style={{ ...styles.btn, padding: "3px 5px", fontSize: 9, minWidth: 24, height: 24 }}
+                        onClick={() => exec("justifyLeft")}
+                        title="Left"
+                      >
+                        ⟸
+                      </button>
+                      <button
+                        style={{ ...styles.btn, padding: "3px 5px", fontSize: 9, minWidth: 24, height: 24 }}
+                        onClick={() => exec("justifyCenter")}
+                        title="Center"
+                      >
+                        ⇔
+                      </button>
+                      <button
+                        style={{ ...styles.btn, padding: "3px 5px", fontSize: 9, minWidth: 24, height: 24 }}
+                        onClick={() => exec("justifyRight")}
+                        title="Right"
+                      >
+                        ⟹
+                      </button>
+
+                      <div style={{ width: 1, height: 16, background: theme.border, margin: "0 2px" }} />
+
+                      <button
+                        style={{ ...styles.btn, padding: "3px 7px", fontSize: 9, height: 24 }}
+                        onClick={insertPageBreak}
+                        title="Page Break"
+                      >
+                        ⤓
+                      </button>
+
+                      {/* Right-side: uploads + Save */}
+                      <div style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
+                        <label
+                          style={{
+                            ...styles.btn,
+                            padding: "3px 8px",
+                            fontSize: 9,
+                            cursor: "pointer",
+                            height: 24,
+                            display: "flex",
+                            alignItems: "center",
+                          }}
+                        >
+                          📄 Word
+                          <input
+                            type="file"
+                            accept=".docx"
+                            style={{ display: "none" }}
+                            onChange={(e) =>
+                              e.target.files && importDocx(e.target.files[0], true)
+                            }
+                          />
+                        </label>
+
+                        <label
+                          style={{
+                            ...styles.btn,
+                            padding: "3px 8px",
+                            fontSize: 9,
+                            cursor: "pointer",
+                            height: 24,
+                            display: "flex",
+                            alignItems: "center",
+                          }}
+                        >
+                          🌐 HTML
+                          <input
+                            type="file"
+                            accept=".html,.htm,.xhtml"
+                            style={{ display: "none" }}
+                            onChange={(e) =>
+                              e.target.files && importHTML(e.target.files[0], true)
+                            }
+                          />
+                        </label>
+
+                        <button
+                          style={{ ...styles.btnPrimary, padding: "6px 12px", fontSize: 12, height: 28 }}
+                          onClick={saveActiveChapterHTML}
+                        >
+                          Save
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Editor canvas wrapper */}
+                    <div
+                      style={{
+                        padding: 16,
+                        background: `linear-gradient(180deg, ${theme.bg}, #e6ebf2)`,
+                        borderRadius: 12,
+                        border: `1px solid ${theme.border}`,
+                      }}
+                    >
+                      <div
+                        ref={editorRef}
+                        contentEditable
+                        suppressContentEditableWarning
+                        style={{
+                          margin: "0 auto",
+                          width: "100%",
+                          maxWidth: 800,
+                          minHeight: 1040,
+                          background: "#ffffff",
+                          color: "#111",
+                          border: "1px solid #e5e7eb",
+                          boxShadow: "0 8px 30px rgba(2,20,40,0.10)",
+                          borderRadius: 6,
+                          padding: "48px 48px",
+                          lineHeight: ms.lineHeight,
+                          fontFamily: ms.fontFamily,
+                          fontSize: ms.fontSizePt * (96 / 72),
+                          outline: "none",
+                          direction: "ltr",
+                          unicodeBidi: "plaintext",
+                          whiteSpace: "pre-wrap",
+                        }}
+                      />
+                    </div>
+
+                    <div style={{ color: theme.subtext, fontSize: 12, marginTop: 6 }}>
+                      Tip: Use H1/H2/H3 for sections — if "Build Contents from Headings" is on,
+                      your TOC will include them.
+                    </div>
+                  </section>
+                </div>
+              </div>
+
+     {/* 📦 Chapter Management */}
+              <div style={styles.glassCard}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+                  <h3 style={{ margin: 0, fontSize: 18, color: theme.text }}>Chapter Management</h3>
+                  <button style={styles.btnPrimary} onClick={addChapter}>+ Add Chapter</button>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
+                  {chapters.map((c, i) => (
+                    <div key={c.id} style={{ border: `1px solid ${theme.border}`, borderRadius: 12, padding: 14, background: c.included ? theme.white : "#F9FBFD" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 14, fontWeight: 700, color: theme.text }}>{c.title}</div>
+                          <div style={{ fontSize: 12, color: theme.subtext, marginTop: 4 }}>
+                            {(c.textHTML ? stripHtml(c.textHTML) : c.text).slice(0, 100)}…
+                          </div>
+                        </div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                            <button
+                              style={{ ...styles.btn, padding: "6px 8px" }}
+                              onClick={() =>
+                                setChapters((prev) => {
+                                  const next = [...prev];
+                                  const to = Math.max(0, Math.min(next.length - 1, i - 1));
+                                  const [item] = next.splice(i, 1);
+                                  next.splice(to, 0, item);
+                                  return next;
+                                })
+                              }
+                              title="Move up"
+                            >
+                              ↑
+                            </button>
+                            <button
+                              style={{ ...styles.btn, padding: "6px 8px" }}
+                              onClick={() =>
+                                setChapters((prev) => {
+                                  const next = [...prev];
+                                  const to = Math.max(0, Math.min(next.length - 1, i + 1));
+                                  const [item] = next.splice(i, 1);
+                                  next.splice(to, 0, item);
+                                  return next;
+                                })
+                              }
+                              title="Move down"
+                            >
+                              ↓
+                            </button>
+                          </div>
+                          <Toggle
+                            checked={c.included}
+                            onChange={(v) => setChapters((prev) => prev.map((x) => (x.id === c.id ? { ...x, included: v } : x)))}
+                            label={c.included ? "Included" : "Excluded"}
+                          />
+                        </div>
+                      </div>
+                      <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                        <button style={styles.btn} onClick={() => setActiveChapterId(c.id)}>Open</button>
+                        <label style={{ ...styles.btn, cursor: "pointer" }}>
+                          Replace with .docx
+                          <input
+                            type="file"
+                            accept=".docx"
+                            style={{ display: "none" }}
+                            onChange={(e) => e.target.files && importDocx(e.target.files[0], false)}
+                          />
+                        </label>
+                        <label style={{ ...styles.btn, cursor: "pointer" }}>
+                          Replace with .html
+                          <input
+                            type="file"
+                            accept=".html,.htm,.xhtml"
+                            style={{ display: "none" }}
+                            onChange={(e) => e.target.files && importHTML(e.target.files[0], false)}
+                          />
+                        </label>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </main>
+
+            {isWide && (
+              <PublishingSidebar
+                meta={meta}
+                setMeta={setMeta}
+                matter={matter}
+                setMatter={setMatter}
+                manuscriptPreset={manuscriptPreset}
+                setManuscriptPreset={setManuscriptPreset}
+                platformPreset={platformPreset}
+                setPlatformPreset={setPlatformPreset}
+                includeHeadersFooters={includeHeadersFooters}
+                wordCount={wordCount}
+                ms={ms}
+                setMsOverrides={setMsOverrides}
+                manuscriptEntries={manuscriptEntries}
+                platformEntries={platformEntries}
+                googleMode={googleMode}
+                setGoogleMode={setGoogleMode}
+              />
+            )}
+          </div>
         </div>
       </div>
-    </main>
-
-    {isWide && (
-      <PublishingSidebar
-        meta={meta}
-        setMeta={setMeta}
-        matter={matter}
-        setMatter={setMatter}
-        manuscriptPreset={manuscriptPreset}
-        setManuscriptPreset={setManuscriptPreset}
-        platformPreset={platformPreset}
-        setPlatformPreset={setPlatformPreset}
-        includeHeadersFooters={includeHeadersFooters}
-        wordCount={wordCount}
-        ms={ms}
-        setMsOverrides={setMsOverrides}
-        manuscriptEntries={manuscriptEntries}
-        platformEntries={platformEntries}
-        googleMode={googleMode}
-        setGoogleMode={setGoogleMode}
-      />
-    )}
-  </div>{/* grid wrapper */}
-</div>{/* inner + sectionShell */}
-</div>{/* styles.outer */}
-</PageShell>
-); // closes return
-} // closes function
+    </PageShell>
+  );
+}
 
 /* ---------- Small UI helpers (kept at bottom for clarity) ---------- */
 type ToggleProps = {
@@ -1757,7 +1629,7 @@ const Toggle: React.FC<ToggleProps> = ({ checked, onChange, label }) => {
     </button>
   );
 };
-  
+
 /* ---------- utilities ---------- */
 function safeFile(name: string): string {
   return (name || "manuscript").replace(/[^\w\-]+/g, "_");
