@@ -1658,8 +1658,8 @@ async function runAI<T = any>(path: string, payload: any): Promise<T> {
     wordCount={wordCount}
     ms={ms}
     setMsOverrides={setMsOverrides}
-    manuscriptEntries={Object.entries(MANUSCRIPT_PRESETS).map(([k, v]) => [k, v.label] as const)}
-    platformEntries={Object.entries(PLATFORM_PRESETS).map(([k, v]) => [k, v.label] as const)}
+    manuscriptEntries={manuscriptEntries}
+    platformEntries={platformEntries}
     googleMode={googleMode}
     setGoogleMode={setGoogleMode}
   />
