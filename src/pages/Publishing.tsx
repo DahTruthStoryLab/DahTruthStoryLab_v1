@@ -1552,119 +1552,152 @@ async function runAI<T = any>(path: string, payload: any): Promise<T> {
         whiteSpace: "pre-wrap",
       }}
     />
-  </div>
-
-  <div style={{ color: theme.subtext, fontSize: 12, marginTop: 6 }}>
-    Tip: Use H1/H2/H3 for sections — if "Build Contents from Headings" is on,
-    your TOC will include them.
-  </div>
-</section>
-
-{/* 📦 Chapter Management */}
-<div style={styles.glassCard}>
-  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
-    <h3 style={{ margin: 0, fontSize: 18, color: theme.text }}>Chapter Management</h3>
-    <button style={styles.btnPrimary} onClick={addChapter}>+ Add Chapter</button>
-  </div>
-
-  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
-    {chapters.map((c, i) => (
-      <div key={c.id} style={{ border: `1px solid ${theme.border}`, borderRadius: 12, padding: 14, background: c.included ? theme.white : "#F9FBFD" }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 14, fontWeight: 700, color: theme.text }}>{c.title}</div>
-            <div style={{ fontSize: 12, color: theme.subtext, marginTop: 4 }}>
-              {(c.textHTML ? stripHtml(c.textHTML) : c.text).slice(0, 100)}…
-            </div>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-              <button
-                style={{ ...styles.btn, padding: "6px 8px" }}
-                onClick={() =>
-                  setChapters((prev) => {
-                    const next = [...prev];
-                    const to = Math.max(0, Math.min(next.length - 1, i - 1));
-                    const [item] = next.splice(i, 1);
-                    next.splice(to, 0, item);
-                    return next;
-                  })
-                }
-                title="Move up"
-              >
-                ↑
-              </button>
-              <button
-                style={{ ...styles.btn, padding: "6px 8px" }}
-                onClick={() =>
-                  setChapters((prev) => {
-                    const next = [...prev];
-                    const to = Math.max(0, Math.min(next.length - 1, i + 1));
-                    const [item] = next.splice(i, 1);
-                    next.splice(to, 0, item);
-                    return next;
-                  })
-                }
-                title="Move down"
-              >
-                ↓
-              </button>
-            </div>
-            <Toggle
-              checked={c.included}
-              onChange={(v) => setChapters((prev) => prev.map((x) => (x.id === c.id ? { ...x, included: v } : x)))}
-              label={c.included ? "Included" : "Excluded"}
-            />
-          </div>
+{/* Editor canvas wrapper */}
+        <div
+          style={{
+            padding: 16,
+            background: `linear-gradient(180deg, ${theme.bg}, #e6ebf2)`,
+            borderRadius: 12,
+            border: `1px solid ${theme.border}`,
+          }}
+        >
+          <div
+            ref={editorRef}
+            contentEditable
+            suppressContentEditableWarning
+            style={{
+              margin: "0 auto",
+              width: "100%",
+              maxWidth: 800,
+              minHeight: 1040,
+              background: "#ffffff",
+              color: "#111",
+              border: "1px solid #e5e7eb",
+              boxShadow: "0 8px 30px rgba(2,20,40,0.10)",
+              borderRadius: 6,
+              padding: "48px 48px",
+              lineHeight: ms.lineHeight,
+              fontFamily: ms.fontFamily,
+              fontSize: ms.fontSizePt * (96 / 72),
+              outline: "none",
+              direction: "ltr",
+              unicodeBidi: "plaintext",
+              whiteSpace: "pre-wrap",
+            }}
+          />
         </div>
-        <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-          <button style={styles.btn} onClick={() => setActiveChapterId(c.id)}>Open</button>
-          <label style={{ ...styles.btn, cursor: "pointer" }}>
-            Replace with .docx
-            <input
-              type="file"
-              accept=".docx"
-              style={{ display: "none" }}
-              onChange={(e) => e.target.files && importDocx(e.target.files[0], false)}
-            />
-          </label>
-          <label style={{ ...styles.btn, cursor: "pointer" }}>
-            Replace with .html
-            <input
-              type="file"
-              accept=".html,.htm,.xhtml"
-              style={{ display: "none" }}
-              onChange={(e) => e.target.files && importHTML(e.target.files[0], false)}
-            />
-          </label>
+
+        <div style={{ color: theme.subtext, fontSize: 12, marginTop: 6 }}>
+          Tip: Use H1/H2/H3 for sections — if "Build Contents from Headings" is on,
+          your TOC will include them.
+        </div>
+      </section>
+
+      {/* 📦 Chapter Management */}
+      <div style={styles.glassCard}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
+          <h3 style={{ margin: 0, fontSize: 18, color: theme.text }}>Chapter Management</h3>
+          <button style={styles.btnPrimary} onClick={addChapter}>+ Add Chapter</button>
+        </div>
+
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 12 }}>
+          {chapters.map((c, i) => (
+            <div key={c.id} style={{ border: `1px solid ${theme.border}`, borderRadius: 12, padding: 14, background: c.included ? theme.white : "#F9FBFD" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 14, fontWeight: 700, color: theme.text }}>{c.title}</div>
+                  <div style={{ fontSize: 12, color: theme.subtext, marginTop: 4 }}>
+                    {(c.textHTML ? stripHtml(c.textHTML) : c.text).slice(0, 100)}…
+                  </div>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                    <button
+                      style={{ ...styles.btn, padding: "6px 8px" }}
+                      onClick={() =>
+                        setChapters((prev) => {
+                          const next = [...prev];
+                          const to = Math.max(0, Math.min(next.length - 1, i - 1));
+                          const [item] = next.splice(i, 1);
+                          next.splice(to, 0, item);
+                          return next;
+                        })
+                      }
+                      title="Move up"
+                    >
+                      ↑
+                    </button>
+                    <button
+                      style={{ ...styles.btn, padding: "6px 8px" }}
+                      onClick={() =>
+                        setChapters((prev) => {
+                          const next = [...prev];
+                          const to = Math.max(0, Math.min(next.length - 1, i + 1));
+                          const [item] = next.splice(i, 1);
+                          next.splice(to, 0, item);
+                          return next;
+                        })
+                      }
+                      title="Move down"
+                    >
+                      ↓
+                    </button>
+                  </div>
+                  <Toggle
+                    checked={c.included}
+                    onChange={(v) => setChapters((prev) => prev.map((x) => (x.id === c.id ? { ...x, included: v } : x)))}
+                    label={c.included ? "Included" : "Excluded"}
+                  />
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                <button style={styles.btn} onClick={() => setActiveChapterId(c.id)}>Open</button>
+                <label style={{ ...styles.btn, cursor: "pointer" }}>
+                  Replace with .docx
+                  <input
+                    type="file"
+                    accept=".docx"
+                    style={{ display: "none" }}
+                    onChange={(e) => e.target.files && importDocx(e.target.files[0], false)}
+                  />
+                </label>
+                <label style={{ ...styles.btn, cursor: "pointer" }}>
+                  Replace with .html
+                  <input
+                    type="file"
+                    accept=".html,.htm,.xhtml"
+                    style={{ display: "none" }}
+                    onChange={(e) => e.target.files && importHTML(e.target.files[0], false)}
+                  />
+                </label>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
-    ))}
-  </div>
-</div>
-</main>
+    </main>
 
-{isWide && (
-  <PublishingSidebar
-    meta={meta}
-    setMeta={setMeta}
-    matter={matter}
-    setMatter={setMatter}
-    manuscriptPreset={manuscriptPreset}
-    setManuscriptPreset={setManuscriptPreset}
-    platformPreset={platformPreset}
-    setPlatformPreset={setPlatformPreset}
-    includeHeadersFooters={includeHeadersFooters}
-    wordCount={wordCount}
-    ms={ms}
-    setMsOverrides={setMsOverrides}
-    manuscriptEntries={manuscriptEntries}
-    platformEntries={platformEntries}
-    googleMode={googleMode}
-    setGoogleMode={setGoogleMode}
-  />
-)}
-</div>{/* grid wrapper */}
+    {isWide && (
+      <PublishingSidebar
+        meta={meta}
+        setMeta={setMeta}
+        matter={matter}
+        setMatter={setMatter}
+        manuscriptPreset={manuscriptPreset}
+        setManuscriptPreset={setManuscriptPreset}
+        platformPreset={platformPreset}
+        setPlatformPreset={setPlatformPreset}
+        includeHeadersFooters={includeHeadersFooters}
+        wordCount={wordCount}
+        ms={ms}
+        setMsOverrides={setMsOverrides}
+        manuscriptEntries={manuscriptEntries}
+        platformEntries={platformEntries}
+        googleMode={googleMode}
+        setGoogleMode={setGoogleMode}
+      />
+    )}
+  </div>{/* grid wrapper */}
 </div>{/* inner + sectionShell */}
 </div>{/* styles.outer */}
 </PageShell>
@@ -1724,7 +1757,7 @@ const Toggle: React.FC<ToggleProps> = ({ checked, onChange, label }) => {
     </button>
   );
 };
-
+  
 /* ---------- utilities ---------- */
 function safeFile(name: string): string {
   return (name || "manuscript").replace(/[^\w\-]+/g, "_");
