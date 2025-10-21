@@ -1649,6 +1649,9 @@ async function runAI<T = any>(path: string, payload: any): Promise<T> {
     )}
   </div>
 </div>
+</div>{/* closes styles.outer */}
+</PageShell>
+);
 
     <section>
       {/* Toolbar (sticky) */}
@@ -1919,9 +1922,7 @@ async function runAI<T = any>(path: string, payload: any): Promise<T> {
     </section>
   </div>
 </div>
-
-
-              <div style={styles.glassCard}>
+             <div style={styles.glassCard}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
                   <h3 style={{ margin: 0, fontSize: 18, color: theme.text }}>Chapter Management</h3>
                   <button style={styles.btnPrimary} onClick={addChapter}>+ Add Chapter</button>
