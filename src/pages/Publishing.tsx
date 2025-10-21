@@ -457,15 +457,6 @@ async function runAI<T = any>(path: string, payload: any): Promise<T> {
     <PageShell> ... </PageShell>
   );
 }
-
-    if (!resp.ok) {
-      const text = await resp.text().catch(() => "");
-      throw new Error(`AI error ${resp.status}: ${text || resp.statusText}`);
-    }
-    return resp.json();
-  }
-  // ↑↑↑ ADD THIS HERE ↑↑↑
-
   
   /* --------------------- Builder: Word-like Editor --------------------- */
   const [activeChapterId, setActiveChapterId] = useState(chapters[0]?.id || "");
