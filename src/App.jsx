@@ -137,6 +137,11 @@ function TableOfContentsRouter() {
 // App
 // =========================
 export default function App() {
+  useEffect(() => {
+    if (import.meta.env.DEV) {
+      console.log("VITE_API_BASE =", import.meta.env.VITE_API_BASE);
+    }
+  }, []);
   return (
     <UserProvider>
       <DndProvider backend={MultiBackend} options={BACKENDS}>
