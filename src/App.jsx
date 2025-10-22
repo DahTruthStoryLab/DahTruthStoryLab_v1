@@ -13,22 +13,6 @@ import { Amplify } from "aws-amplify";
 import awsconfig from "./aws-exports";
 Amplify.configure(awsconfig);
 
-function App() {
-  useEffect(() => {
-    if (import.meta.env.DEV) {
-      console.log("VITE_API_BASE =", import.meta.env.VITE_API_BASE);
-    }
-  }, []);
-
-  return (
-    <Router>
-      {/* your routes/components */}
-    </Router>
-  );
-}
-
-export default App;
-
 // ---------------------------
 // DnD Multi-backend (desktop + mobile)
 import { DndProvider } from "react-dnd";
