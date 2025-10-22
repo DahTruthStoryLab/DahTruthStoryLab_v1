@@ -1,5 +1,5 @@
 // src/App.tsx
-import React, { Suspense, lazy, useEffect } from "react";
+import React, { useEffect, Suspense, lazy } from "react";
 import {
   BrowserRouter as Router,
   Routes,
@@ -9,12 +9,25 @@ import {
   Navigate,
 } from "react-router-dom";
 
-// ADD THESE TWO LINES:
-import { Amplify } from 'aws-amplify';
-import awsconfig from './aws-exports';
-
-// CONFIGURE AMPLIFY (ADD THIS LINE):
+import { Amplify } from "aws-amplify";
+import awsconfig from "./aws-exports";
 Amplify.configure(awsconfig);
+
+function App() {
+  useEffect(() => {
+    if (import.meta.env.DEV) {
+      console.log("VITE_API_BASE =", import.meta.env.VITE_API_BASE);
+    }
+  }, []);
+
+  return (
+    <Router>
+      {/* your routes/components */}
+    </Router>
+  );
+}
+
+export default App;
 
 // ---------------------------
 // DnD Multi-backend (desktop + mobile)
