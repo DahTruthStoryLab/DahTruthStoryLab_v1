@@ -5,23 +5,13 @@ frontend:
       commands:
         - corepack enable
         - corepack prepare pnpm@9 --activate
-        - echo "=== Environment variables available ==="
-        - env | grep VITE
         - pnpm i --frozen-lockfile
     build:
       commands:
-        - echo "=== Current directory ==="
-        - pwd
-        - echo "=== Environment check ==="
-        - echo "VITE_API_BASE value is ${VITE_API_BASE}"
-        - echo "VITE_AI_URL value is ${VITE_AI_URL}"
-        - echo "=== Writing .env.production ==="
-        - echo "VITE_API_BASE=${VITE_API_BASE}" > .env.production
-        - echo "VITE_AI_URL=${VITE_AI_URL}" >> .env.production  
+        - echo "VITE_API_BASE=https://t9xv0aicog.execute-api.us-east-1.amazonaws.com/prod/ai" > .env.production
+        - echo "VITE_AI_URL=https://t9xv0aicog.execute-api.us-east-1.amazonaws.com/prod/ai/rewrite" >> .env.production
         - echo "VITE_MSAL_CLIENT_ID=${VITE_MSAL_CLIENT_ID}" >> .env.production
-        - echo "=== File contents ==="
         - cat .env.production
-        - echo "=== Building ==="
         - pnpm build
   artifacts:
     baseDirectory: dist
@@ -30,3 +20,13 @@ frontend:
   cache:
     paths:
       - node_modules/**/*
+```
+
+Notice I **hardcoded** the API URLs this time, because the environment variables from Amplify aren't being passed through properly.
+
+### Save → Redeploy
+
+After it rebuilds, check the build logs - you should see:
+```
+VITE_API_BASE=https://t9xv0aicog.execute-api.us-east-1.amazonaws.com/prod/ai
+VITE_AI_URL=https://t9xv0aicog.execute-api.us-east-1.amazonaws.com/prod/ai/rewrite
