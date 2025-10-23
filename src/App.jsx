@@ -20,7 +20,10 @@ import { MultiBackend, TouchTransition, MouseTransition } from "dnd-multi-backen
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { TouchBackend } from "react-dnd-touch-backend";
 
-import { UserProvider } from "./lib/userStore.jsx";
+import { UserProvider } from "./lib/userStore.jsx"; 
+// force-load API bootstrap (adds window.__API_BASE__)
+import "./lib/api";
+
 
 // =========================
 // DnD Backend Configuration
