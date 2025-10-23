@@ -1,0 +1,581 @@
+# StoryContext API Reference
+
+Complete reference for all functions available in StoryContext.
+
+---
+
+## 📚 Import
+
+```javascript
+import { useStory } from '../contexts/StoryContext';
+
+function YourComponent() {
+  const {
+    // ... destructure what you need
+  } = useStory();
+}
+```
+
+---
+
+## 📖 Story Meta Functions
+
+### `storyMeta`
+Current story metadata object.
+
+**Usage:**
+```javascript
+const { storyMeta } = useStory();
+console.log(storyMeta.title); // "My Amazing Story"
+```
+
+### `updateStoryMeta(updates)`
+Update story metadata.
+
+**Parameters:**
+- `updates` (object) - Fields to update
+
+**Example:**
+```javascript
+const { updateStoryMeta } = useStory();
+
+updateStoryMeta({
+  title: 'New Title',
+  author: 'Jane Doe',
+  genre: 'Fantasy',
+  status: 'revision',
+});
+```
+
+---
+
+## 📝 Chapter Functions
+
+### `chapters`
+Array of all chapters.
+
+**Usage:**
+```javascript
+const { chapters } = useStory();
+chapters.forEach(chapter => {
+  console.log(chapter.title, chapter.wordCount);
+});
+```
+
+### `addChapter(title, content)`
+Create a new chapter.
+
+**Parameters:**
+- `title` (string) - Chapter title
+- `content` (string, optional) - Initial content
+
+**Returns:** New chapter object
+
+**Example:**
+```javascript
+const { addChapter } = useStory();
+const newChapter = addChapter('Chapter 5', '<p>Once upon a time...</p>');
+```
+
+### `updateChapter(chapterId, updates)`
+Update an existing chapter.
+
+**Parameters:**
+- `chapterId` (string) - Chapter ID
+- `updates` (object) - Fields to update
+
+**Example:**
+```javascript
+const { updateChapter } = useStory();
+
+updateChapter('123456', {
+  title: 'Chapter 1: The Beginning',
+  content: '<p>New content...</p>',
+});
+```
+
+### `deleteChapter(chapterId)`
+Delete a chapter.
+
+**Parameters:**
+- `chapterId` (string) - Chapter ID to delete
+
+**Example:**
+```javascript
+const { deleteChapter } = useStory();
+deleteChapter('123456');
+```
+
+### `reorderChapters(newOrder)`
+Reorder chapters (for drag-and-drop).
+
+**Parameters:**
+- `newOrder` (array) - Array of chapters in new order
+
+**Example:**
+```javascript
+const { chapters, reorderChapters } = useStory();
+
+// After drag-and-drop
+const reordered = [...chapters];
+// ... reorder logic ...
+reorderChapters(reordered);
+```
+
+### `currentChapterId`
+ID of currently selected chapter.
+
+**Usage:**
+```javascript
+const { currentChapterId } = useStory();
+if (currentChapterId === chapter.id) {
+  // This is the active chapter
+}
+```
+
+### `getCurrentChapter()`
+Get the currently selected chapter object.
+
+**Returns:** Chapter object or null
+
+**Example:**
+```javascript
+const { getCurrentChapter } = useStory();
+const current = getCurrentChapter();
+if (current) {
+  console.log(`Editing: ${current.title}`);
+}
+```
+
+### `setCurrentChapter(chapterId)`
+Set the active chapter.
+
+**Parameters:**
+- `chapterId` (string) - Chapter ID to activate
+
+**Example:**
+```javascript
+const { setCurrentChapter } = useStory();
+setCurrentChapter('123456');
+```
+
+---
+
+## 👥 Character Functions
+
+### `characters`
+Array of all characters.
+
+**Usage:**
+```javascript
+const { characters } = useStory();
+characters.forEach(char => {
+  console.log(char.name, char.role);
+});
+```
+
+### `addCharacter(name, details)`
+Add a new character.
+
+**Parameters:**
+- `name` (string) - Character name
+- `details` (object, optional) - Additional character info
+  - `role` (string) - protagonist, antagonist, supporting, etc.
+  - `traits` (array) - Character traits
+  - `notes` (string) - Character notes
+  - `appearances` (array) - Chapter IDs where character appears
+
+**Returns:** New character object
+
+**Example:**
+```javascript
+const { addCharacter } = useStory();
+
+const hero = addCharacter('Alice', {
+  role: 'protagonist',
+  traits: ['brave', 'curious', 'clever'],
+  notes: 'Main character, enters Wonderland in Chapter 1',
+});
+```
+
+### `updateCharacter(characterId, updates)`
+Update a character.
+
+**Parameters:**
+- `characterId` (string) - Character ID
+- `updates` (object) - Fields to update
+
+**Example:**
+```javascript
+const { updateCharacter } = useStory();
+
+updateCharacter('123456', {
+  name: 'Alice (Adult)',
+  traits: ['brave', 'curious', 'clever', 'wise'],
+  notes: 'Updated after character development',
+});
+```
+
+### `deleteCharacter(characterId)`
+Delete a character.
+
+**Parameters:**
+- `characterId` (string) - Character ID
+
+**Example:**
+```javascript
+const { deleteCharacter } = useStory();
+deleteCharacter('123456');
+```
+
+### `extractCharactersFromText(text)`
+Auto-detect character names from text using AI.
+
+**Parameters:**
+- `text` (string) - Text to analyze
+
+**Returns:** Promise<array> - Array of detected character names
+
+**Example:**
+```javascript
+const { extractCharactersFromText } = useStory();
+
+const text = "Alice met the Mad Hatter and the Cheshire Cat.";
+const names = await extractCharactersFromText(text);
+// Returns: ['Alice', 'Hatter', 'Cheshire', 'Cat']
+// Automatically adds new characters
+```
+
+---
+
+## 🎯 Goals & Statistics
+
+### `goals`
+Current writing goals object.
+
+**Usage:**
+```javascript
+const { goals } = useStory();
+console.log(`Daily goal: ${goals.dailyWordCount} words`);
+console.log(`Total goal: ${goals.totalWordCountGoal} words`);
+```
+
+### `updateGoals(updates)`
+Update writing goals.
+
+**Parameters:**
+- `updates` (object) - Goals to update
+  - `dailyWordCount` (number) - Daily word goal
+  - `totalWordCountGoal` (number) - Overall project goal
+  - `deadline` (string) - Deadline date (ISO format)
+
+**Example:**
+```javascript
+const { updateGoals } = useStory();
+
+updateGoals({
+  dailyWordCount: 2000,
+  totalWordCountGoal: 80000,
+  deadline: new Date('2025-12-31').toISOString(),
+});
+```
+
+### `stats`
+Current writing statistics.
+
+**Usage:**
+```javascript
+const { stats } = useStory();
+console.log(`Total: ${stats.totalWords} words`);
+console.log(`Today: ${stats.todayWords} words`);
+console.log(`Streak: ${stats.currentStreak} days`);
+```
+
+### `updateStats(wordCount)`
+Update statistics (usually called automatically).
+
+**Parameters:**
+- `wordCount` (number) - Words written
+
+**Example:**
+```javascript
+const { updateStats } = useStory();
+updateStats(500); // Add 500 words to stats
+```
+
+### `getTotalWordCount()`
+Get total word count across all chapters.
+
+**Returns:** number
+
+**Example:**
+```javascript
+const { getTotalWordCount } = useStory();
+const total = getTotalWordCount();
+console.log(`Your story has ${total} words`);
+```
+
+---
+
+## 📊 Activity Logging
+
+### `activityLog`
+Array of recent activities (last 50).
+
+**Usage:**
+```javascript
+const { activityLog } = useStory();
+activityLog.forEach(activity => {
+  console.log(activity.action, activity.timestamp);
+});
+```
+
+### `logActivity(action, details)`
+Log a custom activity (usually called automatically).
+
+**Parameters:**
+- `action` (string) - Action name (e.g., 'custom_action')
+- `details` (object, optional) - Additional details
+
+**Example:**
+```javascript
+const { logActivity } = useStory();
+
+logActivity('plot_brainstorm', {
+  duration: '30 minutes',
+  ideas: 5,
+});
+```
+
+**Built-in Actions:**
+- `chapter_added`
+- `chapter_updated`
+- `chapter_deleted`
+- `chapters_reordered`
+- `character_added`
+- `character_updated`
+- `character_deleted`
+- `ai_grammar_check`
+- `ai_style_check`
+- `ai_readability_check`
+- `ai_improve`
+- `story_meta_updated`
+- `goals_updated`
+- `story_exported`
+- `story_imported`
+
+---
+
+## 💾 Import/Export
+
+### `exportStory(format)`
+Export story data.
+
+**Parameters:**
+- `format` (string, optional) - Export format ('json' only for now)
+
+**Example:**
+```javascript
+const { exportStory } = useStory();
+
+// Downloads story as JSON file
+exportStory('json');
+```
+
+**Exported Data Includes:**
+- Story metadata
+- All chapters
+- All characters
+- Writing goals
+- Export timestamp
+
+### `importStory(data)`
+Import story data.
+
+**Parameters:**
+- `data` (object) - Story data object (from exportStory)
+
+**Returns:** boolean - Success/failure
+
+**Example:**
+```javascript
+const { importStory } = useStory();
+
+const handleFileUpload = (event) => {
+  const file = event.target.files[0];
+  const reader = new FileReader();
+  
+  reader.onload = (e) => {
+    const data = JSON.parse(e.target.result);
+    const success = importStory(data);
+    
+    if (success) {
+      alert('Story imported successfully!');
+    } else {
+      alert('Import failed!');
+    }
+  };
+  
+  reader.readAsText(file);
+};
+```
+
+---
+
+## 🔍 Common Patterns
+
+### Get Active Chapter Content
+```javascript
+const { getCurrentChapter } = useStory();
+const chapter = getCurrentChapter();
+const content = chapter?.content || '';
+```
+
+### Update Chapter Content (with auto-save)
+```javascript
+const { currentChapterId, updateChapter } = useStory();
+
+const handleContentChange = (newContent) => {
+  if (currentChapterId) {
+    updateChapter(currentChapterId, { content: newContent });
+  }
+};
+```
+
+### Check if Goal is Met
+```javascript
+const { stats, goals } = useStory();
+const dailyGoalMet = stats.todayWords >= goals.dailyWordCount;
+const totalGoalMet = getTotalWordCount() >= goals.totalWordCountGoal;
+```
+
+### Get Chapter by ID
+```javascript
+const { chapters } = useStory();
+const chapter = chapters.find(ch => ch.id === chapterId);
+```
+
+### Get Characters in a Chapter
+```javascript
+const { characters } = useStory();
+const chapterId = '123456';
+const charactersInChapter = characters.filter(char => 
+  char.appearances?.includes(chapterId)
+);
+```
+
+### Calculate Progress Percentage
+```javascript
+const { goals, getTotalWordCount } = useStory();
+const total = getTotalWordCount();
+const progress = Math.min(100, (total / goals.totalWordCountGoal) * 100);
+```
+
+---
+
+## 🎨 Complete Example Component
+
+```javascript
+import React, { useState } from 'react';
+import { useStory } from '../contexts/StoryContext';
+import { runGrammar } from '../lib/api';
+
+function MyWritingComponent() {
+  const {
+    // Chapter management
+    chapters,
+    currentChapterId,
+    getCurrentChapter,
+    setCurrentChapter,
+    updateChapter,
+    addChapter,
+    
+    // Stats
+    stats,
+    goals,
+    getTotalWordCount,
+    
+    // Activity
+    logActivity,
+  } = useStory();
+
+  const [content, setContent] = useState('');
+
+  // Load current chapter
+  React.useEffect(() => {
+    const current = getCurrentChapter();
+    if (current) {
+      setContent(current.content);
+    }
+  }, [currentChapterId]);
+
+  // Handle content change
+  const handleChange = (newContent) => {
+    setContent(newContent);
+    if (currentChapterId) {
+      updateChapter(currentChapterId, { content: newContent });
+    }
+  };
+
+  // Create new chapter
+  const handleNewChapter = () => {
+    const title = prompt('Chapter title?');
+    if (title) {
+      const chapter = addChapter(title);
+      setCurrentChapter(chapter.id);
+    }
+  };
+
+  // Run AI check
+  const handleGrammarCheck = async () => {
+    try {
+      const result = await runGrammar(content);
+      alert(`Found ${result.suggestions.length} suggestions`);
+      logActivity('ai_grammar_check');
+    } catch (error) {
+      console.error('AI error:', error);
+    }
+  };
+
+  return (
+    <div>
+      <h1>Writing: {getCurrentChapter()?.title}</h1>
+      
+      {/* Stats */}
+      <div>
+        Today: {stats.todayWords} / {goals.dailyWordCount} words
+        Total: {getTotalWordCount()} words
+      </div>
+
+      {/* Controls */}
+      <button onClick={handleNewChapter}>New Chapter</button>
+      <button onClick={handleGrammarCheck}>Check Grammar</button>
+
+      {/* Chapter List */}
+      <div>
+        {chapters.map(ch => (
+          <button
+            key={ch.id}
+            onClick={() => setCurrentChapter(ch.id)}
+            className={ch.id === currentChapterId ? 'active' : ''}
+          >
+            {ch.title}
+          </button>
+        ))}
+      </div>
+
+      {/* Editor */}
+      <textarea
+        value={content}
+        onChange={(e) => handleChange(e.target.value)}
+      />
+    </div>
+  );
+}
+```
+
+---
+
+## 🚀 Ready to Use!
+
+You now have a complete reference for all StoryContext functions. Use this guide to integrate AI and data management throughout your app!
