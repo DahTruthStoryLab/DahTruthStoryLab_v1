@@ -131,7 +131,6 @@ export default function App() {
     }
   }, []);
   return (
-   return (
     <UserProvider>
       <StoryProvider>  {/* ADD THIS LINE */}
         <DndProvider backend={MultiBackend} options={BACKENDS}>
