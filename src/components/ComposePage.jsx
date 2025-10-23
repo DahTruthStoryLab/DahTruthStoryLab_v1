@@ -1,396 +1,693 @@
-// src/components/ComposePage_Updated.jsx
-import React, { useState, useEffect, useRef } from 'react';
-import ReactQuill from 'react-quill';
-import 'react-quill/dist/quill.snow.css';
-import { useStory } from '../contexts/StoryContext';
-import { runGrammar, runStyle, runReadability, runAssistant } from '../lib/api';
+// src/components/ComposePage.jsx
+import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import ReactQuill from "react-quill";
+import Quill from "quill";
+import "react-quill/dist/quill.snow.css";
+import {
+  ArrowLeft,
+  Bot,
+  Save,
+  Maximize2,
+  Minimize2,
+  RotateCcw,
+  RotateCw,
+  Download,
+  Upload,
+} from "lucide-react";
+import { useAI } from "../lib/AiProvider";
+import { useNavigate } from "react-router-dom";
+import { useDrag, useDrop } from "react-dnd";
 
-export default function ComposePageUpdated() {
-  const {
-    chapters,
-    currentChapterId,
-    getCurrentChapter,
-    setCurrentChapter,
-    updateChapter,
-    addChapter,
-    logActivity,
-  } = useStory();
+/* ------- Fonts whitelist (family + size) ------- */
+const Font = Quill.import("formats/font");
+const FONT_WHITELIST = [
+  "sans",
+  "serif",
+  "mono",
+  "arial",
+  "calibri",
+  "cambria",
+  "timesnewroman",
+  "georgia",
+  "garamond",
+  "verdana",
+  "couriernew",
+];
+Font.whitelist = FONT_WHITELIST;
+Quill.register(Font, true);
 
-  const [editorContent, setEditorContent] = useState('');
-  const [aiResults, setAiResults] = useState(null);
-  const [aiLoading, setAiLoading] = useState(false);
-  const [showAiPanel, setShowAiPanel] = useState(false);
-  const [isFullscreen, setIsFullscreen] = useState(false);
-  const quillRef = useRef(null);
+const Size = Quill.import("formats/size");
+Size.whitelist = ["small", false, "large", "huge"];
+Quill.register(Size, true);
 
-  // Load current chapter content
+/* ------- Load Mammoth dynamically from CDN ------- */
+async function loadMammoth() {
+  if (window.mammoth) return window.mammoth;
+  await new Promise((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = "https://cdn.jsdelivr.net/npm/mammoth@1.6.0/mammoth.browser.min.js";
+    s.async = true;
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error("Failed to load Mammoth"));
+    document.head.appendChild(s);
+  });
+  return window.mammoth;
+}
+
+/* ------- Storage helpers ------- */
+const STORAGE_KEY = "dahtruth-story-lab-toc-v3";
+const loadState = () => {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+};
+const saveState = (state) => {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    window.dispatchEvent(new Event("project:change"));
+  } catch {}
+};
+
+/* ------- Small helpers ------- */
+const countWords = (html = "") => {
+  const text = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+  return text ? text.split(/\s+/).length : 0;
+};
+const ensureFirstChapter = (chapters) =>
+  Array.isArray(chapters) && chapters.length
+    ? chapters
+    : [
+        {
+          id: Date.now(),
+          title: "Chapter 1: Untitled",
+          content: "",
+          wordCount: 0,
+          lastEdited: "Just now",
+          status: "draft",
+        },
+      ];
+
+/* Prevent global shortcuts when typing in inputs or Quill editor */
+function isEditableTarget(t) {
+  if (!t) return false;
+  const el = t.nodeType === 3 ? t.parentElement : t;
+  const tag = (el?.tagName || "").toLowerCase();
+  if (tag === "input" || tag === "textarea" || tag === "select") return true;
+  if (el?.isContentEditable) return true;
+  return !!el?.closest?.('.ql-editor,[contenteditable="true"]');
+}
+
+/* ==============================
+   Compose Page (isolated writer)
+============================== */
+export default function ComposePage() {
+  const ai = useAI();
+  const navigate = useNavigate();
+
+  // Load initial project
+  const initial = useMemo(loadState, []);
+  const [book, setBook] = useState(initial?.book || { title: "Untitled Book" });
+  const [chapters, setChapters] = useState(
+    ensureFirstChapter(initial?.chapters || [])
+  );
+  const [selectedId, setSelectedId] = useState(chapters[0].id);
+  const selected = chapters.find((c) => c.id === selectedId) || chapters[0];
+
+  // Editor state
+  const [title, setTitle] = useState(selected.title || "");
+  const [html, setHtml] = useState(selected.content || "");
+  const [isFS, setIsFS] = useState(false);
+  const [aiBusy, setAiBusy] = useState(false);
+  const editorRef = useRef(null);
+  const fsEditorRef = useRef(null);
+
+  /* Sync editor when selected chapter changes */
   useEffect(() => {
-    const currentChapter = getCurrentChapter();
-    if (currentChapter) {
-      setEditorContent(currentChapter.content || '');
-    } else if (chapters.length > 0) {
-      // If no current chapter, select the first one
-      setCurrentChapter(chapters[0].id);
-    }
-  }, [currentChapterId, getCurrentChapter, chapters, setCurrentChapter]);
+    const sel = chapters.find((c) => c.id === selectedId);
+    if (!sel) return;
+    setTitle(sel.title || "");
+    setHtml(sel.content || "");
+  }, [selectedId, chapters]);
 
-  // Auto-save every 5 seconds
+  /* Persist project (debounced) */
   useEffect(() => {
-    if (!currentChapterId) return;
-
-    const timer = setTimeout(() => {
-      saveCurrentChapter();
-    }, 5000);
-
-    return () => clearTimeout(timer);
-  }, [editorContent, currentChapterId]);
-
-  const saveCurrentChapter = () => {
-    if (currentChapterId && editorContent) {
-      updateChapter(currentChapterId, { content: editorContent });
-    }
-  };
-
-  const handleEditorChange = (content) => {
-    setEditorContent(content);
-  };
-
-  // ==================== AI FUNCTIONS ====================
-
-  const handleGrammarCheck = async () => {
-    if (!editorContent) {
-      alert('Please write some text first!');
-      return;
-    }
-
-    setAiLoading(true);
-    setShowAiPanel(true);
-    
-    try {
-      const result = await runGrammar(editorContent);
-      setAiResults({
-        type: 'grammar',
-        data: result,
+    const t = setTimeout(() => {
+      const current = loadState() || {};
+      saveState({
+        book,
+        chapters,
+        daily: current.daily || { goal: 500, counts: {} },
+        settings: current.settings || { theme: "light", focusMode: false },
+        tocOutline: current.tocOutline || [],
       });
-      logActivity('ai_grammar_check', { chapterId: currentChapterId });
-    } catch (error) {
-      console.error('Grammar check error:', error);
-      alert('Grammar check failed. Please try again.');
-    } finally {
-      setAiLoading(false);
-    }
-  };
+    }, 400);
+    return () => clearTimeout(t);
+  }, [book, chapters]);
 
-  const handleStyleCheck = async () => {
-    if (!editorContent) {
-      alert('Please write some text first!');
-      return;
-    }
+  /* Quill toolbar modules */
+  const modules = useMemo(
+    () => ({
+      toolbar: [
+        [{ header: [1, 2, 3, false] }],
+        [{ font: FONT_WHITELIST }],
+        [{ size: Size.whitelist }],
+        ["bold", "italic", "underline", "strike"],
+        [{ list: "ordered" }, { list: "bullet" }],
+        [{ align: [] }],
+        ["blockquote", "code-block"],
+        ["link", "image"],
+        ["clean"],
+      ],
+      history: { delay: 500, maxStack: 200, userOnly: true },
+    }),
+    []
+  );
 
-    setAiLoading(true);
-    setShowAiPanel(true);
-    
-    try {
-      const result = await runStyle(editorContent);
-      setAiResults({
-        type: 'style',
-        data: result,
+  /* Get active editor based on fullscreen state */
+  const getActiveEditor = () => (isFS ? fsEditorRef.current : editorRef.current);
+
+  /* Save */
+  const handleSave = useCallback(() => {
+    setChapters((prevChapters) => {
+      const chapterToUpdate = prevChapters.find((c) => c.id === selectedId);
+      if (!chapterToUpdate) return prevChapters;
+
+      const updated = {
+        ...chapterToUpdate,
+        title: title || chapterToUpdate.title,
+        content: html,
+        wordCount: countWords(html),
+        lastEdited: new Date().toLocaleString(),
+        status: chapterToUpdate.status || "draft",
+      };
+
+      const nextChapters = prevChapters.map((c) =>
+        c.id === updated.id ? updated : c
+      );
+
+      const current = loadState() || {};
+      saveState({
+        book,
+        chapters: nextChapters,
+        daily: current.daily || { goal: 500, counts: {} },
+        settings: current.settings || { theme: "light", focusMode: false },
+        tocOutline: current.tocOutline || [],
       });
-      logActivity('ai_style_check', { chapterId: currentChapterId });
-    } catch (error) {
-      console.error('Style check error:', error);
-      alert('Style check failed. Please try again.');
-    } finally {
-      setAiLoading(false);
-    }
-  };
 
-  const handleReadabilityCheck = async () => {
-    if (!editorContent) {
-      alert('Please write some text first!');
-      return;
-    }
+      return nextChapters;
+    });
+  }, [selectedId, title, html, book]);
 
-    setAiLoading(true);
-    setShowAiPanel(true);
-    
+  /* Undo / Redo */
+  const undo = () => getActiveEditor()?.getEditor?.()?.history?.undo?.();
+  const redo = () => getActiveEditor()?.getEditor?.()?.history?.redo?.();
+
+  /* AI proof/clarify */
+  const runAI = async (mode = "proofread") => {
     try {
-      const result = await runReadability(editorContent);
-      setAiResults({
-        type: 'readability',
-        data: result,
+      setAiBusy(true);
+      const edited = await ai.proofread(html || "", { mode, noEmDashes: true });
+      const newHtml = edited ?? html;
+      setHtml(newHtml);
+
+      setChapters((prev) => {
+        const next = prev.map((c) =>
+          c.id === selectedId
+            ? {
+                ...c,
+                title: title || c.title,
+                content: newHtml,
+                wordCount: countWords(newHtml),
+                lastEdited: new Date().toLocaleString(),
+              }
+            : c
+        );
+        const current = loadState() || {};
+        saveState({
+          book,
+          chapters: next,
+          daily: current.daily || { goal: 500, counts: {} },
+          settings: current.settings || { theme: "light", focusMode: false },
+          tocOutline: current.tocOutline || [],
+        });
+        return next;
       });
-      logActivity('ai_readability_check', { chapterId: currentChapterId });
-    } catch (error) {
-      console.error('Readability check error:', error);
-      alert('Readability check failed. Please try again.');
+    } catch (e) {
+      console.error("[AI] error:", e);
+      alert(e.message || "AI request failed");
     } finally {
-      setAiLoading(false);
+      setAiBusy(false);
     }
   };
 
-  const handleAiImprove = async () => {
-    if (!editorContent) {
-      alert('Please write some text first!');
-      return;
-    }
+  const handleSaveAndProof = async () => {
+    handleSave();
+    await runAI("proofread");
+  };
 
-    setAiLoading(true);
-    
-    try {
-      const result = await runAssistant(editorContent, 'improve', '');
-      if (result.improvedHtml) {
-        setEditorContent(result.improvedHtml);
+  /* Keyboard shortcuts */
+  useEffect(() => {
+    const onKey = (e) => {
+      if (isEditableTarget(e.target)) return;
+
+      const k = e.key.toLowerCase();
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && k === "s") {
+        e.preventDefault();
+        handleSave();
       }
-      logActivity('ai_improve', { chapterId: currentChapterId });
-      alert('Text improved successfully!');
-    } catch (error) {
-      console.error('AI improve error:', error);
-      alert('AI improve failed. Please try again.');
-    } finally {
-      setAiLoading(false);
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && k === "s") {
+        e.preventDefault();
+        handleSaveAndProof();
+      }
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && k === "z") {
+        e.preventDefault();
+        undo();
+      }
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && k === "z") {
+        e.preventDefault();
+        redo();
+      }
+    };
+    window.addEventListener("keydown", onKey, { capture: true });
+    return () => window.removeEventListener("keydown", onKey, { capture: true });
+  }, [handleSave, handleSaveAndProof, isFS]);
+
+  /* Add a new chapter */
+  const addChapter = () => {
+    const id = Date.now();
+    const ch = {
+      id,
+      title: `Chapter ${chapters.length + 1}: Untitled`,
+      content: "",
+      wordCount: 0,
+      lastEdited: "Just now",
+      status: "draft",
+    };
+    setChapters((prev) => [ch, ...prev]);
+    setSelectedId(id);
+  };
+
+  /* Reorder helper */
+  const reorderChapters = (dragId, targetId) => {
+    if (!dragId || !targetId || dragId === targetId) return;
+    setChapters((prev) => {
+      const from = prev.findIndex((c) => c.id === dragId);
+      const to = prev.findIndex((c) => c.id === targetId);
+      if (from === -1 || to === -1 || from === to) return prev;
+
+      const next = prev.slice();
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+
+      const current = loadState() || {};
+      saveState({
+        book,
+        chapters: next,
+        daily: current.daily || { goal: 500, counts: {} },
+        settings: current.settings || { theme: "light", focusMode: false },
+        tocOutline: current.tocOutline || [],
+      });
+
+      if (selectedId === dragId) setSelectedId(dragId);
+      return next;
+    });
+  };
+
+  /* Import Word (.docx) */
+  const ImportDocxButton = () => {
+    const fileInputRef = useRef(null);
+    const onPick = () => fileInputRef.current?.click();
+    
+    const onFile = async (e) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      if (!file.name.toLowerCase().endsWith(".docx")) {
+        alert("Please choose a .docx file (not .doc).");
+        e.target.value = "";
+        return;
+      }
+
+      try {
+        const mammoth = await loadMammoth();
+        const arrayBuffer = await file.arrayBuffer();
+
+        const { value: htmlContent } = await mammoth.convertToHtml(
+          { arrayBuffer },
+          {
+            styleMap: [
+              "p[style-name='Heading 1'] => h1:fresh",
+              "p[style-name='Heading 2'] => h2:fresh",
+              "p[style-name='Heading 3'] => h3:fresh",
+            ],
+            convertImage: mammoth.images.inline(async (elem) => {
+              const buff = await elem.read("base64");
+              return { src: `data:${elem.contentType};base64,${buff}` };
+            }),
+          }
+        );
+
+        const activeEditor = getActiveEditor();
+        const q = activeEditor?.getEditor?.();
+        if (q) {
+          const delta = q.clipboard.convert({ html: htmlContent });
+          q.setContents(delta, "user");
+          setHtml(q.root.innerHTML);
+        }
+      } catch (err) {
+        console.error(err);
+        alert("Failed to import .docx");
+      } finally {
+        e.target.value = "";
+      }
+    };
+
+    return (
+      <>
+        <button
+          onClick={onPick}
+          className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50"
+          title="Import Word Document"
+        >
+          <Upload size={16} /> Import
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+          className="hidden"
+          onChange={onFile}
+        />
+      </>
+    );
+  };
+
+  /* Export to Word */
+  const exportToDocx = () => {
+    try {
+      const docHtml = `
+        <!DOCTYPE html>
+        <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+        <head>
+          <meta charset='utf-8'>
+          <title>${title || "Untitled Chapter"}</title>
+          <style>
+            body { font-family: 'Times New Roman', serif; font-size: 12pt; line-height: 1.5; }
+            h1, h2, h3 { font-family: Arial, sans-serif; }
+            p { margin: 0 0 12pt 0; }
+          </style>
+        </head>
+        <body>
+          <h1>${title || "Untitled Chapter"}</h1>
+          ${html}
+        </body>
+        </html>
+      `;
+      const blob = new Blob(['\ufeff', docHtml], {
+        type: 'application/msword',
+      });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${title || "chapter"}.doc`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error(err);
+      alert("Failed to export document");
     }
   };
 
-  // ==================== CHAPTER MANAGEMENT ====================
+  /* Draggable + droppable chapter list item */
+  const ChapterItem = ({ ch }) => {
+    const [{ isDragging }, dragRef] = useDrag(
+      () => ({
+        type: "CHAPTER",
+        item: { id: ch.id },
+        collect: (m) => ({ isDragging: m.isDragging() }),
+      }),
+      [ch.id]
+    );
 
-  const handleNewChapter = () => {
-    const title = prompt('Enter chapter title:');
-    if (title) {
-      const newChapter = addChapter(title);
-      setCurrentChapter(newChapter.id);
-    }
+    const [{ isOver }, dropRef] = useDrop(
+      () => ({
+        accept: "CHAPTER",
+        drop: (item) => {
+          if (item?.id && item.id !== ch.id) reorderChapters(item.id, ch.id);
+        },
+        collect: (m) => ({ isOver: m.isOver() }),
+      }),
+      [ch.id]
+    );
+
+    const setRefs = (el) => {
+      dropRef(el);
+      dragRef(el);
+    };
+
+    return (
+      <button
+        ref={setRefs}
+        type="button"
+        onClick={() => setSelectedId(ch.id)}
+        className={[
+          "w-full text-left px-3 py-2 rounded-lg border transition",
+          isOver ? "dnd-drop-hover" : "",
+          isDragging ? "dnd-draggable dnd-dragging" : "dnd-draggable",
+          selectedId === ch.id
+            ? "bg-primary/15 border-primary/40"
+            : "bg-white border-white/60 hover:bg-white/80",
+        ].join(" ")}
+        title={`${(ch.wordCount || 0).toLocaleString()} words`}
+      >
+        <div className="font-medium truncate">{ch.title}</div>
+        <div className="text-xs text-slate-500">
+          {(ch.wordCount || 0).toLocaleString()} words • {ch.lastEdited || "—"}
+        </div>
+      </button>
+    );
   };
 
-  const handleChapterSelect = (chapterId) => {
-    saveCurrentChapter(); // Save current before switching
-    setCurrentChapter(chapterId);
-  };
+  /* Back to Dashboard */
+  const goBack = () => navigate("/dashboard");
 
-  // ==================== QUILL CONFIG ====================
+  /* Toolbar component */
+  const Toolbar = ({ compact = false }) => (
+    <>
+      {!compact && (
+        <>
+          <button
+            onClick={undo}
+            className="rounded-lg border px-2 py-1.5 bg-white hover:bg-slate-50"
+            title="Undo"
+          >
+            <RotateCcw size={16} />
+          </button>
+          <button
+            onClick={redo}
+            className="rounded-lg border px-2 py-1.5 bg-white hover:bg-slate-50"
+            title="Redo"
+          >
+            <RotateCw size={16} />
+          </button>
+        </>
+      )}
 
-  const modules = {
-    toolbar: [
-      [{ header: [1, 2, 3, false] }],
-      ['bold', 'italic', 'underline', 'strike'],
-      [{ list: 'ordered' }, { list: 'bullet' }],
-      [{ indent: '-1' }, { indent: '+1' }],
-      ['blockquote', 'code-block'],
-      [{ align: [] }],
-      ['clean'],
-    ],
-  };
+      <ImportDocxButton />
 
-  const currentChapter = getCurrentChapter();
+      <button
+        onClick={exportToDocx}
+        className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50"
+        title="Export to Word"
+      >
+        <Download size={16} /> Export
+      </button>
 
-  const toggleFullscreen = () => {
-    setIsFullscreen(!isFullscreen);
-  };
+      <button
+        onClick={() => runAI("proofread")}
+        className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50 disabled:opacity-60"
+        disabled={aiBusy}
+        title="AI Proofread"
+      >
+        <Bot size={16} />
+        {aiBusy ? "AI…" : compact ? "Proof" : "AI: Proofread"}
+      </button>
+      <button
+        onClick={() => runAI("clarify")}
+        className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50 disabled:opacity-60"
+        disabled={aiBusy}
+        title="AI Clarify"
+      >
+        <Bot size={16} />
+        {aiBusy ? "AI…" : compact ? "Clarify" : "AI: Clarify"}
+      </button>
+      <button
+        onClick={handleSaveAndProof}
+        className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50 disabled:opacity-60"
+        disabled={aiBusy}
+        title="Proofread + Save"
+      >
+        <Bot size={16} />
+        Proof + Save
+      </button>
+      <button
+        onClick={handleSave}
+        className="inline-flex items-center gap-2 rounded-lg bg-primary text-white px-3 py-1.5 hover:opacity-90"
+        title="Save (Ctrl+S)"
+      >
+        <Save size={16} /> Save
+      </button>
+    </>
+  );
 
   return (
-    <div className={`min-h-screen bg-[var(--color-parchment)] ${isFullscreen ? 'fixed inset-0 z-50' : ''}`}>
-      {/* Header */}
-      <div className="border-b border-[var(--color-ink)]/20 bg-white/50 backdrop-blur">
-        <div className="max-w-7xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold text-[var(--color-ink)]">
-                {currentChapter?.title || 'No Chapter Selected'}
-              </h1>
-              <p className="text-sm text-[var(--color-ink)]/60">
-                {currentChapter?.wordCount || 0} words
-              </p>
-            </div>
-            
-            {/* AI Toolbar */}
-            <div className="flex gap-2">
-              <button
-                onClick={toggleFullscreen}
-                className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
-                title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
-              >
-                {isFullscreen ? '⛶ Exit' : '⛶ Fullscreen'}
-              </button>
-              <button
-                onClick={handleGrammarCheck}
-                disabled={aiLoading}
-                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
-              >
-                Grammar Check
-              </button>
-              <button
-                onClick={handleStyleCheck}
-                disabled={aiLoading}
-                className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 disabled:opacity-50"
-              >
-                Style Check
-              </button>
-              <button
-                onClick={handleReadabilityCheck}
-                disabled={aiLoading}
-                className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
-              >
-                Readability
-              </button>
-              <button
-                onClick={handleAiImprove}
-                disabled={aiLoading}
-                className="px-4 py-2 bg-orange-600 text-white rounded hover:bg-orange-700 disabled:opacity-50"
-              >
-                AI Improve
-              </button>
-            </div>
+    <div className="min-h-screen bg-[rgb(244,247,250)] text-slate-900">
+      {/* Top bar */}
+      <div className="sticky top-0 z-40 bg-white/80 backdrop-blur border-b border-slate-200">
+        <div className="max-w-7xl mx-auto px-4 h-14 flex items-center gap-2">
+          <button
+            onClick={goBack}
+            className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50"
+            title="Back to Dashboard"
+          >
+            <ArrowLeft size={16} /> Back to Dashboard
+          </button>
+
+          <div className="ml-auto flex items-center gap-2">
+            <Toolbar />
+            <button
+              onClick={() => setIsFS((v) => !v)}
+              className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50"
+              title={isFS ? "Exit Fullscreen" : "Fullscreen"}
+            >
+              {isFS ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+              {isFS ? "Exit" : "Fullscreen"}
+            </button>
           </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 py-6">
-        <div className="grid grid-cols-12 gap-6">
-          {/* Chapter Sidebar - Hide in fullscreen */}
-          {!isFullscreen && (
-            <div className="col-span-3 space-y-4">
+      {/* Layout */}
+      <div className="max-w-7xl mx-auto px-4 py-6 grid grid-cols-1 xl:grid-cols-[18rem_1fr] gap-6">
+        {/* Left: Chapters */}
+        <aside className="xl:sticky xl:top-16 space-y-2" style={{ zIndex: 10 }}>
+          <div className="flex items-center justify-between">
+            <div className="text-sm text-slate-600">Chapters</div>
             <button
-              onClick={handleNewChapter}
-              className="w-full px-4 py-2 bg-[var(--color-accent)] text-white rounded hover:opacity-90"
+              onClick={addChapter}
+              className="text-sm px-2 py-1 rounded-md border bg-white hover:bg-slate-50"
             >
-              + New Chapter
+              + Add
             </button>
-            
-            <div className="space-y-2">
-              <h3 className="font-semibold text-[var(--color-ink)]">Chapters</h3>
-              {chapters.map((chapter) => (
+          </div>
+          <div className="space-y-2">
+            {chapters.map((c) => (
+              <ChapterItem key={c.id} ch={c} />
+            ))}
+          </div>
+        </aside>
+
+        {/* Center: Editor */}
+        <section className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+          <div className="px-4 py-3 border-b border-slate-200 flex items-center gap-3">
+            <input
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder="Chapter title"
+              className="w-full text-lg font-semibold outline-none bg-transparent"
+            />
+            <div className="text-sm text-slate-500">
+              {(countWords(html) || 0).toLocaleString()} words
+            </div>
+          </div>
+
+          <div className="p-3">
+            <ReactQuill
+              ref={editorRef}
+              theme="snow"
+              value={html}
+              onChange={setHtml}
+              modules={modules}
+              placeholder="Start writing your story here…"
+            />
+          </div>
+        </section>
+      </div>
+
+      {/* Fullscreen overlay */}
+      {isFS && (
+        <div className="fixed inset-0 z-[9999] bg-[#fdecef]">
+          <div className="absolute top-0 left-0 right-0 p-3 flex items-center justify-between gap-2 bg-white/90 backdrop-blur border-b">
+            <button
+              onClick={goBack}
+              className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50"
+              title="Back to Dashboard"
+            >
+              <ArrowLeft size={16} /> Back
+            </button>
+
+            <div className="flex items-center gap-2">
+              <Toolbar compact />
+              <button
+                onClick={() => setIsFS(false)}
+                className="rounded-lg border bg-white px-3 py-1.5 hover:bg-slate-50"
+                title="Exit Fullscreen"
+              >
+                <Minimize2 size={18} />
+              </button>
+            </div>
+          </div>
+
+          <div className="pt-20 pb-6 px-6 h-full grid grid-cols-1 xl:grid-cols-[18rem_1fr] gap-6 overflow-auto">
+            {/* Chapters */}
+            <aside className="space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="text-sm text-slate-700">Chapters</div>
                 <button
-                  key={chapter.id}
-                  onClick={() => handleChapterSelect(chapter.id)}
-                  className={`w-full text-left px-4 py-2 rounded transition ${
-                    chapter.id === currentChapterId
-                      ? 'bg-[var(--color-accent)] text-white'
-                      : 'bg-white/50 hover:bg-white/80'
-                  }`}
+                  onClick={addChapter}
+                  className="text-sm px-2 py-1 rounded-md border bg-white hover:bg-slate-50"
                 >
-                  <div className="font-medium">{chapter.title}</div>
-                  <div className="text-xs opacity-70">{chapter.wordCount} words</div>
+                  + Add
                 </button>
-              ))}
-            </div>
-          </div>
-          )}
+              </div>
+              <div className="space-y-2">
+                {chapters.map((c) => (
+                  <ChapterItem key={c.id} ch={c} />
+                ))}
+              </div>
+            </aside>
 
-          {/* Editor */}
-          <div className={isFullscreen ? 'col-span-12' : showAiPanel ? 'col-span-6' : 'col-span-9'}>
-            <div className="bg-white rounded-lg shadow-lg">
-              <ReactQuill
-                ref={quillRef}
-                value={editorContent}
-                onChange={handleEditorChange}
-                modules={modules}
-                theme="snow"
-                placeholder="Start writing your story..."
-                style={{ height: '70vh' }}
-              />
-            </div>
-          </div>
-
-          {/* AI Results Panel */}
-          {showAiPanel && !isFullscreen && (
-            <div className="col-span-3">
-              <div className="bg-white rounded-lg shadow-lg p-4">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-semibold text-[var(--color-ink)]">
-                    AI Results
-                  </h3>
-                  <button
-                    onClick={() => setShowAiPanel(false)}
-                    className="text-gray-500 hover:text-gray-700"
-                  >
-                    ✕
-                  </button>
-                </div>
-
-                {aiLoading && (
-                  <div className="text-center py-8">
-                    <div className="animate-spin h-8 w-8 border-4 border-blue-600 border-t-transparent rounded-full mx-auto"></div>
-                    <p className="mt-2 text-sm text-gray-600">Analyzing...</p>
-                  </div>
-                )}
-
-                {!aiLoading && aiResults && (
-                  <div className="space-y-4">
-                    {/* Grammar Results */}
-                    {aiResults.type === 'grammar' && (
-                      <div>
-                        <h4 className="font-medium mb-2">Grammar Suggestions:</h4>
-                        {aiResults.data.suggestions?.length > 0 ? (
-                          <ul className="space-y-2">
-                            {aiResults.data.suggestions.map((suggestion, idx) => (
-                              <li key={idx} className="text-sm bg-yellow-50 p-2 rounded">
-                                {suggestion}
-                              </li>
-                            ))}
-                          </ul>
-                        ) : (
-                          <p className="text-sm text-green-600">No grammar issues found!</p>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Style Results */}
-                    {aiResults.type === 'style' && (
-                      <div>
-                        <h4 className="font-medium mb-2">Style Suggestions:</h4>
-                        {aiResults.data.suggestions?.length > 0 ? (
-                          <ul className="space-y-2">
-                            {aiResults.data.suggestions.map((suggestion, idx) => (
-                              <li key={idx} className="text-sm bg-blue-50 p-2 rounded">
-                                {suggestion}
-                              </li>
-                            ))}
-                          </ul>
-                        ) : (
-                          <p className="text-sm text-green-600">Style looks great!</p>
-                        )}
-                      </div>
-                    )}
-
-                    {/* Readability Results */}
-                    {aiResults.type === 'readability' && (
-                      <div>
-                        <h4 className="font-medium mb-2">Readability Analysis:</h4>
-                        <div className="space-y-2 text-sm">
-                          <div className="flex justify-between p-2 bg-gray-50 rounded">
-                            <span>Score:</span>
-                            <span className="font-semibold">{aiResults.data.score}</span>
-                          </div>
-                          <div className="flex justify-between p-2 bg-gray-50 rounded">
-                            <span>Grade Level:</span>
-                            <span className="font-semibold">{aiResults.data.gradeLevel}</span>
-                          </div>
-                          <div className="flex justify-between p-2 bg-gray-50 rounded">
-                            <span>Reading Level:</span>
-                            <span className="font-semibold">{aiResults.data.readingLevel}</span>
-                          </div>
-                        </div>
-                        {aiResults.data.suggestions?.length > 0 && (
-                          <div className="mt-4">
-                            <h5 className="font-medium mb-2">Suggestions:</h5>
-                            <ul className="space-y-1">
-                              {aiResults.data.suggestions.map((suggestion, idx) => (
-                                <li key={idx} className="text-sm text-gray-700">
-                                  • {suggestion}
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
+            {/* Page */}
+            <div className="w-full max-w-3xl mx-auto bg-white border border-slate-200 rounded-[14px] shadow-2xl">
+              <div className="px-3 py-2 border-b border-slate-200 flex items-center justify-between">
+                <input
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className="text-xl font-semibold bg-transparent outline-none"
+                  placeholder="Chapter title"
+                />
+                <span className="text-sm text-slate-500">
+                  {(countWords(html) || 0).toLocaleString()} words
+                </span>
+              </div>
+              <div className="p-3">
+                <ReactQuill
+                  ref={fsEditorRef}
+                  theme="snow"
+                  value={html}
+                  onChange={setHtml}
+                  modules={modules}
+                  placeholder="Write in fullscreen…"
+                />
               </div>
             </div>
-          )}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
-} 
+}
