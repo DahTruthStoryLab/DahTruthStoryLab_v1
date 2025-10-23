@@ -20,13 +20,3 @@ frontend:
   cache:
     paths:
       - node_modules/**/*
-```
-
-Notice I **hardcoded** the API URLs this time, because the environment variables from Amplify aren't being passed through properly.
-
-### Save → Redeploy
-
-After it rebuilds, check the build logs - you should see:
-```
-VITE_API_BASE=https://t9xv0aicog.execute-api.us-east-1.amazonaws.com/prod/ai
-VITE_AI_URL=https://t9xv0aicog.execute-api.us-east-1.amazonaws.com/prod/ai/rewrite
