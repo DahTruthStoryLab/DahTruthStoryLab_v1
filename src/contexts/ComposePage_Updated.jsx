@@ -20,6 +20,7 @@ export default function ComposePageUpdated() {
   const [aiResults, setAiResults] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [showAiPanel, setShowAiPanel] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const quillRef = useRef(null);
 
   // Load current chapter content
@@ -182,8 +183,12 @@ export default function ComposePageUpdated() {
 
   const currentChapter = getCurrentChapter();
 
+  const toggleFullscreen = () => {
+    setIsFullscreen(!isFullscreen);
+  };
+
   return (
-    <div className="min-h-screen bg-[var(--color-parchment)]">
+    <div className={`min-h-screen bg-[var(--color-parchment)] ${isFullscreen ? 'fixed inset-0 z-50' : ''}`}>
       {/* Header */}
       <div className="border-b border-[var(--color-ink)]/20 bg-white/50 backdrop-blur">
         <div className="max-w-7xl mx-auto px-4 py-4">
@@ -199,6 +204,13 @@ export default function ComposePageUpdated() {
             
             {/* AI Toolbar */}
             <div className="flex gap-2">
+              <button
+                onClick={toggleFullscreen}
+                className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
+                title={isFullscreen ? "Exit Fullscreen" : "Enter Fullscreen"}
+              >
+                {isFullscreen ? '⛶ Exit' : '⛶ Fullscreen'}
+              </button>
               <button
                 onClick={handleGrammarCheck}
                 disabled={aiLoading}
@@ -234,8 +246,9 @@ export default function ComposePageUpdated() {
 
       <div className="max-w-7xl mx-auto px-4 py-6">
         <div className="grid grid-cols-12 gap-6">
-          {/* Chapter Sidebar */}
-          <div className="col-span-3 space-y-4">
+          {/* Chapter Sidebar - Hide in fullscreen */}
+          {!isFullscreen && (
+            <div className="col-span-3 space-y-4">
             <button
               onClick={handleNewChapter}
               className="w-full px-4 py-2 bg-[var(--color-accent)] text-white rounded hover:opacity-90"
@@ -261,9 +274,10 @@ export default function ComposePageUpdated() {
               ))}
             </div>
           </div>
+          )}
 
           {/* Editor */}
-          <div className={showAiPanel ? 'col-span-6' : 'col-span-9'}>
+          <div className={isFullscreen ? 'col-span-12' : showAiPanel ? 'col-span-6' : 'col-span-9'}>
             <div className="bg-white rounded-lg shadow-lg">
               <ReactQuill
                 ref={quillRef}
@@ -278,7 +292,7 @@ export default function ComposePageUpdated() {
           </div>
 
           {/* AI Results Panel */}
-          {showAiPanel && (
+          {showAiPanel && !isFullscreen && (
             <div className="col-span-3">
               <div className="bg-white rounded-lg shadow-lg p-4">
                 <div className="flex items-center justify-between mb-4">
