@@ -337,7 +337,7 @@ export default function App() {
           </Suspense>
         </Router>
       </DndProvider>
-    </UserProvider>
-   </StoryProvider>  {/* ADD THIS LINE */}
+  </StoryProvider>  // ← Close StoryProvider first
+</UserProvider>    // ← Then close UserProvider
   );
 }
