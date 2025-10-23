@@ -8,6 +8,9 @@ frontend:
         - pnpm i --frozen-lockfile
     build:
       commands:
+        - echo "VITE_API_BASE=$VITE_API_BASE" >> .env.production
+        - echo "VITE_AI_URL=$VITE_AI_URL" >> .env.production
+        - echo "VITE_MSAL_CLIENT_ID=$VITE_MSAL_CLIENT_ID" >> .env.production
         - pnpm build
   artifacts:
     baseDirectory: dist
