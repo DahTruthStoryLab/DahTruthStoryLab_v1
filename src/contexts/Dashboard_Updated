@@ -144,6 +144,12 @@ export default function DashboardUpdated() {
                   description="Organize your chapters"
                 />
                 <QuickActionButton
+                  to="/calendar"
+                  icon="📅"
+                  title="Calendar"
+                  description="Track deadlines & goals"
+                />
+                <QuickActionButton
                   to="/story-lab"
                   icon="🧪"
                   title="Story Lab"
@@ -154,6 +160,12 @@ export default function DashboardUpdated() {
                   icon="📤"
                   title="Publishing Suite"
                   description="Prepare for publication"
+                />
+                <QuickActionButton
+                  to="/profile"
+                  icon="👤"
+                  title="Profile"
+                  description="Manage your author profile"
                 />
               </div>
             </div>
