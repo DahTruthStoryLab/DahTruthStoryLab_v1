@@ -131,8 +131,7 @@ export default function App() {
   }, []);
   return (
     <UserProvider>
-      <StoryProvider>  {/* ADD THIS LINE */}
-        <DndProvider backend={MultiBackend} options={BACKENDS}>
+    <DndProvider backend={MultiBackend} options={BACKENDS}>
         <Router>
           <ScrollToTop />
           <Suspense fallback={<Fallback />}>
@@ -336,7 +335,6 @@ export default function App() {
           </Suspense>
         </Router>
       </DndProvider>
-  </StoryProvider>  // ← Close StoryProvider first
-</UserProvider>    // ← Then close UserProvider
+   </UserProvider>    // ← Then close UserProvider
   );
 }
