@@ -2,7 +2,9 @@
 // Absolute base to your HTTP API stage, e.g.
 //   dev:  https://t9xv0aicog.execute-api.us-east-1.amazonaws.com/dev/ai
 //   prod: https://t9xv0aicog.execute-api.us-east-1.amazonaws.com/prod/ai
-export const API_BASE: string | undefined = import.meta.env.VITE_API_BASE as string | undefined;
+export const API_BASE: string = 
+  import.meta.env.VITE_API_BASE || 
+  'https://t9xv0aicog.execute-api.us-east-1.amazonaws.com/prod/ai';
 
 // expose for quick console checks on the live site
 // @ts-ignore
@@ -21,18 +23,15 @@ async function jsonFetch(url: string, init: RequestInit) {
   const ct = res.headers.get("content-type") || "";
   const isJson = ct.includes("application/json");
   const body = isJson ? await res.json() : await res.text();
-
   if (!res.ok) {
     const msg = isJson ? (body as any)?.error ?? JSON.stringify(body) : body.slice(0, 200);
     console.error("❌ HTTP error", res.status, res.statusText, "from", url, "\nBody:", msg);
     throw new Error(`HTTP ${res.status} ${res.statusText} — ${msg}`);
   }
-
   if (!isJson) {
     console.error("❌ Non-JSON response from:", url, "\nFirst 200 chars:\n", (body as string).slice(0, 200));
     throw new Error(`Expected JSON but got non-JSON from ${url}`);
   }
-
   return body;
 }
 
