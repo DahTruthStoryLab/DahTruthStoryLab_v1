@@ -19,7 +19,6 @@ import { DndProvider } from "react-dnd";
 import { MultiBackend, TouchTransition, MouseTransition } from "dnd-multi-backend";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { TouchBackend } from "react-dnd-touch-backend";
-import { StoryProvider } from './contexts/StoryContext';
 
 import { UserProvider } from "./lib/userStore.jsx"; 
 // force-load API bootstrap (adds window.__API_BASE__)
