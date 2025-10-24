@@ -1454,7 +1454,7 @@ return (
               alignItems: "center",
             }}
           >
-            🌐 HTML
+         🌐 HTML
             <input
               type="file"
               accept=".html,.htm,.xhtml"
@@ -1465,7 +1465,6 @@ return (
               }}
             />
           </label>
-
           <button
             style={{ ...styles.btnPrimary, padding: "6px 12px", fontSize: 12, height: 28 }}
             onClick={saveActiveChapterHTML}
@@ -1475,48 +1474,72 @@ return (
         </div>
       </div>
 
+      {/* Editor canvas wrapper */}
+      <div
+        style={{
+          padding: 16,
+          background: `linear-gradient(180deg, ${theme.bg}, #e6ebf2)`,
+          borderRadius: 12,
+          border: `1px solid ${theme.border}`,
+        }}
+      >
+        <div
+          ref={editorRef}
+          contentEditable
+          suppressContentEditableWarning
+          style={{
+            margin: "0 auto",
+            width: "100%",
+            maxWidth: 800,
+            minHeight: 1040,
+            background: "#ffffff",
+            color: "#111",
+            border: "1px solid #e5e7eb",
+            boxShadow: "0 8px 30px rgba(2,20,40,0.10)",
+            borderRadius: 6,
+            padding: "48px 48px",
+            lineHeight: ms.lineHeight,
+            fontFamily: ms.fontFamily,
+            fontSize: ms.fontSizePt * (96 / 72),
+            outline: "none",
+            direction: "ltr",
+            unicodeBidi: "plaintext",
+            whiteSpace: "pre-wrap",
+          }}
+        />
+      </div>
 
-                    {/* Editor canvas wrapper */}
-                    <div
-                      style={{
-                        padding: 16,
-                        background: `linear-gradient(180deg, ${theme.bg}, #e6ebf2)`,
-                        borderRadius: 12,
-                        border: `1px solid ${theme.border}`,
-                      }}
-                    >
-                    <div
-                        ref={editorRef}
-                        contentEditable
-                        suppressContentEditableWarning
-                        style={{
-                          margin: "0 auto",
-                          width: "100%",
-                          maxWidth: 800,
-                          minHeight: 1040,
-                          background: "#ffffff",
-                          color: "#111",
-                          border: "1px solid #e5e7eb",
-                          boxShadow: "0 8px 30px rgba(2,20,40,0.10)",
-                          borderRadius: 6,
-                          padding: "48px 48px",
-                          lineHeight: ms.lineHeight,
-                          fontFamily: ms.fontFamily,
-                          fontSize: ms.fontSizePt * (96 / 72),
-                          outline: "none",
-                          direction: "ltr",
-                          unicodeBidi: "plaintext",
-                          whiteSpace: "pre-wrap",
-                        }}
-                      />
-                      <div style={{ color: theme.subtext, fontSize: 12, marginTop: 6 }}>
-                      Tip: Use H1/H2/H3 for sections — if "Build Contents from Headings" is on,
-                      your TOC will include them.
-                    </div>
-                  </section>
-                </div>
-              </div>
+      <div style={{ color: theme.subtext, fontSize: 12, marginTop: 6 }}>
+        Tip: Use H1/H2/H3 for sections — if "Build Contents from Headings" is on,
+        your TOC will include them.
+      </div>
+    </section>
+  </div>
+</div>
+```
 
+---
+
+## 🔑 **Key Fixes:**
+
+1. ✅ **Fixed indentation** - Was all over the place
+2. ✅ **Changed `/>` to proper closing** - The editor div should close with `/>` as self-closing
+3. ✅ **Moved tip div outside** - Was inside the editor div incorrectly  
+4. ✅ **Proper closing tags** - `</section>`, `</div>`, `</div>` in correct order
+
+---
+
+## 📋 **Tag Structure (Must Match):**
+```
+<section>                    ← Opens somewhere above
+  <div>                      ← Content wrapper
+    <div>                    ← Editor canvas wrapper
+      <div ref={editorRef} /> ← Editor (self-closing)
+    </div>                   ← Close canvas wrapper
+    <div>Tip...</div>        ← Tip text
+  </section>                 ← Close section
+</div>                       ← Close content wrapper
+</div>                       ← Close outer wrapper
   {/* 📦 Chapter Management */}
               <div style={styles.glassCard}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
