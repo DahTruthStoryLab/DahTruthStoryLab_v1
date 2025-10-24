@@ -30,7 +30,7 @@ const GOOGLE_PALETTE = {
 
 // --- AI API base (top-level/module scope) ---
 const AI_API_BASE: string =
-  (import.meta as any).env?.VITE_AI_API_BASE ?? "/proof.api";
+  (import.meta as any).env?.VITE_API_BASE ?? "/proof.api";
 
 /* ---------- Types ---------- */
 type Chapter = {
