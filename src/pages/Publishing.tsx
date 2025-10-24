@@ -1628,34 +1628,34 @@ return (
                 </div>
               </div>
             </main>
-
-                  {isWide && (
-          <PublishingSidebar
-            meta={meta}
-            setMeta={setMeta}
-            matter={matter}
-            setMatter={setMatter}
-            manuscriptPreset={manuscriptPreset}
-            setManuscriptPreset={setManuscriptPreset}
-            platformPreset={platformPreset}
-            setPlatformPreset={setPlatformPreset}
-            includeHeadersFooters={includeHeadersFooters}
-            wordCount={wordCount}
-            ms={ms}
-            setMsOverrides={setMsOverrides}
-            manuscriptEntries={manuscriptEntries}
-            platformEntries={platformEntries}
-            googleMode={googleMode}
-            setGoogleMode={setGoogleMode}
-          />
-        )}
-      </div> {/* grid: display: "grid", gridTemplateColumns: ... */}
-    </div> {/* inner + sectionShell */}
-  </div> {/* outer */}
-</PageShell>
-);
+         
+            {isWide && (
+              <PublishingSidebar
+                meta={meta}
+                setMeta={setMeta}
+                matter={matter}
+                setMatter={setMatter}
+                manuscriptPreset={manuscriptPreset}
+                setManuscriptPreset={setManuscriptPreset}
+                platformPreset={platformPreset}
+                setPlatformPreset={setPlatformPreset}
+                includeHeadersFooters={includeHeadersFooters}
+                wordCount={wordCount}
+                ms={ms}
+                setMsOverrides={setMsOverrides}
+                manuscriptEntries={manuscriptEntries}
+                platformEntries={platformEntries}
+                googleMode={googleMode}
+                setGoogleMode={setGoogleMode}
+              />
+            )}
+          </div> {/* grid */}
+        </div> {/* inner + sectionShell */}
+      </div> {/* outer */}
+    </PageShell>
+  );
 }
-
+   
 /* ---------- Small UI helpers (kept at bottom for clarity) ---------- */
 type ToggleProps = {
   checked: boolean;
