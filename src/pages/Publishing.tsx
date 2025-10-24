@@ -862,7 +862,8 @@ if (asNewChapter) {
     }));
     setChapters((prev) => [...prev, ...newChapters]);
     setActiveChapterId(newChapters[0].id);
-    navigate("/format"); // ← jump to Manuscript page
+   // navigate("/format"); // ← Removed: stay on Publishing page
+alert(`Imported ${newChapters.length} chapters successfully! Click "Open" in Chapter Management to edit.`);
   }
 } else {
   // Replace current chapter
@@ -880,7 +881,8 @@ if (asNewChapter) {
     }
     return next;
   });
-  navigate("/format"); // ← jump to Manuscript page
+ // navigate("/format"); // ← Removed: stay on Publishing page
+alert(`Imported ${newChapters.length} chapters successfully! Click "Open" in Chapter Management to edit.`);
 }
 } catch (err) {
   console.error(err);
