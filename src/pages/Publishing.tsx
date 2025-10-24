@@ -1470,104 +1470,292 @@ return (
      {/* ✍️ Editor + Chapters */}
 <div style={{ ...styles.glassCard, marginBottom: 16 }}>
   <div style={{ display: "grid", gap: 16, gridTemplateColumns: isWide ? "220px 1fr" : "1fr" }}>
-    {isWide && (
-      <aside>
-        <div style={{ fontWeight: 700, marginBottom: 8, color: theme.text, fontSize: 13 }}>
-          Chapters
-        </div>
-        <div style={{ display: "grid", gap: 6 }}>
-          {chapters.map((c) => (
-            <button
-              key={c.id}
-              onClick={() => setActiveChapterId(c.id)}
-              style={{
-                textAlign: "left",
-                padding: "8px 10px",
-                borderRadius: 10,
-                border: `1px solid ${c.id === activeChapterId ? theme.accent : theme.border}`,
-                background: c.id === activeChapterId ? theme.highlight : theme.white,
-                color: theme.text,
-                cursor: "pointer",
-                fontSize: 12,
-              }}
-              title={c.title}
-            >
-              {c.included ? "✅ " : "🚫 "} {c.title}
-            </button>
-          ))}
-          <button onClick={addChapter} style={{ ...styles.btnPrimary, marginTop: 6, fontSize: 12 }}>
-            + Add Chapter
-          </button>
-        </div>
-      </aside>
-    )}
+   {isWide && (
+  <aside>
+    <div style={{ fontWeight: 700, marginBottom: 8, color: theme.text, fontSize: 13 }}>
+      Chapters
+    </div>
+    <div style={{ display: "grid", gap: 6 }}>
+      {chapters.map((c) => (
+        <button
+          key={c.id}
+          onClick={() => setActiveChapterId(c.id)}
+          style={{
+            textAlign: "left",
+            padding: "8px 10px",
+            borderRadius: 10,
+            border: `1px solid ${c.id === activeChapterId ? theme.accent : theme.border}`,
+            background: c.id === activeChapterId ? theme.highlight : theme.white,
+            color: theme.text,
+            cursor: "pointer",
+            fontSize: 12,
+          }}
+          title={c.title}
+        >
+          {c.included ? "✅ " : "🚫 "} {c.title}
+        </button>
+      ))}
+      <button onClick={addChapter} style={{ ...styles.btnPrimary, marginTop: 6, fontSize: 12 }}>
+        + Add Chapter
+      </button>
+    </div>
+  </aside>
+)}
 
-    <section>
-      {/* Toolbar (sticky) — THIS <div> MUST EXIST */}
-      <div
+<section>
+  {/* Toolbar (sticky) */}
+  <div
+    style={{
+      position: "sticky",
+      top: 0,
+      zIndex: 20,
+      display: "flex",
+      alignItems: "center",
+      gap: 4,
+      flexWrap: "wrap",
+      padding: "6px 10px",
+      border: `1px solid ${theme.border}`,
+      borderRadius: 8,
+      marginBottom: 12,
+      background: theme.white,
+      fontSize: 11,
+    }}
+  >
+    {/* ——— your existing controls ——— */}
+    <select
+      onChange={(e) => setFont(e.target.value)}
+      defaultValue="Times New Roman"
+      aria-label="Font family"
+      style={{
+        ...(styles.input as any),
+        width: 120,
+        padding: "3px 5px",
+        fontSize: 10,
+        height: 24,
+      }}
+    >
+      <option>Times New Roman</option>
+      <option>Georgia</option>
+      <option>Garamond</option>
+      <option>Palatino</option>
+      <option>Calibri</option>
+      <option>Arial</option>
+    </select>
+
+    <select
+      onChange={(e) => setFontSizePt(parseInt(e.target.value, 10))}
+      defaultValue="16"
+      aria-label="Font size (pt)"
+      style={{
+        ...(styles.input as any),
+        width: 45,
+        padding: "3px 4px",
+        fontSize: 10,
+        height: 24,
+      }}
+    >
+      <option value="14">14</option>
+      <option value="16">16</option>
+      <option value="18">18</option>
+      <option value="20">20</option>
+      <option value="22">22</option>
+    </select>
+
+    <div style={{ width: 1, height: 16, background: theme.border, margin: "0 2px" }} />
+
+    <button
+      style={{ ...styles.btn, padding: "3px 6px", fontSize: 10, fontWeight: 700, minWidth: 24, height: 24 }}
+      onClick={() => exec("bold")}
+      title="Bold"
+    >
+      B
+    </button>
+    <button
+      style={{ ...styles.btn, padding: "3px 6px", fontSize: 10, minWidth: 24, height: 24 }}
+      onClick={() => exec("italic")}
+      title="Italic"
+    >
+      <em>I</em>
+    </button>
+    <button
+      style={{ ...styles.btn, padding: "3px 6px", fontSize: 10, minWidth: 24, height: 24 }}
+      onClick={() => exec("underline")}
+      title="Underline"
+    >
+      <u>U</u>
+    </button>
+
+    <div style={{ width: 1, height: 16, background: theme.border, margin: "0 2px" }} />
+
+    <button
+      style={{ ...styles.btn, padding: "3px 5px", fontSize: 9, minWidth: 24, height: 24 }}
+      onClick={() => setBlock("H1")}
+      title="H1"
+    >
+      H1
+    </button>
+    <button
+      style={{ ...styles.btn, padding: "3px 5px", fontSize: 9, minWidth: 24, height: 24 }}
+      onClick={() => setBlock("H2")}
+      title="H2"
+    >
+      H2
+    </button>
+    <button
+      style={{ ...styles.btn, padding: "3px 5px", fontSize: 9, minWidth: 24, height: 24 }}
+      onClick={() => setBlock("H3")}
+      title="H3"
+    >
+      H3
+    </button>
+
+    <div style={{ width: 1, height: 16, background: theme.border, margin: "0 2px" }} />
+
+    <button
+      style={{ ...styles.btn, padding: "3px 5px", fontSize: 9, minWidth: 24, height: 24 }}
+      onClick={() => exec("insertUnorderedList")}
+      title="Bullet"
+    >
+      •
+    </button>
+    <button
+      style={{ ...styles.btn, padding: "3px 5px", fontSize: 9, minWidth: 24, height: 24 }}
+      onClick={() => exec("insertOrderedList")}
+      title="Number"
+    >
+      1.
+    </button>
+
+    <div style={{ width: 1, height: 16, background: theme.border, margin: "0 2px" }} />
+
+    <button
+      style={{ ...styles.btn, padding: "3px 5px", fontSize: 9, minWidth: 24, height: 24 }}
+      onClick={() => exec("justifyLeft")}
+      title="Left"
+    >
+      ⟸
+    </button>
+    <button
+      style={{ ...styles.btn, padding: "3px 5px", fontSize: 9, minWidth: 24, height: 24 }}
+      onClick={() => exec("justifyCenter")}
+      title="Center"
+    >
+      ⇔
+    </button>
+    <button
+      style={{ ...styles.btn, padding: "3px 5px", fontSize: 9, minWidth: 24, height: 24 }}
+      onClick={() => exec("justifyRight")}
+      title="Right"
+    >
+      ⟹
+    </button>
+
+    <div style={{ width: 1, height: 16, background: theme.border, margin: "0 2px" }} />
+
+    <button
+      style={{ ...styles.btn, padding: "3px 7px", fontSize: 9, height: 24 }}
+      onClick={insertPageBreak}
+      title="Page Break"
+    >
+      ⤓
+    </button>
+
+    {/* Right-side: uploads + Save */}
+    <div style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
+      <label
         style={{
-          position: "sticky",
-          top: 0,
-          zIndex: 20,
+          ...styles.btn,
+          padding: "3px 8px",
+          fontSize: 9,
+          cursor: "pointer",
+          height: 24,
           display: "flex",
           alignItems: "center",
-          gap: 4,
-          flexWrap: "wrap",
-          padding: "6px 10px",
-          border: `1px solid ${theme.border}`,
-          borderRadius: 8,
-          marginBottom: 12,
-          background: theme.white,
-          fontSize: 11,
         }}
       >
-        {/* —— your existing controls (selects, buttons, uploads, Save) —— */}
-        {/* Example: the two <select>s you pasted, bold/italic/underline, etc. */}
-        {/* Make sure this toolbar DIV closes right here ↓ */}
-      </div>
-
-      {/* Editor canvas wrapper (ONE instance only) */}
-      <div
-        style={{
-          padding: 16,
-          background: `linear-gradient(180deg, ${theme.bg}, #e6ebf2)`,
-          borderRadius: 12,
-          border: `1px solid ${theme.border}`,
-        }}
-      >
-        <div
-          ref={editorRef}
-          contentEditable
-          suppressContentEditableWarning
-          style={{
-            margin: "0 auto",
-            width: "100%",
-            maxWidth: 800,
-            minHeight: 1040,
-            background: "#ffffff",
-            color: "#111",
-            border: "1px solid #e5e7eb",
-            boxShadow: "0 8px 30px rgba(2,20,40,0.10)",
-            borderRadius: 6,
-            padding: "48px 48px",
-            lineHeight: ms.lineHeight,
-            fontFamily: ms.fontFamily,
-            fontSize: ms.fontSizePt * (96 / 72),
-            outline: "none",
-            direction: "ltr",
-            unicodeBidi: "plaintext",
-            whiteSpace: "pre-wrap",
+        📄 Word
+        <input
+          type="file"
+          accept=".docx"
+          style={{ display: "none" }}
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) importDocx(f, true);
           }}
-        ></div>
-      </div>
+        />
+      </label>
 
-      <div style={{ color: theme.subtext, fontSize: 12, marginTop: 6 }}>
-        Tip: Use H1/H2/H3 for sections — if "Build Contents from Headings" is on, your TOC will include them.
-      </div>
-    </section>
+      <label
+        style={{
+          ...styles.btn,
+          padding: "3px 8px",
+          fontSize: 9,
+          cursor: "pointer",
+          height: 24,
+          display: "flex",
+          alignItems: "center",
+        }}
+      >
+        🌐 HTML
+        <input
+          type="file"
+          accept=".html,.htm,.xhtml"
+          style={{ display: "none" }}
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) importHTML(f, true);
+          }}
+        />
+      </label>
+
+      <button
+        style={{ ...styles.btnPrimary, padding: "6px 12px", fontSize: 12, height: 28 }}
+        onClick={saveActiveChapterHTML}
+      >
+        Save
+      </button>
+    </div>
+  </div> {/* end toolbar */}
+
+  {/* Editor canvas wrapper */}
+  <div
+    style={{
+      padding: 16,
+      background: `linear-gradient(180deg, ${theme.bg}, #e6ebf2)`,
+      borderRadius: 12,
+      border: `1px solid ${theme.border}`,
+    }}
+  >
+    <div
+      ref={editorRef}
+      contentEditable
+      suppressContentEditableWarning
+      style={{
+        margin: "0 auto",
+        width: "100%",
+        maxWidth: 800,
+        minHeight: 1040,
+        background: "#ffffff",
+        color: "#111",
+        border: "1px solid #e5e7eb",
+        boxShadow: "0 8px 30px rgba(2,20,40,0.10)",
+        borderRadius: 6,
+        padding: "48px 48px",
+        lineHeight: ms.lineHeight,
+        fontFamily: ms.fontFamily,
+        fontSize: ms.fontSizePt * (96 / 72),
+        outline: "none",
+        direction: "ltr",
+        unicodeBidi: "plaintext",
+        whiteSpace: "pre-wrap",
+      }}
+    ></div>
   </div>
-</div>
 
+  <div style={{ color: theme.subtext, fontSize: 12, marginTop: 6 }}>
+    Tip: Use H1/H2/H3 for sections — if "Build Contents from Headings" is on, your TOC will include them.
+  </div>
+</section>
 
   {/* 📦 Chapter Management */}
               <div style={styles.glassCard}>
