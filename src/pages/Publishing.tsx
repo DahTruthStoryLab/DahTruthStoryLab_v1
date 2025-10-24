@@ -1454,7 +1454,7 @@ return (
               alignItems: "center",
             }}
           >
-         🌐 HTML
+      🌐 HTML
             <input
               type="file"
               accept=".html,.htm,.xhtml"
@@ -1516,9 +1516,6 @@ return (
     </section>
   </div>
 </div>
-```
-
----
 
 ## 🔑 **Key Fixes:**
 
