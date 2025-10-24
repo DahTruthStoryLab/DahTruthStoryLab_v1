@@ -1156,20 +1156,37 @@ return (
                     busy={working === a.key}
                     theme={theme}
                     styles={styles}
-                    onClick={async () => {
+                   onClick={async () => {
                       if (working) return;
                       setWorking(a.key);
                       try {
                         const currentHtml = editorRef.current?.innerHTML ?? "";
-                        const res = await runAI<{ html?: string }>(a.key, {
+                        const res = await runAI<any>(a.key, {
                           chapterId: chapters[activeIdx]?.id,
                           title: chapters[activeIdx]?.title,
                           html: currentHtml,
+                          text: currentHtml,
                           meta,
                         });
-                        const improved = res?.html ?? currentHtml;
-
-                        if (editorRef.current) editorRef.current.innerHTML = improved;
+                        
+                        // Handle different response formats
+                        let improved = currentHtml;
+                        if (res?.improvedHtml) {
+                          improved = res.improvedHtml;
+                        } else if (res?.html) {
+                          improved = res.html;
+                        }
+                        
+                        // Show suggestions if any
+                        if (res?.suggestions && res.suggestions.length > 0) {
+                          const suggestionText = res.suggestions.join('\n- ');
+                          alert(`Suggestions:\n- ${suggestionText}`);
+                        }
+                        
+                        if (editorRef.current && improved !== currentHtml) {
+                          editorRef.current.innerHTML = improved;
+                        }
+                        
                         setChapters((prev) => {
                           const next = [...prev];
                           const ch = next[activeIdx];
