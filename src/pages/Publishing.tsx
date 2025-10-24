@@ -1223,58 +1223,51 @@ return (
             </div>
             {/* (Section continues with editor toolbar/canvas, chapter management, sidebar, and closers) */}
 
-{/* ✍️ Editor + Chapters */}
-<div style={{ ...styles.glassCard, marginBottom: 16 }}>
-  <div style={{ display: "grid", gap: 16, gridTemplateColumns: isWide ? "220px 1fr" : "1fr" }}>
-    {isWide && (
-      <aside>
-        <div style={{ fontWeight: 700, marginBottom: 8, color: theme.text, fontSize: 13 }}>Chapters</div>
-        <div style={{ display: "grid", gap: 6 }}>
-          {chapters.map((c) => (
-            <button
-              key={c.id}
-              onClick={() => setActiveChapterId(c.id)}
-              style={{
-                textAlign: "left",
-                padding: "8px 10px",
-                borderRadius: 10,
-                border: `1px solid ${c.id === activeChapterId ? theme.accent : theme.border}`,
-                background: c.id === activeChapterId ? theme.highlight : theme.white,
-                color: theme.text,
-                cursor: "pointer",
-                fontSize: 12,
-              }}
-              title={c.title}
-            >
-              {c.included ? "✅ " : "🚫 "} {c.title}
-            </button>
-          ))}
-          <button onClick={addChapter} style={{ ...styles.btnPrimary, marginTop: 6, fontSize: 12 }}>
-            + Add Chapter
-          </button>
-        </div>
-      </aside>
-    )}
+        {/* …toolbar controls go here… */}
+      </div>
 
-    <section>
-      {/* Toolbar (sticky) */}
+      {/* Editor canvas wrapper */}
       <div
         style={{
-          position: "sticky",
-          top: 0,
-          zIndex: 20,
-          display: "flex",
-          alignItems: "center",
-          gap: 4,
-          flexWrap: "wrap",
-          padding: "6px 10px",
+          padding: 16,
+          background: `linear-gradient(180deg, ${theme.bg}, #e6ebf2)`,
+          borderRadius: 12,
           border: `1px solid ${theme.border}`,
-          borderRadius: 8,
-          marginBottom: 12,
-          background: theme.white,
-          fontSize: 11,
         }}
       >
+        <div
+          ref={editorRef}
+          contentEditable
+          suppressContentEditableWarning
+          style={{
+            margin: "0 auto",
+            width: "100%",
+            maxWidth: 800,
+            minHeight: 1040,
+            background: "#ffffff",
+            color: "#111",
+            border: "1px solid #e5e7eb",
+            boxShadow: "0 8px 30px rgba(2,20,40,0.10)",
+            borderRadius: 6,
+            padding: "48px 48px",
+            lineHeight: ms.lineHeight,
+            fontFamily: ms.fontFamily,
+            fontSize: ms.fontSizePt * (96 / 72),
+            outline: "none",
+            direction: "ltr",
+            unicodeBidi: "plaintext",
+            whiteSpace: "pre-wrap",
+          }}
+        ></div>
+      </div>
+
+      <div style={{ color: theme.subtext, fontSize: 12, marginTop: 6 }}>
+        Tip: Use H1/H2/H3 for sections — if "Build Contents from Headings" is on, your TOC will include them.
+      </div>
+    </section>
+  </div> 
+</div>
+
         <select
           onChange={(e) => setFont(e.target.value)}
           defaultValue="Times New Roman"
