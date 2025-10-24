@@ -1222,8 +1222,7 @@ return (
               </div>
             </div>
             
-            <main>
-              {/* ✍️ Editor + Chapters */}
+           {/* ✍️ Editor + Chapters */}
               <div style={{ ...styles.glassCard, marginBottom: 16 }}>
                 <div
                   style={{
