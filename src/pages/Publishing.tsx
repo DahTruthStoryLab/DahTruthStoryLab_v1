@@ -1467,7 +1467,66 @@ return (
         </div>
       </div>
 
-      {/* Editor canvas wrapper */}
+     {/* ✍️ Editor + Chapters */}
+<div style={{ ...styles.glassCard, marginBottom: 16 }}>
+  <div style={{ display: "grid", gap: 16, gridTemplateColumns: isWide ? "220px 1fr" : "1fr" }}>
+    {isWide && (
+      <aside>
+        <div style={{ fontWeight: 700, marginBottom: 8, color: theme.text, fontSize: 13 }}>
+          Chapters
+        </div>
+        <div style={{ display: "grid", gap: 6 }}>
+          {chapters.map((c) => (
+            <button
+              key={c.id}
+              onClick={() => setActiveChapterId(c.id)}
+              style={{
+                textAlign: "left",
+                padding: "8px 10px",
+                borderRadius: 10,
+                border: `1px solid ${c.id === activeChapterId ? theme.accent : theme.border}`,
+                background: c.id === activeChapterId ? theme.highlight : theme.white,
+                color: theme.text,
+                cursor: "pointer",
+                fontSize: 12,
+              }}
+              title={c.title}
+            >
+              {c.included ? "✅ " : "🚫 "} {c.title}
+            </button>
+          ))}
+          <button onClick={addChapter} style={{ ...styles.btnPrimary, marginTop: 6, fontSize: 12 }}>
+            + Add Chapter
+          </button>
+        </div>
+      </aside>
+    )}
+
+    <section>
+      {/* Toolbar (sticky) — THIS <div> MUST EXIST */}
+      <div
+        style={{
+          position: "sticky",
+          top: 0,
+          zIndex: 20,
+          display: "flex",
+          alignItems: "center",
+          gap: 4,
+          flexWrap: "wrap",
+          padding: "6px 10px",
+          border: `1px solid ${theme.border}`,
+          borderRadius: 8,
+          marginBottom: 12,
+          background: theme.white,
+          fontSize: 11,
+        }}
+      >
+        {/* —— your existing controls (selects, buttons, uploads, Save) —— */}
+        {/* Example: the two <select>s you pasted, bold/italic/underline, etc. */}
+        {/* Make sure this toolbar DIV closes right here ↓ */}
+      </div>
+
+      {/* Editor canvas wrapper (ONE instance only) */}
       <div
         style={{
           padding: 16,
@@ -1499,30 +1558,17 @@ return (
             unicodeBidi: "plaintext",
             whiteSpace: "pre-wrap",
           }}
-        />
+        ></div>
       </div>
 
       <div style={{ color: theme.subtext, fontSize: 12, marginTop: 6 }}>
-        Tip: Use H1/H2/H3 for sections — if "Build Contents from Headings" is on,
-        your TOC will include them.
+        Tip: Use H1/H2/H3 for sections — if "Build Contents from Headings" is on, your TOC will include them.
       </div>
     </section>
   </div>
 </div>
 
----
 
-## 📋 **Tag Structure (Must Match):**
-```
-<section>                    ← Opens somewhere above
-  <div>                      ← Content wrapper
-    <div>                    ← Editor canvas wrapper
-      <div ref={editorRef} /> ← Editor (self-closing)
-    </div>                   ← Close canvas wrapper
-    <div>Tip...</div>        ← Tip text
-  </section>                 ← Close section
-</div>                       ← Close content wrapper
-</div>                       ← Close outer wrapper
   {/* 📦 Chapter Management */}
               <div style={styles.glassCard}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 14 }}>
