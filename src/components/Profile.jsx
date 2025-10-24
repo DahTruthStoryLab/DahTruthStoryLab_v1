@@ -178,6 +178,29 @@ export default function Profile() {
   const [lastSaved, setLastSaved] = useState(Date.now());
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
+const [openaiKey, setOpenaiKey] = useState("");
+const [claudeKey, setClaudeKey] = useState("");
+const [aiProvider, setAiProvider] = useState("claude");
+const [showApiHelp, setShowApiHelp] = useState(false);
+
+// Load API keys from localStorage on mount
+useEffect(() => {
+  const savedOpenAI = localStorage.getItem('openai_api_key') || '';
+  const savedClaude = localStorage.getItem('claude_api_key') || '';
+  const savedProvider = localStorage.getItem('ai_provider') || 'claude';
+  setOpenaiKey(savedOpenAI);
+  setClaudeKey(savedClaude);
+  setAiProvider(savedProvider);
+}, []);
+
+// Save API keys to localStorage
+const saveApiKeys = () => {
+  localStorage.setItem('openai_api_key', openaiKey);
+  localStorage.setItem('claude_api_key', claudeKey);
+  localStorage.setItem('ai_provider', aiProvider);
+  alert('✅ API keys saved successfully!');
+};
+  
   useEffect(() => {
     if (store?.user) {
       setDisplayName(store.user.displayName || "");
@@ -407,8 +430,144 @@ export default function Profile() {
                     placeholder="https://DahTruth.com"
                     className="w-full rounded-lg bg-white border border-[hsl(var(--border))] px-4 py-3 text-sm outline-none"
                   />
-                </div>
+                </div> 
+                
+{/* AI API Keys */}
+            <div className="glass-panel p-6">
+              <div className="flex items-center justify-between mb-4">
+                <div className="text-lg font-semibold heading-serif">🤖 AI API Keys</div>
+                <button
+                  onClick={() => setShowApiHelp(!showApiHelp)}
+                  className="px-3 py-1.5 text-xs rounded-lg bg-white border border-[hsl(var(--border))] hover:opacity-90"
+                >
+                  {showApiHelp ? "Hide Help" : "Show Help"}
+                </button>
+              </div>
 
+              {showApiHelp && (
+                <div className="mb-6 rounded-lg bg-blue-50 border border-blue-200 p-4 text-sm">
+                  <div className="font-semibold mb-3 text-blue-900">📚 How to get your API keys:</div>
+                  
+                  <div className="mb-4">
+                    <div className="font-semibold text-blue-900 mb-2">OpenAI (ChatGPT):</div>
+                    <ol className="list-decimal list-inside space-y-1 text-blue-800 ml-2">
+                      <li>Go to{" "}
+                        <a 
+                          href="https://platform.openai.com/api-keys" 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="underline text-blue-600 hover:text-blue-800"
+                        >
+                          platform.openai.com/api-keys
+                        </a>
+                      </li>
+                      <li>Sign in or create an account</li>
+                      <li>Click "Create new secret key"</li>
+                      <li>Copy the key (starts with "sk-")</li>
+                      <li>Paste it below</li>
+                    </ol>
+                  </div>
+
+                  <div className="mb-4">
+                    <div className="font-semibold text-blue-900 mb-2">Anthropic Claude:</div>
+                    <ol className="list-decimal list-inside space-y-1 text-blue-800 ml-2">
+                      <li>Go to{" "}
+                        <a 
+                          href="https://console.anthropic.com/settings/keys" 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="underline text-blue-600 hover:text-blue-800"
+                        >
+                          console.anthropic.com/settings/keys
+                        </a>
+                      </li>
+                      <li>Sign in or create an account</li>
+                      <li>Click "Create Key"</li>
+                      <li>Copy the key (starts with "sk-ant-")</li>
+                      <li>Paste it below</li>
+                    </ol>
+                  </div>
+
+                  <div className="rounded-lg bg-yellow-50 border border-yellow-200 p-3 mb-3">
+                    <div className="font-semibold text-yellow-900 mb-1">💡 Pro Tip:</div>
+                    <div className="text-yellow-800 text-xs">
+                      Your API keys are stored locally on your device only. They're never sent to our servers - only directly to OpenAI or Anthropic when you use AI features.
+                    </div>
+                  </div>
+
+                  <div className="text-xs text-blue-700">
+                    <strong>💰 Cost:</strong> Both services charge based on usage. OpenAI typically costs ~$0.002 per page, Claude ~$0.008 per page. Check their pricing pages for current rates.
+                  </div>
+                </div>
+              )}
+
+              {/* OpenAI Key */}
+              <div className="mb-4">
+                <label className="text-xs text-muted mb-1 block font-semibold">
+                  OpenAI API Key (ChatGPT)
+                </label>
+                <input
+                  type="password"
+                  value={openaiKey}
+                  onChange={(e) => setOpenaiKey(e.target.value)}
+                  placeholder="sk-..."
+                  className="w-full rounded-lg bg-white border border-[hsl(var(--border))] px-4 py-3 text-sm outline-none font-mono"
+                />
+                {openaiKey && (
+                  <div className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                    <span>✓</span>
+                    <span>Key saved (ends with: ...{openaiKey.slice(-4)})</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Claude Key */}
+              <div className="mb-4">
+                <label className="text-xs text-muted mb-1 block font-semibold">
+                  Anthropic Claude API Key
+                </label>
+                <input
+                  type="password"
+                  value={claudeKey}
+                  onChange={(e) => setClaudeKey(e.target.value)}
+                  placeholder="sk-ant-..."
+                  className="w-full rounded-lg bg-white border border-[hsl(var(--border))] px-4 py-3 text-sm outline-none font-mono"
+                />
+                {claudeKey && (
+                  <div className="text-xs text-green-600 mt-1 flex items-center gap-1">
+                    <span>✓</span>
+                    <span>Key saved (ends with: ...{claudeKey.slice(-4)})</span>
+                  </div>
+                )}
+              </div>
+
+              {/* AI Provider Selection */}
+              <div className="mb-6">
+                <label className="text-xs text-muted mb-1 block font-semibold">
+                  Preferred AI Provider
+                </label>
+                <select
+                  value={aiProvider}
+                  onChange={(e) => setAiProvider(e.target.value)}
+                  className="w-full rounded-lg bg-white border border-[hsl(var(--border))] px-4 py-3 text-sm outline-none"
+                >
+                  <option value="claude">Claude (Better for creative writing)</option>
+                  <option value="openai">OpenAI ChatGPT (Faster responses)</option>
+                </select>
+                <div className="text-xs text-muted mt-1">
+                  This will be used for all AI features across the app
+                </div>
+              </div>
+
+              {/* Save Button */}
+              <button 
+                onClick={saveApiKeys}
+                className="btn-gold inline-flex items-center gap-2"
+              >
+                <Save size={16} /> Save API Keys
+              </button>
+            </div>
+                
                 <div className="md:col-span-2">
                   <label className="text-xs text-muted mb-1 block">Bio</label>
                   <textarea
