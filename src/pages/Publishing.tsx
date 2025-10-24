@@ -5,6 +5,7 @@ import React, { useEffect, useMemo, useRef, useState, useCallback } from "react"
 import { useNavigate } from "react-router-dom";
 import PageShell from "../components/layout/PageShell.tsx";
 import PublishingSidebar from "../components/publishing/PublishingSidebar.tsx";
+import { runGrammar, runStyle, runReadability, runPublishingPrep } from "../lib/api";
 
 /* ---------- Theme via CSS variables (from your brand.css) ---------- */
 const theme = {
@@ -448,7 +449,6 @@ export default function Publishing(): JSX.Element {
     []
   );
 
-// ===== END SECTION A =====
 
 // ===== SECTION B: AI helper + editor utilities (opens importDocx, not closed here) =====
 
@@ -460,21 +460,27 @@ async function runAI<T = any>(path: string, payload: any): Promise<T> {
     throw new Error("Missing VITE_AI_API_BASE");
   }
 
+  // Normalize payload to what your service expects
+  const apiPayload = {
+    text: payload.html || payload.text || ""
+  };
+
   const url = `${base.replace(/\/$/, "")}/${path.replace(/^\//, "")}`;
   const resp = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
+    body: JSON.stringify(apiPayload),
   });
+
   if (!resp.ok) {
     let text = "";
-    try {
-      text = await resp.text();
-    } catch {}
+    try { text = await resp.text(); } catch {}
     throw new Error(`AI error ${resp.status}: ${text || resp.statusText}`);
   }
+
   return (await resp.json()) as T;
 }
+
 
 /* --------------------- Builder: Word-like Editor --------------------- */
 const [activeChapterId, setActiveChapterId] = useState(chapters[0]?.id || "");
@@ -828,8 +834,6 @@ const importDocx = useCallback(
         return;
       }
 
-    // ===== SECTION C: finish importDocx + importHTML + start UI (opening JSX only) =====
-
 // -------- Insert into app state --------
 if (asNewChapter) {
   if (fallbackHtml) {
@@ -842,9 +846,11 @@ if (asNewChapter) {
       text: "",
       textHTML: fallbackHtml,
     };
+     setChapters((prev) => [...prev, ch]);
     setChapters((prev) => [...prev, ch]);
     setActiveChapterId(id);
-    navigate("/format"); // ← jump to Manuscript page
+    // navigate("/format"); // ← REMOVED - don't auto-jump
+    alert(`Imported "${file.name}" successfully! Click "Open" in Chapter Management to edit.`);
   } else {
     // Multiple chapters grouped by H1
     const newChapters = chapterGroups.map((g) => ({
@@ -899,8 +905,10 @@ const importHTML = useCallback(
           text: "",
           textHTML: html,
         };
-        setChapters((prev) => [...prev, ch]);
-        setActiveChapterId(id);
+      setChapters((prev) => [...prev, ch]);
+      setActiveChapterId(id);
+      // Don't auto-navigate - let user click "Open" when ready  
+      alert(`Imported "${ch.title}" successfully! Click "Open" in Chapter Management to edit.`);
       } else {
         setChapters((prev) => {
           const next = [...prev];
@@ -1118,6 +1126,20 @@ return (
                 <span aria-hidden>🤖</span> AI Tools
               </h3>
 
+              <div style={{ marginBottom: 16 }}>
+                
+              <button
+                style={{
+                  ...styles.btnPrimary,
+                  background: theme.primary,
+                  color: "white",
+                }}
+                onClick={() => navigate("/dashboard")}
+              >
+                ← Back to Dashboard
+              </button>
+            </div>
+
               <div
                 role="group"
                 aria-label="AI tools"
@@ -1200,8 +1222,6 @@ return (
               </div>
             </div>
             {/* (Section continues with editor toolbar/canvas, chapter management, sidebar, and closers) */}
-
-// ===== SECTION D: Editor + Chapters card =====
 
 {/* ✍️ Editor + Chapters */}
 <div style={{ ...styles.glassCard, marginBottom: 16 }}>
@@ -1465,11 +1485,12 @@ return (
                         border: `1px solid ${theme.border}`,
                       }}
                     >
-                      <div
+                     <div
                         ref={editorRef}
                         contentEditable
                         suppressContentEditableWarning
-                        style={{
+                        style={{ /* … */ }}
+                      ></div>
                           margin: "0 auto",
                           width: "100%",
                           maxWidth: 800,
