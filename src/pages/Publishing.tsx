@@ -1494,14 +1494,13 @@ return (
         >
           {c.included ? "✅ " : "🚫 "} {c.title}
         </button>
-      ))}
-      <button onClick={addChapter} style={{ ...styles.btnPrimary, marginTop: 6, fontSize: 12 }}>
-        + Add Chapter
-      </button>
-    </div>
-  </aside>
+     ))}
+  <button onClick={addChapter} style={{ ...styles.btnPrimary, marginTop: 6, fontSize: 12 }}>
+    + Add Chapter
+  </button>
+</div>
+</aside>
 )}
-
 <section>
   {/* Toolbar (sticky) */}
   <div
