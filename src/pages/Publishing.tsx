@@ -1485,12 +1485,11 @@ return (
                         border: `1px solid ${theme.border}`,
                       }}
                     >
-                     <div
+                    <div
                         ref={editorRef}
                         contentEditable
                         suppressContentEditableWarning
-                        style={{ /* … */ }}
-                      ></div>
+                        style={{
                           margin: "0 auto",
                           width: "100%",
                           maxWidth: 800,
@@ -1510,9 +1509,7 @@ return (
                           whiteSpace: "pre-wrap",
                         }}
                       />
-                    </div>
-
-                    <div style={{ color: theme.subtext, fontSize: 12, marginTop: 6 }}>
+                      <div style={{ color: theme.subtext, fontSize: 12, marginTop: 6 }}>
                       Tip: Use H1/H2/H3 for sections — if "Build Contents from Headings" is on,
                       your TOC will include them.
                     </div>
