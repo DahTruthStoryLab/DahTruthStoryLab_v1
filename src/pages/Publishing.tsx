@@ -1217,24 +1217,21 @@ return (
                     }
                   }}
                 >
-                  ✨ Generate Publishing Prep
+                 ✨ Generate Publishing Prep
                 </button>
+              </div>
             </div>
-            </div>
-            {/* (Section continues with editor toolbar/canvas, chapter management, sidebar, and closers) */}
-        {/* …toolbar controls go here… */}
-          </div> {/* ← CLOSE the toolbar div */}
             
             <main>
               {/* ✍️ Editor + Chapters */}
               <div style={{ ...styles.glassCard, marginBottom: 16 }}>
                 <div
-          style={{
-            display: "grid",
-            gap: 16,
-            gridTemplateColumns: isWide ? "220px 1fr" : "1fr",
-          }}
-        >
+                  style={{
+                    display: "grid",
+                    gap: 16,
+                    gridTemplateColumns: isWide ? "220px 1fr" : "1fr",
+                  }}
+                >
     {isWide && (
       <aside>
         <div
