@@ -1625,10 +1625,10 @@ return (
                       </div>
                     </div>
                   ))}
-                </div>
-              </div>
+                            </div> {/* grid inside Chapter Management */}
+              </div> {/* glassCard: Chapter Management */}
             </main>
-         
+
             {isWide && (
               <PublishingSidebar
                 meta={meta}
@@ -1649,7 +1649,7 @@ return (
                 setGoogleMode={setGoogleMode}
               />
             )}
-          </div> {/* grid */}
+          </div> {/* layout grid (two columns: <main> + sidebar) */}
         </div> {/* inner + sectionShell */}
       </div> {/* outer */}
     </PageShell>
