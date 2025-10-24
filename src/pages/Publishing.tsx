@@ -552,13 +552,18 @@ const insertPageBreak = () => {
 };
 
 const saveActiveChapterHTML = () => {
-  if (!editorRef.current) return;
+  if (!editorRef.current) {
+    alert("⚠️ No editor content to save.");
+    return;
+  }
   setChapters((prev) => {
     const next = [...prev];
     const ch = next[activeIdx];
     if (ch) next[activeIdx] = { ...ch, textHTML: editorRef.current!.innerHTML };
     return next;
   });
+  // Add visual feedback
+  alert("✅ Chapter saved successfully!");
 };
 
 const genId = () =>
