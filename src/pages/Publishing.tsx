@@ -1224,7 +1224,7 @@ return (
             {/* (Section continues with editor toolbar/canvas, chapter management, sidebar, and closers) */}
 
         {/* …toolbar controls go here… */}
-      </div>
+          </div> {/* ← CLOSE the toolbar div */}
 
       {/* Editor canvas wrapper */}
       <div
