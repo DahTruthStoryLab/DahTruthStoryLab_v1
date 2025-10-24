@@ -1261,12 +1261,12 @@ return (
         ></div>
       </div>
 
-      <div style={{ color: theme.subtext, fontSize: 12, marginTop: 6 }}>
-        Tip: Use H1/H2/H3 for sections — if "Build Contents from Headings" is on, your TOC will include them.
-      </div>
-    </section>
-  </div> 
-</div>
+          <div style={{ color: theme.subtext, fontSize: 12, marginTop: 6 }}>
+          Tip: Use H1/H2/H3 for sections — if "Build Contents from Headings" is on, your TOC will include them.
+        </div>
+        </section>
+        </div>   {/* grid */}
+        </div>   {/* glassCard */}
 
         <select
           onChange={(e) => setFont(e.target.value)}
