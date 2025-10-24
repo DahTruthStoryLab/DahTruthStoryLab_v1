@@ -1588,7 +1588,7 @@ return (
                             >
                               ↓
                             </button>
-                          </div>
+                        </div>
                           <Toggle
                             checked={c.included}
                             onChange={(v) => setChapters((prev) => prev.map((x) => (x.id === c.id ? { ...x, included: v } : x)))}
@@ -1625,10 +1625,9 @@ return (
                       </div>
                     </div>
                   ))}
-                            </div> {/* grid inside Chapter Management */}
+                </div> {/* grid inside Chapter Management */}
               </div> {/* glassCard: Chapter Management */}
             </main>
-
             {isWide && (
               <PublishingSidebar
                 meta={meta}
