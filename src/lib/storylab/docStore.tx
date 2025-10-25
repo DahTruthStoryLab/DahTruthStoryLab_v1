@@ -1,0 +1,527 @@
+# 📁 Proposed file map (drop these into your repo)
+
+```
+src/
+  lib/storylab/docStore.ts
+  components/publishing/UploadDropzone.tsx
+  components/publishing/SendToManuscriptButton.tsx
+  components/publishing/ManuscriptEditor.tsx
+  pages/Publishing.tsx  // thin wrapper that composes the pieces
+```
+```
+// src/lib/storylab/docStore.ts
+import { create } from "zustand";
+
+// ---- Types ----
+export type DocStatus = "draft" | "manuscript";
+export type DocSource = "writing" | "upload";
+
+export interface StoryDoc {
+  id: string;
+  title: string;
+  content: string; // plain text for now; wire up rich text later
+  status: DocStatus;
+  source: DocSource;
+  version: number;
+  updatedAt: number; // Date.now()
+}
+
+interface State {
+  docs: Record<string, StoryDoc>;
+  currentDraftId: string | null; // last active draft in Writing
+  currentManuscriptId: string | null; // active manuscript in Publishing
+
+  // Selectors
+  drafts(): StoryDoc[];
+  manuscripts(): StoryDoc[];
+  get(id: string): StoryDoc | undefined;
+
+  // Mutations
+  importFromWriting: (title: string, content: string) => StoryDoc;
+  importFromFile: (file: File) => Promise<StoryDoc>;
+  promoteToManuscript: (id: string) => void;
+  updateContent: (id: string, content: string) => void;
+  rename: (id: string, title: string) => void;
+  setActiveManuscript: (id: string) => void;
+  remove: (id: string) => void;
+}
+
+// ---- Persistence helpers (localStorage) ----
+const LS_KEY = "dt_docs_v2";
+function save(docs: Record<string, StoryDoc>, currentDraftId: string | null, currentManuscriptId: string | null) {
+  localStorage.setItem(LS_KEY, JSON.stringify({ docs, currentDraftId, currentManuscriptId }));
+}
+function load(): { docs: Record<string, StoryDoc>; currentDraftId: string | null; currentManuscriptId: string | null } {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return { docs: {}, currentDraftId: null, currentManuscriptId: null };
+    return JSON.parse(raw);
+  } catch {
+    return { docs: {}, currentDraftId: null, currentManuscriptId: null };
+  }
+}
+
+// ---- Minimal .docx/.md/.txt parsing ----
+async function readTextFile(file: File): Promise<string> {
+  return await file.text();
+}
+
+// Optional: mammoth for .docx → text (only if you already have it; otherwise fallback)
+async function readDocx(file: File): Promise<string> {
+  // @ts-ignore dynamic import if installed
+  const mammoth = await import(/* @vite-ignore */ "mammoth").catch(() => null);
+  if (!mammoth) {
+    throw new Error("DOCX import requires 'mammoth'. Run: npm i mammoth");
+  }
+  const arrayBuffer = await file.arrayBuffer();
+  const result = await mammoth.extractRawText({ arrayBuffer });
+  return result.value || "";
+}
+
+function uid(prefix = "doc"): string {
+  return `${prefix}_${Math.random().toString(36).slice(2, 9)}_${Date.now().toString(36)}`;
+}
+
+export const useDocStore = create<State>((set, get) => {
+  const boot = load();
+  return {
+    docs: boot.docs,
+    currentDraftId: boot.currentDraftId,
+    currentManuscriptId: boot.currentManuscriptId,
+
+    drafts() {
+      const docs = Object.values(get().docs).filter(d => d.status === "draft");
+      return docs.sort((a, b) => b.updatedAt - a.updatedAt);
+    },
+    manuscripts() {
+      const docs = Object.values(get().docs).filter(d => d.status === "manuscript");
+      return docs.sort((a, b) => b.updatedAt - a.updatedAt);
+    },
+    get(id) {
+      return get().docs[id];
+    },
+
+    importFromWriting(title, content) {
+      const id = uid("draft");
+      const doc: StoryDoc = {
+        id,
+        title: title || "Untitled Draft",
+        content: content || "",
+        status: "draft",
+        source: "writing",
+        version: 1,
+        updatedAt: Date.now(),
+      };
+      set(state => {
+        const docs = { ...state.docs, [id]: doc };
+        save(docs, id, state.currentManuscriptId);
+        return { docs, currentDraftId: id };
+      });
+      return doc;
+    },
+
+    async importFromFile(file: File) {
+      const ext = file.name.toLowerCase().split(".").pop();
+      let content = "";
+      if (ext === "md" || ext === "txt") content = await readTextFile(file);
+      else if (ext === "docx") content = await readDocx(file);
+      else throw new Error("Unsupported file. Use .docx, .md, or .txt");
+
+      const id = uid("draft");
+      const doc: StoryDoc = {
+        id,
+        title: file.name.replace(/\.[^.]+$/, ""),
+        content,
+        status: "draft",
+        source: "upload",
+        version: 1,
+        updatedAt: Date.now(),
+      };
+      set(state => {
+        const docs = { ...state.docs, [id]: doc };
+        save(docs, id, state.currentManuscriptId);
+        return { docs, currentDraftId: id };
+      });
+      return doc;
+    },
+
+    promoteToManuscript(id) {
+      set(state => {
+        const doc = state.docs[id];
+        if (!doc) return state as State;
+        const updated: StoryDoc = { ...doc, status: "manuscript", version: doc.version + 1, updatedAt: Date.now() };
+        const docs = { ...state.docs, [id]: updated };
+        save(docs, state.currentDraftId, id);
+        return { docs, currentManuscriptId: id };
+      });
+    },
+
+    updateContent(id, content) {
+      set(state => {
+        const doc = state.docs[id];
+        if (!doc) return state as State;
+        const updated: StoryDoc = { ...doc, content, updatedAt: Date.now() };
+        const docs = { ...state.docs, [id]: updated };
+        save(docs, state.currentDraftId, state.currentManuscriptId);
+        return { docs };
+      });
+    },
+
+    rename(id, title) {
+      set(state => {
+        const doc = state.docs[id];
+        if (!doc) return state as State;
+        const updated: StoryDoc = { ...doc, title, updatedAt: Date.now() };
+        const docs = { ...state.docs, [id]: updated };
+        save(docs, state.currentDraftId, state.currentManuscriptId);
+        return { docs };
+      });
+    },
+
+    setActiveManuscript(id) {
+      set(state => {
+        save(state.docs, state.currentDraftId, id);
+        return { currentManuscriptId: id };
+      });
+    },
+
+    remove(id) {
+      set(state => {
+        const docs = { ...state.docs };
+        delete docs[id];
+        const draft = state.currentDraftId === id ? null : state.currentDraftId;
+        const ms = state.currentManuscriptId === id ? null : state.currentManuscriptId;
+        save(docs, draft, ms);
+        return { docs, currentDraftId: draft, currentManuscriptId: ms };
+      });
+    },
+  };
+});
+```
+```
+// src/components/publishing/UploadDropzone.tsx
+import React, { useRef, useState } from "react";
+import { useDocStore } from "../../lib/storylab/docStore";
+
+interface Props {
+  onImported?: (id: string) => void; // optional callback
+}
+
+export default function UploadDropzone({ onImported }: Props) {
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const importFromFile = useDocStore(s => s.importFromFile);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function pickFile(evt: React.ChangeEvent<HTMLInputElement>) {
+    setErr(null);
+    const file = evt.target.files?.[0];
+    if (!file) return;
+    setBusy(true);
+    try {
+      const doc = await importFromFile(file);
+      // NOTE: DO NOT auto-navigate here. Let the user click "Send to Manuscript" consciously.
+      onImported?.(doc.id);
+    } catch (e: any) {
+      setErr(e?.message || "Failed to import file");
+    } finally {
+      setBusy(false);
+      if (inputRef.current) inputRef.current.value = ""; // reset
+    }
+  }
+
+  function openPicker() {
+    inputRef.current?.click();
+  }
+
+  return (
+    <div className="rounded-2xl border border-border p-6 bg-white/60">
+      <p className="text-sm mb-3">Upload .docx, .md, or .txt</p>
+      <div className="flex gap-3 items-center">
+        <button
+          type="button"
+          onClick={openPicker}
+          className="px-3 py-2 rounded-xl border border-border text-sm hover:bg-white"
+          disabled={busy}
+        >{busy ? "Importing…" : "Choose file"}</button>
+        {err && <span className="text-red-600 text-sm">{err}</span>}
+      </div>
+      <input ref={inputRef} type="file" accept=".docx,.md,.txt" hidden onChange={pickFile} />
+    </div>
+  );
+}
+```
+```
+// src/components/publishing/SendToManuscriptButton.tsx
+import React from "react";
+import { useNavigate } from "react-router-dom";
+import { useDocStore } from "../../lib/storylab/docStore";
+
+export default function SendToManuscriptButton({ docId }: { docId: string }) {
+  const promote = useDocStore(s => s.promoteToManuscript);
+  const navigate = useNavigate();
+
+  function handleSend() {
+    promote(docId);
+    navigate("/publishing/manuscript");
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={handleSend}
+      className="px-3 py-2 rounded-xl border border-border text-sm hover:bg-white"
+    >Send to Manuscript</button>
+  );
+}
+```
+```
+// src/components/publishing/ManuscriptEditor.tsx
+import React, { useEffect, useMemo } from "react";
+import { useDocStore } from "../../lib/storylab/docStore";
+
+export default function ManuscriptEditor() {
+  const currentId = useDocStore(s => s.currentManuscriptId);
+  const get = useDocStore(s => s.get);
+  const updateContent = useDocStore(s => s.updateContent);
+
+  const doc = useMemo(() => (currentId ? get(currentId) : undefined), [currentId, get]);
+
+  useEffect(() => {
+    // If nothing active but we have manuscripts, select the most recent
+    if (!doc) {
+      const list = useDocStore.getState().manuscripts();
+      if (list.length) useDocStore.setState({ currentManuscriptId: list[0].id });
+    }
+  }, [doc]);
+
+  if (!doc) {
+    return <div className="text-sm text-muted">No manuscript selected yet.</div>;
+  }
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2">
+        <h2 className="text-lg font-semibold">{doc.title}</h2>
+        <span className="text-xs text-muted">v{doc.version}</span>
+      </div>
+      <textarea
+        value={doc.content}
+        onChange={e => updateContent(doc.id, e.target.value)}
+        className="w-full h-[60vh] border border-border rounded-xl p-4 bg-white"
+        spellCheck
+      />
+      <p className="text-xs text-muted">Auto-saved locally. Wire this to Amplify Storage when ready.</p>
+    </div>
+  );
+}
+```
+```
+// src/pages/Publishing.tsx (thin page shell example)
+import React, { useState } from "react";
+import UploadDropzone from "../components/publishing/UploadDropzone";
+import SendToManuscriptButton from "../components/publishing/SendToManuscriptButton";
+import ManuscriptEditor from "../components/publishing/ManuscriptEditor";
+import { useDocStore } from "../lib/storylab/docStore";
+
+export default function PublishingPage() {
+  const [lastImportedId, setLastImportedId] = useState<string | null>(null);
+  const drafts = useDocStore(s => s.drafts());
+  const manuscripts = useDocStore(s => s.manuscripts());
+  const setActiveManuscript = useDocStore(s => s.setActiveManuscript);
+
+  return (
+    <div className="max-w-6xl mx-auto p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="md:col-span-1 space-y-6">
+        <UploadDropzone onImported={setLastImportedId} />
+
+        {lastImportedId && (
+          <div className="rounded-2xl border border-border p-4 bg-white/60">
+            <p className="text-sm mb-2">Imported draft ready:</p>
+            <SendToManuscriptButton docId={lastImportedId} />
+          </div>
+        )}
+
+        <div className="rounded-2xl border border-border p-4 bg-white/60">
+          <p className="text-sm font-medium mb-2">Drafts</p>
+          <ul className="text-sm space-y-1">
+            {drafts.map(d => (
+              <li key={d.id} className="flex items-center justify-between">
+                <span>{d.title}</span>
+                <SendToManuscriptButton docId={d.id} />
+              </li>
+            ))}
+            {drafts.length === 0 && <li className="text-muted">No drafts yet.</li>}
+          </ul>
+        </div>
+
+        <div className="rounded-2xl border border-border p-4 bg-white/60">
+          <p className="text-sm font-medium mb-2">Manuscripts</p>
+          <ul className="text-sm space-y-1">
+            {manuscripts.map(m => (
+              <li key={m.id} className="flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => setActiveManuscript(m.id)}
+                  className="underline underline-offset-2"
+                >{m.title}</button>
+                <span className="text-xs text-muted">v{m.version}</span>
+              </li>
+            ))}
+            {manuscripts.length === 0 && <li className="text-muted">None yet.</li>}
+          </ul>
+        </div>
+      </div>
+
+      <div className="md:col-span-2">
+        <ManuscriptEditor />
+      </div>
+    </div>
+  );
+}
+```
+
+---
+
+## ☁️ Wire manuscripts to AWS Amplify Storage (S3)
+
+Below is a **drop‑in upgrade** for `docStore.ts` that keeps your current localStorage behavior but also syncs manuscripts to S3 when available. It uses Amplify’s `Storage` category.
+
+> Works even if users aren’t signed in (public bucket access per your Amplify defaults). If you use Cognito, keys will be namespaced by the signed‑in user automatically when you switch to `private` access.
+
+### 1) Install (if needed)
+```bash
+npm i aws-amplify
+```
+
+### 2) Add these helpers near the top of `docStore.ts`
+```ts
+// Cloud persistence (S3 via Amplify Storage)
+import { Storage } from 'aws-amplify';
+
+const CLOUD_PREFIX = 'manuscripts';
+
+function cloudKey(id: string) {
+  return `${CLOUD_PREFIX}/${id}.json`;
+}
+
+async function saveToCloud(doc: StoryDoc) {
+  try {
+    const body = JSON.stringify(doc);
+    await Storage.put(cloudKey(doc.id), body, {
+      contentType: 'application/json',
+      // accessLevel: 'private', // ← uncomment to scope per Cognito user
+    });
+  } catch (e) {
+    console.warn('saveToCloud failed', e);
+  }
+}
+
+async function loadFromCloud(id: string): Promise<StoryDoc | null> {
+  try {
+    const res: any = await Storage.get(cloudKey(id), { download: true /*, accessLevel: 'private'*/ });
+    if (res && res.Body) {
+      const text = await res.Body.text();
+      return JSON.parse(text) as StoryDoc;
+    }
+  } catch (e) {
+    // Not found or not configured → fall back to local
+  }
+  return null;
+}
+
+async function listCloudManuscripts(): Promise<string[]> {
+  try {
+    const out: any = await Storage.list(CLOUD_PREFIX + '/', { /* accessLevel: 'private' */ });
+    // returns keys like manuscripts/doc_xxx.json
+    return (out?.results || out || [])
+      .map((o: any) => o.key as string)
+      .filter(Boolean)
+      .map((k: string) => k.replace(/^.*\/(.*)\.json$/, '$1'));
+  } catch (e) {
+    return [];
+  }
+}
+```
+
+### 3) Add a tiny debounce utility (same file)
+```ts
+// Debounce to avoid PUT spam while typing
+let saveTimer: any = null;
+function debounceCloudSave(fn: () => void, ms = 800) {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(fn, ms);
+}
+```
+
+### 4) Call cloud saves on meaningful actions
+Replace the existing `promoteToManuscript` and `updateContent` in `useDocStore` with the versions below (only the added cloud lines differ):
+```ts
+promoteToManuscript(id) {
+  set(state => {
+    const doc = state.docs[id];
+    if (!doc) return state as State;
+    const updated: StoryDoc = { ...doc, status: 'manuscript', version: doc.version + 1, updatedAt: Date.now() };
+    const docs = { ...state.docs, [id]: updated };
+    save(docs, state.currentDraftId, id);
+    // cloud save immediately when promoting
+    saveToCloud(updated);
+    return { docs, currentManuscriptId: id };
+  });
+},
+
+updateContent(id, content) {
+  set(state => {
+    const doc = state.docs[id];
+    if (!doc) return state as State;
+    const updated: StoryDoc = { ...doc, content, updatedAt: Date.now() };
+    const docs = { ...state.docs, [id]: updated };
+    save(docs, state.currentDraftId, state.currentManuscriptId);
+    // only debounce cloud saves for manuscripts (drafts stay local unless promoted)
+    if (updated.status === 'manuscript') {
+      debounceCloudSave(() => saveToCloud(updated));
+    }
+    return { docs };
+  });
+},
+```
+
+### 5) Optional: bootstrap from cloud on app start
+Drop this **effect** at the bottom of the store creation (right after `return { ... }`) to pull down any existing manuscripts if local storage is empty. If locals exist, we leave them untouched.
+```ts
+// — after the store object is returned —
+setTimeout(async () => {
+  const { docs } = get();
+  if (Object.keys(docs).length) return; // already have local state
+  const ids = await listCloudManuscripts();
+  const restored: Record<string, StoryDoc> = {};
+  for (const id of ids) {
+    const doc = await loadFromCloud(id);
+    if (doc) restored[id] = doc;
+  }
+  if (Object.keys(restored).length) {
+    set(state => {
+      const merged = { ...state.docs, ...restored };
+      // choose the most recently updated manuscript as active
+      const ms = Object.values(merged)
+        .filter(d => d.status === 'manuscript')
+        .sort((a, b) => b.updatedAt - a.updatedAt)[0]?.id || null;
+      save(merged, state.currentDraftId, ms);
+      return { docs: merged, currentManuscriptId: ms };
+    });
+  }
+}, 0);
+```
+
+### 6) Access control & best practices
+- **Public vs Private**: Use `accessLevel: 'private'` to separate user data per Cognito identity. Keep `public` only for single‑user dev or shareable samples.
+- **Key format**: If multi‑user, change `cloudKey` to `manuscripts/${userId}/${id}.json`. You can grab `userId` via `import { Auth } from 'aws-amplify'` → `const user = await Auth.currentAuthenticatedUser();`
+- **Conflicts**: Last‑write‑wins is simplest. For team editing, store `version` and reject if cloud version is ahead, then prompt to merge.
+- **Exports**: When you add PDF/Docx/ePub later, place them under `exports/${id}/...` for neat separation.
+
+### 7) Quick sanity test
+1. Create a draft → **Send to Manuscript** → confirm it writes to S3.
+2. Type in the manuscript editor → check S3 object `LastModified` updates within ~1–2s.
+3. Clear localStorage → refresh → the bootstrap should rehydrate from S3.
+
+> Leave all localStorage code in place so you can work offline. Cloud is an additive layer.
