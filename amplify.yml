@@ -8,8 +8,15 @@ frontend:
         - pnpm i --frozen-lockfile
     build:
       commands:
-        - echo "VITE_API_BASE=https://t9xv0aicog.execute-api.us-east-1.amazonaws.com/prod/ai" > .env.production
-        - echo "VITE_AI_URL=https://t9xv0aicog.execute-api.us-east-1.amazonaws.com/prod/ai/rewrite" >> .env.production
+        - |
+          if [ "$AMPLIFY_BRANCH" = "main" ] || [ "$AMPLIFY_BRANCH" = "prod" ]; then
+            echo "VITE_API_BASE=https://t9xv0aicog.execute-api.us-east-1.amazonaws.com/prod" > .env.production
+            echo "VITE_AI_URL=https://t9xv0aicog.execute-api.us-east-1.amazonaws.com/prod/ai/rewrite" >> .env.production
+          else
+            # dev / preview branches
+            echo "VITE_API_BASE=https://t9xv0aicog.execute-api.us-east-1.amazonaws.com/dev" > .env.production
+            echo "VITE_AI_URL=https://t9xv0aicog.execute-api.us-east-1.amazonaws.com/dev/ai/rewrite" >> .env.production
+          fi
         - echo "VITE_MSAL_CLIENT_ID=${VITE_MSAL_CLIENT_ID}" >> .env.production
         - cat .env.production
         - pnpm build
