@@ -23,7 +23,7 @@ async function jsonFetch(url: string, init: RequestInit) {
   const body = isJson ? await res.json() : await res.text();
   
   if (!res.ok) {
-    const msg = isJson ? (body as any)?.error ?? JSON.stringify(body) : body.slice(0, 200);
+    const msg = isJson ? ((body as any)?.error ?? JSON.stringify(body)) : (body as string).slice(0, 200);
     console.error("❌ HTTP error", res.status, res.statusText, "from", url, "\nBody:", msg);
     throw new Error(`HTTP ${res.status} ${res.statusText} — ${msg}`);
   }
