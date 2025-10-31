@@ -14,9 +14,9 @@ import {
   Download,
   Upload,
 } from "lucide-react";
-import { useAI } from "../lib/AiProvider";
 import { useNavigate } from "react-router-dom";
 import { useDrag, useDrop } from "react-dnd";
+import { proofread, clarify, rewrite } from "../lib/api";
 
 /* ------- Fonts whitelist (family + size) ------- */
 const Font = Quill.import("formats/font");
@@ -76,6 +76,19 @@ const countWords = (html = "") => {
   const text = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
   return text ? text.split(/\s+/).length : 0;
 };
+const htmlToPlain = (html = "") =>
+  html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+
+const plainToSimpleHtml = (text = "") => {
+  if (!text) return "";
+  // turn blank-line separated paragraphs into <p>…</p>
+  const paras = text
+    .split(/\n{2,}/)
+    .map((p) => `<p>${p.replace(/\n/g, "<br/>")}</p>`)
+    .join("");
+  return paras || `<p>${text}</p>`;
+};
+
 const ensureFirstChapter = (chapters) =>
   Array.isArray(chapters) && chapters.length
     ? chapters
@@ -104,7 +117,6 @@ function isEditableTarget(t) {
    Compose Page (isolated writer)
 ============================== */
 export default function ComposePage() {
-  const ai = useAI();
   const navigate = useNavigate();
 
   // Load initial project
@@ -205,12 +217,29 @@ export default function ComposePage() {
   const undo = () => getActiveEditor()?.getEditor?.()?.history?.undo?.();
   const redo = () => getActiveEditor()?.getEditor?.()?.history?.redo?.();
 
-  /* AI proof/clarify */
+  /* -------- AI actions (calls your /ai/assistant wrappers) -------- */
+  const chooseContent = (res) =>
+    res?.reply ??
+    res?.edited ??
+    res?.result ??
+    res?.text ??
+    res?.output ??
+    res?.echo?.message ??
+    "";
+
   const runAI = async (mode = "proofread") => {
     try {
       setAiBusy(true);
-      const edited = await ai.proofread(html || "", { mode, noEmDashes: true });
-      const newHtml = edited ?? html;
+      const inputPlain = htmlToPlain(html || "");
+      let res;
+      if (mode === "clarify") res = await clarify(inputPlain);
+      else if (mode === "rewrite") res = await rewrite(inputPlain);
+      else res = await proofread(inputPlain);
+
+      const out = chooseContent(res);
+      const newHtml =
+        out && out !== inputPlain ? plainToSimpleHtml(out) : html;
+
       setHtml(newHtml);
 
       setChapters((prev) => {
@@ -237,7 +266,7 @@ export default function ComposePage() {
       });
     } catch (e) {
       console.error("[AI] error:", e);
-      alert(e.message || "AI request failed");
+      alert(e?.message || "AI request failed");
     } finally {
       setAiBusy(false);
     }
@@ -320,7 +349,7 @@ export default function ComposePage() {
   const ImportDocxButton = () => {
     const fileInputRef = useRef(null);
     const onPick = () => fileInputRef.current?.click();
-    
+
     const onFile = async (e) => {
       const file = e.target.files?.[0];
       if (!file) return;
