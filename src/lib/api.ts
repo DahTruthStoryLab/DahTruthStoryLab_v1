@@ -101,22 +101,27 @@ export function runAssistant(
   provider: "anthropic" | "openai" = "anthropic"
 ) {
   const op = "chat";
-  return jsonFetch(`${API_BASE}/ai/assistant`, {
+
+  // Put `operation` in the query string too (in case body/headers get dropped)
+  const url = `${API_BASE}/ai/assistant?operation=${encodeURIComponent(op)}`;
+
+  return jsonFetch(url, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "x-operation": op,
+      "x-operation": op, // header copy
     },
     body: JSON.stringify({
-      operation: op,
-      message: text,   // primary key your Lambda reads
-      text,            // fallback (safe to include)
+      operation: op,     // body copy
+      message: text,     // primary content key
+      text,              // fallback content key
       action,
       instructions,
       provider,
     }),
   });
 }
+
 
 
 export function runReadability(
