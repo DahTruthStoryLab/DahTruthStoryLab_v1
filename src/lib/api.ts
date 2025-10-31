@@ -96,7 +96,7 @@ export function runStyle(
 
 export function runAssistant(
   text: string,
-  action = "improve",
+  action: "improve" | "proofread" | "clarify" | "rewrite" = "improve",
   instructions = "",
   provider: "anthropic" | "openai" = "anthropic"
 ) {
@@ -121,8 +121,6 @@ export function runAssistant(
     }),
   });
 }
-
-
 
 export function runReadability(
   text: string,
@@ -207,3 +205,25 @@ export function filesDelete(params: {
     body: JSON.stringify(params),
   });
 }
+
+// -----------------------------------------------------------------------------
+// Convenience wrappers for ComposePage (exported names)
+// -----------------------------------------------------------------------------
+
+export const proofread = (
+  text: string,
+  instructions = "",
+  provider: "anthropic" | "openai" = "anthropic"
+) => runAssistant(text, "proofread", instructions, provider);
+
+export const clarify = (
+  text: string,
+  instructions = "",
+  provider: "anthropic" | "openai" = "anthropic"
+) => runAssistant(text, "clarify", instructions, provider);
+
+export const rewrite = (
+  text: string,
+  instructions = "",
+  provider: "anthropic" | "openai" = "anthropic"
+) => runAssistant(text, "rewrite", instructions, provider);
