@@ -94,30 +94,30 @@ export function runStyle(
   });
 }
 
-/**
- * Unified assistant/chat call.
- * Many backends expect:
- *   { operation: "chat", message: "<user text>", ... }
- */
 export function runAssistant(
   text: string,
   action = "improve",
   instructions = "",
   provider: "anthropic" | "openai" = "anthropic"
 ) {
-  if (!API_BASE) throw new Error("VITE_API_BASE is not set");
+  const op = "chat";
   return jsonFetch(`${API_BASE}/ai/assistant`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "x-operation": op,
+    },
     body: JSON.stringify({
-      operation: "chat",   // 👈 required by your Lambda
-      message: text,       // 👈 many handlers expect "message" not "text"
-      action,              // optional passthrough
-      instructions,        // optional passthrough
+      operation: op,
+      message: text,   // primary key your Lambda reads
+      text,            // fallback (safe to include)
+      action,
+      instructions,
       provider,
     }),
   });
 }
+
 
 export function runReadability(
   text: string,
