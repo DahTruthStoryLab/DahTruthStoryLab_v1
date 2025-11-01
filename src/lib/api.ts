@@ -3,7 +3,7 @@
 // ---------- Base API URL (must include API Gateway stage like /prod) ----------
 const RAW_API_BASE: string =
   import.meta.env.VITE_API_BASE ||
- "https://t9xv0aicog.execute-api.us-east-1.amazonaws.com/prod";
+"https://t9xv0aicog.execute-api.us-east-1.amazonaws.com/prod";
 
 // Normalize (remove trailing slash if present)
 export const API_BASE: string = RAW_API_BASE.replace(/\/+$/, "");
