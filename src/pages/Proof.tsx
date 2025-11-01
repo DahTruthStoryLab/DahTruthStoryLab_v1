@@ -153,7 +153,7 @@ export default function Proof(): JSX.Element {
 
   /* ---------- AI checks (calls your API) ---------- */
 // put this near the top of Proof.tsx
-const API_URL = ""https://t9xv0aicog.execute-api.us-east-1.amazonaws.com/prod"";
+const API_URL = "https://t9xv0aicog.execute-api.us-east-1.amazonaws.com/prod";
 
 async function runAIChecks() {
   setAiBusy(true);
