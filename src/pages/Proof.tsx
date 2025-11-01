@@ -6,7 +6,7 @@ import PageShell from "../components/layout/PageShell.tsx";
 /* ---------- Where to call your backend ---------- */
 /** If you proxy /api -> API Gateway in dev/hosting, keep "/api".
  *  Otherwise set your deployed API Gateway base URL, e.g.:
- * "https://t9xv0aicog.execute-api.us-east-1.amazonaws.com/prod"
+    "https://ud9loepble.execute-api.us-east-1.amazonaws.com/prod";
  */
 const API_BASE = "/api";
 
@@ -153,7 +153,7 @@ export default function Proof(): JSX.Element {
 
   /* ---------- AI checks (calls your API) ---------- */
 // put this near the top of Proof.tsx
-const API_URL = "https://t9xv0aicog.execute-api.us-east-1.amazonaws.com/prod";
+const API_URL = "https://ud9loepble.execute-api.us-east-1.amazonaws.com/prod";
 
 async function runAIChecks() {
   setAiBusy(true);
