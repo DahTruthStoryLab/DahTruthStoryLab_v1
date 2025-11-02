@@ -3,13 +3,13 @@
 // ---------- Base API URL (must include API Gateway stage like /prod) ----------
 const RAW_API_BASE: string =
   import.meta.env.VITE_API_BASE ||
-"https://t9xv0aicog.execute-api.us-east-1.amazonaws.com/prod";
+  "https://ud9loepble.execute-api.us-east-1.amazonaws.com/prod"; // <- use YOUR invoke URL+stage
 
 // Normalize (remove trailing slash if present)
 export const API_BASE: string = RAW_API_BASE.replace(/\/+$/, "");
 
 // Expose for quick console checks on the live site
-(window as any).__API_BASE__ = API_BASE;
+;(window as any).__API_BASE__ = API_BASE;
 
 // Sanity-check the env var at runtime
 if (!API_BASE || API_BASE.startsWith("/")) {
@@ -29,30 +29,35 @@ async function jsonFetch(url: string, init: RequestInit) {
     const msg = isJson
       ? ((body as any)?.error ?? JSON.stringify(body))
       : (body as string).slice(0, 200);
-    console.error(
-      "❌ HTTP error",
-      res.status,
-      res.statusText,
-      "from",
-      url,
-      "\nBody:",
-      msg
-    );
+    console.error("❌ HTTP error", res.status, res.statusText, "from", url, "\nBody:", msg);
     throw new Error(`HTTP ${res.status} ${res.statusText} — ${msg}`);
   }
 
   if (!isJson) {
-    console.error(
-      "❌ Non-JSON response from:",
-      url,
-      "\nFirst 200 chars:\n",
-      (body as string).slice(0, 200)
-    );
+    console.error("❌ Non-JSON response from:", url, "\nFirst 200 chars:\n", (body as string).slice(0, 200));
     throw new Error(`Expected JSON but got non-JSON from ${url}`);
   }
 
   return body;
 }
+
+// -----------------------------------------------------------------------------
+// Route constants (FLAT: no /ai prefix) — keep these in sync with API Gateway
+// -----------------------------------------------------------------------------
+const ROUTES = {
+  assistant: "/assistant",
+  grammar: "/grammar",
+  rewrite: "/rewrite",
+  style: "/style",
+  publishingPrep: "/publishing-prep",
+  readability: "/readability",
+
+  // Files (use these only if you created matching routes in API Gateway)
+  filesPresignUpload: "/files/presign-upload",
+  filesList: "/files/list",
+  filesGet: "/files/get",
+  filesDelete: "/files/delete",
+} as const;
 
 // -----------------------------------------------------------------------------
 // AI Endpoint Helpers
@@ -63,7 +68,7 @@ export function runRewrite(
   provider: "anthropic" | "openai" = "anthropic"
 ) {
   if (!API_BASE) throw new Error("VITE_API_BASE is not set");
-  return jsonFetch(`${API_BASE}/ai/rewrite`, {
+  return jsonFetch(`${API_BASE}${ROUTES.rewrite}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ text, operation: "rewrite", provider }),
@@ -75,7 +80,7 @@ export function runGrammar(
   provider: "anthropic" | "openai" = "anthropic"
 ) {
   if (!API_BASE) throw new Error("VITE_API_BASE is not set");
-  return jsonFetch(`${API_BASE}/ai/grammar`, {
+  return jsonFetch(`${API_BASE}${ROUTES.grammar}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ text, operation: "grammar", provider }),
@@ -87,7 +92,7 @@ export function runStyle(
   provider: "anthropic" | "openai" = "anthropic"
 ) {
   if (!API_BASE) throw new Error("VITE_API_BASE is not set");
-  return jsonFetch(`${API_BASE}/ai/style`, {
+  return jsonFetch(`${API_BASE}${ROUTES.style}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ text, operation: "style", provider }),
@@ -101,20 +106,14 @@ export function runAssistant(
   provider: "anthropic" | "openai" = "anthropic"
 ) {
   const op = "chat";
-
-  // Put `operation` in the query string too (in case body/headers get dropped)
-  const url = `${API_BASE}/ai/assistant?operation=${encodeURIComponent(op)}`;
-
+  const url = `${API_BASE}${ROUTES.assistant}?operation=${encodeURIComponent(op)}`;
   return jsonFetch(url, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-operation": op, // header copy
-    },
+    headers: { "Content-Type": "application/json", "x-operation": op },
     body: JSON.stringify({
-      operation: op,     // body copy
-      message: text,     // primary content key
-      text,              // fallback content key
+      operation: op,
+      message: text,
+      text,
       action,
       instructions,
       provider,
@@ -127,7 +126,7 @@ export function runReadability(
   provider: "anthropic" | "openai" = "anthropic"
 ) {
   if (!API_BASE) throw new Error("VITE_API_BASE is not set");
-  return jsonFetch(`${API_BASE}/ai/readability`, {
+  return jsonFetch(`${API_BASE}${ROUTES.readability}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ text, operation: "readability", provider }),
@@ -142,7 +141,7 @@ export function runPublishingPrep(
 ) {
   if (!API_BASE) throw new Error("VITE_API_BASE is not set");
   const text = JSON.stringify({ meta, chapters, options });
-  return jsonFetch(`${API_BASE}/ai/publishing-prep`, {
+  return jsonFetch(`${API_BASE}${ROUTES.publishingPrep}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ text, operation: "publishing-prep", provider }),
@@ -150,7 +149,7 @@ export function runPublishingPrep(
 }
 
 // -----------------------------------------------------------------------------
-// File Management Endpoint Helpers
+// File Management Endpoint Helpers (only if your API has these routes)
 // -----------------------------------------------------------------------------
 
 export function filesPresignUpload(params: {
@@ -160,7 +159,7 @@ export function filesPresignUpload(params: {
   keyHint?: string;
 }) {
   if (!API_BASE) throw new Error("VITE_API_BASE is not set");
-  return jsonFetch(`${API_BASE}/files/presign-upload`, {
+  return jsonFetch(`${API_BASE}${ROUTES.filesPresignUpload}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(params),
@@ -173,7 +172,7 @@ export function filesList(params: {
   prefix?: string;
 }) {
   if (!API_BASE) throw new Error("VITE_API_BASE is not set");
-  return jsonFetch(`${API_BASE}/files/list`, {
+  return jsonFetch(`${API_BASE}${ROUTES.filesList}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(params),
@@ -186,7 +185,7 @@ export function filesGet(params: {
   expiresIn?: number;
 }) {
   if (!API_BASE) throw new Error("VITE_API_BASE is not set");
-  return jsonFetch(`${API_BASE}/files/get`, {
+  return jsonFetch(`${API_BASE}${ROUTES.filesGet}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(params),
@@ -199,7 +198,7 @@ export function filesDelete(params: {
   fileKey?: string;
 }) {
   if (!API_BASE) throw new Error("VITE_API_BASE is not set");
-  return jsonFetch(`${API_BASE}/files/delete`, {
+  return jsonFetch(`${API_BASE}${ROUTES.filesDelete}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(params),
@@ -207,23 +206,11 @@ export function filesDelete(params: {
 }
 
 // -----------------------------------------------------------------------------
-// Convenience wrappers for ComposePage (exported names)
+// Convenience wrappers
 // -----------------------------------------------------------------------------
-
-export const proofread = (
-  text: string,
-  instructions = "",
-  provider: "anthropic" | "openai" = "anthropic"
-) => runAssistant(text, "proofread", instructions, provider);
-
-export const clarify = (
-  text: string,
-  instructions = "",
-  provider: "anthropic" | "openai" = "anthropic"
-) => runAssistant(text, "clarify", instructions, provider);
-
-export const rewrite = (
-  text: string,
-  instructions = "",
-  provider: "anthropic" | "openai" = "anthropic"
-) => runAssistant(text, "rewrite", instructions, provider);
+export const proofread = (text: string, instructions = "", provider: "anthropic" | "openai" = "anthropic") =>
+  runAssistant(text, "proofread", instructions, provider);
+export const clarify = (text: string, instructions = "", provider: "anthropic" | "openai" = "anthropic") =>
+  runAssistant(text, "clarify", instructions, provider);
+export const rewrite = (text: string, instructions = "", provider: "anthropic" | "openai" = "anthropic") =>
+  runAssistant(text, "rewrite", instructions, provider);
