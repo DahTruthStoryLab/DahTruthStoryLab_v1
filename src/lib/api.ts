@@ -205,6 +205,38 @@ export function filesDelete(params: {
   });
 }
 
+function withTimeout(ms: number, signal?: AbortSignal) {
+  const c = new AbortController();
+  const t = setTimeout(() => c.abort(), ms);
+  if (signal) signal.addEventListener("abort", () => c.abort(), { once: true });
+  return { controller: c, clear: () => clearTimeout(t) };
+}
+
+async function jsonFetch(url: string, init: RequestInit) {
+  const { controller, clear } = withTimeout(30000, (init as any)?.signal);
+  try {
+    const res = await fetch(url, { ...init, signal: controller.signal });
+    const ct = res.headers.get("content-type") || "";
+    const isJson = ct.includes("application/json");
+    const body = isJson ? await res.json() : await res.text();
+
+    if (!res.ok) {
+      const msg = isJson ? ((body as any)?.error ?? JSON.stringify(body)) : String(body).slice(0, 200);
+      throw new Error(`HTTP ${res.status} ${res.statusText} — ${msg}`);
+    }
+    if (!isJson) throw new Error(`Expected JSON but got non-JSON from ${url}`);
+    return body;
+  } finally {
+    clear();
+  }
+}
+
+function jsonHeaders(extra: Record<string,string> = {}) {
+  return { "Content-Type": "application/json", ...extra };
+}
+// usage:
+headers: jsonHeaders({ "x-operation": op })
+
 // -----------------------------------------------------------------------------
 // Convenience wrappers
 // -----------------------------------------------------------------------------
