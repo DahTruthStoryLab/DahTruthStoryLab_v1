@@ -18,27 +18,40 @@ if (!API_BASE || API_BASE.startsWith("/")) {
   console.log("API_BASE =", API_BASE);
 }
 
+// ---------- Helper functions ----------
+function withTimeout(ms: number, signal?: AbortSignal) {
+  const c = new AbortController();
+  const t = setTimeout(() => c.abort(), ms);
+  if (signal) signal.addEventListener("abort", () => c.abort(), { once: true });
+  return { controller: c, clear: () => clearTimeout(t) };
+}
+
 // ---------- Tiny helper to always send/expect JSON and show readable errors ----------
 async function jsonFetch(url: string, init: RequestInit) {
-  const res = await fetch(url, init);
-  const ct = res.headers.get("content-type") || "";
-  const isJson = ct.includes("application/json");
-  const body = isJson ? await res.json() : await res.text();
+  const { controller, clear } = withTimeout(30000, (init as any)?.signal);
+  try {
+    const res = await fetch(url, { ...init, signal: controller.signal });
+    const ct = res.headers.get("content-type") || "";
+    const isJson = ct.includes("application/json");
+    const body = isJson ? await res.json() : await res.text();
 
-  if (!res.ok) {
-    const msg = isJson
-      ? ((body as any)?.error ?? JSON.stringify(body))
-      : (body as string).slice(0, 200);
-    console.error("❌ HTTP error", res.status, res.statusText, "from", url, "\nBody:", msg);
-    throw new Error(`HTTP ${res.status} ${res.statusText} — ${msg}`);
+    if (!res.ok) {
+      const msg = isJson ? ((body as any)?.error ?? JSON.stringify(body)) : String(body).slice(0, 200);
+      console.error("❌ HTTP error", res.status, res.statusText, "from", url, "\nBody:", msg);
+      throw new Error(`HTTP ${res.status} ${res.statusText} — ${msg}`);
+    }
+    if (!isJson) {
+      console.error("❌ Non-JSON response from:", url, "\nFirst 200 chars:\n", String(body).slice(0, 200));
+      throw new Error(`Expected JSON but got non-JSON from ${url}`);
+    }
+    return body;
+  } finally {
+    clear();
   }
+}
 
-  if (!isJson) {
-    console.error("❌ Non-JSON response from:", url, "\nFirst 200 chars:\n", (body as string).slice(0, 200));
-    throw new Error(`Expected JSON but got non-JSON from ${url}`);
-  }
-
-  return body;
+function jsonHeaders(extra: Record<string,string> = {}) {
+  return { "Content-Type": "application/json", ...extra };
 }
 
 // -----------------------------------------------------------------------------
@@ -204,38 +217,6 @@ export function filesDelete(params: {
     body: JSON.stringify(params),
   });
 }
-
-function withTimeout(ms: number, signal?: AbortSignal) {
-  const c = new AbortController();
-  const t = setTimeout(() => c.abort(), ms);
-  if (signal) signal.addEventListener("abort", () => c.abort(), { once: true });
-  return { controller: c, clear: () => clearTimeout(t) };
-}
-
-async function jsonFetch(url: string, init: RequestInit) {
-  const { controller, clear } = withTimeout(30000, (init as any)?.signal);
-  try {
-    const res = await fetch(url, { ...init, signal: controller.signal });
-    const ct = res.headers.get("content-type") || "";
-    const isJson = ct.includes("application/json");
-    const body = isJson ? await res.json() : await res.text();
-
-    if (!res.ok) {
-      const msg = isJson ? ((body as any)?.error ?? JSON.stringify(body)) : String(body).slice(0, 200);
-      throw new Error(`HTTP ${res.status} ${res.statusText} — ${msg}`);
-    }
-    if (!isJson) throw new Error(`Expected JSON but got non-JSON from ${url}`);
-    return body;
-  } finally {
-    clear();
-  }
-}
-
-function jsonHeaders(extra: Record<string,string> = {}) {
-  return { "Content-Type": "application/json", ...extra };
-}
-// usage:
-headers: jsonHeaders({ "x-operation": op })
 
 // -----------------------------------------------------------------------------
 // Convenience wrappers
