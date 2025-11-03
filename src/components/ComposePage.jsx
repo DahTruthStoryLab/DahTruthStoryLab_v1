@@ -431,26 +431,17 @@ const chooseContent = (res) =>
 // REPLACE your existing runAI with this one:
 const runAI = async (mode = "proofread") => {
   setAiError(null);
+  setAiBusy(true);
   try {
-    setAiBusy(true);
     const inputPlain = htmlToPlain(html || "");
-
-    // IMPORTANT: send ONLY { text } so it matches your Lambda
     let res;
-    if (mode === "clarify") {
-      res = await clarify(inputPlain);
-    } else if (mode === "rewrite") {
-      res = await rewrite(inputPlain);
-    } else if (mode === "grammar") {
-      res = await runGrammar(inputPlain);
-    } else if (mode === "style") {
-      res = await runStyle(inputPlain);
-    } else if (mode === "readability") {
-      res = await runReadability(inputPlain);
-    } else {
-      // default: proofread
-      res = await proofread(inputPlain);
-    }
+
+    if (mode === "clarify") res = await clarify(inputPlain, instructions, provider);
+    else if (mode === "rewrite") res = await rewrite(inputPlain, instructions, provider);
+    else if (mode === "grammar") res = await runGrammar(inputPlain, provider);
+    else if (mode === "style") res = await runStyle(inputPlain, provider);
+    else if (mode === "readability") res = await runReadability(inputPlain, provider);
+    else res = await proofread(inputPlain, instructions, provider);
 
     const out = chooseContent(res);
     const newHtml = out && out !== inputPlain ? plainToSimpleHtml(out) : html;
