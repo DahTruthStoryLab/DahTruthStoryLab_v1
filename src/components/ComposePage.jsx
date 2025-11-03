@@ -26,7 +26,9 @@ import {
   runPublishingPrep,
 } from "../lib/api";
 
-/* ------- Fonts whitelist (family + size) ------- */
+/* ------------------------------------
+   Quill: fonts + sizes whitelists
+------------------------------------ */
 const Font = Quill.import("formats/font");
 const FONT_WHITELIST = [
   "sans",
@@ -48,10 +50,14 @@ const Size = Quill.import("formats/size");
 Size.whitelist = ["small", false, "large", "huge"];
 Quill.register(Size, true);
 
-/* ------- Page sizing ------- */
+/* ------------------------------------
+   Page sizing / pagination constants
+------------------------------------ */
 const PAGE_HEIGHT = 1040; // px visual page “viewport” height
 
-/* ------- Load Mammoth dynamically from CDN ------- */
+/* ------------------------------------
+   Load Mammoth dynamically from CDN
+------------------------------------ */
 async function loadMammoth() {
   if (window.mammoth) return window.mammoth;
   await new Promise((resolve, reject) => {
@@ -65,7 +71,9 @@ async function loadMammoth() {
   return window.mammoth;
 }
 
-/* ------- Local storage helpers ------- */
+/* ------------------------------------
+   Local storage helpers
+------------------------------------ */
 const STORAGE_KEY = "dahtruth-story-lab-toc-v3";
 const loadState = () => {
   try {
@@ -82,7 +90,9 @@ const saveState = (state) => {
   } catch {}
 };
 
-/* ------- Text helpers ------- */
+/* ------------------------------------
+   Text helpers
+------------------------------------ */
 const countWords = (html = "") => {
   const text = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
   return text ? text.split(/\s+/).length : 0;
@@ -121,7 +131,9 @@ function isEditableTarget(t) {
   return !!el?.closest?.('.ql-editor,[contenteditable="true"]');
 }
 
-/* ------- Small UI helpers ------- */
+/* ------------------------------------
+   Tiny UI helpers
+------------------------------------ */
 function PageNumberBadge({ pageIndex, pageCount }) {
   return (
     <div
@@ -169,7 +181,9 @@ function WritingCrumb({ view }) {
   );
 }
 
-/* ------- Chapter card (grid) — draggable ------- */
+/* ------------------------------------
+   Chapter card (grid) — draggable
+------------------------------------ */
 const DND_TYPE = "CHAPTER_CARD";
 function ChapterCard({ ch, index, moveCard, onOpen, active }) {
   const ref = useRef(null);
@@ -261,7 +275,7 @@ export default function ComposePage() {
   const [author, setAuthor] = useState("Jacqueline Session Ausby");
   const [bookTitle, setBookTitle] = useState(initial?.book?.title || "Raising Daisy");
 
-  // Toolbar config
+  // Quill toolbar
   const modules = useMemo(
     () => ({
       toolbar: [
@@ -338,23 +352,16 @@ export default function ComposePage() {
     if (!q) return;
 
     const onTextChange = () => {
-      // Recalc total pages
       recalcPages();
 
       const sel = q.getSelection();
-      const atEnd = sel && sel.index >= (q.getLength() - 1);
-      const nearBottom =
-        q.root.scrollTop + q.root.clientHeight >= q.root.scrollHeight - 4;
+      const atEnd = sel && sel.index >= q.getLength() - 1;
+      const nearBottom = q.root.scrollTop + q.root.clientHeight >= q.root.scrollHeight - 4;
 
-      // If typing at the very end near the bottom, “flip” forward
       if (atEnd && nearBottom) {
-        // Let layout settle then flip
         setTimeout(() => {
           recalcPages();
-          const total = Math.max(
-            1,
-            Math.ceil(q.root.scrollHeight / q.root.clientHeight)
-          );
+          const total = Math.max(1, Math.ceil(q.root.scrollHeight / q.root.clientHeight));
           if (pageIndex < total - 1) {
             goToPage(pageIndex + 1);
           }
@@ -387,9 +394,7 @@ export default function ComposePage() {
         status: chapterToUpdate.status || "draft",
       };
 
-      const nextChapters = prevChapters.map((c) =>
-        c.id === updated.id ? updated : c
-      );
+      const nextChapters = prevChapters.map((c) => (c.id === updated.id ? updated : c));
 
       const current = loadState() || {};
       saveState({
@@ -408,7 +413,9 @@ export default function ComposePage() {
   const undo = () => getQuill()?.history?.undo?.();
   const redo = () => getQuill()?.history?.redo?.();
 
-  /* AI helpers */
+  /* ------------------------------------
+     AI helpers + actions
+  ------------------------------------ */
   const chooseContent = (res) =>
     res?.result ??
     res?.reply ??
@@ -418,73 +425,47 @@ export default function ComposePage() {
     res?.echo?.message ??
     "";
 
- // Keep this small chooser somewhere near runAI
-const chooseContent = (res) =>
-  res?.result ??
-  res?.reply ??
-  res?.edited ??
-  res?.text ??
-  res?.output ??
-  res?.echo?.message ??
-  "";
+  const runAI = async (mode = "proofread") => {
+    setAiError(null);
+    setAiBusy(true);
+    try {
+      const inputPlain = htmlToPlain(html || "");
+      let res;
 
-// REPLACE your existing runAI with this one:
-const runAI = async (mode = "proofread") => {
-  setAiError(null);
-  setAiBusy(true);
-  try {
-    const inputPlain = htmlToPlain(html || "");
-    let res;
+      if (mode === "clarify") res = await clarify(inputPlain, instructions, provider);
+      else if (mode === "rewrite") res = await rewrite(inputPlain, instructions, provider);
+      else if (mode === "grammar") res = await runGrammar(inputPlain, provider);
+      else if (mode === "style") res = await runStyle(inputPlain, provider);
+      else if (mode === "readability") res = await runReadability(inputPlain, provider);
+      else res = await proofread(inputPlain, instructions, provider);
 
-    if (mode === "clarify") res = await clarify(inputPlain, instructions, provider);
-    else if (mode === "rewrite") res = await rewrite(inputPlain, instructions, provider);
-    else if (mode === "grammar") res = await runGrammar(inputPlain, provider);
-    else if (mode === "style") res = await runStyle(inputPlain, provider);
-    else if (mode === "readability") res = await runReadability(inputPlain, provider);
-    else res = await proofread(inputPlain, instructions, provider);
+      const out = chooseContent(res);
+      const newHtml = out && out !== inputPlain ? plainToSimpleHtml(out) : html;
 
-    const out = chooseContent(res);
-    const newHtml = out && out !== inputPlain ? plainToSimpleHtml(out) : html;
-
-    setHtml(newHtml);
-    setChapters((prev) => {
-      const next = prev.map((c) =>
-        c.id === selectedId
-          ? {
-              ...c,
-              title: title || c.title,
-              content: newHtml,
-              wordCount: countWords(newHtml),
-              lastEdited: new Date().toLocaleString(),
-            }
-          : c
-      );
-      const current = loadState() || {};
-      saveState({
-        book: { ...book, title: bookTitle || book.title },
-        chapters: next,
-        daily: current.daily || { goal: 500, counts: {} },
-        settings: current.settings || { theme: "light", focusMode: false },
-        tocOutline: current.tocOutline || [],
+      setHtml(newHtml);
+      setChapters((prev) => {
+        const next = prev.map((c) =>
+          c.id === selectedId
+            ? {
+                ...c,
+                title: title || c.title,
+                content: newHtml,
+                wordCount: countWords(newHtml),
+                lastEdited: new Date().toLocaleString(),
+              }
+            : c
+        );
+        const current = loadState() || {};
+        saveState({
+          book: { ...book, title: bookTitle || book.title },
+          chapters: next,
+          daily: current.daily || { goal: 500, counts: {} },
+          settings: current.settings || { theme: "light", focusMode: false },
+          tocOutline: current.tocOutline || [],
+        });
+        return next;
       });
-      return next;
-    });
 
-    // Recalculate pagination after AI rewrite
-    setTimeout(() => {
-      recalcPages();
-      goToPage(0);
-    }, 30);
-  } catch (e) {
-    console.error("[AI] error:", e);
-    setAiError(e?.message || "AI request failed");
-    alert(e?.message || "AI request failed");
-  } finally {
-    setAiBusy(false);
-  }
-};
-
-      // After AI rewrite, re-measure and start at page 1
       setTimeout(() => {
         recalcPages();
         goToPage(0);
@@ -579,7 +560,9 @@ const runAI = async (mode = "proofread") => {
     });
   };
 
-  /* Import Word (.docx) */
+  /* ------------------------------
+     Import / Export
+  ------------------------------ */
   const ImportDocxButton = () => {
     const fileInputRef = useRef(null);
     const onPick = () => fileInputRef.current?.click();
@@ -650,7 +633,6 @@ const runAI = async (mode = "proofread") => {
     );
   };
 
-  /* Export to Word */
   const exportToDocx = () => {
     try {
       const docHtml = `
@@ -688,7 +670,9 @@ const runAI = async (mode = "proofread") => {
 
   const goBack = () => navigate("/dashboard");
 
-  /* Toolbar with FULL AI buttons (visible on top) */
+  /* ------------------------------------
+     Toolbar with AI buttons
+  ------------------------------------ */
   const Toolbar = ({ compact = false }) => (
     <div className="flex items-center gap-2">
       {!compact && (
@@ -720,7 +704,7 @@ const runAI = async (mode = "proofread") => {
         <Download size={16} /> Export
       </button>
 
-      {/* AI Actions — ALL visible here */}
+      {/* AI Actions */}
       <button
         onClick={() => runAI("proofread")}
         className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50 disabled:opacity-60"
@@ -852,7 +836,6 @@ const runAI = async (mode = "proofread") => {
             </select>
           </div>
 
-          {/* Full AI toolbar (kept visible) */}
           <div className="w-full sm:flex-1" />
           <Toolbar />
         </div>
@@ -975,7 +958,7 @@ const runAI = async (mode = "proofread") => {
 
             <div className="border rounded-lg p-3 bg-white space-y-2">
               <div className="text-sm text-slate-600">Chapters</div>
-              <div className="space-y-2 max-h-[40vh] overflow-auto pr-1">
+              <div className="space-y-2 max-h=[40vh] overflow-auto pr-1">
                 {chapters.map((c) => (
                   <button
                     key={c.id}
@@ -1076,7 +1059,7 @@ const runAI = async (mode = "proofread") => {
               </div>
             </div>
 
-            {/* Footer actions with AI + Save (visible on editor page too) */}
+            {/* Footer actions with AI + Save */}
             <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
               <button
                 onClick={() => runAI("proofread")}
