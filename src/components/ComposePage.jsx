@@ -418,49 +418,80 @@ export default function ComposePage() {
     res?.echo?.message ??
     "";
 
-  const runAI = async (mode = "proofread") => {
-    setAiError(null);
-    try {
-      setAiBusy(true);
-      const inputPlain = htmlToPlain(html || "");
-      let res;
+ // Keep this small chooser somewhere near runAI
+const chooseContent = (res) =>
+  res?.result ??
+  res?.reply ??
+  res?.edited ??
+  res?.text ??
+  res?.output ??
+  res?.echo?.message ??
+  "";
 
-      if (mode === "clarify")
-        res = await clarify(inputPlain, instructions, provider);
-      else if (mode === "rewrite")
-        res = await rewrite(inputPlain, instructions, provider);
-      else if (mode === "grammar") res = await runGrammar(inputPlain, provider);
-      else if (mode === "style") res = await runStyle(inputPlain, provider);
-      else if (mode === "readability")
-        res = await runReadability(inputPlain, provider);
-      else res = await proofread(inputPlain, instructions, provider);
+// REPLACE your existing runAI with this one:
+const runAI = async (mode = "proofread") => {
+  setAiError(null);
+  try {
+    setAiBusy(true);
+    const inputPlain = htmlToPlain(html || "");
 
-      const out = chooseContent(res);
-      const newHtml = out && out !== inputPlain ? plainToSimpleHtml(out) : html;
+    // IMPORTANT: send ONLY { text } so it matches your Lambda
+    let res;
+    if (mode === "clarify") {
+      res = await clarify(inputPlain);
+    } else if (mode === "rewrite") {
+      res = await rewrite(inputPlain);
+    } else if (mode === "grammar") {
+      res = await runGrammar(inputPlain);
+    } else if (mode === "style") {
+      res = await runStyle(inputPlain);
+    } else if (mode === "readability") {
+      res = await runReadability(inputPlain);
+    } else {
+      // default: proofread
+      res = await proofread(inputPlain);
+    }
 
-      setHtml(newHtml);
-      setChapters((prev) => {
-        const next = prev.map((c) =>
-          c.id === selectedId
-            ? {
-                ...c,
-                title: title || c.title,
-                content: newHtml,
-                wordCount: countWords(newHtml),
-                lastEdited: new Date().toLocaleString(),
-              }
-            : c
-        );
-        const current = loadState() || {};
-        saveState({
-          book: { ...book, title: bookTitle || book.title },
-          chapters: next,
-          daily: current.daily || { goal: 500, counts: {} },
-          settings: current.settings || { theme: "light", focusMode: false },
-          tocOutline: current.tocOutline || [],
-        });
-        return next;
+    const out = chooseContent(res);
+    const newHtml = out && out !== inputPlain ? plainToSimpleHtml(out) : html;
+
+    setHtml(newHtml);
+    setChapters((prev) => {
+      const next = prev.map((c) =>
+        c.id === selectedId
+          ? {
+              ...c,
+              title: title || c.title,
+              content: newHtml,
+              wordCount: countWords(newHtml),
+              lastEdited: new Date().toLocaleString(),
+            }
+          : c
+      );
+      const current = loadState() || {};
+      saveState({
+        book: { ...book, title: bookTitle || book.title },
+        chapters: next,
+        daily: current.daily || { goal: 500, counts: {} },
+        settings: current.settings || { theme: "light", focusMode: false },
+        tocOutline: current.tocOutline || [],
       });
+      return next;
+    });
+
+    // Recalculate pagination after AI rewrite
+    setTimeout(() => {
+      recalcPages();
+      goToPage(0);
+    }, 30);
+  } catch (e) {
+    console.error("[AI] error:", e);
+    setAiError(e?.message || "AI request failed");
+    alert(e?.message || "AI request failed");
+  } finally {
+    setAiBusy(false);
+  }
+};
 
       // After AI rewrite, re-measure and start at page 1
       setTimeout(() => {
