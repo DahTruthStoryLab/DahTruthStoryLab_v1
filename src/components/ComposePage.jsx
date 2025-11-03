@@ -4,27 +4,22 @@ import ReactQuill from "react-quill";
 import Quill from "quill";
 import "react-quill/dist/quill.snow.css";
 import {
-  ArrowLeft,
   Bot,
   Save,
-  Minimize2,
   RotateCcw,
   RotateCw,
   Download,
   Upload,
   ChevronLeft,
   ChevronRight,
-  Grid,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useDrag, useDrop } from "react-dnd";
 
 import {
-  runAssistant,
   runGrammar,
   runStyle,
   runReadability,
-  runRewrite,
   proofread,
   clarify,
   rewrite,
@@ -53,8 +48,8 @@ const Size = Quill.import("formats/size");
 Size.whitelist = ["small", false, "large", "huge"];
 Quill.register(Size, true);
 
-/* ------- Word page sizing ------- */
-const PAGE_HEIGHT = 1040; // px visual page “viewport”
+/* ------- Page sizing ------- */
+const PAGE_HEIGHT = 1040; // px visual page “viewport” height
 
 /* ------- Load Mammoth dynamically from CDN ------- */
 async function loadMammoth() {
@@ -94,7 +89,6 @@ const countWords = (html = "") => {
 };
 const htmlToPlain = (html = "") =>
   html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
-
 const plainToSimpleHtml = (text = "") => {
   if (!text) return "";
   const paras = text
@@ -127,9 +121,7 @@ function isEditableTarget(t) {
   return !!el?.closest?.('.ql-editor,[contenteditable="true"]');
 }
 
-/* ----------------------------
-   Small UI helpers
----------------------------- */
+/* ------- Small UI helpers ------- */
 function PageNumberBadge({ pageIndex, pageCount }) {
   return (
     <div
@@ -177,9 +169,7 @@ function WritingCrumb({ view }) {
   );
 }
 
-/* ----------------------------
-   Chapter card (grid) — draggable
----------------------------- */
+/* ------- Chapter card (grid) — draggable ------- */
 const DND_TYPE = "CHAPTER_CARD";
 function ChapterCard({ ch, index, moveCard, onOpen, active }) {
   const ref = useRef(null);
@@ -233,9 +223,9 @@ function ChapterCard({ ch, index, moveCard, onOpen, active }) {
   );
 }
 
-/* ----------------------------
+/* ============================
    Compose Page
----------------------------- */
+============================ */
 export default function ComposePage() {
   const navigate = useNavigate();
 
@@ -255,7 +245,6 @@ export default function ComposePage() {
   const [title, setTitle] = useState(selected.title || "");
   const [html, setHtml] = useState(selected.content || "");
   const editorRef = useRef(null);
-  const fsEditorRef = useRef(null); // retained for fullscreen option if you re-enable
 
   // Pagination
   const [pageIndex, setPageIndex] = useState(0);
@@ -272,7 +261,7 @@ export default function ComposePage() {
   const [author, setAuthor] = useState("Jacqueline Session Ausby");
   const [bookTitle, setBookTitle] = useState(initial?.book?.title || "Raising Daisy");
 
-  // Quill toolbar modules
+  // Toolbar config
   const modules = useMemo(
     () => ({
       toolbar: [
@@ -291,8 +280,7 @@ export default function ComposePage() {
     []
   );
 
-  const getActiveEditor = () => editorRef.current; // only one editor rendered at a time
-  const getQuill = () => getActiveEditor()?.getEditor?.();
+  const getQuill = () => editorRef.current?.getEditor?.();
 
   const recalcPages = useCallback(() => {
     const q = getQuill();
@@ -314,6 +302,7 @@ export default function ComposePage() {
     },
     [pageCount]
   );
+
   const nextPage = () => goToPage(pageIndex + 1);
   const prevPage = () => goToPage(pageIndex - 1);
 
@@ -343,23 +332,32 @@ export default function ComposePage() {
     return () => clearTimeout(t);
   }, [book, chapters]);
 
-  /* Auto-advance at bottom while typing */
+  /* Auto-advance at bottom while typing (page flip) */
   useEffect(() => {
-    const q = editorRef?.current?.getEditor?.();
+    const q = getQuill();
     if (!q) return;
 
     const onTextChange = () => {
+      // Recalc total pages
       recalcPages();
 
       const sel = q.getSelection();
       const atEnd = sel && sel.index >= (q.getLength() - 1);
-      const nearBottom = (q.root.scrollTop + q.root.clientHeight) >= (q.root.scrollHeight - 4);
+      const nearBottom =
+        q.root.scrollTop + q.root.clientHeight >= q.root.scrollHeight - 4;
 
+      // If typing at the very end near the bottom, “flip” forward
       if (atEnd && nearBottom) {
+        // Let layout settle then flip
         setTimeout(() => {
           recalcPages();
-          const newPages = Math.max(1, Math.ceil(q.root.scrollHeight / q.root.clientHeight));
-          if (pageIndex < newPages - 1) goToPage(pageIndex + 1);
+          const total = Math.max(
+            1,
+            Math.ceil(q.root.scrollHeight / q.root.clientHeight)
+          );
+          if (pageIndex < total - 1) {
+            goToPage(pageIndex + 1);
+          }
         }, 10);
       }
     };
@@ -368,31 +366,11 @@ export default function ComposePage() {
     return () => q.off("text-change", onTextChange);
   }, [recalcPages, goToPage, pageIndex]);
 
-  /* Also recalc after html updates */
+  /* Also recalc after explicit HTML updates */
   useEffect(() => {
     const t = setTimeout(() => recalcPages(), 60);
     return () => clearTimeout(t);
   }, [html, recalcPages]);
-
-  /* Quill “page” container styles */
-  const quillPageStyles = {
-    padding: 16,
-    background: "#f0f3f8",
-  };
-  const quillPageInnerStyles = {
-    margin: "0 auto",
-    width: "100%",
-    maxWidth: 800,
-    height: PAGE_HEIGHT,
-    background: "#fff",
-    color: "#111",
-    border: "1px solid #e5e7eb",
-    boxShadow: "0 8px 30px rgba(2,20,40,0.10)",
-    borderRadius: 12,
-    padding: "48px 48px",
-    position: "relative",
-    overflow: "hidden",
-  };
 
   /* Save */
   const handleSave = useCallback(() => {
@@ -447,11 +425,14 @@ export default function ComposePage() {
       const inputPlain = htmlToPlain(html || "");
       let res;
 
-      if (mode === "clarify") res = await clarify(inputPlain, instructions, provider);
-      else if (mode === "rewrite") res = await rewrite(inputPlain, instructions, provider);
+      if (mode === "clarify")
+        res = await clarify(inputPlain, instructions, provider);
+      else if (mode === "rewrite")
+        res = await rewrite(inputPlain, instructions, provider);
       else if (mode === "grammar") res = await runGrammar(inputPlain, provider);
       else if (mode === "style") res = await runStyle(inputPlain, provider);
-      else if (mode === "readability") res = await runReadability(inputPlain, provider);
+      else if (mode === "readability")
+        res = await runReadability(inputPlain, provider);
       else res = await proofread(inputPlain, instructions, provider);
 
       const out = chooseContent(res);
@@ -481,6 +462,7 @@ export default function ComposePage() {
         return next;
       });
 
+      // After AI rewrite, re-measure and start at page 1
       setTimeout(() => {
         recalcPages();
         goToPage(0);
@@ -499,7 +481,7 @@ export default function ComposePage() {
     await runAI("proofread");
   };
 
-  /* Keyboard shortcuts */
+  /* Shortcuts */
   useEffect(() => {
     const onKey = (e) => {
       if (isEditableTarget(e.target)) return;
@@ -533,7 +515,7 @@ export default function ComposePage() {
     return () => window.removeEventListener("keydown", onKey, { capture: true });
   }, [handleSave, handleSaveAndProof, pageIndex, pageCount]);
 
-  /* Add chapter */
+  /* Add + reorder chapters for grid drag/drop */
   const addChapter = () => {
     const id = Date.now();
     const ch = {
@@ -546,15 +528,20 @@ export default function ComposePage() {
     };
     setChapters((prev) => [ch, ...prev]);
     setSelectedId(id);
+    setView("editor");
+    setTimeout(() => {
+      recalcPages();
+      goToPage(0);
+    }, 30);
   };
 
-  /* Reorder chapters for grid drag/drop */
   const arrayMove = (arr, from, to) => {
     const copy = arr.slice();
     const [m] = copy.splice(from, 1);
     copy.splice(to, 0, m);
     return copy;
   };
+
   const moveCard = (fromIndex, toIndex) => {
     setChapters((prev) => {
       const next = arrayMove(prev, fromIndex, toIndex);
@@ -568,64 +555,6 @@ export default function ComposePage() {
       });
       return next;
     });
-  };
-
-  /* Left-rail version (kept if you want to list chapters elsewhere) */
-  const ChapterItem = ({ ch }) => {
-    const [{ isDragging }, dragRef] = useDrag(
-      () => ({
-        type: "CHAPTER",
-        item: { id: ch.id },
-        collect: (m) => ({ isDragging: m.isDragging() }),
-      }),
-      [ch.id]
-    );
-
-    const [{ isOver }, dropRef] = useDrop(
-      () => ({
-        accept: "CHAPTER",
-        drop: (item) => {
-          if (!item?.id || item.id === ch.id) return;
-          // optional: implement id->id reorder if you keep a left list
-        },
-        collect: (m) => ({ isOver: m.isOver() }),
-      }),
-      [ch.id]
-    );
-
-    const setRefs = (el) => {
-      dropRef(el);
-      dragRef(el);
-    };
-
-    return (
-      <button
-        ref={setRefs}
-        type="button"
-        onClick={() => {
-          setSelectedId(ch.id);
-          setView("editor");
-          setTimeout(() => {
-            recalcPages();
-            goToPage(0);
-          }, 30);
-        }}
-        className={[
-          "w-full text-left px-3 py-2 rounded-lg border transition",
-          isOver ? "dnd-drop-hover" : "",
-          isDragging ? "dnd-draggable dnd-dragging" : "dnd-draggable",
-          selectedId === ch.id
-            ? "bg-primary/15 border-primary/40"
-            : "bg-white border-white/60 hover:bg-white/80",
-        ].join(" ")}
-        title={`${(ch.wordCount || 0).toLocaleString()} words`}
-      >
-        <div className="font-medium truncate">{ch.title}</div>
-        <div className="text-xs text-slate-500">
-          {(ch.wordCount || 0).toLocaleString()} words • {ch.lastEdited || "—"}
-        </div>
-      </button>
-    );
   };
 
   /* Import Word (.docx) */
@@ -737,8 +666,9 @@ export default function ComposePage() {
 
   const goBack = () => navigate("/dashboard");
 
+  /* Toolbar with FULL AI buttons (visible on top) */
   const Toolbar = ({ compact = false }) => (
-    <>
+    <div className="flex items-center gap-2">
       {!compact && (
         <>
           <button
@@ -768,6 +698,7 @@ export default function ComposePage() {
         <Download size={16} /> Export
       </button>
 
+      {/* AI Actions — ALL visible here */}
       <button
         onClick={() => runAI("proofread")}
         className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50 disabled:opacity-60"
@@ -775,8 +706,9 @@ export default function ComposePage() {
         title="AI Proofread"
       >
         <Bot size={16} />
-        {aiBusy ? "AI…" : compact ? "Proof" : "AI: Proofread"}
+        {aiBusy ? "AI…" : "Proofread"}
       </button>
+
       <button
         onClick={() => runAI("clarify")}
         className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50 disabled:opacity-60"
@@ -784,16 +716,17 @@ export default function ComposePage() {
         title="AI Clarify"
       >
         <Bot size={16} />
-        {aiBusy ? "AI…" : compact ? "Clarify" : "AI: Clarify"}
+        {aiBusy ? "AI…" : "Clarify"}
       </button>
+
       <button
         onClick={() => runAI("rewrite")}
         className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50 disabled:opacity-60"
         disabled={aiBusy}
-        title="AI Clear Rewrite"
+        title="AI Rewrite"
       >
         <Bot size={16} />
-        {aiBusy ? "AI…" : compact ? "Rewrite" : "AI: Rewrite"}
+        {aiBusy ? "AI…" : "Rewrite"}
       </button>
 
       {!compact && (
@@ -834,6 +767,7 @@ export default function ComposePage() {
         <Bot size={16} />
         Proof + Save
       </button>
+
       <button
         onClick={handleSave}
         className="inline-flex items-center gap-2 rounded-lg bg-primary text-white px-3 py-1.5 hover:opacity-90"
@@ -841,24 +775,22 @@ export default function ComposePage() {
       >
         <Save size={16} /> Save
       </button>
-    </>
+    </div>
   );
 
   return (
     <div className="min-h-screen bg-[rgb(244,247,250)] text-slate-900">
-      {/* Top bar */}
+      {/* Top bar with GOLD button + crumb + full AI Toolbar */}
       <div className="sticky top-0 z-40 bg-white/80 backdrop-blur border-b border-slate-200">
-        <div className="max-w-7xl mx-auto px-3 h-12 flex items-center gap-2">
+        <div className="max-w-7xl mx-auto px-3 h-auto py-2 flex flex-wrap items-center gap-3">
           <GoldButton onClick={goBack} title="Back to Dashboard">
             ← Dashboard
           </GoldButton>
 
-          <div className="ml-3">
-            <WritingCrumb view={view} />
-          </div>
+          <WritingCrumb view={view} />
 
           {/* View toggle */}
-          <div className="ml-3 flex items-center gap-1">
+          <div className="ml-1 flex items-center gap-1">
             <button
               onClick={() => setView("grid")}
               className={`inline-flex items-center gap-2 rounded-md border px-2.5 py-1 text-[13px] ${
@@ -886,7 +818,7 @@ export default function ComposePage() {
           </div>
 
           {/* Provider (compact) */}
-          <div className="ml-3 flex items-center gap-1">
+          <div className="ml-2 flex items-center gap-1">
             <label className="text-[12px] text-slate-600">Provider:</label>
             <select
               className="border rounded px-2 py-1 text-[12px]"
@@ -898,16 +830,13 @@ export default function ComposePage() {
             </select>
           </div>
 
-          <div className="flex-1" />
-
-          {/* Right tools (compact suggestion area) */}
-          <div className="hidden sm:flex items-center gap-1">
-            {/* You can drop a compact Toolbar here if desired */}
-          </div>
+          {/* Full AI toolbar (kept visible) */}
+          <div className="w-full sm:flex-1" />
+          <Toolbar />
         </div>
       </div>
 
-      {/* GRID VIEW */}
+      {/* GRID VIEW (4x4) */}
       {view === "grid" && (
         <div className="max-w-7xl mx-auto px-4 py-6">
           <div className="flex items-center justify-between mb-3">
@@ -941,10 +870,10 @@ export default function ComposePage() {
         </div>
       )}
 
-      {/* EDITOR VIEW */}
+      {/* EDITOR VIEW (book page with flip + page numbers) */}
       {view === "editor" && (
         <div className="max-w-7xl mx-auto px-4 py-6 grid grid-cols-1 xl:grid-cols-[18rem_1fr] gap-6">
-          {/* Left: Meta + AI */}
+          {/* Left: meta + AI instructions + chapters list */}
           <aside className="xl:sticky xl:top-16 space-y-3" style={{ zIndex: 10 }}>
             <div className="space-y-2 border rounded-lg p-3 bg-white">
               <div className="text-sm font-medium">Publishing Meta</div>
@@ -1026,7 +955,28 @@ export default function ComposePage() {
               <div className="text-sm text-slate-600">Chapters</div>
               <div className="space-y-2 max-h-[40vh] overflow-auto pr-1">
                 {chapters.map((c) => (
-                  <ChapterItem key={c.id} ch={c} />
+                  <button
+                    key={c.id}
+                    onClick={() => {
+                      setSelectedId(c.id);
+                      setView("editor");
+                      setTimeout(() => {
+                        recalcPages();
+                        goToPage(0);
+                      }, 30);
+                    }}
+                    className={[
+                      "w-full text-left px-3 py-2 rounded-lg border transition",
+                      selectedId === c.id
+                        ? "bg-primary/15 border-primary/40"
+                        : "bg-white border-white/60 hover:bg-white/80",
+                    ].join(" ")}
+                  >
+                    <div className="font-medium truncate">{c.title}</div>
+                    <div className="text-xs text-slate-500">
+                      {(c.wordCount || 0).toLocaleString()} words • {c.lastEdited || "—"}
+                    </div>
+                  </button>
                 ))}
               </div>
               <button
@@ -1071,8 +1021,24 @@ export default function ComposePage() {
               </div>
             </div>
 
+            {/* White page with fixed page-height viewport */}
             <div style={{ padding: 16, background: "#f0f3f8" }}>
-              <div style={quillPageInnerStyles}>
+              <div
+                style={{
+                  margin: "0 auto",
+                  width: "100%",
+                  maxWidth: 800,
+                  height: PAGE_HEIGHT,
+                  background: "#fff",
+                  color: "#111",
+                  border: "1px solid #e5e7eb",
+                  boxShadow: "0 8px 30px rgba(2,20,40,0.10)",
+                  borderRadius: 12,
+                  padding: "48px 48px",
+                  position: "relative",
+                  overflow: "hidden",
+                }}
+              >
                 <ReactQuill
                   ref={editorRef}
                   theme="snow"
@@ -1088,7 +1054,60 @@ export default function ComposePage() {
               </div>
             </div>
 
-            <div className="mt-3 flex items-center justify-end gap-2">
+            {/* Footer actions with AI + Save (visible on editor page too) */}
+            <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
+              <button
+                onClick={() => runAI("proofread")}
+                className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50 disabled:opacity-60"
+                disabled={aiBusy}
+                title="AI Proofread"
+              >
+                <Bot size={16} />
+                {aiBusy ? "AI…" : "Proofread"}
+              </button>
+              <button
+                onClick={() => runAI("clarify")}
+                className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50 disabled:opacity-60"
+                disabled={aiBusy}
+                title="AI Clarify"
+              >
+                <Bot size={16} />
+                {aiBusy ? "AI…" : "Clarify"}
+              </button>
+              <button
+                onClick={() => runAI("rewrite")}
+                className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50 disabled:opacity-60"
+                disabled={aiBusy}
+                title="AI Rewrite"
+              >
+                <Bot size={16} />
+                {aiBusy ? "AI…" : "Rewrite"}
+              </button>
+              <button
+                onClick={() => runAI("grammar")}
+                className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50 disabled:opacity-60"
+                disabled={aiBusy}
+                title="AI Grammar"
+              >
+                🔤 Grammar
+              </button>
+              <button
+                onClick={() => runAI("style")}
+                className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50 disabled:opacity-60"
+                disabled={aiBusy}
+                title="AI Style"
+              >
+                🪶 Style
+              </button>
+              <button
+                onClick={() => runAI("readability")}
+                className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50 disabled:opacity-60"
+                disabled={aiBusy}
+                title="AI Readability"
+              >
+                📊 Readability
+              </button>
+
               <button
                 onClick={handleSaveAndProof}
                 className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50 disabled:opacity-60"
