@@ -270,10 +270,11 @@ export default function ComposePage() {
   const [instructions, setInstructions] = useState(
     "Keep ADOS cadence; pastoral but firm."
   );
-  const [provider, setProvider] = useState("anthropic"); // "anthropic" | "openai"
-  const [pubAdvice, setPubAdvice] = useState(null);
-  const [author, setAuthor] = useState("Jacqueline Session Ausby");
-  const [bookTitle, setBookTitle] = useState(initial?.book?.title || "Raising Daisy");
+ - const [provider, setProvider] = useState("anthropic"); // "anthropic" | "openai"
++  const [provider, setProvider] = useState("openai"); // "openai" | "anthropic"
+   const [pubAdvice, setPubAdvice] = useState(null);
+   const [author, setAuthor] = useState("Jacqueline Session Ausby");
+   const [bookTitle, setBookTitle] = useState(initial?.book?.title || "Raising Daisy");
 
   // Quill toolbar
   const modules = useMemo(
