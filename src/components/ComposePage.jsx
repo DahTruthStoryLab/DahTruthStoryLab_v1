@@ -7,7 +7,6 @@ import {
   ArrowLeft,
   Bot,
   Save,
-  Maximize2,
   Minimize2,
   RotateCcw,
   RotateCw,
@@ -16,7 +15,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Grid,
-  BookOpenCheck,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useDrag, useDrop } from "react-dnd";
@@ -55,6 +53,9 @@ const Size = Quill.import("formats/size");
 Size.whitelist = ["small", false, "large", "huge"];
 Quill.register(Size, true);
 
+/* ------- Word page sizing ------- */
+const PAGE_HEIGHT = 1040; // px visual page “viewport”
+
 /* ------- Load Mammoth dynamically from CDN ------- */
 async function loadMammoth() {
   if (window.mammoth) return window.mammoth;
@@ -69,7 +70,7 @@ async function loadMammoth() {
   return window.mammoth;
 }
 
-/* ------- Storage helpers ------- */
+/* ------- Local storage helpers ------- */
 const STORAGE_KEY = "dahtruth-story-lab-toc-v3";
 const loadState = () => {
   try {
@@ -86,7 +87,7 @@ const saveState = (state) => {
   } catch {}
 };
 
-/* ------- Small helpers ------- */
+/* ------- Text helpers ------- */
 const countWords = (html = "") => {
   const text = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
   return text ? text.split(/\s+/).length : 0;
@@ -127,32 +128,8 @@ function isEditableTarget(t) {
 }
 
 /* ----------------------------
-   Chapter Card (Grid view)
+   Small UI helpers
 ---------------------------- */
-function ChapterCard({ ch, active, onOpen, onDropHere, onDragStart }) {
-  // Simple non-RnD draggable (grid is for quick access)
-  return (
-    <button
-      type="button"
-      onClick={onOpen}
-      className={[
-        "group relative rounded-2xl border p-4 text-left transition bg-white",
-        active ? "ring-2 ring-primary/60" : "hover:shadow-md",
-      ].join(" ")}
-    >
-      <div className="flex items-start justify-between gap-2">
-        <div className="font-semibold line-clamp-2">{ch.title}</div>
-        <BookOpenCheck className="opacity-60" size={18} />
-      </div>
-      <div className="mt-2 text-xs text-slate-500">
-        {(ch.wordCount || 0).toLocaleString()} words • {ch.lastEdited || "—"}
-      </div>
-      <div className="absolute inset-0 rounded-2xl ring-0 ring-primary/0 group-hover:ring-2 group-hover:ring-primary/20 pointer-events-none" />
-    </button>
-  );
-}
-
-/* Little badge that sits on the page and shows "Page X / Y" */
 function PageNumberBadge({ pageIndex, pageCount }) {
   return (
     <div
@@ -175,6 +152,86 @@ function PageNumberBadge({ pageIndex, pageCount }) {
   );
 }
 
+function GoldButton({ children, className = "", ...props }) {
+  return (
+    <button
+      {...props}
+      className={[
+        "inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-1",
+        className,
+      ].join(" ")}
+      style={{ backgroundColor: "#D4AF37" }}
+    >
+      {children}
+    </button>
+  );
+}
+
+function WritingCrumb({ view }) {
+  return (
+    <div className="text-[13px] text-slate-600">
+      <span className="opacity-80">Writing</span>
+      <span className="px-2 opacity-50">▸</span>
+      <span className="font-medium">{view === "grid" ? "Chapters" : "Editor"}</span>
+    </div>
+  );
+}
+
+/* ----------------------------
+   Chapter card (grid) — draggable
+---------------------------- */
+const DND_TYPE = "CHAPTER_CARD";
+function ChapterCard({ ch, index, moveCard, onOpen, active }) {
+  const ref = useRef(null);
+
+  const [, drop] = useDrop({
+    accept: DND_TYPE,
+    hover(item) {
+      if (!ref.current) return;
+      const dragIndex = item.index;
+      if (dragIndex === index) return;
+      moveCard(dragIndex, index);
+      item.index = index;
+    },
+  });
+
+  const [{ isDragging }, drag] = useDrag({
+    type: DND_TYPE,
+    item: { id: ch.id, index },
+    collect: (monitor) => ({ isDragging: monitor.isDragging() }),
+  });
+
+  drag(drop(ref));
+
+  return (
+    <button
+      ref={ref}
+      type="button"
+      onClick={onOpen}
+      className={[
+        "group relative rounded-2xl border p-4 text-left transition bg-white",
+        active ? "ring-2 ring-primary/60" : "hover:shadow-md",
+        isDragging ? "opacity-50" : "",
+      ].join(" ")}
+    >
+      <div className="h-2 rounded-md bg-gradient-to-r from-slate-200 via-slate-100 to-slate-200 mb-3" />
+      <div className="flex items-start justify-between gap-2">
+        <div className="font-semibold line-clamp-2">{ch.title}</div>
+        <span className="text-[11px] px-2 py-0.5 rounded bg-slate-100 text-slate-600">
+          {ch.status || "draft"}
+        </span>
+      </div>
+      <p className="mt-2 text-[12px] text-slate-600 line-clamp-3">
+        {String(ch.content || "").replace(/<[^>]+>/g, " ").trim().slice(0, 180) || "—"}
+      </p>
+      <div className="mt-3 text-[12px] text-slate-500 flex items-center justify-between">
+        <span>{(ch.wordCount || 0).toLocaleString()} words</span>
+        <span>{ch.lastEdited || "—"}</span>
+      </div>
+      <div className="absolute inset-0 rounded-2xl ring-0 ring-primary/0 group-hover:ring-2 group-hover:ring-primary/10 pointer-events-none" />
+    </button>
+  );
+}
 
 /* ----------------------------
    Compose Page
@@ -182,7 +239,7 @@ function PageNumberBadge({ pageIndex, pageCount }) {
 export default function ComposePage() {
   const navigate = useNavigate();
 
-  // Load initial project
+  // Initial project
   const initial = useMemo(loadState, []);
   const [book, setBook] = useState(initial?.book || { title: "Untitled Book" });
   const [chapters, setChapters] = useState(
@@ -191,65 +248,31 @@ export default function ComposePage() {
   const [selectedId, setSelectedId] = useState(chapters[0].id);
   const selected = chapters.find((c) => c.id === selectedId) || chapters[0];
 
-  // Views: 'grid' (chapter cards) or 'editor' (book page)
+  // Views: 'grid' or 'editor'
   const [view, setView] = useState("grid");
 
   // Editor state
   const [title, setTitle] = useState(selected.title || "");
   const [html, setHtml] = useState(selected.content || "");
-  const [isFS, setIsFS] = useState(false);
-  const [aiBusy, setAiBusy] = useState(false);
-  const [aiError, setAiError] = useState(null);
-
   const editorRef = useRef(null);
-  const fsEditorRef = useRef(null);
+  const fsEditorRef = useRef(null); // retained for fullscreen option if you re-enable
+
+  // Pagination
+  const [pageIndex, setPageIndex] = useState(0);
+  const [pageCount, setPageCount] = useState(1);
 
   // AI controls
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiError, setAiError] = useState(null);
   const [instructions, setInstructions] = useState(
     "Keep ADOS cadence; pastoral but firm."
   );
   const [provider, setProvider] = useState("anthropic"); // "anthropic" | "openai"
-
-  // Publishing prep preview
   const [pubAdvice, setPubAdvice] = useState(null);
   const [author, setAuthor] = useState("Jacqueline Session Ausby");
   const [bookTitle, setBookTitle] = useState(initial?.book?.title || "Raising Daisy");
 
-  // Book page "flip" state
-  const PAGE_HEIGHT = 1040; // px (visual page height)
-  const [pageIndex, setPageIndex] = useState(0);
-  const [pageCount, setPageCount] = useState(1);
-  const pageContainerRef = useRef(null); // holds Quill container in editor view
-
-  /* Sync editor when selected chapter changes */
-  useEffect(() => {
-    const sel = chapters.find((c) => c.id === selectedId);
-    if (!sel) return;
-    setTitle(sel.title || "");
-    setHtml(sel.content || "");
-    setPageIndex(0);
-    // recalc after content renders
-    const t = setTimeout(() => recalcPages(), 80);
-    return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedId, chapters, view, isFS]);
-
-  /* Persist project (debounced) */
-  useEffect(() => {
-    const t = setTimeout(() => {
-      const current = loadState() || {};
-      saveState({
-        book,
-        chapters,
-        daily: current.daily || { goal: 500, counts: {} },
-        settings: current.settings || { theme: "light", focusMode: false },
-        tocOutline: current.tocOutline || [],
-      });
-    }, 400);
-    return () => clearTimeout(t);
-  }, [book, chapters]);
-
-  /* Quill toolbar modules */
+  // Quill toolbar modules
   const modules = useMemo(
     () => ({
       toolbar: [
@@ -268,44 +291,91 @@ export default function ComposePage() {
     []
   );
 
-  /* Helpers to access active Quill instance */
-  const getActiveEditor = () => (isFS ? fsEditorRef.current : editorRef.current);
+  const getActiveEditor = () => editorRef.current; // only one editor rendered at a time
   const getQuill = () => getActiveEditor()?.getEditor?.();
 
-  /* Recalculate pages by measuring the editor scroll size */
-  const recalcPages = () => {
+  const recalcPages = useCallback(() => {
     const q = getQuill();
     if (!q) return;
-    const scrollEl = q.root; // .ql-editor is scrollable when container has fixed height
-    if (!scrollEl) return;
+    const scrollEl = q.root;
     const total = Math.max(scrollEl.scrollHeight, scrollEl.clientHeight);
     const count = Math.max(1, Math.ceil(total / PAGE_HEIGHT));
     setPageCount(count);
-    // Clamp current page
     setPageIndex((p) => Math.min(p, count - 1));
-  };
+  }, []);
 
-  /* Flip to page by adjusting scrollTop on the Quill editor root */
-  const goToPage = (idx) => {
-    const q = getQuill();
-    if (!q) return;
-    const target = Math.max(0, Math.min(idx, pageCount - 1));
-    q.root.scrollTop = target * PAGE_HEIGHT;
-    setPageIndex(target);
-  };
+  const goToPage = useCallback(
+    (idx) => {
+      const q = getQuill();
+      if (!q) return;
+      const target = Math.max(0, Math.min(idx, pageCount - 1));
+      q.root.scrollTop = target * PAGE_HEIGHT;
+      setPageIndex(target);
+    },
+    [pageCount]
+  );
   const nextPage = () => goToPage(pageIndex + 1);
   const prevPage = () => goToPage(pageIndex - 1);
 
-  /* Recalc pages after content changes and after Quill mounts */
+  /* Sync editor when chapter changes */
+  useEffect(() => {
+    const sel = chapters.find((c) => c.id === selectedId);
+    if (!sel) return;
+    setTitle(sel.title || "");
+    setHtml(sel.content || "");
+    setPageIndex(0);
+    const t = setTimeout(() => recalcPages(), 80);
+    return () => clearTimeout(t);
+  }, [selectedId, chapters, view, recalcPages]);
+
+  /* Persist project (debounced) */
+  useEffect(() => {
+    const t = setTimeout(() => {
+      const current = loadState() || {};
+      saveState({
+        book,
+        chapters,
+        daily: current.daily || { goal: 500, counts: {} },
+        settings: current.settings || { theme: "light", focusMode: false },
+        tocOutline: current.tocOutline || [],
+      });
+    }, 400);
+    return () => clearTimeout(t);
+  }, [book, chapters]);
+
+  /* Auto-advance at bottom while typing */
+  useEffect(() => {
+    const q = editorRef?.current?.getEditor?.();
+    if (!q) return;
+
+    const onTextChange = () => {
+      recalcPages();
+
+      const sel = q.getSelection();
+      const atEnd = sel && sel.index >= (q.getLength() - 1);
+      const nearBottom = (q.root.scrollTop + q.root.clientHeight) >= (q.root.scrollHeight - 4);
+
+      if (atEnd && nearBottom) {
+        setTimeout(() => {
+          recalcPages();
+          const newPages = Math.max(1, Math.ceil(q.root.scrollHeight / q.root.clientHeight));
+          if (pageIndex < newPages - 1) goToPage(pageIndex + 1);
+        }, 10);
+      }
+    };
+
+    q.on("text-change", onTextChange);
+    return () => q.off("text-change", onTextChange);
+  }, [recalcPages, goToPage, pageIndex]);
+
+  /* Also recalc after html updates */
   useEffect(() => {
     const t = setTimeout(() => recalcPages(), 60);
     return () => clearTimeout(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [html, isFS]);
+  }, [html, recalcPages]);
 
-  /* Make Quill render as a fixed-height "book page" */
+  /* Quill “page” container styles */
   const quillPageStyles = {
-    // outer white page
     padding: 16,
     background: "#f0f3f8",
   };
@@ -313,13 +383,15 @@ export default function ComposePage() {
     margin: "0 auto",
     width: "100%",
     maxWidth: 800,
-    height: PAGE_HEIGHT, // <- fixed page height
+    height: PAGE_HEIGHT,
     background: "#fff",
     color: "#111",
     border: "1px solid #e5e7eb",
     boxShadow: "0 8px 30px rgba(2,20,40,0.10)",
     borderRadius: 12,
     padding: "48px 48px",
+    position: "relative",
+    overflow: "hidden",
   };
 
   /* Save */
@@ -355,10 +427,10 @@ export default function ComposePage() {
   }, [selectedId, title, html, book, bookTitle]);
 
   /* Undo / Redo */
-  const undo = () => getActiveEditor()?.getEditor?.()?.history?.undo?.();
-  const redo = () => getActiveEditor()?.getEditor?.()?.history?.redo?.();
+  const undo = () => getQuill()?.history?.undo?.();
+  const redo = () => getQuill()?.history?.redo?.();
 
-  /* -------- AI actions (pass instructions + provider) -------- */
+  /* AI helpers */
   const chooseContent = (res) =>
     res?.result ??
     res?.reply ??
@@ -383,8 +455,7 @@ export default function ComposePage() {
       else res = await proofread(inputPlain, instructions, provider);
 
       const out = chooseContent(res);
-      const newHtml =
-        out && out !== inputPlain ? plainToSimpleHtml(out) : html;
+      const newHtml = out && out !== inputPlain ? plainToSimpleHtml(out) : html;
 
       setHtml(newHtml);
       setChapters((prev) => {
@@ -410,7 +481,6 @@ export default function ComposePage() {
         return next;
       });
 
-      // Recalculate pagination after AI rewrite
       setTimeout(() => {
         recalcPages();
         goToPage(0);
@@ -450,7 +520,6 @@ export default function ComposePage() {
         e.preventDefault();
         redo();
       }
-      // Page flipping shortcuts
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && k === "arrowright") {
         e.preventDefault();
         nextPage();
@@ -462,9 +531,9 @@ export default function ComposePage() {
     };
     window.addEventListener("keydown", onKey, { capture: true });
     return () => window.removeEventListener("keydown", onKey, { capture: true });
-  }, [handleSave, handleSaveAndProof, isFS, pageIndex, pageCount]);
+  }, [handleSave, handleSaveAndProof, pageIndex, pageCount]);
 
-  /* Add a new chapter */
+  /* Add chapter */
   const addChapter = () => {
     const id = Date.now();
     const ch = {
@@ -479,30 +548,84 @@ export default function ComposePage() {
     setSelectedId(id);
   };
 
-  /* Reorder helper (kept from your original list) */
-  const reorderChapters = (dragId, targetId) => {
-    if (!dragId || !targetId || dragId === targetId) return;
+  /* Reorder chapters for grid drag/drop */
+  const arrayMove = (arr, from, to) => {
+    const copy = arr.slice();
+    const [m] = copy.splice(from, 1);
+    copy.splice(to, 0, m);
+    return copy;
+  };
+  const moveCard = (fromIndex, toIndex) => {
     setChapters((prev) => {
-      const from = prev.findIndex((c) => c.id === dragId);
-      const to = prev.findIndex((c) => c.id === targetId);
-      if (from === -1 || to === -1 || from === to) return prev;
-
-      const next = prev.slice();
-      const [moved] = next.splice(from, 1);
-      next.splice(to, 0, moved);
-
+      const next = arrayMove(prev, fromIndex, toIndex);
       const current = loadState() || {};
       saveState({
-        book,
+        book: { ...book, title: bookTitle || book.title },
         chapters: next,
         daily: current.daily || { goal: 500, counts: {} },
         settings: current.settings || { theme: "light", focusMode: false },
         tocOutline: current.tocOutline || [],
       });
-
-      if (selectedId === dragId) setSelectedId(dragId);
       return next;
     });
+  };
+
+  /* Left-rail version (kept if you want to list chapters elsewhere) */
+  const ChapterItem = ({ ch }) => {
+    const [{ isDragging }, dragRef] = useDrag(
+      () => ({
+        type: "CHAPTER",
+        item: { id: ch.id },
+        collect: (m) => ({ isDragging: m.isDragging() }),
+      }),
+      [ch.id]
+    );
+
+    const [{ isOver }, dropRef] = useDrop(
+      () => ({
+        accept: "CHAPTER",
+        drop: (item) => {
+          if (!item?.id || item.id === ch.id) return;
+          // optional: implement id->id reorder if you keep a left list
+        },
+        collect: (m) => ({ isOver: m.isOver() }),
+      }),
+      [ch.id]
+    );
+
+    const setRefs = (el) => {
+      dropRef(el);
+      dragRef(el);
+    };
+
+    return (
+      <button
+        ref={setRefs}
+        type="button"
+        onClick={() => {
+          setSelectedId(ch.id);
+          setView("editor");
+          setTimeout(() => {
+            recalcPages();
+            goToPage(0);
+          }, 30);
+        }}
+        className={[
+          "w-full text-left px-3 py-2 rounded-lg border transition",
+          isOver ? "dnd-drop-hover" : "",
+          isDragging ? "dnd-draggable dnd-dragging" : "dnd-draggable",
+          selectedId === ch.id
+            ? "bg-primary/15 border-primary/40"
+            : "bg-white border-white/60 hover:bg-white/80",
+        ].join(" ")}
+        title={`${(ch.wordCount || 0).toLocaleString()} words`}
+      >
+        <div className="font-medium truncate">{ch.title}</div>
+        <div className="text-xs text-slate-500">
+          {(ch.wordCount || 0).toLocaleString()} words • {ch.lastEdited || "—"}
+        </div>
+      </button>
+    );
   };
 
   /* Import Word (.docx) */
@@ -597,11 +720,9 @@ export default function ComposePage() {
         </body>
         </html>
       `;
-      const blob = new Blob(['\ufeff', docHtml], {
-        type: 'application/msword',
-      });
+      const blob = new Blob(["\ufeff", docHtml], { type: "application/msword" });
       const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
+      const link = document.createElement("a");
       link.href = url;
       link.download = `${title || "chapter"}.doc`;
       document.body.appendChild(link);
@@ -614,67 +735,8 @@ export default function ComposePage() {
     }
   };
 
-  /* Draggable + droppable chapter list item (kept for left rail list if you want it later) */
-  const ChapterItem = ({ ch }) => {
-    const [{ isDragging }, dragRef] = useDrag(
-      () => ({
-        type: "CHAPTER",
-        item: { id: ch.id },
-        collect: (m) => ({ isDragging: m.isDragging() }),
-      }),
-      [ch.id]
-    );
-
-    const [{ isOver }, dropRef] = useDrop(
-      () => ({
-        accept: "CHAPTER",
-        drop: (item) => {
-          if (item?.id && item.id !== ch.id) reorderChapters(item.id, ch.id);
-        },
-        collect: (m) => ({ isOver: m.isOver() }),
-      }),
-      [ch.id]
-    );
-
-    const setRefs = (el) => {
-      dropRef(el);
-      dragRef(el);
-    };
-
-    return (
-      <button
-        ref={setRefs}
-        type="button"
-        onClick={() => {
-          setSelectedId(ch.id);
-          setView("editor");
-          setTimeout(() => {
-            recalcPages();
-            goToPage(0);
-          }, 30);
-        }}
-        className={[
-          "w-full text-left px-3 py-2 rounded-lg border transition",
-          isOver ? "dnd-drop-hover" : "",
-          isDragging ? "dnd-draggable dnd-dragging" : "dnd-draggable",
-          selectedId === ch.id
-            ? "bg-primary/15 border-primary/40"
-            : "bg-white border-white/60 hover:bg-white/80",
-        ].join(" ")}
-        title={`${(ch.wordCount || 0).toLocaleString()} words`}
-      >
-        <div className="font-medium truncate">{ch.title}</div>
-        <div className="text-xs text-slate-500">
-          {(ch.wordCount || 0).toLocaleString()} words • {ch.lastEdited || "—"}
-        </div>
-      </button>
-    );
-  };
-
-  /* Back to Dashboard */
   const goBack = () => navigate("/dashboard");
 
-  /* Toolbar */
   const Toolbar = ({ compact = false }) => (
     <>
       {!compact && (
@@ -706,7 +768,6 @@ export default function ComposePage() {
         <Download size={16} /> Export
       </button>
 
-      {/* AI Actions */}
       <button
         onClick={() => runAI("proofread")}
         className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50 disabled:opacity-60"
@@ -783,28 +844,29 @@ export default function ComposePage() {
     </>
   );
 
-  /* ----------------------------
-     TOP BAR
-  ---------------------------- */
   return (
     <div className="min-h-screen bg-[rgb(244,247,250)] text-slate-900">
+      {/* Top bar */}
       <div className="sticky top-0 z-40 bg-white/80 backdrop-blur border-b border-slate-200">
-        <div className="max-w-7xl mx-auto px-4 h-14 flex items-center gap-2">
-          <button
-            onClick={goBack}
-            className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50"
-            title="Back to Dashboard"
-          >
-            <ArrowLeft size={16} /> Back to Dashboard
-          </button>
+        <div className="max-w-7xl mx-auto px-3 h-12 flex items-center gap-2">
+          <GoldButton onClick={goBack} title="Back to Dashboard">
+            ← Dashboard
+          </GoldButton>
 
-          <div className="ml-3 flex items-center gap-2">
+          <div className="ml-3">
+            <WritingCrumb view={view} />
+          </div>
+
+          {/* View toggle */}
+          <div className="ml-3 flex items-center gap-1">
             <button
               onClick={() => setView("grid")}
-              className={`inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 ${view === "grid" ? "bg-slate-100" : "bg-white hover:bg-slate-50"}`}
+              className={`inline-flex items-center gap-2 rounded-md border px-2.5 py-1 text-[13px] ${
+                view === "grid" ? "bg-slate-100" : "bg-white hover:bg-slate-50"
+              }`}
               title="Chapter Grid"
             >
-              <Grid size={16} /> Grid
+              Grid
             </button>
             <button
               onClick={() => {
@@ -814,18 +876,20 @@ export default function ComposePage() {
                   goToPage(0);
                 }, 30);
               }}
-              className={`inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 ${view === "editor" ? "bg-slate-100" : "bg-white hover:bg-slate-50"}`}
+              className={`inline-flex items-center gap-2 rounded-md border px-2.5 py-1 text-[13px] ${
+                view === "editor" ? "bg-slate-100" : "bg-white hover:bg-slate-50"
+              }`}
               title="Open Editor"
             >
-              <BookOpenCheck size={16} /> Editor
+              Editor
             </button>
           </div>
 
-          {/* Provider */}
-          <div className="ml-3 flex items-center gap-2">
-            <label className="text-xs text-slate-600">Provider:</label>
+          {/* Provider (compact) */}
+          <div className="ml-3 flex items-center gap-1">
+            <label className="text-[12px] text-slate-600">Provider:</label>
             <select
-              className="border rounded px-2 py-1 text-sm"
+              className="border rounded px-2 py-1 text-[12px]"
               value={provider}
               onChange={(e) => setProvider(e.target.value)}
             >
@@ -835,21 +899,15 @@ export default function ComposePage() {
           </div>
 
           <div className="flex-1" />
-          <Toolbar />
-          <button
-            onClick={() => setIsFS((v) => !v)}
-            className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50"
-            title={isFS ? "Exit Fullscreen" : "Fullscreen"}
-          >
-            {isFS ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
-            {isFS ? "Exit" : "Fullscreen"}
-          </button>
+
+          {/* Right tools (compact suggestion area) */}
+          <div className="hidden sm:flex items-center gap-1">
+            {/* You can drop a compact Toolbar here if desired */}
+          </div>
         </div>
       </div>
 
-      {/* ----------------------------
-          GRID VIEW (4 x 4)
-      ---------------------------- */}
+      {/* GRID VIEW */}
       {view === "grid" && (
         <div className="max-w-7xl mx-auto px-4 py-6">
           <div className="flex items-center justify-between mb-3">
@@ -862,10 +920,12 @@ export default function ComposePage() {
             </button>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4 gap-4">
-            {chapters.map((c) => (
+            {chapters.map((c, idx) => (
               <ChapterCard
                 key={c.id}
                 ch={c}
+                index={idx}
+                moveCard={moveCard}
                 active={c.id === selectedId}
                 onOpen={() => {
                   setSelectedId(c.id);
@@ -881,12 +941,10 @@ export default function ComposePage() {
         </div>
       )}
 
-      {/* ----------------------------
-          EDITOR VIEW (Book pages)
-      ---------------------------- */}
+      {/* EDITOR VIEW */}
       {view === "editor" && (
         <div className="max-w-7xl mx-auto px-4 py-6 grid grid-cols-1 xl:grid-cols-[18rem_1fr] gap-6">
-          {/* Left sidebar: meta + AI instructions */}
+          {/* Left: Meta + AI */}
           <aside className="xl:sticky xl:top-16 space-y-3" style={{ zIndex: 10 }}>
             <div className="space-y-2 border rounded-lg p-3 bg-white">
               <div className="text-sm font-medium">Publishing Meta</div>
@@ -1013,17 +1071,10 @@ export default function ComposePage() {
               </div>
             </div>
 
-            {/* White page with page-height viewport */}
-            <div style={quillPageStyles}>
-              <div
-                style={{
-                  ...quillPageInnerStyles,
-                  position: "relative",         // <-- add this so we can absolutely position the badge
-                  overflow: "hidden"            // keeps badge visually crisp on edges
-                }}
-              >
+            <div style={{ padding: 16, background: "#f0f3f8" }}>
+              <div style={quillPageInnerStyles}>
                 <ReactQuill
-                  ref={editorRef /* or fsEditorRef in the fullscreen block */}
+                  ref={editorRef}
                   theme="snow"
                   value={html}
                   onChange={(v) => {
@@ -1033,8 +1084,6 @@ export default function ComposePage() {
                   modules={modules}
                   placeholder="Write your chapter…"
                 />
-            
-                {/* Page number overlay */}
                 <PageNumberBadge pageIndex={pageIndex} pageCount={pageCount} />
               </div>
             </div>
@@ -1060,109 +1109,6 @@ export default function ComposePage() {
           </section>
         </div>
       )}
-
-      {/* Fullscreen overlay (optional — keeps your old FS, works with page flip too) */}
-      {isFS && view === "editor" && (
-        <div className="fixed inset-0 z-[9999] bg-[#fdecef]">
-          <div className="absolute top-0 left-0 right-0 p-3 flex items-center justify-between gap-2 bg-white/90 backdrop-blur border-b">
-            <button
-              onClick={() => setView("grid")}
-              className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50"
-              title="Back to Grid"
-            >
-              <Grid size={16} /> Grid
-            </button>
-
-            <div className="flex items-center gap-2">
-              <Toolbar compact />
-              <button
-                onClick={() => setIsFS(false)}
-                className="rounded-lg border bg-white px-3 py-1.5 hover:bg-slate-50"
-                title="Exit Fullscreen"
-              >
-                <Minimize2 size={18} />
-              </button>
-            </div>
-          </div>
-
-          <div className="pt-20 pb-6 px-6 h-full overflow-auto">
-            <div className="mx-auto" style={{ maxWidth: 880 }}>
-              <div className="mb-3 flex items-center gap-3">
-                <input
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  className="flex-1 text-xl font-semibold bg-transparent outline-none border-b border-slate-300 pb-1"
-                  placeholder="Chapter title"
-                />
-                <span className="text-sm text-slate-500">
-                  {(countWords(html) || 0).toLocaleString()} words
-                </span>
-                <div className="ml-auto flex items-center gap-2">
-                  <button
-                    onClick={prevPage}
-                    disabled={pageIndex === 0}
-                    className="inline-flex items-center gap-1 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50 disabled:opacity-50"
-                  >
-                    <ChevronLeft size={16} /> Prev
-                  </button>
-                  <div className="text-sm tabular-nums">
-                    Page {Math.min(pageIndex + 1, pageCount)} / {pageCount}
-                  </div>
-                  <button
-                    onClick={nextPage}
-                    disabled={pageIndex >= pageCount - 1}
-                    className="inline-flex items-center gap-1 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50 disabled:opacity-50"
-                  >
-                    Next <ChevronRight size={16} />
-                  </button>
-                </div>
-              </div>
-
-              <div style={quillPageStyles}>
-                <div style={quillPageInnerStyles}>
-                  <ReactQuill
-                    ref={fsEditorRef}
-                    theme="snow"
-                    value={html}
-                    onChange={(v) => {
-                      setHtml(v);
-                      setTimeout(recalcPages, 10);
-                    }}
-                    modules={modules}
-                    placeholder="Write in fullscreen…"
-                  />
-                </div>
-              </div>
-              <div className="mt-3 flex items-center justify-end gap-2">
-                <button
-                  onClick={handleSaveAndProof}
-                  className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50 disabled:opacity-60"
-                  disabled={aiBusy}
-                  title="Proofread + Save"
-                >
-                  <Bot size={16} />
-                  Proof + Save
-                </button>
-                <button
-                  onClick={handleSave}
-                  className="inline-flex items-center gap-2 rounded-lg bg-primary text-white px-3 py-1.5 hover:opacity-90"
-                  title="Save (Ctrl+S)"
-                >
-                  <Save size={16} /> Save
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
-
-/* ----------------------------
-   Styling note for Quill:
-   To ensure the editor scrolls by page-height, Quill needs a
-   fixed-height container and a scrollable .ql-editor.
-   The inline styles above set a fixed height; Quill snow theme
-   already makes .ql-editor scrollable when height is constrained.
----------------------------- */
