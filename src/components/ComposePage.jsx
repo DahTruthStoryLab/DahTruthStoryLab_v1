@@ -53,7 +53,7 @@ Quill.register(Size, true);
 /* ------------------------------------
    Page sizing / pagination constants
 ------------------------------------ */
-const PAGE_HEIGHT = 1040; // px visual page "viewport" height
+const PAGE_HEIGHT = 1040; // px visual page “viewport” height
 
 /* ------------------------------------
    Load Mammoth dynamically from CDN
@@ -130,21 +130,6 @@ function isEditableTarget(t) {
   if (el?.isContentEditable) return true;
   return !!el?.closest?.('.ql-editor,[contenteditable="true"]');
 }
-
-/* ------------------------------------
-   Helper to extract content from API response
------------------------------------- */
-const chooseContent = (res) => {
-  if (!res) return "";
-  if (typeof res === "string") return res;
-  if (res.result) return res.result;
-  if (res.text) return res.text;
-  if (res.content) return res.content;
-  if (res.improved) return res.improved;
-  if (res.corrected) return res.corrected;
-  if (res.rewritten) return res.rewritten;
-  return "";
-};
 
 /* ------------------------------------
    Tiny UI helpers
@@ -285,7 +270,7 @@ export default function ComposePage() {
   const [instructions, setInstructions] = useState(
     "Keep ADOS cadence; pastoral but firm."
   );
-  const [provider, setProvider] = useState("openai"); // "openai" | "anthropic"
+  const [provider, setProvider] = useState("anthropic"); // "anthropic" | "openai"
   const [pubAdvice, setPubAdvice] = useState(null);
   const [author, setAuthor] = useState("Jacqueline Session Ausby");
   const [bookTitle, setBookTitle] = useState(initial?.book?.title || "Raising Daisy");
@@ -431,25 +416,35 @@ export default function ComposePage() {
   /* ------------------------------------
      AI helpers + actions
   ------------------------------------ */
+  const chooseContent = (res) =>
+    res?.result ??
+    res?.reply ??
+    res?.edited ??
+    res?.text ??
+    res?.output ??
+    res?.echo?.message ??
+    "";
+
   const runAI = async (mode = "proofread") => {
     setAiError(null);
     setAiBusy(true);
     try {
       const inputPlain = htmlToPlain(html || "");
       let res;
-      if (mode === "clarify")      res = await clarify(inputPlain, instructions, provider);
+
+      if (mode === "clarify") res = await clarify(inputPlain, instructions, provider);
       else if (mode === "rewrite") res = await rewrite(inputPlain, instructions, provider);
       else if (mode === "grammar") res = await runGrammar(inputPlain, provider);
-      else if (mode === "style")   res = await runStyle(inputPlain, provider);
+      else if (mode === "style") res = await runStyle(inputPlain, provider);
       else if (mode === "readability") res = await runReadability(inputPlain, provider);
-      else                         res = await proofread(inputPlain, instructions, provider);
+      else res = await proofread(inputPlain, instructions, provider);
 
       const out = chooseContent(res);
       const newHtml = out && out !== inputPlain ? plainToSimpleHtml(out) : html;
 
       setHtml(newHtml);
-      setChapters(prev => {
-        const next = prev.map(c =>
+      setChapters((prev) => {
+        const next = prev.map((c) =>
           c.id === selectedId
             ? {
                 ...c,
@@ -471,16 +466,14 @@ export default function ComposePage() {
         return next;
       });
 
-      // re-measure and jump to page 1
       setTimeout(() => {
         recalcPages();
         goToPage(0);
       }, 30);
     } catch (e) {
       console.error("[AI] error:", e);
-      const msg = e?.message || e?.messageText || "AI request failed";
-      setAiError(msg);
-      alert(msg);
+      setAiError(e?.message || "AI request failed");
+      alert(e?.message || "AI request failed");
     } finally {
       setAiBusy(false);
     }
@@ -1143,4 +1136,3 @@ export default function ComposePage() {
     </div>
   );
 }
-
