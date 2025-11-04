@@ -408,6 +408,8 @@ export default function Publishing(): JSX.Element {
     },
   ]);
 
+  const [provider, setProvider] = useState<"openai" | "anthropic">("openai");
+  
   const [matter, setMatter] = useState<Matter>({
     titlePage: "{title}\nby {author}",
     copyright: "© {year} {author}. All rights reserved.",
@@ -459,16 +461,18 @@ async function runAI<T = any>(path: string, payload: any): Promise<T> {
     alert("AI API base is not configured. Set VITE_AI_API_BASE.");
     throw new Error("Missing VITE_AI_API_BASE");
   }
-
   // Normalize payload to what your service expects
   const apiPayload = {
-    text: payload.html || payload.text || ""
+    text: payload.html || payload.text || "",
+    provider: provider  // ← ADD THIS LINE
   };
-
   const url = `${base.replace(/\/$/, "")}/${path.replace(/^\//, "")}`;
   const resp = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { 
+      "Content-Type": "application/json",
+      "x-provider": provider  // ← ADD THIS LINE
+    },
     body: JSON.stringify(apiPayload),
   });
 
