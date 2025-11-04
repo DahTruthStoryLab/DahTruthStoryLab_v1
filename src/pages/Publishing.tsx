@@ -5,7 +5,7 @@ import React, { useEffect, useMemo, useRef, useState, useCallback } from "react"
 import { useNavigate } from "react-router-dom";
 import PageShell from "../components/layout/PageShell.tsx";
 import PublishingSidebar from "../components/publishing/PublishingSidebar.tsx";
-import { runGrammar, runStyle, runReadability, runPublishingPrep } from "../lib/api";
+import { runGrammar, runStyle, runReadability, runPublishingPrep, runAssistant } from "../lib/api";
 
 /* ---------- Theme via CSS variables (from your brand.css) ---------- */
 const theme = {
@@ -27,10 +27,6 @@ const GOOGLE_PALETTE = {
   accent: "#34a853",
   highlight: "rgba(26,115,232,0.10)",
 } as const;
-
-// --- AI API base (top-level/module scope) ---
-const AI_API_BASE: string =
-  (import.meta as any).env?.VITE_API_BASE ?? "/proof.api";
 
 /* ---------- Types ---------- */
 type Chapter = {
@@ -451,41 +447,6 @@ export default function Publishing(): JSX.Element {
     []
   );
 
-
-// ===== SECTION B: AI helper + editor utilities (opens importDocx, not closed here) =====
-
-// ------------ AI helper ------------
-async function runAI<T = any>(path: string, payload: any): Promise<T> {
-  const base = AI_API_BASE?.trim();
-  if (!base) {
-    alert("AI API base is not configured. Set VITE_AI_API_BASE.");
-    throw new Error("Missing VITE_AI_API_BASE");
-  }
-  // Normalize payload to what your service expects
-  const apiPayload = {
-    text: payload.html || payload.text || "",
-    provider: provider  // ← ADD THIS LINE
-  };
-  const url = `${base.replace(/\/$/, "")}/${path.replace(/^\//, "")}`;
-  const resp = await fetch(url, {
-    method: "POST",
-    headers: { 
-      "Content-Type": "application/json",
-      "x-provider": provider  // ← ADD THIS LINE
-    },
-    body: JSON.stringify(apiPayload),
-  });
-
-  if (!resp.ok) {
-    let text = "";
-    try { text = await resp.text(); } catch {}
-    throw new Error(`AI error ${resp.status}: ${text || resp.statusText}`);
-  }
-
-  return (await resp.json()) as T;
-}
-
-
 /* --------------------- Builder: Word-like Editor --------------------- */
 const [activeChapterId, setActiveChapterId] = useState(chapters[0]?.id || "");
 const activeIdx = Math.max(0, chapters.findIndex((c) => c.id === activeChapterId));
@@ -566,7 +527,6 @@ const saveActiveChapterHTML = () => {
     if (ch) next[activeIdx] = { ...ch, textHTML: editorRef.current!.innerHTML };
     return next;
   });
-  // Add visual feedback
   alert("✅ Chapter saved successfully!");
 };
 
@@ -601,7 +561,6 @@ const importDocx = useCallback(
       const JSZip = (await import("jszip")).default;
       const zip = await JSZip.loadAsync(file);
 
-      // -------- Load main document --------
       let docEntry = zip.file("word/document.xml");
       if (!docEntry) {
         const altKey = Object.keys(zip.files).find((k) =>
@@ -616,7 +575,6 @@ const importDocx = useCallback(
       const docXml = await docEntry.async("string");
       const xml = new DOMParser().parseFromString(docXml, "application/xml");
 
-      // -------- Relationships (for images) --------
       let relsEntry = zip.file("word/_rels/document.xml.rels");
       if (!relsEntry) {
         const altRel = Object.keys(zip.files).find((k) =>
@@ -643,7 +601,6 @@ const importDocx = useCallback(
           });
       }
 
-      // -------- Numbering (lists) --------
       let numberingEntry = zip.file("word/numbering.xml");
       if (!numberingEntry) {
         const altNum = Object.keys(zip.files).find((k) =>
@@ -739,7 +696,6 @@ const importDocx = useCallback(
         return html || "<br/>";
       }
 
-      // -------- Parse paragraphs into chapters (by Heading 1) --------
       const paras = Array.from(xml.getElementsByTagName("*")).filter((n) => n.localName === "p");
 
       let listOpenType: "ul" | "ol" | null = null;
@@ -843,65 +799,56 @@ const importDocx = useCallback(
         return;
       }
 
-// -------- Insert into app state --------
-if (asNewChapter) {
-  if (fallbackHtml) {
-    // One chapter
-    const id = genId();
-    const ch: Chapter = {
-      id,
-      title: file.name.replace(/\.docx$/i, "") || "Imported DOCX",
-      included: true,
-      text: "",
-      textHTML: fallbackHtml,
-    };
-     setChapters((prev) => [...prev, ch]);
-    setChapters((prev) => [...prev, ch]);
-    setActiveChapterId(id);
-    // navigate("/format"); // ← REMOVED - don't auto-jump
-    alert(`Imported "${file.name}" successfully! Click "Open" in Chapter Management to edit.`);
-  } else {
-    // Multiple chapters grouped by H1
-    const newChapters = chapterGroups.map((g) => ({
-      id: genId(),
-      title: g.title,
-      included: true,
-      text: "",
-      textHTML: g.content.join("\n"),
-    }));
-    setChapters((prev) => [...prev, ...newChapters]);
-    setActiveChapterId(newChapters[0].id);
-   // navigate("/format"); // ← Removed: stay on Publishing page
-alert(`Imported ${newChapters.length} chapters successfully! Click "Open" in Chapter Management to edit.`);
-  }
-} else {
-  // Replace current chapter
-  const htmlToUse =
-    fallbackHtml ?? chapterGroups.map((g) => g.content.join("\n")).join("\n");
-  setChapters((prev) => {
-    const next = [...prev];
-    const ch = next[activeIdx];
-    if (ch) {
-      next[activeIdx] = {
-        ...ch,
-        textHTML: htmlToUse,
-        title: ch.title || file.name.replace(/\.docx$/i, "") || "Imported DOCX",
-      };
+      if (asNewChapter) {
+        if (fallbackHtml) {
+          const id = genId();
+          const ch: Chapter = {
+            id,
+            title: file.name.replace(/\.docx$/i, "") || "Imported DOCX",
+            included: true,
+            text: "",
+            textHTML: fallbackHtml,
+          };
+          setChapters((prev) => [...prev, ch]);
+          setActiveChapterId(id);
+          alert(`Imported "${file.name}" successfully! Click "Open" in Chapter Management to edit.`);
+        } else {
+          const newChapters = chapterGroups.map((g) => ({
+            id: genId(),
+            title: g.title,
+            included: true,
+            text: "",
+            textHTML: g.content.join("\n"),
+          }));
+          setChapters((prev) => [...prev, ...newChapters]);
+          setActiveChapterId(newChapters[0].id);
+          alert(`Imported ${newChapters.length} chapters successfully! Click "Open" in Chapter Management to edit.`);
+        }
+      } else {
+        const htmlToUse =
+          fallbackHtml ?? chapterGroups.map((g) => g.content.join("\n")).join("\n");
+        setChapters((prev) => {
+          const next = [...prev];
+          const ch = next[activeIdx];
+          if (ch) {
+            next[activeIdx] = {
+              ...ch,
+              textHTML: htmlToUse,
+              title: ch.title || file.name.replace(/\.docx$/i, "") || "Imported DOCX",
+            };
+          }
+          return next;
+        });
+        alert("Chapter replaced successfully!");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Sorry—import failed. The file may be malformed or not a valid .docx.");
     }
-    return next;
-  });
- // navigate("/format"); // ← Removed: stay on Publishing page
-alert(`Imported ${newChapters.length} chapters successfully! Click "Open" in Chapter Management to edit.`);
-}
-} catch (err) {
-  console.error(err);
-  alert("Sorry—import failed. The file may be malformed or not a valid .docx.");
-}
-},
-[activeIdx, navigate, setChapters, setActiveChapterId]
+  },
+  [activeIdx, setChapters, setActiveChapterId]
 );
 
-// ---- HTML import ----
 const importHTML = useCallback(
   async (file: File, asNewChapter: boolean = true) => {
     try {
@@ -916,10 +863,9 @@ const importHTML = useCallback(
           text: "",
           textHTML: html,
         };
-      setChapters((prev) => [...prev, ch]);
-      setActiveChapterId(id);
-      // Don't auto-navigate - let user click "Open" when ready  
-      alert(`Imported "${ch.title}" successfully! Click "Open" in Chapter Management to edit.`);
+        setChapters((prev) => [...prev, ch]);
+        setActiveChapterId(id);
+        alert(`Imported "${ch.title}" successfully! Click "Open" in Chapter Management to edit.`);
       } else {
         setChapters((prev) => {
           const next = [...prev];
@@ -933,6 +879,7 @@ const importHTML = useCallback(
           }
           return next;
         });
+        alert("Chapter replaced successfully!");
       }
     } catch (err) {
       console.error(err);
@@ -1138,18 +1085,32 @@ return (
               </h3>
 
               <div style={{ marginBottom: 16 }}>
-                
-              <button
-                style={{
-                  ...styles.btnPrimary,
-                  background: theme.primary,
-                  color: "white",
-                }}
-                onClick={() => navigate("/dashboard")}
-              >
-                ← Back to Dashboard
-              </button>
-            </div>
+                <button
+                  style={{
+                    ...styles.btnPrimary,
+                    background: theme.primary,
+                    color: "white",
+                  }}
+                  onClick={() => navigate("/dashboard")}
+                >
+                  ← Back to Dashboard
+                </button>
+              </div>
+
+              {/* Optional: Provider dropdown */}
+              <div style={{ marginBottom: 12 }}>
+                <label style={{ ...styles.label, display: "block", marginBottom: 4 }}>
+                  AI Provider:
+                </label>
+                <select
+                  value={provider}
+                  onChange={(e) => setProvider(e.target.value as "openai" | "anthropic")}
+                  style={{ ...styles.input, maxWidth: 200 }}
+                >
+                  <option value="openai">OpenAI</option>
+                  <option value="anthropic">Anthropic</option>
+                </select>
+              </div>
 
               <div
                 role="group"
@@ -1165,32 +1126,29 @@ return (
                     busy={working === a.key}
                     theme={theme}
                     styles={styles}
-                   onClick={async () => {
+                    onClick={async () => {
                       if (working) return;
                       setWorking(a.key);
                       try {
                         const currentHtml = editorRef.current?.innerHTML ?? "";
-                        const res = await runAI<any>(a.key, {
-                          chapterId: chapters[activeIdx]?.id,
-                          title: chapters[activeIdx]?.title,
-                          html: currentHtml,
-                          text: currentHtml,
-                          meta,
-                        });
+                        const currentText = stripHtml(currentHtml) || "";
                         
-                        // Handle different response formats
-                        let improved = currentHtml;
-                        if (res?.improvedHtml) {
-                          improved = res.improvedHtml;
-                        } else if (res?.html) {
-                          improved = res.html;
+                        let res: any;
+                        if (a.key === "grammar") {
+                          res = await runGrammar(currentText, provider);
+                        } else if (a.key === "style") {
+                          res = await runStyle(currentText, provider);
+                        } else if (a.key === "readability") {
+                          res = await runReadability(currentText, provider);
+                        } else if (a.key === "assistant") {
+                          res = await runAssistant(currentText, "improve", "", provider);
                         }
                         
-                        // Show suggestions if any
-                        if (res?.suggestions && res.suggestions.length > 0) {
-                          const suggestionText = res.suggestions.join('\n- ');
-                          alert(`Suggestions:\n- ${suggestionText}`);
-                        }
+                        const improvedText = res?.result || res?.text || res?.output || currentText;
+                        
+                        const improved = improvedText !== currentText 
+                          ? `<p>${improvedText.split('\n\n').join('</p><p>')}</p>`.replace(/<p><\/p>/g, '<p><br/></p>')
+                          : currentHtml;
                         
                         if (editorRef.current && improved !== currentHtml) {
                           editorRef.current.innerHTML = improved;
@@ -1203,7 +1161,8 @@ return (
                           return next;
                         });
                       } catch (e: any) {
-                        alert(e?.message || "Sorry—something went wrong running that AI tool.");
+                        console.error("[AI Error]:", e);
+                        alert(e?.message || "AI request failed. Check console for details.");
                       } finally {
                         setWorking(null);
                       }
@@ -1212,7 +1171,6 @@ return (
                 ))}
               </div>
 
-              {/* Generate Publishing Prep */}
               <div style={{ marginTop: 10, display: "flex", justifyContent: "flex-end" }}>
                 <button
                   style={{ ...styles.btnDark }}
@@ -1229,23 +1187,24 @@ return (
                           text: c.textHTML ? stripHtml(c.textHTML) : c.text,
                         }));
 
-                      const res = await runAI<{ prep?: any }>("publishing-prep", {
+                      const res = await runPublishingPrep(
                         meta,
-                        matter,
-                        chapters: chaptersPlain,
-                        options: { tone: "professional/warm", audience: "agents_and_publishers" },
-                      });
+                        chaptersPlain,
+                        { tone: "professional/warm", audience: "agents_and_publishers" },
+                        provider
+                      );
 
-                      if (!res?.prep) throw new Error("No prep content returned from AI.");
-                      navigate("/publishing-prep", { state: { generated: res.prep } });
+                      if (!res?.prep && !res?.result) throw new Error("No prep content returned from AI.");
+                      navigate("/publishing-prep", { state: { generated: res.prep || res.result || res } });
                     } catch (e: any) {
+                      console.error("[Publishing Prep Error]:", e);
                       alert(e?.message || "Couldn't generate publishing prep.");
                     } finally {
                       setWorking(null);
                     }
                   }}
                 >
-                 ✨ Generate Publishing Prep
+                  ✨ Generate Publishing Prep
                 </button>
               </div>
             </div>
@@ -1320,7 +1279,6 @@ return (
           fontSize: 11,
         }}
       >
-        {/* FONT SELECTS */}
         <select
           onChange={(e) => setFont(e.target.value)}
           defaultValue="Times New Roman"
@@ -1362,7 +1320,6 @@ return (
 
         <div style={{ width: 1, height: 16, background: theme.border, margin: "0 2px" }} />
 
-        {/* INLINE STYLES */}
         <button
           style={{ ...styles.btn, padding: "3px 6px", fontSize: 10, fontWeight: 700, minWidth: 24, height: 24 }}
           onClick={() => exec("bold")}
@@ -1387,7 +1344,6 @@ return (
 
         <div style={{ width: 1, height: 16, background: theme.border, margin: "0 2px" }} />
 
-        {/* HEADINGS */}
         <button
           style={{ ...styles.btn, padding: "3px 5px", fontSize: 9, minWidth: 24, height: 24 }}
           onClick={() => setBlock("H1")}
@@ -1412,7 +1368,6 @@ return (
 
         <div style={{ width: 1, height: 16, background: theme.border, margin: "0 2px" }} />
 
-        {/* LISTS */}
         <button
           style={{ ...styles.btn, padding: "3px 5px", fontSize: 9, minWidth: 24, height: 24 }}
           onClick={() => exec("insertUnorderedList")}
@@ -1430,7 +1385,6 @@ return (
 
         <div style={{ width: 1, height: 16, background: theme.border, margin: "0 2px" }} />
 
-        {/* ALIGNMENT */}
         <button
           style={{ ...styles.btn, padding: "3px 5px", fontSize: 9, minWidth: 24, height: 24 }}
           onClick={() => exec("justifyLeft")}
@@ -1455,7 +1409,6 @@ return (
 
         <div style={{ width: 1, height: 16, background: theme.border, margin: "0 2px" }} />
 
-        {/* PAGE BREAK */}
         <button
           style={{ ...styles.btn, padding: "3px 7px", fontSize: 9, height: 24 }}
           onClick={insertPageBreak}
@@ -1464,7 +1417,6 @@ return (
           ⤓
         </button>
 
-        {/* Right-side: uploads + Save */}
         <div style={{ marginLeft: "auto", display: "flex", gap: 6 }}>
           <label
             style={{
@@ -1519,9 +1471,8 @@ return (
             Save
           </button>
         </div>
-      </div>{/* end toolbar */}
+      </div>
 
-      {/* Editor canvas wrapper */}
       <div
         style={{
           padding: 16,
@@ -1649,8 +1600,8 @@ return (
                       </div>
                     </div>
                   ))}
-                </div> {/* grid inside Chapter Management */}
-              </div> {/* glassCard: Chapter Management */}
+                </div>
+              </div>
             </main>
             {isWide && (
               <PublishingSidebar
@@ -1672,9 +1623,9 @@ return (
                 setGoogleMode={setGoogleMode}
               />
             )}
-          </div> {/* layout grid (two columns: <main> + sidebar) */}
-        </div> {/* inner + sectionShell */}
-      </div> {/* outer */}
+          </div>
+        </div>
+      </div>
     </PageShell>
   );
 }
