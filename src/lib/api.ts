@@ -9,9 +9,12 @@
 
 /* ------------------------------- API BASE --------------------------------- */
 
+// src/lib/api.ts (top)
 const RAW_API_BASE: string =
-  (import.meta as any)?.env?.VITE_API_BASE ||
-  "https://ud9loepble.execute-api.us-east-1.amazonaws.com/prod"; // ← your API + /stage
+  import.meta.env.VITE_API_BASE || "/api"; // dev: /api (Vite proxy), prod: full URL from .env.production
+
+export const API_BASE: string = RAW_API_BASE.replace(/\/+$/, "");
+;(window as any).__API_BASE__ = API_BASE;
 
 export const API_BASE: string = RAW_API_BASE.replace(/\/+$/, "");
 
