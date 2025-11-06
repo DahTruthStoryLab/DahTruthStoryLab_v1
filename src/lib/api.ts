@@ -10,13 +10,13 @@
 /* ------------------------------- API BASE --------------------------------- */
 
 // src/lib/api.ts (top)
-const RAW_API_BASE: string =
-  import.meta.env.VITE_API_BASE || "/api"; // dev: /api (Vite proxy), prod: full URL from .env.production
+const RAW_API_BASE: string = import.meta.env.VITE_API_BASE || "/api";
 
-export const API_BASE: string = RAW_API_BASE.replace(/\/+$/, "");
-;(window as any).__API_BASE__ = API_BASE;
+export const API_BASE: string = String(RAW_API_BASE).replace(/\/+$/, "");
 
-export const API_BASE: string = RAW_API_BASE.replace(/\/+$/, "");
+if (typeof window !== "undefined") {
+  (window as any).__API_BASE__ = API_BASE;
+}
 
 // Expose in browser console to help diagnose prod issues quickly
 ;(window as any).__API_BASE__ = API_BASE;
