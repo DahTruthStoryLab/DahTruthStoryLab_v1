@@ -1,7 +1,6 @@
 /* =============================================================================
    DahTruth Story Lab - API Client (TypeScript)
-   - Works with both legacy flat routes (/grammar, /style, …)
-     AND the unified route:  /assistant?operation=<op>
+   - Works with unified route:  /ai-assistant?operation=<op>
    - Timeouts, retries, readable errors
    - Anthropic "credit balance" -> auto fallback to OpenAI once
    - Normalized responses so UI can always read `.result`
@@ -98,8 +97,8 @@ function isAnthropicCreditError(msg?: string) {
 /* --------------------------- Core assistant call -------------------------- */
 /**
  * callAssistant(operation, payload, provider, opts)
- * Sends to:   POST  {API_BASE}/assistant?operation=<op>
- * Adds x-provider header and provider in body (for Lambda convenience)
+ * Sends to:   POST  {API_BASE}/ai-assistant
+ * Adds x-operation header and operation in body (for Lambda convenience)
  * Retries transient errors; falls back Anthropic -> OpenAI on credit error
  */
 async function callAssistant(
@@ -108,13 +107,14 @@ async function callAssistant(
   provider: "openai" | "anthropic" = "openai",
   opts: { retries?: number; timeoutMs?: number; headers?: Record<string, string> } = {}
 ): Promise<any> {
-  const url = `${API_BASE}/assistant?operation=${encodeURIComponent(operation)}`;
+  const url = `${API_BASE}/ai-assistant`;
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
     "x-provider": provider,
+    "x-operation": operation,
     ...(opts.headers || {}),
   };
-  const body = JSON.stringify({ provider, ...payload });
+  const body = JSON.stringify({ provider, operation, ...payload });
 
   const attempts = Math.max(1, opts.retries ?? 1);
   const delays = backoff(attempts - 1);
@@ -168,68 +168,15 @@ async function callAssistant(
   return run(provider);
 }
 
-/* ---------------------------- Legacy route call --------------------------- */
-/** Try a legacy flat route first; if 404/405, fallback to assistant op */
-async function callLegacyOrAssistant(
-  routePath: string,
-  operation: string,
-  payload: Record<string, any>,
-  provider: "openai" | "anthropic" = "openai",
-  opts: { retries?: number; timeoutMs?: number } = {}
-) {
-  // 1) Try legacy route if it exists in your API
-  try {
-    const res = await fetchWithTimeout(
-      `${API_BASE}${routePath}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-operation": operation, "x-provider": provider },
-        body: JSON.stringify({ provider, operation, ...payload }),
-      },
-      opts.timeoutMs ?? 25000
-    );
-    const text = await res.text().catch(() => null);
-    const norm = normalizeResponse(res, text);
-
-    // If legacy returns 404/405, transparently fall back to assistant op
-    if (!norm.ok && (norm.status === 404 || norm.status === 405)) {
-      return await callAssistant(operation, payload, provider, opts);
-    }
-    if (!norm.ok) {
-      const err = new Error(norm.error || `HTTP ${norm.status}`);
-      (err as any).status = norm.status;
-      (err as any).raw = norm.raw;
-      throw err;
-    }
-    return norm.json ?? { result: norm.result, raw: norm.raw };
-  } catch (e: any) {
-    // Network/timeout etc → try assistant as a backup
-    if (e?.status === 404 || e?.status === 405 || !e?.status) {
-      return await callAssistant(operation, payload, provider, opts);
-    }
-    throw e;
-  }
-}
-
 /* --------------------------------- Routes --------------------------------- */
 
 const ROUTES = {
-  assistant: "/assistant",
-  grammar: "/grammar",
-  rewrite: "/rewrite",
-  style: "/style",
-  publishingPrep: "/publishing-prep",
-  readability: "/readability",
-
-  // Files (only if you created these routes in API Gateway)
-  filesPresignUpload: "/files/presign-upload",
-  filesList: "/files/list",
-  filesGet: "/files/get",
-  filesDelete: "/files/delete",
+  aiAssistant: "/ai-assistant",
+  files: "/files",
 } as const;
 
 /* ------------------------------ AI Helpers -------------------------------- */
-/** Generic chat/improve endpoint (your ComposePage uses these wrappers) */
+/** Generic chat/improve endpoint */
 export function runAssistant(
   text: string,
   action: "improve" | "proofread" | "clarify" | "rewrite" = "improve",
@@ -249,8 +196,7 @@ export function runRewrite(
   text: string,
   provider: "anthropic" | "openai" = "openai"
 ) {
-  return callLegacyOrAssistant(
-    ROUTES.rewrite,
+  return callAssistant(
     "rewrite",
     { text },
     provider,
@@ -262,8 +208,7 @@ export function runGrammar(
   text: string,
   provider: "anthropic" | "openai" = "openai"
 ) {
-  return callLegacyOrAssistant(
-    ROUTES.grammar,
+  return callAssistant(
     "grammar",
     { text },
     provider,
@@ -275,8 +220,7 @@ export function runStyle(
   text: string,
   provider: "anthropic" | "openai" = "openai"
 ) {
-  return callLegacyOrAssistant(
-    ROUTES.style,
+  return callAssistant(
     "style",
     { text },
     provider,
@@ -288,8 +232,7 @@ export function runReadability(
   text: string,
   provider: "anthropic" | "openai" = "openai"
 ) {
-  return callLegacyOrAssistant(
-    ROUTES.readability,
+  return callAssistant(
     "readability",
     { text },
     provider,
@@ -303,9 +246,7 @@ export function runPublishingPrep(
   options: any = {},
   provider: "anthropic" | "openai" = "openai"
 ) {
-  // Send a compact payload to Lambda (some gateways limit body size)
-  return callLegacyOrAssistant(
-    ROUTES.publishingPrep,
+  return callAssistant(
     "publishing-prep",
     { meta, chapters, options },
     provider,
@@ -333,7 +274,7 @@ export const rewrite = (
 ) => runAssistant(text, "rewrite", instructions, provider);
 
 /* --------------------------- File helper routes --------------------------- */
-// Only useful if you created these routes on your API.
+// These use the /files endpoint with different operations
 
 export function filesPresignUpload(params: {
   userId: string;
@@ -342,11 +283,11 @@ export function filesPresignUpload(params: {
   keyHint?: string;
 }) {
   return fetchWithTimeout(
-    `${API_BASE}${ROUTES.filesPresignUpload}`,
+    `${API_BASE}${ROUTES.files}`,
     {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(params),
+      headers: { "Content-Type": "application/json", "x-operation": "presign-upload" },
+      body: JSON.stringify({ operation: "presign-upload", ...params }),
     },
     25000
   ).then(async (res) => {
@@ -363,11 +304,10 @@ export function filesList(params: {
   prefix?: string;
 }) {
   return fetchWithTimeout(
-    `${API_BASE}${ROUTES.filesList}`,
+    `${API_BASE}${ROUTES.files}`,
     {
-      method: "POST",
+      method: "GET",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(params),
     },
     25000
   ).then(async (res) => {
@@ -380,11 +320,10 @@ export function filesList(params: {
 
 export function filesGet(params: { userId: string; key: string; expiresIn?: number }) {
   return fetchWithTimeout(
-    `${API_BASE}${ROUTES.filesGet}`,
+    `${API_BASE}${ROUTES.files}`,
     {
-      method: "POST",
+      method: "GET",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(params),
     },
     25000
   ).then(async (res) => {
@@ -397,9 +336,9 @@ export function filesGet(params: { userId: string; key: string; expiresIn?: numb
 
 export function filesDelete(params: { userId: string; manuscriptId?: string; fileKey?: string }) {
   return fetchWithTimeout(
-    `${API_BASE}${ROUTES.filesDelete}`,
+    `${API_BASE}${ROUTES.files}`,
     {
-      method: "POST",
+      method: "DELETE",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(params),
     },
