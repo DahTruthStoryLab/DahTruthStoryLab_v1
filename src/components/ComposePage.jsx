@@ -1,4 +1,6 @@
 // src/components/ComposePage.jsx
+// FIXED VERSION - Phase 1: AI Response Formatting
+
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import ReactQuill from "react-quill";
 import Quill from "quill";
@@ -53,7 +55,7 @@ Quill.register(Size, true);
 /* ------------------------------------
    Page sizing / pagination constants
 ------------------------------------ */
-const PAGE_HEIGHT = 1040; // px visual page “viewport” height
+const PAGE_HEIGHT = 1040; // px visual page "viewport" height
 
 /* ------------------------------------
    Load Mammoth dynamically from CDN
@@ -91,21 +93,41 @@ const saveState = (state) => {
 };
 
 /* ------------------------------------
-   Text helpers
+   Text helpers - FIXED FOR BETTER FORMATTING
 ------------------------------------ */
 const countWords = (html = "") => {
   const text = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
   return text ? text.split(/\s+/).length : 0;
 };
+
 const htmlToPlain = (html = "") =>
   html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+
+// FIXED: Better paragraph preservation
 const plainToSimpleHtml = (text = "") => {
   if (!text) return "";
-  const paras = text
-    .split(/\n{2,}/)
-    .map((p) => `<p>${p.replace(/\n/g, "<br/>")}</p>`)
+  
+  // Split by double line breaks OR single line breaks followed by capital letter (common paragraph pattern)
+  let paragraphs = text.split(/\n\n+/);
+  
+  // If we only have one "paragraph" but the text has single newlines, try splitting on those too
+  if (paragraphs.length === 1 && text.includes('\n')) {
+    // Split on single newlines that are followed by a capital letter or number (likely new paragraph)
+    paragraphs = text.split(/\n(?=[A-Z0-9])/);
+  }
+  
+  // Convert each paragraph
+  const htmlParagraphs = paragraphs
+    .map(p => p.trim())
+    .filter(p => p.length > 0)
+    .map((p) => {
+      // Within each paragraph, convert single newlines to <br/>
+      const withBreaks = p.replace(/\n/g, "<br/>");
+      return `<p>${withBreaks}</p>`;
+    })
     .join("");
-  return paras || `<p>${text}</p>`;
+  
+  return htmlParagraphs || `<p>${text}</p>`;
 };
 
 const ensureFirstChapter = (chapters) =>
@@ -290,6 +312,9 @@ export default function ComposePage() {
         ["clean"],
       ],
       history: { delay: 500, maxStack: 200, userOnly: true },
+      clipboard: {
+        matchVisual: false, // Preserve formatting on paste
+      },
     }),
     []
   );
@@ -346,7 +371,7 @@ export default function ComposePage() {
     return () => clearTimeout(t);
   }, [book, chapters]);
 
-  /* Auto-advance at bottom while typing (page flip) */
+  /* Auto-advance at bottom while typing (page flip) - FIXED */
   useEffect(() => {
     const q = getQuill();
     if (!q) return;
@@ -355,14 +380,17 @@ export default function ComposePage() {
       recalcPages();
 
       const sel = q.getSelection();
-      const atEnd = sel && sel.index >= q.getLength() - 1;
-      const nearBottom = q.root.scrollTop + q.root.clientHeight >= q.root.scrollHeight - 4;
+      if (!sel) return;
+      
+      const atEnd = sel.index >= q.getLength() - 1;
+      const scrollEl = q.root;
+      const nearBottom = scrollEl.scrollTop + scrollEl.clientHeight >= scrollEl.scrollHeight - 20;
 
       if (atEnd && nearBottom) {
         setTimeout(() => {
           recalcPages();
-          const total = Math.max(1, Math.ceil(q.root.scrollHeight / q.root.clientHeight));
-          if (pageIndex < total - 1) {
+          const newCount = Math.max(1, Math.ceil(scrollEl.scrollHeight / PAGE_HEIGHT));
+          if (pageIndex < newCount - 1) {
             goToPage(pageIndex + 1);
           }
         }, 10);
@@ -414,7 +442,7 @@ export default function ComposePage() {
   const redo = () => getQuill()?.history?.redo?.();
 
   /* ------------------------------------
-     AI helpers + actions
+     AI helpers + actions - FIXED
   ------------------------------------ */
   const chooseContent = (res) =>
     res?.result ??
@@ -440,7 +468,16 @@ export default function ComposePage() {
       else res = await proofread(inputPlain, instructions, provider);
 
       const out = chooseContent(res);
-      const newHtml = out && out !== inputPlain ? plainToSimpleHtml(out) : html;
+      
+      // FIXED: Better handling of AI response
+      let newHtml;
+      if (out && out !== inputPlain) {
+        // Convert plain text response to HTML with proper paragraphs
+        newHtml = plainToSimpleHtml(out);
+      } else {
+        // No change from AI
+        newHtml = html;
+      }
 
       setHtml(newHtml);
       setChapters((prev) => {
@@ -561,7 +598,7 @@ export default function ComposePage() {
   };
 
   /* ------------------------------
-     Import / Export
+     Import / Export - TO BE IMPROVED IN PHASE 2
   ------------------------------ */
   const ImportDocxButton = () => {
     const fileInputRef = useRef(null);
@@ -607,7 +644,7 @@ export default function ComposePage() {
         }
       } catch (err) {
         console.error(err);
-        alert("Failed to import .docx");
+        alert("Failed to import .docx: " + err.message);
       } finally {
         e.target.value = "";
       }
@@ -875,11 +912,15 @@ export default function ComposePage() {
         </div>
       )}
 
-      {/* EDITOR VIEW (book page with flip + page numbers) */}
+      {/* EDITOR VIEW continues... (rest of the component unchanged for now) */}
       {view === "editor" && (
         <div className="max-w-7xl mx-auto px-4 py-6 grid grid-cols-1 xl:grid-cols-[18rem_1fr] gap-6">
-          {/* Left: meta + AI instructions + chapters list */}
+          {/* Sidebar and editor content - keeping existing code for now */}
+          {/* This will be improved in Phase 2 & 3 */}
+          
+          {/* Left sidebar with Publishing Meta, AI Instructions, and Chapters list */}
           <aside className="xl:sticky xl:top-16 space-y-3" style={{ zIndex: 10 }}>
+            {/* Publishing Meta section */}
             <div className="space-y-2 border rounded-lg p-3 bg-white">
               <div className="text-sm font-medium">Publishing Meta</div>
               <label className="text-xs text-slate-600">Book Title</label>
@@ -946,6 +987,7 @@ export default function ComposePage() {
               )}
             </div>
 
+            {/* AI Instructions section */}
             <div className="space-y-1 border rounded-lg p-3 bg-white">
               <div className="text-sm font-medium">AI Instructions</div>
               <textarea
@@ -956,9 +998,10 @@ export default function ComposePage() {
               />
             </div>
 
+            {/* Chapters list */}
             <div className="border rounded-lg p-3 bg-white space-y-2">
               <div className="text-sm text-slate-600">Chapters</div>
-              <div className="space-y-2 max-h=[40vh] overflow-auto pr-1">
+              <div className="space-y-2 max-h-[40vh] overflow-auto pr-1">
                 {chapters.map((c) => (
                   <button
                     key={c.id}
@@ -993,7 +1036,7 @@ export default function ComposePage() {
             </div>
           </aside>
 
-          {/* Page editor */}
+          {/* Page editor section */}
           <section className="bg-transparent">
             <div className="mb-3 flex items-center gap-3">
               <input
@@ -1136,3 +1179,4 @@ export default function ComposePage() {
     </div>
   );
 }
+
