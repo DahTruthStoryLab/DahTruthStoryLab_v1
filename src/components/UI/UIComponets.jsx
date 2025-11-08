@@ -3,10 +3,6 @@
 
 import React from "react";
 
-/**
- * Gold Dashboard Button
- * Uses brand gold color #D4AF37
- */
 export function GoldButton({ children, className = "", ...props }) {
   return (
     <button
@@ -22,9 +18,6 @@ export function GoldButton({ children, className = "", ...props }) {
   );
 }
 
-/**
- * Breadcrumb showing current view
- */
 export function WritingCrumb({ view }) {
   return (
     <div className="text-[13px] text-slate-600">
@@ -35,9 +28,6 @@ export function WritingCrumb({ view }) {
   );
 }
 
-/**
- * Page Number Badge for editor
- */
 export function PageNumberBadge({ pageIndex, pageCount }) {
   return (
     <div
@@ -60,9 +50,6 @@ export function PageNumberBadge({ pageIndex, pageCount }) {
   );
 }
 
-/**
- * Save Status Indicator
- */
 export function SaveStatus({ saving, lastSaved, hasUnsavedChanges }) {
   if (saving) {
     return (
