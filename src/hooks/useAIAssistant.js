@@ -9,7 +9,6 @@ import {
   proofread,
   clarify,
   rewrite,
-  callAssistant,
 } from "../lib/api";
 import { htmlToPlain, plainToSimpleHtml } from "../utils/textFormatting";
 
@@ -19,9 +18,8 @@ export function useAIAssistant() {
   const [instructions, setInstructions] = useState(
     "Keep ADOS cadence; pastoral but firm."
   );
-  const [provider, setProvider] = useState("openai"); // "openai" | "anthropic"
+  const [provider, setProvider] = useState("openai");
 
-  // Extract content from AI response
   const extractContent = (res) =>
     res?.result ??
     res?.reply ??
@@ -31,7 +29,6 @@ export function useAIAssistant() {
     res?.echo?.message ??
     "";
 
-  // Run AI operation
   const runAI = async (mode, html, customInstructions = null, customProvider = null) => {
     setAiError(null);
     setAiBusy(true);
@@ -68,12 +65,11 @@ export function useAIAssistant() {
       const output = extractContent(res);
 
       if (output && output !== inputPlain) {
-        // Convert AI response back to HTML with proper paragraphs
         const newHtml = plainToSimpleHtml(output);
         return newHtml;
       }
 
-      return html; // No change from AI
+      return html;
     } catch (e) {
       console.error("[AI] error:", e);
       const errorMsg = e?.message || "AI request failed";
@@ -85,48 +81,21 @@ export function useAIAssistant() {
     }
   };
 
-  // Generate chapter-specific prompt using AI
   const generateChapterPrompt = async (chapter) => {
     if (!chapter) return null;
 
-    setAiBusy(true);
-    setAiError(null);
-
-    try {
-      const response = await callAssistant(
-        "generate-writing-prompt",
-        {
-          chapterNumber: chapter.id,
-          chapterTitle: chapter.title,
-          chapterContent: htmlToPlain(chapter.content).slice(0, 500), // First 500 chars
-          currentInstructions: instructions,
-        },
-        provider,
-        { retries: 2, timeoutMs: 15000 }
-      );
-
-      const generatedPrompt = extractContent(response);
-      
-      if (generatedPrompt) {
-        // Ask user if they want to use it
-        const useIt = window.confirm(
-          `AI suggests this prompt for "${chapter.title}":\n\n${generatedPrompt}\n\nUse this prompt?`
-        );
-        
-        if (useIt) {
-          setInstructions(generatedPrompt);
-          return generatedPrompt;
-        }
-      }
-
-      return null;
-    } catch (e) {
-      console.error("[AI] generate prompt error:", e);
-      setAiError(e?.message || "Failed to generate prompt");
-      return null;
-    } finally {
-      setAiBusy(false);
+    const simplePrompt = `For "${chapter.title}": Focus on clear narrative flow and character development. Maintain consistent tone and pacing.`;
+    
+    const useIt = window.confirm(
+      `Suggested prompt for "${chapter.title}":\n\n${simplePrompt}\n\nUse this prompt?`
+    );
+    
+    if (useIt) {
+      setInstructions(simplePrompt);
+      return simplePrompt;
     }
+
+    return null;
   };
 
   return {
