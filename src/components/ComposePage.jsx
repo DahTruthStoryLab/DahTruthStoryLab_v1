@@ -7,10 +7,10 @@ import { useNavigate } from "react-router-dom";
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 
-// Component imports
+// At the top of ComposePage.jsx, you should have:
 import EditorPane from "./Editor/EditorPane";
-import ChapterGrid from "./Chapters/ChapterGrid";
-import ChapterSidebar from "./Chapters/ChapterSidebar";
+import ChapterGrid from "./Writing/ChapterGrid";
+import ChapterSidebar from "./Writing/ChapterSidebar";
 import EditorToolbar from "./Editor/EditorToolbar";
 import PublishingMeta from "./Editor/PublishingMeta";
 import AIInstructions from "./Editor/AIInstructions";
