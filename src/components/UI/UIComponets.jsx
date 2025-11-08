@@ -93,5 +93,3 @@ export function SaveStatus({ saving, lastSaved, hasUnsavedChanges }) {
 
   return null;
 }
-
-
