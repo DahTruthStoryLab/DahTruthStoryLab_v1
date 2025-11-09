@@ -84,18 +84,87 @@ export default function ComposePage() {
   };
 
   // Handle AI operations
-  const handleAI = async (mode) => {
-    const result = await runAI(mode, html, instructions, provider);
-    if (result) {
-      setHtml(result);
-      updateChapter(selectedId, {
-        title: title || selectedChapter.title,
-        content: result,
-      });
-    }
-  };
+const handleAI = async (mode) => {
+  const result = await runAI(mode, html, instructions, provider);
+  if (result) {
+    setHtml(result);
+    updateChapter(selectedId, {
+      title: title || selectedChapter.title,
+      content: result,
+    });
+  }
+};
 
-  const goBack = () => navigate("/dashboard");
+// Handle import
+const handleImport = (htmlContent, shouldSplit) => {
+  if (shouldSplit) {
+    // Split into chapters by headings
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = htmlContent;
+    
+    const newChapters = [];
+    let currentChapter = { content: "", title: "Chapter 1" };
+    let chapterNumber = 1;
+    
+    Array.from(tempDiv.children).forEach((element) => {
+      const tagName = element.tagName.toLowerCase();
+      
+      if (tagName === 'h1' || tagName === 'h2' || tagName === 'h3') {
+        if (currentChapter.content) {
+          addChapter();
+          const lastId = chapters[0]?.id;
+          if (lastId) {
+            updateChapter(lastId, {
+              title: currentChapter.title,
+              content: currentChapter.content,
+            });
+          }
+          chapterNumber++;
+        }
+        currentChapter = {
+          title: element.textContent.trim() || `Chapter ${chapterNumber}`,
+          content: "",
+        };
+      } else {
+        currentChapter.content += element.outerHTML;
+      }
+    });
+    
+    // Add the last chapter
+    if (currentChapter.content) {
+      addChapter();
+      const lastId = chapters[0]?.id;
+      if (lastId) {
+        updateChapter(lastId, {
+          title: currentChapter.title,
+          content: currentChapter.content,
+        });
+      }
+    }
+    
+    setView("grid");
+  } else {
+    // Import into current chapter
+    setHtml(htmlContent);
+    updateChapter(selectedId, {
+      title: title || selectedChapter.title,
+      content: htmlContent,
+    });
+  }
+};
+
+// Handle export
+const handleExport = () => {
+  const blob = new Blob([html], { type: 'text/html' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${title || 'chapter'}.html`;
+  a.click();
+  URL.revokeObjectURL(url);
+};
+
+const goBack = () => navigate("/dashboard");
 
   return (
     <DndProvider backend={HTML5Backend}>
