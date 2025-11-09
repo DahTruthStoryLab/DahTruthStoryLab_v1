@@ -10,6 +10,7 @@ export default function ChapterGrid({
   onSelectChapter,
   onAddChapter,
   onMoveChapter,
+  onDeleteChapter,  // ← ADD THIS LINE
 }) {
   return (
     <div className="max-w-7xl mx-auto px-4 py-6">
