@@ -217,14 +217,14 @@ const goBack = () => navigate("/dashboard");
 
             <div className="w-full sm:flex-1" />
 
-            {/* Editor Toolbar - All AI buttons, Save, etc. */}
+          {/* Editor Toolbar - All AI buttons, Save, etc. */}
             <EditorToolbar
               onAI={handleAI}
               onSave={handleSave}
+              onImport={handleImport}
+              onExport={handleExport}
               aiBusy={aiBusy}
-            />
-          </div>
-        </div>
+            />   
 
         {/* ========== GRID VIEW ========== */}
         {view === "grid" && (
