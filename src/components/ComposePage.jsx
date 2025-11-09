@@ -164,8 +164,15 @@ const handleExport = () => {
   URL.revokeObjectURL(url);
 };
 
-const goBack = () => navigate("/dashboard");
+// Handle delete current chapter
+const handleDeleteCurrent = () => {
+  if (window.confirm(`Delete "${title || selectedChapter.title}"?`)) {
+    deleteChapter(selectedId);
+    setView("grid");
+  }
+};
 
+const goBack = () => navigate("/dashboard");
   return (
     <DndProvider backend={HTML5Backend}>
       <div className="min-h-screen bg-[rgb(244,247,250)] text-slate-900">
@@ -223,6 +230,7 @@ const goBack = () => navigate("/dashboard");
               onSave={handleSave}
               onImport={handleImport}
               onExport={handleExport}
+              onDelete={handleDeleteCurrent}  // ← ADD THIS LINE 
               aiBusy={aiBusy}
             />   
           </div>  {/* ← ADD THIS - closes max-w-7xl container */}
