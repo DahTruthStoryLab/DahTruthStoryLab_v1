@@ -3,9 +3,10 @@
 // Preserves all brand styling and functionality
 
 import React from "react";
-import { Bot, Save, RotateCcw, RotateCw, Download, Upload } from "lucide-react";
+import { Bot, Save, RotateCcw, RotateCw, Download } from "lucide-react";
+import ImportButton from "./ImportButton";
 
-export default function EditorToolbar({ onAI, onSave, aiBusy, compact = false }) {
+export default function EditorToolbar({ onAI, onSave, onImport, onExport, aiBusy, compact = false }) {
   return (
     <div className="flex items-center gap-2 flex-wrap">
       {/* Undo/Redo - only show if not compact */}
@@ -32,19 +33,14 @@ export default function EditorToolbar({ onAI, onSave, aiBusy, compact = false })
         </>
       )}
 
-      {/* Import/Export - will be implemented later */}
-      <button
-        className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50"
-        title="Import Word Document"
-        disabled
-      >
-        <Upload size={16} /> Import
-      </button>
+      {/* Import/Export */}
+      <ImportButton onImport={onImport} aiBusy={aiBusy} />
 
       <button
-        className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50"
+        onClick={onExport}
+        className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50 disabled:opacity-60"
         title="Export to Word"
-        disabled
+        disabled={aiBusy}
       >
         <Download size={16} /> Export
       </button>
@@ -124,4 +120,3 @@ export default function EditorToolbar({ onAI, onSave, aiBusy, compact = false })
     </div>
   );
 }
-
