@@ -215,9 +215,9 @@ const goBack = () => navigate("/dashboard");
               </select>
             </div>
 
-            <div className="w-full sm:flex-1" />
+             <div className="w-full sm:flex-1" />
 
-          {/* Editor Toolbar - All AI buttons, Save, etc. */}
+            {/* Editor Toolbar - All AI buttons, Save, etc. */}
             <EditorToolbar
               onAI={handleAI}
               onSave={handleSave}
@@ -225,6 +225,8 @@ const goBack = () => navigate("/dashboard");
               onExport={handleExport}
               aiBusy={aiBusy}
             />   
+          </div>  {/* ← ADD THIS - closes max-w-7xl container */}
+        </div>    {/* ← ADD THIS - closes sticky top-0 div */}
 
         {/* ========== GRID VIEW ========== */}
         {view === "grid" && (
