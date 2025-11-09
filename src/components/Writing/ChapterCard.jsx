@@ -1,13 +1,30 @@
-// src/components/Chapters/ChapterCard.jsx
+// src/components/Writing/ChapterCard.jsx
 // Individual chapter card with drag-and-drop, glassmorphic design
 
 import React, { useRef } from "react";
 import { useDrag, useDrop } from "react-dnd";
-import { getPreviewText } from "../../utils/textFormatting";
+import { Trash2 } from "lucide-react";
 
 const DND_TYPE = "CHAPTER_CARD";
 
-export default function ChapterCard({ chapter, index, moveCard, onOpen, active }) {
+// Extract first N words from HTML
+const getFirstWords = (html = "", wordCount = 20) => {
+  // Strip HTML tags
+  const text = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+  
+  if (!text) return "—";
+  
+  // Split into words and take first N words
+  const words = text.split(/\s+/);
+  
+  if (words.length <= wordCount) {
+    return text;
+  }
+  
+  return words.slice(0, wordCount).join(" ") + "...";
+};
+
+export default function ChapterCard({ chapter, index, moveCard, onOpen, active, onDelete }) {
   const ref = useRef(null);
 
   // Drop zone - allows cards to be dropped here
@@ -33,6 +50,13 @@ export default function ChapterCard({ chapter, index, moveCard, onOpen, active }
   // Combine drag and drop refs
   drag(drop(ref));
 
+  const handleDelete = (e) => {
+    e.stopPropagation();
+    if (window.confirm(`Delete "${chapter.title}"?`)) {
+      onDelete?.(chapter.id);
+    }
+  };
+
   return (
     <button
       ref={ref}
@@ -44,20 +68,29 @@ export default function ChapterCard({ chapter, index, moveCard, onOpen, active }
         isDragging ? "opacity-50" : "",
       ].join(" ")}
     >
+      {/* Delete Button - Top Right */}
+      <button
+        onClick={handleDelete}
+        className="absolute top-2 right-2 p-1.5 rounded-lg bg-white/80 hover:bg-red-50 text-slate-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity z-10"
+        title="Delete chapter"
+      >
+        <Trash2 size={14} />
+      </button>
+
       {/* Progress bar decoration */}
       <div className="h-2 rounded-md bg-gradient-to-r from-slate-200 via-slate-100 to-slate-200 mb-3" />
       
       {/* Title and Status */}
       <div className="flex items-start justify-between gap-2">
-        <div className="font-semibold line-clamp-2">{chapter.title}</div>
+        <div className="font-semibold line-clamp-2 pr-6">{chapter.title}</div>
         <span className="text-[11px] px-2 py-0.5 rounded bg-slate-100 text-slate-600">
           {chapter.status || "draft"}
         </span>
       </div>
 
-      {/* Preview Text */}
+      {/* Preview Text - First 20 Words */}
       <p className="mt-2 text-[12px] text-slate-600 line-clamp-3">
-        {getPreviewText(chapter.content, 180) || "—"}
+        {getFirstWords(chapter.content, 20)}
       </p>
 
       {/* Word Count and Last Edited */}
@@ -71,4 +104,3 @@ export default function ChapterCard({ chapter, index, moveCard, onOpen, active }
     </button>
   );
 }
-
