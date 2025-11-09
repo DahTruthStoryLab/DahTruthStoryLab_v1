@@ -35,6 +35,7 @@ export default function ChapterGrid({
             moveCard={onMoveChapter}
             active={chapter.id === selectedId}
             onOpen={() => onSelectChapter(chapter.id)}
+            onDelete={onDeleteChapter}  // ← ADD THIS LINE
           />
         ))}
       </div>
