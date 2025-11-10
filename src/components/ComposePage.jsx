@@ -38,6 +38,7 @@ export default function ComposePage() {
     setSelectedId,
     addChapter,
     updateChapter,
+    deleteChapter,  // ← ADDED THIS
     moveChapter,
     saveProject,
   } = useChapterManager();
@@ -84,100 +85,143 @@ export default function ComposePage() {
   };
 
   // Handle AI operations
-const handleAI = async (mode) => {
-  const result = await runAI(mode, html, instructions, provider);
-  if (result) {
-    setHtml(result);
-    updateChapter(selectedId, {
-      title: title || selectedChapter.title,
-      content: result,
-    });
-  }
-};
+  const handleAI = async (mode) => {
+    const result = await runAI(mode, html, instructions, provider);
+    if (result) {
+      setHtml(result);
+      updateChapter(selectedId, {
+        title: title || selectedChapter.title,
+        content: result,
+      });
+    }
+  };
 
-// Handle import
-const handleImport = (htmlContent, shouldSplit) => {
-  if (shouldSplit) {
-    // Split into chapters by headings
-    const tempDiv = document.createElement('div');
-    tempDiv.innerHTML = htmlContent;
+  // Handle import - COMPLETELY REWRITTEN
+  const handleImport = async (htmlContent, shouldSplit) => {
+    console.log("📥 Import started, shouldSplit:", shouldSplit);
     
-    const newChapters = [];
-    let currentChapter = { content: "", title: "Chapter 1" };
-    let chapterNumber = 1;
-    
-    Array.from(tempDiv.children).forEach((element) => {
-      const tagName = element.tagName.toLowerCase();
+    if (shouldSplit) {
+      // Split into chapters by headings
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = htmlContent;
       
-      if (tagName === 'h1' || tagName === 'h2' || tagName === 'h3') {
-        if (currentChapter.content) {
-          addChapter();
-          const lastId = chapters[0]?.id;
-          if (lastId) {
-            updateChapter(lastId, {
-              title: currentChapter.title,
+      console.log("📄 Total elements in document:", tempDiv.children.length);
+      
+      const chapterData = [];
+      let currentChapter = { content: "", title: "" };
+      let chapterNumber = 1;
+      
+      // Process each element
+      Array.from(tempDiv.children).forEach((element, idx) => {
+        const tagName = element.tagName.toLowerCase();
+        console.log(`Element ${idx}: ${tagName}`, element.textContent.substring(0, 50));
+        
+        // If we hit a heading, save previous chapter and start new one
+        if (tagName === 'h1' || tagName === 'h2' || tagName === 'h3') {
+          // Save previous chapter if it has content
+          if (currentChapter.content.trim()) {
+            console.log(`✅ Saving chapter: "${currentChapter.title}"`);
+            chapterData.push({
+              title: currentChapter.title || `Chapter ${chapterNumber}`,
               content: currentChapter.content,
             });
+            chapterNumber++;
           }
-          chapterNumber++;
+          
+          // Start new chapter with this heading as title
+          currentChapter = {
+            title: element.textContent.trim() || `Chapter ${chapterNumber}`,
+            content: "",
+          };
+          console.log(`📖 New chapter started: "${currentChapter.title}"`);
+        } else {
+          // Add content to current chapter
+          currentChapter.content += element.outerHTML;
         }
-        currentChapter = {
-          title: element.textContent.trim() || `Chapter ${chapterNumber}`,
-          content: "",
-        };
-      } else {
-        currentChapter.content += element.outerHTML;
-      }
-    });
-    
-    // Add the last chapter
-    if (currentChapter.content) {
-      addChapter();
-      const lastId = chapters[0]?.id;
-      if (lastId) {
-        updateChapter(lastId, {
-          title: currentChapter.title,
+      });
+      
+      // Don't forget the last chapter
+      if (currentChapter.content.trim()) {
+        console.log(`✅ Saving final chapter: "${currentChapter.title}"`);
+        chapterData.push({
+          title: currentChapter.title || `Chapter ${chapterNumber}`,
           content: currentChapter.content,
         });
       }
+      
+      console.log(`📊 Total chapters to create: ${chapterData.length}`);
+      
+      if (chapterData.length === 0) {
+        alert("No chapters found. The document may not have proper headings (H1, H2, or H3).");
+        return;
+      }
+      
+      // Create chapters one at a time with proper delay
+      for (let i = 0; i < chapterData.length; i++) {
+        const data = chapterData[i];
+        console.log(`Creating chapter ${i + 1}/${chapterData.length}: "${data.title}"`);
+        
+        const newId = addChapter();
+        
+        // Wait a tiny bit before updating
+        await new Promise(resolve => setTimeout(resolve, 50));
+        
+        updateChapter(newId, {
+          title: data.title,
+          content: data.content,
+        });
+      }
+      
+      alert(`✅ Successfully imported ${chapterData.length} chapters!`);
+      setView("grid");
+      
+    } else {
+      // Import into current chapter (no splitting)
+      console.log("📥 Importing into current chapter");
+      setHtml(htmlContent);
+      updateChapter(selectedId, {
+        title: title || selectedChapter.title,
+        content: htmlContent,
+      });
+      alert("✅ Document imported into current chapter!");
+    }
+  };
+
+  // Handle export
+  const handleExport = () => {
+    const blob = new Blob([html], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${title || 'chapter'}.html`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // Handle delete current chapter
+  const handleDeleteCurrent = () => {
+    if (!selectedChapter) {
+      console.log("❌ No chapter selected");
+      return;
     }
     
-    setView("grid");
-  } else {
-    // Import into current chapter
-    setHtml(htmlContent);
-    updateChapter(selectedId, {
-      title: title || selectedChapter.title,
-      content: htmlContent,
-    });
-  }
-};
-
-// Handle export
-const handleExport = () => {
-  const blob = new Blob([html], { type: 'text/html' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `${title || 'chapter'}.html`;
-  a.click();
-  URL.revokeObjectURL(url);
-};
-
-// Handle delete current chapter
-const handleDeleteCurrent = () => {
-  if (!selectedChapter) return;
-  
-  if (window.confirm(`Delete "${title || selectedChapter.title}"?\n\nThis cannot be undone.`)) {
-    deleteChapter(selectedId);
+    console.log("🗑️ Delete button clicked for:", selectedChapter.title);
     
-    // Wait a moment then switch to grid view
-    setTimeout(() => {
-      setView("grid");
-    }, 100);
-  }
-};
-const goBack = () => navigate("/dashboard");
+    if (window.confirm(`Delete "${title || selectedChapter.title}"?\n\nThis cannot be undone.`)) {
+      console.log("✅ User confirmed delete");
+      deleteChapter(selectedId);
+      
+      // Switch to grid view after delete
+      setTimeout(() => {
+        setView("grid");
+      }, 100);
+    } else {
+      console.log("❌ User cancelled delete");
+    }
+  };
+
+  const goBack = () => navigate("/dashboard");
+
   return (
     <DndProvider backend={HTML5Backend}>
       <div className="min-h-screen bg-[rgb(244,247,250)] text-slate-900">
@@ -227,7 +271,7 @@ const goBack = () => navigate("/dashboard");
               </select>
             </div>
 
-             <div className="w-full sm:flex-1" />
+            <div className="w-full sm:flex-1" />
 
             {/* Editor Toolbar - All AI buttons, Save, etc. */}
             <EditorToolbar
@@ -235,11 +279,11 @@ const goBack = () => navigate("/dashboard");
               onSave={handleSave}
               onImport={handleImport}
               onExport={handleExport}
-              onDelete={handleDeleteCurrent}  // ← ADD THIS LINE 
+              onDelete={handleDeleteCurrent}
               aiBusy={aiBusy}
             />   
-          </div>  {/* ← ADD THIS - closes max-w-7xl container */}
-        </div>    {/* ← ADD THIS - closes sticky top-0 div */}
+          </div>
+        </div>
 
         {/* ========== GRID VIEW ========== */}
         {view === "grid" && (
@@ -252,6 +296,7 @@ const goBack = () => navigate("/dashboard");
             }}
             onAddChapter={addChapter}
             onMoveChapter={moveChapter}
+            onDeleteChapter={deleteChapter}
           />
         )}
 
@@ -307,4 +352,3 @@ const goBack = () => navigate("/dashboard");
     </DndProvider>
   );
 }
-
