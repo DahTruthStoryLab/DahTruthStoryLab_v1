@@ -82,18 +82,25 @@ export default function EditorPane({ title, setTitle, html, setHtml, onSave, onA
     setPageIndex((prev) => Math.min(prev, count - 1));
   }, []);
 
-  // Navigate to specific page
-  const goToPage = useCallback(
-    (idx) => {
-      const q = getQuill();
-      if (!q) return;
-      
-      const target = Math.max(0, Math.min(idx, pageCount - 1));
-      q.root.scrollTop = target * PAGE_HEIGHT;
-      setPageIndex(target);
-    },
-    [pageCount]
-  );
+ // Navigate to specific page
+const goToPage = useCallback(
+  (idx) => {
+    const q = getQuill();
+    if (!q) return;
+    
+    const target = Math.max(0, Math.min(idx, pageCount - 1));
+    const scrollEl = q.root;
+    
+    // Scroll to the target page position
+    scrollEl.scrollTo({
+      top: target * PAGE_HEIGHT,
+      behavior: 'smooth'
+    });
+    
+    setPageIndex(target);
+  },
+  [pageCount]
+);
 
   const nextPage = () => goToPage(pageIndex + 1);
   const prevPage = () => goToPage(pageIndex - 1);
@@ -104,31 +111,78 @@ export default function EditorPane({ title, setTitle, html, setHtml, onSave, onA
     return () => clearTimeout(timer);
   }, [html, recalcPages]);
 
-  // Auto-advance to next page when typing at bottom
-  useEffect(() => {
-    const q = getQuill();
-    if (!q) return;
+ // Auto-advance to next page when typing at bottom
+useEffect(() => {
+  const q = getQuill();
+  if (!q) return;
 
-    const onTextChange = () => {
-      recalcPages();
+  const onTextChange = () => {
+    recalcPages();
 
-      const sel = q.getSelection();
-      if (!sel) return;
+    const sel = q.getSelection();
+    if (!sel) return;
 
-      const atEnd = sel.index >= q.getLength() - 1;
-      const scrollEl = q.root;
-      const nearBottom = scrollEl.scrollTop + scrollEl.clientHeight >= scrollEl.scrollHeight - 20;
+    const atEnd = sel.index >= q.getLength() - 1;
+    const scrollEl = q.root;
+    const nearBottom = scrollEl.scrollTop + scrollEl.clientHeight >= scrollEl.scrollHeight - 20;
 
-      if (atEnd && nearBottom) {
-        setTimeout(() => {
-          recalcPages();
-          const newCount = Math.max(1, Math.ceil(scrollEl.scrollHeight / PAGE_HEIGHT));
-          if (pageIndex < newCount - 1) {
-            goToPage(pageIndex + 1);
-          }
-        }, 10);
+    if (atEnd && nearBottom) {
+      setTimeout(() => {
+        recalcPages();
+        const newCount = Math.max(1, Math.ceil(scrollEl.scrollHeight / PAGE_HEIGHT));
+        if (pageIndex < newCount - 1) {
+          goToPage(pageIndex + 1);
+        }
+      }, 10);
+    }
+  };
+
+  q.on("text-change", onTextChange);
+  return () => q.off("text-change", onTextChange);
+}, [recalcPages, goToPage, pageIndex]);
+
+// ========== ADD THIS NEW EFFECT ==========
+// Auto-flip to next page when scrolling to bottom
+useEffect(() => {
+  const q = getQuill();
+  if (!q) return;
+
+  const scrollEl = q.root;
+  let scrollTimeout = null;
+
+  const onScroll = () => {
+    // Clear existing timeout
+    if (scrollTimeout) clearTimeout(scrollTimeout);
+
+    // Wait for scroll to finish (debounce)
+    scrollTimeout = setTimeout(() => {
+      const scrollTop = scrollEl.scrollTop;
+      const clientHeight = scrollEl.clientHeight;
+      const scrollHeight = scrollEl.scrollHeight;
+      
+      // Calculate which page we should be on based on scroll position
+      const targetPage = Math.floor(scrollTop / PAGE_HEIGHT);
+      
+      // If we're near the bottom of current page, advance to next
+      const distanceFromBottom = scrollHeight - (scrollTop + clientHeight);
+      
+      if (distanceFromBottom < 50 && pageIndex < pageCount - 1) {
+        // Near bottom, advance to next page
+        goToPage(pageIndex + 1);
+      } else if (targetPage !== pageIndex) {
+        // Update page index to match scroll position
+        setPageIndex(Math.max(0, Math.min(targetPage, pageCount - 1)));
       }
-    };
+    }, 150); // Wait 150ms after scroll stops
+  };
+
+  scrollEl.addEventListener("scroll", onScroll);
+  return () => {
+    scrollEl.removeEventListener("scroll", onScroll);
+    if (scrollTimeout) clearTimeout(scrollTimeout);
+  };
+}, [pageIndex, pageCount, goToPage]);
+// ========== END NEW EFFECT ==========
 
     q.on("text-change", onTextChange);
     return () => q.off("text-change", onTextChange);
