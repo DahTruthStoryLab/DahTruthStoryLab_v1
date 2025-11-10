@@ -184,10 +184,6 @@ useEffect(() => {
 }, [pageIndex, pageCount, goToPage]);
 // ========== END NEW EFFECT ==========
 
-    q.on("text-change", onTextChange);
-    return () => q.off("text-change", onTextChange);
-  }, [recalcPages, goToPage, pageIndex]);
-
   // Keyboard shortcuts
   useEffect(() => {
     const onKey = (e) => {
