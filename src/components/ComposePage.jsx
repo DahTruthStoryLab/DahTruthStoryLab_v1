@@ -166,12 +166,17 @@ const handleExport = () => {
 
 // Handle delete current chapter
 const handleDeleteCurrent = () => {
-  if (window.confirm(`Delete "${title || selectedChapter.title}"?`)) {
+  if (!selectedChapter) return;
+  
+  if (window.confirm(`Delete "${title || selectedChapter.title}"?\n\nThis cannot be undone.`)) {
     deleteChapter(selectedId);
-    setView("grid");
+    
+    // Wait a moment then switch to grid view
+    setTimeout(() => {
+      setView("grid");
+    }, 100);
   }
 };
-
 const goBack = () => navigate("/dashboard");
   return (
     <DndProvider backend={HTML5Backend}>
