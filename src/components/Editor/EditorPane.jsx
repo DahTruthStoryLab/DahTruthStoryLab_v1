@@ -1,8 +1,8 @@
 // src/components/Editor/EditorPane.jsx
-// Main editor with Quill, pagination, and white book-page design
-// Proper 8.5" x 11" page with 1" margins and scrolling
+// FIXED: Toolbar at top, proper page navigation, scrolling works
+// 8.5" x 11" page with margins
 
-import React, { useRef, useState, useEffect, useCallback, useMemo } from "react";
+import React, { useRef, useState, useEffect, useCallback } from "react";
 import ReactQuill from "react-quill";
 import Quill from "quill";
 import "react-quill/dist/quill.snow.css";
@@ -40,35 +40,36 @@ Quill.register(Size, true);
 // 8.5" x 11" page at 96 DPI
 const PAGE_WIDTH = 816;   // 8.5" × 96 DPI
 const PAGE_HEIGHT = 1056; // 11" × 96 DPI
-const MARGIN = 96;        // 1" margins × 96 DPI
+const MARGIN_TOP = 96;    // 1 inch
+const MARGIN_BOTTOM = 96;
+const MARGIN_LEFT = 96;
+const MARGIN_RIGHT = 96;
 
 /* ========== EditorPane Component ========== */
 
-export default function EditorPane({ title, setTitle, html, setHtml, onSave, onAI, aiBusy }) {
+export default function EditorPane({ title, setTitle, html, setHtml, onSave, onAI, aiBusy, margins }) {
   const editorRef = useRef(null);
-  const containerRef = useRef(null);
+  const scrollContainerRef = useRef(null);
   const [pageIndex, setPageIndex] = useState(0);
   const [pageCount, setPageCount] = useState(1);
 
-  // Quill modules configuration
-  const modules = useMemo(
-    () => ({
-      toolbar: [
-        [{ header: [1, 2, 3, false] }],
-        [{ font: FONT_WHITELIST }],
-        [{ size: Size.whitelist }],
-        ["bold", "italic", "underline", "strike"],
-        [{ list: "ordered" }, { list: "bullet" }],
-        [{ align: [] }],
-        ["blockquote", "code-block"],
-        ["link", "image"],
-        ["clean"],
-      ],
-      history: { delay: 500, maxStack: 200, userOnly: true },
-      clipboard: { matchVisual: false },
-    }),
-    []
-  );
+  // Use provided margins or defaults
+  const actualMargins = margins || {
+    top: MARGIN_TOP,
+    bottom: MARGIN_BOTTOM,
+    left: MARGIN_LEFT,
+    right: MARGIN_RIGHT,
+  };
+
+  // Quill modules - toolbar at top
+  const modules = {
+    toolbar: {
+      container: "#quill-toolbar", // Use custom toolbar
+      handlers: {},
+    },
+    history: { delay: 500, maxStack: 200, userOnly: true },
+    clipboard: { matchVisual: false },
+  };
 
   // Get Quill instance
   const getQuill = () => editorRef.current?.getEditor?.();
@@ -78,13 +79,11 @@ export default function EditorPane({ title, setTitle, html, setHtml, onSave, onA
     const q = getQuill();
     if (!q) return;
     
-    const scrollEl = q.root;
-    const contentHeight = scrollEl.scrollHeight;
+    const contentHeight = q.root.scrollHeight;
     const count = Math.max(1, Math.ceil(contentHeight / PAGE_HEIGHT));
     
-    console.log(`📄 Recalc: content=${contentHeight}px, pages=${count}`);
+    console.log(`📄 Pages: ${count}, content height: ${contentHeight}px`);
     setPageCount(count);
-    setPageIndex((prev) => Math.min(prev, count - 1));
   }, []);
 
   // Navigate to specific page
@@ -94,12 +93,11 @@ export default function EditorPane({ title, setTitle, html, setHtml, onSave, onA
       if (!q) return;
       
       const target = Math.max(0, Math.min(idx, pageCount - 1));
-      const scrollEl = q.root;
       const targetScrollTop = target * PAGE_HEIGHT;
       
-      console.log(`📄 Going to page ${target + 1}/${pageCount}, scrollTop=${targetScrollTop}px`);
+      console.log(`📄 Going to page ${target + 1}/${pageCount}, scroll to ${targetScrollTop}px`);
       
-      scrollEl.scrollTo({
+      q.root.scrollTo({
         top: targetScrollTop,
         behavior: 'smooth'
       });
@@ -109,8 +107,17 @@ export default function EditorPane({ title, setTitle, html, setHtml, onSave, onA
     [pageCount]
   );
 
-  const nextPage = () => goToPage(pageIndex + 1);
-  const prevPage = () => goToPage(pageIndex - 1);
+  const nextPage = () => {
+    if (pageIndex < pageCount - 1) {
+      goToPage(pageIndex + 1);
+    }
+  };
+  
+  const prevPage = () => {
+    if (pageIndex > 0) {
+      goToPage(pageIndex - 1);
+    }
+  };
 
   // Recalculate pages when content changes
   useEffect(() => {
@@ -118,15 +125,13 @@ export default function EditorPane({ title, setTitle, html, setHtml, onSave, onA
     return () => clearTimeout(timer);
   }, [html, recalcPages]);
 
-  // Track scroll position to update page number
+  // Track scroll to update page number
   useEffect(() => {
     const q = getQuill();
     if (!q) return;
 
-    const scrollEl = q.root;
-
     const onScroll = () => {
-      const scrollTop = scrollEl.scrollTop;
+      const scrollTop = q.root.scrollTop;
       const currentPage = Math.floor(scrollTop / PAGE_HEIGHT);
       
       if (currentPage !== pageIndex && currentPage < pageCount) {
@@ -134,8 +139,8 @@ export default function EditorPane({ title, setTitle, html, setHtml, onSave, onA
       }
     };
 
-    scrollEl.addEventListener("scroll", onScroll);
-    return () => scrollEl.removeEventListener("scroll", onScroll);
+    q.root.addEventListener("scroll", onScroll);
+    return () => q.root.removeEventListener("scroll", onScroll);
   }, [pageIndex, pageCount]);
 
   // Keyboard shortcuts
@@ -146,13 +151,11 @@ export default function EditorPane({ title, setTitle, html, setHtml, onSave, onA
 
       const k = e.key.toLowerCase();
 
-      // Ctrl/Cmd + S = Save
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && k === "s") {
         e.preventDefault();
         onSave?.();
       }
 
-      // Ctrl/Cmd + Arrow = Page navigation
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && k === "arrowright") {
         e.preventDefault();
         nextPage();
@@ -165,12 +168,12 @@ export default function EditorPane({ title, setTitle, html, setHtml, onSave, onA
 
     window.addEventListener("keydown", onKey, { capture: true });
     return () => window.removeEventListener("keydown", onKey, { capture: true });
-  }, [onSave, nextPage, prevPage]);
+  }, [onSave, pageIndex, pageCount]);
 
   return (
-    <section className="bg-transparent">
-      {/* Chapter Title and Controls */}
-      <div className="mb-3 flex items-center gap-3">
+    <div className="flex flex-col h-full">
+      {/* Chapter Title and Page Navigation */}
+      <div className="mb-3 flex items-center gap-3 flex-shrink-0">
         <input
           value={title}
           onChange={(e) => setTitle(e.target.value)}
@@ -182,25 +185,25 @@ export default function EditorPane({ title, setTitle, html, setHtml, onSave, onA
           {countWords(html).toLocaleString()} words
         </div>
 
-        {/* Page Navigation */}
-        <div className="ml-auto flex items-center gap-2">
+        {/* Page Navigation Controls */}
+        <div className="flex items-center gap-2">
           <button
             onClick={prevPage}
             disabled={pageIndex === 0}
-            className="inline-flex items-center gap-1 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex items-center gap-1 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
             title="Previous Page (Ctrl+←)"
           >
             <ChevronLeft size={16} /> Prev
           </button>
           
-          <div className="text-sm tabular-nums">
+          <div className="text-sm font-medium tabular-nums">
             Page {pageIndex + 1} / {pageCount}
           </div>
           
           <button
             onClick={nextPage}
             disabled={pageIndex >= pageCount - 1}
-            className="inline-flex items-center gap-1 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex items-center gap-1 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed text-sm"
             title="Next Page (Ctrl+→)"
           >
             Next <ChevronRight size={16} />
@@ -208,115 +211,183 @@ export default function EditorPane({ title, setTitle, html, setHtml, onSave, onA
         </div>
       </div>
 
-      {/* White Page Container - Book-like design */}
+      {/* Custom Quill Toolbar - OUTSIDE editor, at top */}
       <div 
-        ref={containerRef}
+        id="quill-toolbar" 
+        className="mb-2 flex-shrink-0 bg-white border border-slate-300 rounded-lg p-2"
         style={{ 
-          padding: 16, 
-          background: "#f0f3f8",
-          maxHeight: "calc(100vh - 200px)",
-          overflowY: "auto"
+          display: 'flex', 
+          flexWrap: 'wrap', 
+          gap: '8px',
+          alignItems: 'center'
         }}
       >
+        {/* Font */}
+        <select className="ql-font" defaultValue="">
+          <option value="">Sans Serif</option>
+          <option value="serif">Serif</option>
+          <option value="mono">Monospace</option>
+          {FONT_WHITELIST.map(font => (
+            <option key={font} value={font}>{font}</option>
+          ))}
+        </select>
+
+        {/* Size */}
+        <select className="ql-size" defaultValue="">
+          <option value="small">Small</option>
+          <option value="">Normal</option>
+          <option value="large">Large</option>
+          <option value="huge">Huge</option>
+        </select>
+
+        {/* Headers */}
+        <select className="ql-header" defaultValue="">
+          <option value="">Normal</option>
+          <option value="1">Heading 1</option>
+          <option value="2">Heading 2</option>
+          <option value="3">Heading 3</option>
+        </select>
+
+        <span className="border-l border-slate-300 h-6 mx-1"></span>
+
+        {/* Formatting */}
+        <button className="ql-bold" title="Bold"></button>
+        <button className="ql-italic" title="Italic"></button>
+        <button className="ql-underline" title="Underline"></button>
+        <button className="ql-strike" title="Strikethrough"></button>
+
+        <span className="border-l border-slate-300 h-6 mx-1"></span>
+
+        {/* Lists */}
+        <button className="ql-list" value="ordered" title="Numbered List"></button>
+        <button className="ql-list" value="bullet" title="Bullet List"></button>
+
+        <span className="border-l border-slate-300 h-6 mx-1"></span>
+
+        {/* Alignment */}
+        <button className="ql-align" value="" title="Align Left"></button>
+        <button className="ql-align" value="center" title="Align Center"></button>
+        <button className="ql-align" value="right" title="Align Right"></button>
+        <button className="ql-align" value="justify" title="Justify"></button>
+
+        <span className="border-l border-slate-300 h-6 mx-1"></span>
+
+        {/* Extras */}
+        <button className="ql-blockquote" title="Blockquote"></button>
+        <button className="ql-code-block" title="Code Block"></button>
+        <button className="ql-link" title="Insert Link"></button>
+        <button className="ql-image" title="Insert Image"></button>
+
+        <span className="border-l border-slate-300 h-6 mx-1"></span>
+
+        <button className="ql-clean" title="Clear Formatting"></button>
+      </div>
+
+      {/* Editor Container with Scrolling */}
+      <div 
+        ref={scrollContainerRef}
+        className="flex-1 overflow-hidden bg-slate-100 rounded-lg p-4"
+      >
         <div
+          className="mx-auto bg-white shadow-lg"
           style={{
-            margin: "0 auto",
             width: PAGE_WIDTH,
             minHeight: PAGE_HEIGHT,
-            background: "#fff",
-            color: "#111",
-            border: "1px solid #e5e7eb",
-            boxShadow: "0 8px 30px rgba(2,20,40,0.10)",
-            borderRadius: 12,
-            padding: `${MARGIN}px`,
-            position: "relative",
+            padding: `${actualMargins.top}px ${actualMargins.right}px ${actualMargins.bottom}px ${actualMargins.left}px`,
+            position: 'relative',
           }}
         >
-          {/* Quill Editor - Now with proper scrolling */}
-          <div style={{ 
-            minHeight: PAGE_HEIGHT - (MARGIN * 2),
-            position: "relative"
-          }}>
-            <ReactQuill
-              ref={editorRef}
-              theme="snow"
-              value={html}
-              onChange={(value) => {
-                setHtml(value);
-                setTimeout(recalcPages, 50);
-              }}
-              modules={modules}
-              placeholder="Write your chapter…"
-              style={{
-                border: "none",
-                minHeight: "100%"
-              }}
-            />
-          </div>
+          <ReactQuill
+            ref={editorRef}
+            theme="snow"
+            value={html}
+            onChange={(value) => {
+              setHtml(value);
+              setTimeout(recalcPages, 50);
+            }}
+            modules={modules}
+            placeholder="Write your chapter…"
+          />
 
           {/* Page Number Badge */}
           <PageNumberBadge pageIndex={pageIndex} pageCount={pageCount} />
         </div>
       </div>
 
-      {/* Bottom Action Buttons */}
-      <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
-        <button
-          onClick={() => onAI?.("proofread")}
-          className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50 disabled:opacity-60"
-          disabled={aiBusy}
-          title="AI Proofread"
-        >
-          {aiBusy ? "AI…" : "Proofread"}
-        </button>
-        
-        <button
-          onClick={() => onAI?.("grammar")}
-          className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50 disabled:opacity-60"
-          disabled={aiBusy}
-          title="AI Grammar"
-        >
-          🔤 Grammar
-        </button>
-
-        <button
-          onClick={onSave}
-          className="inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-white hover:opacity-90"
-          style={{ backgroundColor: "#D4AF37" }}
-          title="Save (Ctrl+S)"
-        >
-          💾 Save
-        </button>
-      </div>
-
-      {/* Custom styles for Quill to make it scrollable */}
+      {/* Custom Styles */}
       <style>{`
-        .ql-container {
-          border: none !important;
-          font-family: 'Times New Roman', serif;
-          font-size: 12pt;
-          line-height: 2;
+        /* Hide default Quill toolbar since we use custom */
+        .ql-toolbar.ql-snow {
+          display: none !important;
         }
+        
+        /* Editor styling */
+        .ql-container.ql-snow {
+          border: none !important;
+          font-family: 'Times New Roman', Georgia, serif;
+          font-size: 12pt;
+          line-height: 1.8;
+        }
+        
         .ql-editor {
           padding: 0 !important;
-          min-height: ${PAGE_HEIGHT - (MARGIN * 2)}px;
+          min-height: ${PAGE_HEIGHT - actualMargins.top - actualMargins.bottom}px;
+          max-height: none;
           overflow-y: auto !important;
-          max-height: none !important;
         }
+        
+        /* Scrollbar styling */
         .ql-editor::-webkit-scrollbar {
           width: 12px;
         }
+        
         .ql-editor::-webkit-scrollbar-track {
           background: #f1f1f1;
+          border-radius: 6px;
         }
+        
         .ql-editor::-webkit-scrollbar-thumb {
           background: #888;
           border-radius: 6px;
         }
+        
         .ql-editor::-webkit-scrollbar-thumb:hover {
           background: #555;
         }
+
+        /* Custom toolbar button styling */
+        #quill-toolbar button {
+          width: 28px;
+          height: 28px;
+          padding: 4px;
+          border: 1px solid #e2e8f0;
+          border-radius: 4px;
+          background: white;
+          cursor: pointer;
+          transition: all 0.15s;
+        }
+
+        #quill-toolbar button:hover {
+          background: #f1f5f9;
+          border-color: #cbd5e1;
+        }
+
+        #quill-toolbar button.ql-active {
+          background: #e0e7ff;
+          border-color: #818cf8;
+          color: #4f46e5;
+        }
+
+        #quill-toolbar select {
+          height: 28px;
+          padding: 0 8px;
+          border: 1px solid #e2e8f0;
+          border-radius: 4px;
+          background: white;
+          font-size: 13px;
+        }
       `}</style>
-    </section>
+    </div>
   );
 }
+
