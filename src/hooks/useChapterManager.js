@@ -110,19 +110,36 @@ export function useChapterManager() {
   };
 
   // Delete chapter
-  const deleteChapter = (id) => {
-    setChapters((prev) => {
-      const filtered = prev.filter((c) => c.id !== id);
-      // Ensure at least one chapter
-      return filtered.length > 0 ? filtered : ensureFirstChapter([]);
-    });
+const deleteChapter = (id) => {
+  setChapters((prev) => {
+    const filtered = prev.filter((c) => c.id !== id);
+    // Ensure at least one chapter remains
+    const result = filtered.length > 0 ? filtered : ensureFirstChapter([]);
     
-    // If deleted chapter was selected, select first remaining chapter
-    if (selectedId === id) {
+    // Immediately save to localStorage
+    setTimeout(() => {
+      const current = loadState() || {};
+      saveState({
+        book,
+        chapters: result,
+        daily: current.daily || { goal: 500, counts: {} },
+        settings: current.settings || { theme: "light", focusMode: false },
+        tocOutline: current.tocOutline || [],
+      });
+    }, 0);
+    
+    return result;
+  });
+  
+  // If deleted chapter was selected, select first remaining chapter
+  if (selectedId === id) {
+    setTimeout(() => {
       const remaining = chapters.filter((c) => c.id !== id);
-      setSelectedId(remaining[0]?.id || chapters[0]?.id);
-    }
-  };
+      const newSelectedId = remaining[0]?.id || chapters[0]?.id;
+      setSelectedId(newSelectedId);
+    }, 50);
+  }
+};
 
   // Move chapter (for drag and drop)
   const moveChapter = (fromIndex, toIndex) => {
