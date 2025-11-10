@@ -109,38 +109,32 @@ export function useChapterManager() {
     );
   };
 
-  // Delete chapter
+ // Delete chapter - FIXED VERSION
 const deleteChapter = (id) => {
+  console.log("🗑️ DELETE called for chapter ID:", id);
+  console.log("📋 Current chapters:", chapters.map(c => ({ id: c.id, title: c.title })));
+  
   setChapters((prev) => {
     const filtered = prev.filter((c) => c.id !== id);
+    console.log("📋 After filter:", filtered.map(c => ({ id: c.id, title: c.title })));
+    
     // Ensure at least one chapter remains
     const result = filtered.length > 0 ? filtered : ensureFirstChapter([]);
-    
-    // Immediately save to localStorage
-    setTimeout(() => {
-      const current = loadState() || {};
-      saveState({
-        book,
-        chapters: result,
-        daily: current.daily || { goal: 500, counts: {} },
-        settings: current.settings || { theme: "light", focusMode: false },
-        tocOutline: current.tocOutline || [],
-      });
-    }, 0);
+    console.log("📋 Final result:", result.map(c => ({ id: c.id, title: c.title })));
     
     return result;
   });
   
-  // If deleted chapter was selected, select first remaining chapter
+  // If deleted chapter was selected, select another one
   if (selectedId === id) {
-    setTimeout(() => {
-      const remaining = chapters.filter((c) => c.id !== id);
-      const newSelectedId = remaining[0]?.id || chapters[0]?.id;
+    const remaining = chapters.filter((c) => c.id !== id);
+    const newSelectedId = remaining[0]?.id;
+    console.log("🎯 Selecting new chapter:", newSelectedId);
+    if (newSelectedId) {
       setSelectedId(newSelectedId);
-    }, 50);
+    }
   }
 };
-
   // Move chapter (for drag and drop)
   const moveChapter = (fromIndex, toIndex) => {
     setChapters((prev) => {
