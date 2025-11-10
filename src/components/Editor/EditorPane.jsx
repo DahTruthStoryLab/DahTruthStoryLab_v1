@@ -1,6 +1,6 @@
 // src/components/Editor/EditorPane.jsx
 // Main editor with Quill, pagination, and white book-page design
-// Preserves all visual styling: 800px × 1040px white page, 48px margins
+// Proper 8.5" x 11" page with 1" margins and scrolling
 
 import React, { useRef, useState, useEffect, useCallback, useMemo } from "react";
 import ReactQuill from "react-quill";
@@ -37,12 +37,16 @@ Quill.register(Size, true);
 
 /* ========== Constants ========== */
 
-const PAGE_HEIGHT = 1040; // px - matches Word document page height
+// 8.5" x 11" page at 96 DPI
+const PAGE_WIDTH = 816;   // 8.5" × 96 DPI
+const PAGE_HEIGHT = 1056; // 11" × 96 DPI
+const MARGIN = 96;        // 1" margins × 96 DPI
 
 /* ========== EditorPane Component ========== */
 
 export default function EditorPane({ title, setTitle, html, setHtml, onSave, onAI, aiBusy }) {
   const editorRef = useRef(null);
+  const containerRef = useRef(null);
   const [pageIndex, setPageIndex] = useState(0);
   const [pageCount, setPageCount] = useState(1);
 
@@ -61,7 +65,7 @@ export default function EditorPane({ title, setTitle, html, setHtml, onSave, onA
         ["clean"],
       ],
       history: { delay: 500, maxStack: 200, userOnly: true },
-      clipboard: { matchVisual: false }, // Preserve formatting on paste
+      clipboard: { matchVisual: false },
     }),
     []
   );
@@ -75,119 +79,68 @@ export default function EditorPane({ title, setTitle, html, setHtml, onSave, onA
     if (!q) return;
     
     const scrollEl = q.root;
-    const total = Math.max(scrollEl.scrollHeight, scrollEl.clientHeight);
-    const count = Math.max(1, Math.ceil(total / PAGE_HEIGHT));
+    const contentHeight = scrollEl.scrollHeight;
+    const count = Math.max(1, Math.ceil(contentHeight / PAGE_HEIGHT));
     
+    console.log(`📄 Recalc: content=${contentHeight}px, pages=${count}`);
     setPageCount(count);
     setPageIndex((prev) => Math.min(prev, count - 1));
   }, []);
 
- // Navigate to specific page
-const goToPage = useCallback(
-  (idx) => {
-    const q = getQuill();
-    if (!q) return;
-    
-    const target = Math.max(0, Math.min(idx, pageCount - 1));
-    const scrollEl = q.root;
-    
-    // Scroll to the target page position
-    scrollEl.scrollTo({
-      top: target * PAGE_HEIGHT,
-      behavior: 'smooth'
-    });
-    
-    setPageIndex(target);
-  },
-  [pageCount]
-);
+  // Navigate to specific page
+  const goToPage = useCallback(
+    (idx) => {
+      const q = getQuill();
+      if (!q) return;
+      
+      const target = Math.max(0, Math.min(idx, pageCount - 1));
+      const scrollEl = q.root;
+      const targetScrollTop = target * PAGE_HEIGHT;
+      
+      console.log(`📄 Going to page ${target + 1}/${pageCount}, scrollTop=${targetScrollTop}px`);
+      
+      scrollEl.scrollTo({
+        top: targetScrollTop,
+        behavior: 'smooth'
+      });
+      
+      setPageIndex(target);
+    },
+    [pageCount]
+  );
 
   const nextPage = () => goToPage(pageIndex + 1);
   const prevPage = () => goToPage(pageIndex - 1);
 
   // Recalculate pages when content changes
   useEffect(() => {
-    const timer = setTimeout(() => recalcPages(), 60);
+    const timer = setTimeout(() => recalcPages(), 100);
     return () => clearTimeout(timer);
   }, [html, recalcPages]);
 
- // Auto-advance to next page when typing at bottom
-useEffect(() => {
-  const q = getQuill();
-  if (!q) return;
+  // Track scroll position to update page number
+  useEffect(() => {
+    const q = getQuill();
+    if (!q) return;
 
-  const onTextChange = () => {
-    recalcPages();
-
-    const sel = q.getSelection();
-    if (!sel) return;
-
-    const atEnd = sel.index >= q.getLength() - 1;
     const scrollEl = q.root;
-    const nearBottom = scrollEl.scrollTop + scrollEl.clientHeight >= scrollEl.scrollHeight - 20;
 
-    if (atEnd && nearBottom) {
-      setTimeout(() => {
-        recalcPages();
-        const newCount = Math.max(1, Math.ceil(scrollEl.scrollHeight / PAGE_HEIGHT));
-        if (pageIndex < newCount - 1) {
-          goToPage(pageIndex + 1);
-        }
-      }, 10);
-    }
-  };
-
-  q.on("text-change", onTextChange);
-  return () => q.off("text-change", onTextChange);
-}, [recalcPages, goToPage, pageIndex]);
-
-// ========== ADD THIS NEW EFFECT ==========
-// Auto-flip to next page when scrolling to bottom
-useEffect(() => {
-  const q = getQuill();
-  if (!q) return;
-
-  const scrollEl = q.root;
-  let scrollTimeout = null;
-
-  const onScroll = () => {
-    // Clear existing timeout
-    if (scrollTimeout) clearTimeout(scrollTimeout);
-
-    // Wait for scroll to finish (debounce)
-    scrollTimeout = setTimeout(() => {
+    const onScroll = () => {
       const scrollTop = scrollEl.scrollTop;
-      const clientHeight = scrollEl.clientHeight;
-      const scrollHeight = scrollEl.scrollHeight;
+      const currentPage = Math.floor(scrollTop / PAGE_HEIGHT);
       
-      // Calculate which page we should be on based on scroll position
-      const targetPage = Math.floor(scrollTop / PAGE_HEIGHT);
-      
-      // If we're near the bottom of current page, advance to next
-      const distanceFromBottom = scrollHeight - (scrollTop + clientHeight);
-      
-      if (distanceFromBottom < 50 && pageIndex < pageCount - 1) {
-        // Near bottom, advance to next page
-        goToPage(pageIndex + 1);
-      } else if (targetPage !== pageIndex) {
-        // Update page index to match scroll position
-        setPageIndex(Math.max(0, Math.min(targetPage, pageCount - 1)));
+      if (currentPage !== pageIndex && currentPage < pageCount) {
+        setPageIndex(currentPage);
       }
-    }, 150); // Wait 150ms after scroll stops
-  };
+    };
 
-  scrollEl.addEventListener("scroll", onScroll);
-  return () => {
-    scrollEl.removeEventListener("scroll", onScroll);
-    if (scrollTimeout) clearTimeout(scrollTimeout);
-  };
-}, [pageIndex, pageCount, goToPage]);
-// ========== END NEW EFFECT ==========
+    scrollEl.addEventListener("scroll", onScroll);
+    return () => scrollEl.removeEventListener("scroll", onScroll);
+  }, [pageIndex, pageCount]);
 
   // Keyboard shortcuts
   useEffect(() => {
     const onKey = (e) => {
-      // Only handle if not in an input
       const isInput = e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA";
       if (isInput) return;
 
@@ -212,7 +165,7 @@ useEffect(() => {
 
     window.addEventListener("keydown", onKey, { capture: true });
     return () => window.removeEventListener("keydown", onKey, { capture: true });
-  }, [onSave, pageIndex, pageCount]);
+  }, [onSave, nextPage, prevPage]);
 
   return (
     <section className="bg-transparent">
@@ -241,7 +194,7 @@ useEffect(() => {
           </button>
           
           <div className="text-sm tabular-nums">
-            Page {Math.min(pageIndex + 1, pageCount)} / {pageCount}
+            Page {pageIndex + 1} / {pageCount}
           </div>
           
           <button
@@ -256,42 +209,57 @@ useEffect(() => {
       </div>
 
       {/* White Page Container - Book-like design */}
-      <div style={{ padding: 16, background: "#f0f3f8" }}>
+      <div 
+        ref={containerRef}
+        style={{ 
+          padding: 16, 
+          background: "#f0f3f8",
+          maxHeight: "calc(100vh - 200px)",
+          overflowY: "auto"
+        }}
+      >
         <div
           style={{
             margin: "0 auto",
-            width: "100%",
-            maxWidth: 800,          // Standard manuscript width
-            height: PAGE_HEIGHT,     // 1040px - like a real page
-            background: "#fff",      // Pure white paper
-            color: "#111",           // Black text
+            width: PAGE_WIDTH,
+            minHeight: PAGE_HEIGHT,
+            background: "#fff",
+            color: "#111",
             border: "1px solid #e5e7eb",
-            boxShadow: "0 8px 30px rgba(2,20,40,0.10)", // Paper shadow
+            boxShadow: "0 8px 30px rgba(2,20,40,0.10)",
             borderRadius: 12,
-            padding: "48px 48px",    // Generous margins (like 1" in Word)
+            padding: `${MARGIN}px`,
             position: "relative",
-            overflow: "hidden",
           }}
         >
-          {/* Quill Editor */}
-          <ReactQuill
-            ref={editorRef}
-            theme="snow"
-            value={html}
-            onChange={(value) => {
-              setHtml(value);
-              setTimeout(recalcPages, 10);
-            }}
-            modules={modules}
-            placeholder="Write your chapter…"
-          />
+          {/* Quill Editor - Now with proper scrolling */}
+          <div style={{ 
+            minHeight: PAGE_HEIGHT - (MARGIN * 2),
+            position: "relative"
+          }}>
+            <ReactQuill
+              ref={editorRef}
+              theme="snow"
+              value={html}
+              onChange={(value) => {
+                setHtml(value);
+                setTimeout(recalcPages, 50);
+              }}
+              modules={modules}
+              placeholder="Write your chapter…"
+              style={{
+                border: "none",
+                minHeight: "100%"
+              }}
+            />
+          </div>
 
           {/* Page Number Badge */}
           <PageNumberBadge pageIndex={pageIndex} pageCount={pageCount} />
         </div>
       </div>
 
-      {/* Bottom Action Buttons (Optional - can remove if toolbar at top is enough) */}
+      {/* Bottom Action Buttons */}
       <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
         <button
           onClick={() => onAI?.("proofread")}
@@ -320,7 +288,35 @@ useEffect(() => {
           💾 Save
         </button>
       </div>
+
+      {/* Custom styles for Quill to make it scrollable */}
+      <style>{`
+        .ql-container {
+          border: none !important;
+          font-family: 'Times New Roman', serif;
+          font-size: 12pt;
+          line-height: 2;
+        }
+        .ql-editor {
+          padding: 0 !important;
+          min-height: ${PAGE_HEIGHT - (MARGIN * 2)}px;
+          overflow-y: auto !important;
+          max-height: none !important;
+        }
+        .ql-editor::-webkit-scrollbar {
+          width: 12px;
+        }
+        .ql-editor::-webkit-scrollbar-track {
+          background: #f1f1f1;
+        }
+        .ql-editor::-webkit-scrollbar-thumb {
+          background: #888;
+          border-radius: 6px;
+        }
+        .ql-editor::-webkit-scrollbar-thumb:hover {
+          background: #555;
+        }
+      `}</style>
     </section>
   );
 }
-
