@@ -1,15 +1,12 @@
-
-
 // src/components/ComposePage.jsx
 // Main Container - Orchestrates all components
 // Preserves all visual design, brand colors, and functionality
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
 
-// At the top of ComposePage.jsx, you should have:
 import EditorPane from "./Editor/EditorPane";
 import ChapterGrid from "./Writing/ChapterGrid";
 import ChapterSidebar from "./Writing/ChapterSidebar";
@@ -17,16 +14,16 @@ import EditorToolbar from "./Editor/EditorToolbar";
 import PublishingMeta from "./Editor/PublishingMeta";
 import AIInstructions from "./Editor/AIInstructions";
 
-// Custom hooks
 import { useChapterManager } from "../hooks/useChapterManager";
 import { useAIAssistant } from "../hooks/useAIAssistant";
 
-// Utils
 import { GoldButton, WritingCrumb } from "./UI/UIComponents";
 
 /* ============================
-   Main Compose Page
-============================ */
+   Debug toggle for import logs
+============================= */
+const DEBUG_IMPORT = false; // set true to see detailed console logs during import/split
+
 export default function ComposePage() {
   const navigate = useNavigate();
 
@@ -40,7 +37,7 @@ export default function ComposePage() {
     setSelectedId,
     addChapter,
     updateChapter,
-    deleteChapter,  // ← ADDED THIS
+    deleteChapter,
     moveChapter,
     saveProject,
   } = useChapterManager();
@@ -79,8 +76,9 @@ export default function ComposePage() {
 
   // Handle save
   const handleSave = () => {
+    if (!selectedId) return;
     updateChapter(selectedId, {
-      title: title || selectedChapter.title,
+      title: title || selectedChapter?.title || "",
       content: html,
     });
     saveProject({ book: { ...book, title: bookTitle }, chapters });
@@ -91,134 +89,125 @@ export default function ComposePage() {
     const result = await runAI(mode, html, instructions, provider);
     if (result) {
       setHtml(result);
-      updateChapter(selectedId, {
-        title: title || selectedChapter.title,
-        content: result,
-      });
+      if (selectedId) {
+        updateChapter(selectedId, {
+          title: title || selectedChapter?.title || "",
+          content: result,
+        });
+      }
     }
   };
 
-  // Handle import - COMPLETELY REWRITTEN
+  // Handle import (with optional split by headings)
   const handleImport = async (htmlContent, shouldSplit) => {
-    console.log("📥 Import started, shouldSplit:", shouldSplit);
-    
+    if (DEBUG_IMPORT) console.log("📥 Import started, shouldSplit:", shouldSplit);
+
     if (shouldSplit) {
-      // Split into chapters by headings
-      const tempDiv = document.createElement('div');
+      const t0 = performance.now();
+      const tempDiv = document.createElement("div");
       tempDiv.innerHTML = htmlContent;
-      
-      console.log("📄 Total elements in document:", tempDiv.children.length);
-      
+
+      if (DEBUG_IMPORT) {
+        console.log("📄 Total elements in document:", tempDiv.children.length);
+      }
+
       const chapterData = [];
       let currentChapter = { content: "", title: "" };
       let chapterNumber = 1;
-      
-      // Process each element
+
       Array.from(tempDiv.children).forEach((element, idx) => {
         const tagName = element.tagName.toLowerCase();
-        console.log(`Element ${idx}: ${tagName}`, element.textContent.substring(0, 50));
-        
-        // If we hit a heading, save previous chapter and start new one
-        if (tagName === 'h1' || tagName === 'h2' || tagName === 'h3') {
-          // Save previous chapter if it has content
+        if (DEBUG_IMPORT) {
+          console.log(
+            `Element ${idx}: <${tagName}>`,
+            (element.textContent || "").trim().slice(0, 120)
+          );
+        }
+
+        // Heading starts a new chapter
+        if (tagName === "h1" || tagName === "h2" || tagName === "h3") {
           if (currentChapter.content.trim()) {
-            console.log(`✅ Saving chapter: "${currentChapter.title}"`);
+            if (DEBUG_IMPORT) {
+              console.log(`✅ Saving chapter: "${currentChapter.title}"`);
+            }
             chapterData.push({
               title: currentChapter.title || `Chapter ${chapterNumber}`,
               content: currentChapter.content,
             });
             chapterNumber++;
           }
-          
-          // Start new chapter with this heading as title
           currentChapter = {
-            title: element.textContent.trim() || `Chapter ${chapterNumber}`,
+            title: (element.textContent || "").trim() || `Chapter ${chapterNumber}`,
             content: "",
           };
-          console.log(`📖 New chapter started: "${currentChapter.title}"`);
+          if (DEBUG_IMPORT) console.log(`📖 New chapter started: "${currentChapter.title}"`);
         } else {
-          // Add content to current chapter
+          // Accumulate content
           currentChapter.content += element.outerHTML;
         }
       });
-      
-      // Don't forget the last chapter
+
+      // Final chapter
       if (currentChapter.content.trim()) {
-        console.log(`✅ Saving final chapter: "${currentChapter.title}"`);
+        if (DEBUG_IMPORT) console.log(`✅ Saving final chapter: "${currentChapter.title}"`);
         chapterData.push({
           title: currentChapter.title || `Chapter ${chapterNumber}`,
           content: currentChapter.content,
         });
       }
-      
-      console.log(`📊 Total chapters to create: ${chapterData.length}`);
-      
+
+      if (DEBUG_IMPORT) console.log(`📊 Total chapters to create: ${chapterData.length}`);
+
       if (chapterData.length === 0) {
         alert("No chapters found. The document may not have proper headings (H1, H2, or H3).");
         return;
       }
-      
-      // Create chapters one at a time with proper delay
+
+      // Create chapters one at a time (small delay for UI responsiveness)
       for (let i = 0; i < chapterData.length; i++) {
         const data = chapterData[i];
-        console.log(`Creating chapter ${i + 1}/${chapterData.length}: "${data.title}"`);
-        
+        if (DEBUG_IMPORT) {
+          console.log(`🛠️ Creating chapter ${i + 1}/${chapterData.length}: "${data.title}"`);
+        }
         const newId = addChapter();
-        
-        // Wait a tiny bit before updating
-        await new Promise(resolve => setTimeout(resolve, 50));
-        
-        updateChapter(newId, {
-          title: data.title,
-          content: data.content,
-        });
+        await new Promise((resolve) => setTimeout(resolve, 50));
+        updateChapter(newId, { title: data.title, content: data.content });
       }
-      
+
+      const t1 = performance.now();
+      if (DEBUG_IMPORT) console.log(`⏱️ Import complete in ${(t1 - t0).toFixed(0)} ms`);
       alert(`✅ Successfully imported ${chapterData.length} chapters!`);
       setView("grid");
-      
     } else {
-      // Import into current chapter (no splitting)
-      console.log("📥 Importing into current chapter");
+      if (DEBUG_IMPORT) console.log("📥 Importing into current chapter");
       setHtml(htmlContent);
-      updateChapter(selectedId, {
-        title: title || selectedChapter.title,
-        content: htmlContent,
-      });
+      if (selectedId) {
+        updateChapter(selectedId, {
+          title: title || selectedChapter?.title || "",
+          content: htmlContent,
+        });
+      }
       alert("✅ Document imported into current chapter!");
     }
   };
 
   // Handle export
   const handleExport = () => {
-    const blob = new Blob([html], { type: 'text/html' });
+    const blob = new Blob([html], { type: "text/html" });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
+    const a = document.createElement("a");
     a.href = url;
-    a.download = `${title || 'chapter'}.html`;
+    a.download = `${title || "chapter"}.html`;
     a.click();
     URL.revokeObjectURL(url);
   };
 
   // Handle delete current chapter
   const handleDeleteCurrent = () => {
-    if (!selectedChapter) {
-      console.log("❌ No chapter selected");
-      return;
-    }
-    
-    console.log("🗑️ Delete button clicked for:", selectedChapter.title);
-    
+    if (!selectedChapter || !selectedId) return;
     if (window.confirm(`Delete "${title || selectedChapter.title}"?\n\nThis cannot be undone.`)) {
-      console.log("✅ User confirmed delete");
       deleteChapter(selectedId);
-      
-      // Switch to grid view after delete
-      setTimeout(() => {
-        setView("grid");
-      }, 100);
-    } else {
-      console.log("❌ User cancelled delete");
+      setTimeout(() => setView("grid"), 100);
     }
   };
 
@@ -229,7 +218,7 @@ export default function ComposePage() {
       <div className="min-h-screen bg-[rgb(244,247,250)] text-slate-900">
         {/* ========== TOP BAR ========== */}
         <div className="sticky top-0 z-40 bg-white/80 backdrop-blur border-b border-slate-200">
-          <div className="max-w-7xl mx-auto px-3 h-auto py-2 flex flex-wrap items-center gap-3">
+          <div className="max-w-7xl mx-auto px-3 h-auto py-2 flex items-center gap-3 overflow-x-auto">
             {/* Gold Dashboard Button */}
             <GoldButton onClick={goBack} title="Back to Dashboard">
               ← Dashboard
@@ -283,7 +272,7 @@ export default function ComposePage() {
               onExport={handleExport}
               onDelete={handleDeleteCurrent}
               aiBusy={aiBusy}
-            />   
+            />
           </div>
         </div>
 
@@ -302,58 +291,64 @@ export default function ComposePage() {
           />
         )}
 
-       {/* ========== EDITOR VIEW ========== */}
-{view === "editor" && (
-  <div
-    className="max-w-7xl mx-auto px-4 py-6 grid gap-6"
-    style={{
-      // Force two columns at all sizes (no responsive collapse)
-      gridTemplateColumns: "280px minmax(0, 1fr)",
-      // Optional guard if your work setup embeds in a narrow panel
-      minWidth: 1024,
-    }}
-  >
-    {/* Left Sidebar */}
-    <aside className="sticky top-16 space-y-3" style={{ zIndex: 10 }}>
-      {/* Publishing Meta */}
-      <PublishingMeta
-        bookTitle={bookTitle}
-        setBookTitle={setBookTitle}
-        author={author}
-        setAuthor={setAuthor}
-        onPublishingPrep={() => {}}
-        aiBusy={aiBusy}
-        aiError={aiError}
-      />
+        {/* ========== EDITOR VIEW ========== */}
+        {view === "editor" && (
+          <div
+            className="max-w-7xl mx-auto px-4 py-6 grid gap-6"
+            style={{
+              // Force two columns at all widths (prevents sidebar from becoming a top bar)
+              gridTemplateColumns: "280px minmax(0, 1fr)",
+              // Guard for narrow work panels/iframes
+              minWidth: 1024,
+            }}
+          >
+            {/* Left Sidebar */}
+            <aside className="sticky top-16 space-y-3" style={{ zIndex: 10 }}>
+              {/* Publishing Meta */}
+              <PublishingMeta
+                bookTitle={bookTitle}
+                setBookTitle={setBookTitle}
+                author={author}
+                setAuthor={setAuthor}
+                onPublishingPrep={() => {
+                  // reserved for publishing prep flow
+                }}
+                aiBusy={aiBusy}
+                aiError={aiError}
+              />
 
-      {/* AI Instructions */}
-      <AIInstructions
-        instructions={instructions}
-        setInstructions={setInstructions}
-        chapterTitle={selectedChapter?.title}
-        onGeneratePrompt={() => generateChapterPrompt(selectedChapter)}
-        aiBusy={aiBusy}
-      />
+              {/* AI Instructions / prompt button */}
+              <AIInstructions
+                instructions={instructions}
+                setInstructions={setInstructions}
+                chapterTitle={selectedChapter?.title}
+                onGeneratePrompt={() => generateChapterPrompt(selectedChapter)}
+                aiBusy={aiBusy}
+              />
 
-      {/* Chapters List */}
-      <ChapterSidebar
-        chapters={chapters}
-        selectedId={selectedId}
-        onSelectChapter={setSelectedId}
-        onAddChapter={addChapter}
-      />
-    </aside>
+              {/* Chapters List */}
+              <ChapterSidebar
+                chapters={chapters}
+                selectedId={selectedId}
+                onSelectChapter={setSelectedId}
+                onAddChapter={addChapter}
+              />
+            </aside>
 
-    {/* Main Editor */}
-    <EditorPane
-      title={title}
-      setTitle={setTitle}
-      html={html}
-      setHtml={setHtml}
-      onSave={handleSave}
-      onAI={handleAI}
-      aiBusy={aiBusy}
-      pageWidth={1000}  // optional: wider canvas
-    />
-  </div>
-)}
+            {/* Main Editor */}
+            <EditorPane
+              title={title}
+              setTitle={setTitle}
+              html={html}
+              setHtml={setHtml}
+              onSave={handleSave}
+              onAI={handleAI}
+              aiBusy={aiBusy}
+              pageWidth={1000} // wider canvas; adjust if you like
+            />
+          </div>
+        )}
+      </div>
+    </DndProvider>
+  );
+}
