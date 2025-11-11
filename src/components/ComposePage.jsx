@@ -2,7 +2,7 @@
 // Main Container - Orchestrates all components
 // Preserves all visual design, brand colors, and functionality
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
@@ -13,6 +13,7 @@ import ChapterSidebar from "./Writing/ChapterSidebar";
 import EditorToolbar from "./Editor/EditorToolbar";
 import PublishingMeta from "./Editor/PublishingMeta";
 import AIInstructions from "./Editor/AIInstructions";
+import TrashDock from "./Writing/TrashDock";
 
 import { useChapterManager } from "../hooks/useChapterManager";
 import { useAIAssistant } from "../hooks/useAIAssistant";
@@ -65,6 +66,41 @@ export default function ComposePage() {
   // Publishing metadata
   const [author, setAuthor] = useState("Jacqueline Session Ausby");
   const [bookTitle, setBookTitle] = useState(book?.title || "Raising Daisy");
+
+  // Multi-select state (shared between grid and sidebar)
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [selectMode, setSelectMode] = useState(false);
+  const lastClickedIndexRef = useRef(null);
+
+  // Selection helpers
+  function clearSelection() {
+    setSelectedIds(new Set());
+  }
+
+  function toggleSelect(id, { additive = false } = {}) {
+    setSelectedIds(prev => {
+      const next = new Set(additive ? prev : []);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+
+  function rangeSelect(fromIdx, toIdx, list /* array of chapter ids in order */) {
+    const [a, b] = [Math.min(fromIdx, toIdx), Math.max(fromIdx, toIdx)];
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      for (let i = a; i <= b; i++) next.add(list[i]);
+      return next;
+    });
+  }
+
+  function toggleSelectMode() {
+    setSelectMode(!selectMode);
+    if (selectMode) {
+      // Exiting select mode: clear selection
+      clearSelection();
+    }
+  }
 
   // Sync editor when chapter changes
   useEffect(() => {
@@ -211,6 +247,23 @@ export default function ComposePage() {
     }
   };
 
+  // Handle delete multiple chapters (for sidebar multi-select and drag-to-trash)
+  const handleDeleteMultiple = (ids) => {
+    if (!ids || ids.length === 0) return;
+    
+    if (!window.confirm(`Delete ${ids.length} chapter(s)? This cannot be undone.`)) return;
+    
+    ids.forEach(id => deleteChapter(id));
+    
+    // Clear selection after delete
+    clearSelection();
+    
+    // If current chapter was deleted, return to grid
+    if (ids.includes(selectedId)) {
+      setTimeout(() => setView("grid"), 100);
+    }
+  };
+
   const goBack = () => navigate("/dashboard");
 
   return (
@@ -249,6 +302,41 @@ export default function ComposePage() {
               </button>
             </div>
 
+            {/* Select Mode Toggle (shown in both views) */}
+            <button
+              onClick={toggleSelectMode}
+              className={[
+                "inline-flex items-center gap-2 rounded-md border px-2.5 py-1 text-[13px]",
+                selectMode ? "bg-blue-100 border-blue-300" : "bg-white hover:bg-slate-50",
+              ].join(" ")}
+              title="Toggle Select Mode"
+            >
+              {selectMode ? "✓ Select" : "Select"}
+            </button>
+
+            {/* Selection toolbar (when items selected) */}
+            {selectMode && selectedIds.size > 0 && (
+              <div className="flex items-center gap-2 px-3 py-1 bg-blue-50 rounded-md border border-blue-200">
+                <span className="text-xs font-medium text-blue-900">
+                  {selectedIds.size} selected
+                </span>
+                <button
+                  onClick={() => handleDeleteMultiple(Array.from(selectedIds))}
+                  className="text-xs px-2 py-0.5 rounded bg-red-500 text-white hover:bg-red-600"
+                  title="Delete Selected"
+                >
+                  🗑️ Delete
+                </button>
+                <button
+                  onClick={clearSelection}
+                  className="text-xs px-2 py-0.5 rounded border border-slate-300 bg-white hover:bg-slate-50"
+                  title="Clear Selection"
+                >
+                  Clear
+                </button>
+              </div>
+            )}
+
             {/* Provider Selector */}
             <div className="ml-2 flex items-center gap-1">
               <label className="text-[12px] text-slate-600">Provider:</label>
@@ -282,12 +370,23 @@ export default function ComposePage() {
             chapters={chapters}
             selectedId={selectedId}
             onSelectChapter={(id) => {
-              setSelectedId(id);
-              setView("editor");
+              if (selectMode) {
+                // In select mode: don't navigate, just toggle selection
+                toggleSelect(id);
+              } else {
+                // Normal mode: navigate to editor
+                setSelectedId(id);
+                setView("editor");
+              }
             }}
             onAddChapter={addChapter}
             onMoveChapter={moveChapter}
             onDeleteChapter={deleteChapter}
+            selectMode={selectMode}
+            selectedIds={selectedIds}
+            onToggleSelect={toggleSelect}
+            onRangeSelect={rangeSelect}
+            lastClickedIndexRef={lastClickedIndexRef}
           />
         )}
 
@@ -332,6 +431,12 @@ export default function ComposePage() {
                 selectedId={selectedId}
                 onSelectChapter={setSelectedId}
                 onAddChapter={addChapter}
+                onDeleteMultiple={handleDeleteMultiple}
+                selectMode={selectMode}
+                selectedIds={selectedIds}
+                onToggleSelect={toggleSelect}
+                onRangeSelect={rangeSelect}
+                lastClickedIndexRef={lastClickedIndexRef}
               />
             </aside>
 
@@ -346,6 +451,9 @@ export default function ComposePage() {
               aiBusy={aiBusy}
               pageWidth={1000} // wider canvas; adjust if you like
             />
+
+            {/* Trash Dock - Drag chapters here to delete */}
+            <TrashDock onDelete={handleDeleteMultiple} />
           </div>
         )}
       </div>
