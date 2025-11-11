@@ -1,3 +1,5 @@
+
+
 // src/components/ComposePage.jsx
 // Main Container - Orchestrates all components
 // Preserves all visual design, brand colors, and functionality
@@ -300,55 +302,58 @@ export default function ComposePage() {
           />
         )}
 
-        {/* ========== EDITOR VIEW ========== */}
-        {view === "editor" && (
-          <div className="max-w-7xl mx-auto px-4 py-6 grid grid-cols-1 xl:grid-cols-[18rem_1fr] gap-6">
-            {/* Left Sidebar */}
-            <aside className="xl:sticky xl:top-16 space-y-3" style={{ zIndex: 10 }}>
-              {/* Publishing Meta */}
-              <PublishingMeta
-                bookTitle={bookTitle}
-                setBookTitle={setBookTitle}
-                author={author}
-                setAuthor={setAuthor}
-                onPublishingPrep={() => {
-                  // Will implement publishing prep
-                }}
-                aiBusy={aiBusy}
-                aiError={aiError}
-              />
+       {/* ========== EDITOR VIEW ========== */}
+{view === "editor" && (
+  <div
+    className="max-w-7xl mx-auto px-4 py-6 grid gap-6"
+    style={{
+      // Force two columns at all sizes (no responsive collapse)
+      gridTemplateColumns: "280px minmax(0, 1fr)",
+      // Optional guard if your work setup embeds in a narrow panel
+      minWidth: 1024,
+    }}
+  >
+    {/* Left Sidebar */}
+    <aside className="sticky top-16 space-y-3" style={{ zIndex: 10 }}>
+      {/* Publishing Meta */}
+      <PublishingMeta
+        bookTitle={bookTitle}
+        setBookTitle={setBookTitle}
+        author={author}
+        setAuthor={setAuthor}
+        onPublishingPrep={() => {}}
+        aiBusy={aiBusy}
+        aiError={aiError}
+      />
 
-              {/* AI Instructions */}
-              <AIInstructions
-                instructions={instructions}
-                setInstructions={setInstructions}
-                chapterTitle={selectedChapter?.title}
-                onGeneratePrompt={() => generateChapterPrompt(selectedChapter)}
-                aiBusy={aiBusy}
-              />
+      {/* AI Instructions */}
+      <AIInstructions
+        instructions={instructions}
+        setInstructions={setInstructions}
+        chapterTitle={selectedChapter?.title}
+        onGeneratePrompt={() => generateChapterPrompt(selectedChapter)}
+        aiBusy={aiBusy}
+      />
 
-              {/* Chapters List */}
-              <ChapterSidebar
-                chapters={chapters}
-                selectedId={selectedId}
-                onSelectChapter={setSelectedId}
-                onAddChapter={addChapter}
-              />
-            </aside>
+      {/* Chapters List */}
+      <ChapterSidebar
+        chapters={chapters}
+        selectedId={selectedId}
+        onSelectChapter={setSelectedId}
+        onAddChapter={addChapter}
+      />
+    </aside>
 
-            {/* Main Editor */}
-            <EditorPane
-              title={title}
-              setTitle={setTitle}
-              html={html}
-              setHtml={setHtml}
-              onSave={handleSave}
-              onAI={handleAI}
-              aiBusy={aiBusy}
-            />
-          </div>
-        )}
-      </div>
-    </DndProvider>
-  );
-}
+    {/* Main Editor */}
+    <EditorPane
+      title={title}
+      setTitle={setTitle}
+      html={html}
+      setHtml={setHtml}
+      onSave={handleSave}
+      onAI={handleAI}
+      aiBusy={aiBusy}
+      pageWidth={1000}  // optional: wider canvas
+    />
+  </div>
+)}
