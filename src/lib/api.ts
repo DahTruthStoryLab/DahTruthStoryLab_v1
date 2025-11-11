@@ -188,10 +188,9 @@ export function runAssistant(
     op,
     { message: text, text, action, instructions },
     provider,
-    { retries: 2, timeoutMs: 30000 }
+    { retries: 2, timeoutMs: 45000 }  // Changed from 30000
   );
 }
-
 export function runRewrite(
   text: string,
   provider: "anthropic" | "openai" = "openai"
@@ -200,10 +199,9 @@ export function runRewrite(
     "rewrite",
     { text },
     provider,
-    { retries: 2, timeoutMs: 25000 }
+    { retries: 2, timeoutMs: 60000 }  // Changed from 25000
   );
 }
-
 export function runGrammar(
   text: string,
   provider: "anthropic" | "openai" = "openai"
@@ -212,10 +210,9 @@ export function runGrammar(
     "grammar",
     { text },
     provider,
-    { retries: 2, timeoutMs: 25000 }
+    { retries: 2, timeoutMs: 60000 }  // Changed from 25000
   );
 }
-
 export function runStyle(
   text: string,
   provider: "anthropic" | "openai" = "openai"
@@ -224,10 +221,9 @@ export function runStyle(
     "style",
     { text },
     provider,
-    { retries: 2, timeoutMs: 25000 }
+    { retries: 2, timeoutMs: 60000 }  // Changed from 25000
   );
 }
-
 export function runReadability(
   text: string,
   provider: "anthropic" | "openai" = "openai"
@@ -236,10 +232,9 @@ export function runReadability(
     "readability",
     { text },
     provider,
-    { retries: 2, timeoutMs: 25000 }
+    { retries: 2, timeoutMs: 60000 }  // Changed from 25000
   );
 }
-
 export function runPublishingPrep(
   meta: any,
   chapters: any[],
@@ -250,10 +245,9 @@ export function runPublishingPrep(
     "publishing-prep",
     { meta, chapters, options },
     provider,
-    { retries: 2, timeoutMs: 45000 }
+    { retries: 2, timeoutMs: 45000 }  // This one is fine as-is
   );
 }
-
 /* ------------------------- Convenience wrappers --------------------------- */
 export const proofread = (
   text: string,
