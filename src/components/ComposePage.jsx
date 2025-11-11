@@ -25,6 +25,43 @@ import { GoldButton, WritingCrumb } from "./UI/UIComponents";
 ============================= */
 const DEBUG_IMPORT = false; // set true to see detailed console logs during import/split
 
+/* ============================
+   Import helpers (robust split)
+============================= */
+const HEADING_MATCH = /(chapter|ch\.?)\s*\d+|^chapter\b/i;
+
+function isHeadingEl(el) {
+  if (!el || !el.tagName) return false;
+  const tag = el.tagName.toLowerCase();
+  if (tag === "h1" || tag === "h2" || tag === "h3") return true;
+
+  const cls = (el.getAttribute("class") || "").toLowerCase();
+  // Word/Docs often: MsoHeading1, heading-1, title
+  if (/\b(msoheading|heading|title)\b/.test(cls)) return true;
+
+  const styles = (el.getAttribute("style") || "").toLowerCase();
+  // Some use CSS page-breaks on headings
+  if (/page-break|break-before|break-after/.test(styles)) return true;
+
+  return false;
+}
+
+function isPageBreakNode(node) {
+  // Comments like <!-- pagebreak --> or <hr> / CSS page-break
+  if (node.nodeType === 8) return /pagebreak/i.test(node.nodeValue || "");
+  if (node.nodeType === 1) {
+    const tag = node.tagName.toLowerCase();
+    if (tag === "hr") return true;
+    const styles = (node.getAttribute("style") || "").toLowerCase();
+    if (/page-break/.test(styles)) return true;
+  }
+  return false;
+}
+
+function textOf(el) {
+  return (el.textContent || "").trim();
+}
+
 export default function ComposePage() {
   const navigate = useNavigate();
 
@@ -78,29 +115,42 @@ export default function ComposePage() {
   }
 
   function toggleSelect(id, { additive = false } = {}) {
-    setSelectedIds(prev => {
+    setSelectedIds((prev) => {
       const next = new Set(additive ? prev : []);
       next.has(id) ? next.delete(id) : next.add(id);
       return next;
     });
   }
 
-  function rangeSelect(fromIdx, toIdx, list /* array of chapter ids in order */) {
+  function rangeSelect(fromIdx, toIdx, idList /* array of chapter ids in order */) {
     const [a, b] = [Math.min(fromIdx, toIdx), Math.max(fromIdx, toIdx)];
-    setSelectedIds(prev => {
+    setSelectedIds((prev) => {
       const next = new Set(prev);
-      for (let i = a; i <= b; i++) next.add(list[i]);
+      for (let i = a; i <= b; i++) next.add(idList[i]);
       return next;
     });
   }
 
   function toggleSelectMode() {
-    setSelectMode(!selectMode);
-    if (selectMode) {
-      // Exiting select mode: clear selection
-      clearSelection();
-    }
+    setSelectMode((s) => {
+      if (s) clearSelection(); // leaving select mode clears
+      return !s;
+    });
   }
+
+  // Keyboard delete (Delete/Backspace) for bulk selection
+  useEffect(() => {
+    const onKey = (e) => {
+      const tag = (e.target && e.target.tagName) || "";
+      if (/input|textarea|select/i.test(tag)) return;
+      if ((e.key === "Delete" || e.key === "Backspace") && selectedIds.size) {
+        e.preventDefault();
+        handleDeleteMultiple(Array.from(selectedIds));
+      }
+    };
+    window.addEventListener("keydown", onKey, { capture: true });
+    return () => window.removeEventListener("keydown", onKey, { capture: true });
+  }, [selectedIds]);
 
   // Sync editor when chapter changes
   useEffect(() => {
@@ -134,87 +184,11 @@ export default function ComposePage() {
     }
   };
 
-  // Handle import (with optional split by headings)
+  // Handle import (with robust optional split by headings/page-breaks)
   const handleImport = async (htmlContent, shouldSplit) => {
     if (DEBUG_IMPORT) console.log("📥 Import started, shouldSplit:", shouldSplit);
 
-    if (shouldSplit) {
-      const t0 = performance.now();
-      const tempDiv = document.createElement("div");
-      tempDiv.innerHTML = htmlContent;
-
-      if (DEBUG_IMPORT) {
-        console.log("📄 Total elements in document:", tempDiv.children.length);
-      }
-
-      const chapterData = [];
-      let currentChapter = { content: "", title: "" };
-      let chapterNumber = 1;
-
-      Array.from(tempDiv.children).forEach((element, idx) => {
-        const tagName = element.tagName.toLowerCase();
-        if (DEBUG_IMPORT) {
-          console.log(
-            `Element ${idx}: <${tagName}>`,
-            (element.textContent || "").trim().slice(0, 120)
-          );
-        }
-
-        // Heading starts a new chapter
-        if (tagName === "h1" || tagName === "h2" || tagName === "h3") {
-          if (currentChapter.content.trim()) {
-            if (DEBUG_IMPORT) {
-              console.log(`✅ Saving chapter: "${currentChapter.title}"`);
-            }
-            chapterData.push({
-              title: currentChapter.title || `Chapter ${chapterNumber}`,
-              content: currentChapter.content,
-            });
-            chapterNumber++;
-          }
-          currentChapter = {
-            title: (element.textContent || "").trim() || `Chapter ${chapterNumber}`,
-            content: "",
-          };
-          if (DEBUG_IMPORT) console.log(`📖 New chapter started: "${currentChapter.title}"`);
-        } else {
-          // Accumulate content
-          currentChapter.content += element.outerHTML;
-        }
-      });
-
-      // Final chapter
-      if (currentChapter.content.trim()) {
-        if (DEBUG_IMPORT) console.log(`✅ Saving final chapter: "${currentChapter.title}"`);
-        chapterData.push({
-          title: currentChapter.title || `Chapter ${chapterNumber}`,
-          content: currentChapter.content,
-        });
-      }
-
-      if (DEBUG_IMPORT) console.log(`📊 Total chapters to create: ${chapterData.length}`);
-
-      if (chapterData.length === 0) {
-        alert("No chapters found. The document may not have proper headings (H1, H2, or H3).");
-        return;
-      }
-
-      // Create chapters one at a time (small delay for UI responsiveness)
-      for (let i = 0; i < chapterData.length; i++) {
-        const data = chapterData[i];
-        if (DEBUG_IMPORT) {
-          console.log(`🛠️ Creating chapter ${i + 1}/${chapterData.length}: "${data.title}"`);
-        }
-        const newId = addChapter();
-        await new Promise((resolve) => setTimeout(resolve, 50));
-        updateChapter(newId, { title: data.title, content: data.content });
-      }
-
-      const t1 = performance.now();
-      if (DEBUG_IMPORT) console.log(`⏱️ Import complete in ${(t1 - t0).toFixed(0)} ms`);
-      alert(`✅ Successfully imported ${chapterData.length} chapters!`);
-      setView("grid");
-    } else {
+    if (!shouldSplit) {
       if (DEBUG_IMPORT) console.log("📥 Importing into current chapter");
       setHtml(htmlContent);
       if (selectedId) {
@@ -224,7 +198,79 @@ export default function ComposePage() {
         });
       }
       alert("✅ Document imported into current chapter!");
+      return;
     }
+
+    const t0 = performance.now();
+    const root = document.createElement("div");
+    root.innerHTML = htmlContent;
+
+    // Flatten elements + comments (for page-break comments)
+    const nodes = [];
+    const walker = document.createTreeWalker(
+      root,
+      NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_COMMENT,
+      null
+    );
+    while (walker.nextNode()) nodes.push(walker.currentNode);
+
+    const out = [];
+    let buffer = "";
+    let currentTitle = "";
+    let n = 1;
+
+    function push() {
+      if (!buffer.trim()) return;
+      out.push({ title: currentTitle || `Chapter ${n}`, content: buffer });
+      n += 1;
+      buffer = "";
+      currentTitle = "";
+    }
+
+    for (const node of nodes) {
+      if (isPageBreakNode(node)) {
+        push();
+        continue;
+      }
+
+      if (node.nodeType === 1) {
+        if (isHeadingEl(node)) {
+          const t = textOf(node);
+          if (buffer.trim()) push();
+          currentTitle = HEADING_MATCH.test(t) ? t : t || `Chapter ${n}`;
+          continue;
+        }
+        if (node.tagName.toLowerCase() === "p") {
+          const t = textOf(node);
+          if (HEADING_MATCH.test(t)) {
+            if (buffer.trim()) push();
+            currentTitle = t;
+            continue;
+          }
+        }
+        buffer += node.outerHTML || "";
+      }
+    }
+    if (buffer.trim()) push();
+
+    if (DEBUG_IMPORT) console.log("📊 Chapters parsed:", out.length, out.map((c) => c.title));
+    if (out.length === 0) {
+      alert("No chapters detected. Use H1/H2/H3 or ‘Chapter 1’, ‘Chapter 2’, etc.");
+      return;
+    }
+
+    for (let i = 0; i < out.length; i++) {
+      const c = out[i];
+      if (DEBUG_IMPORT) console.log(`🛠️ Creating chapter ${i + 1}/${out.length}: "${c.title}"`);
+      const newId = addChapter();
+      await new Promise((r) => setTimeout(r, 30));
+      updateChapter(newId, { title: c.title, content: c.content });
+    }
+
+    const t1 = performance.now();
+    if (DEBUG_IMPORT) console.log(`⏱️ Import complete in ${(t1 - t0).toFixed(0)} ms`);
+    alert(`✅ Successfully imported ${out.length} chapters!`);
+    setView("grid");
   };
 
   // Handle export
@@ -247,17 +293,14 @@ export default function ComposePage() {
     }
   };
 
-  // Handle delete multiple chapters (for sidebar multi-select and drag-to-trash)
+  // Bulk delete (sidebar/grid multi-select + drag-to-trash)
   const handleDeleteMultiple = (ids) => {
     if (!ids || ids.length === 0) return;
-    
     if (!window.confirm(`Delete ${ids.length} chapter(s)? This cannot be undone.`)) return;
-    
-    ids.forEach(id => deleteChapter(id));
-    
-    // Clear selection after delete
+
+    ids.forEach((id) => deleteChapter(id));
     clearSelection();
-    
+
     // If current chapter was deleted, return to grid
     if (ids.includes(selectedId)) {
       setTimeout(() => setView("grid"), 100);
@@ -366,28 +409,37 @@ export default function ComposePage() {
 
         {/* ========== GRID VIEW ========== */}
         {view === "grid" && (
-          <ChapterGrid
-            chapters={chapters}
-            selectedId={selectedId}
-            onSelectChapter={(id) => {
-              if (selectMode) {
-                // In select mode: don't navigate, just toggle selection
-                toggleSelect(id);
-              } else {
-                // Normal mode: navigate to editor
-                setSelectedId(id);
-                setView("editor");
-              }
-            }}
-            onAddChapter={addChapter}
-            onMoveChapter={moveChapter}
-            onDeleteChapter={deleteChapter}
-            selectMode={selectMode}
-            selectedIds={selectedIds}
-            onToggleSelect={toggleSelect}
-            onRangeSelect={rangeSelect}
-            lastClickedIndexRef={lastClickedIndexRef}
-          />
+          <>
+            <ChapterGrid
+              chapters={chapters}
+              selectedId={selectedId}
+              onSelectChapter={(id) => {
+                if (selectMode) {
+                  // In select mode: don't navigate, just toggle selection
+                  toggleSelect(id);
+                } else {
+                  // Normal mode: navigate to editor
+                  setSelectedId(id);
+                  setView("editor");
+                }
+              }}
+              onAddChapter={addChapter}
+              onMoveChapter={moveChapter}
+              onDeleteChapter={deleteChapter}
+              selectMode={selectMode}
+              selectedIds={selectedIds}
+              onToggleSelect={toggleSelect}
+              onRangeSelect={(idx) => {
+                const list = chapters.map((c) => c.id);
+                if (lastClickedIndexRef.current == null) lastClickedIndexRef.current = idx;
+                rangeSelect(lastClickedIndexRef.current, idx, list);
+                lastClickedIndexRef.current = idx;
+              }}
+              lastClickedIndexRef={lastClickedIndexRef}
+            />
+            {/* Trash Dock for grid view */}
+            <TrashDock onDelete={handleDeleteMultiple} />
+          </>
         )}
 
         {/* ========== EDITOR VIEW ========== */}
@@ -435,7 +487,12 @@ export default function ComposePage() {
                 selectMode={selectMode}
                 selectedIds={selectedIds}
                 onToggleSelect={toggleSelect}
-                onRangeSelect={rangeSelect}
+                onRangeSelect={(idx) => {
+                  const list = chapters.map((c) => c.id);
+                  if (lastClickedIndexRef.current == null) lastClickedIndexRef.current = idx;
+                  rangeSelect(lastClickedIndexRef.current, idx, list);
+                  lastClickedIndexRef.current = idx;
+                }}
                 lastClickedIndexRef={lastClickedIndexRef}
               />
             </aside>
