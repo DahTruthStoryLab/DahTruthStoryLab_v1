@@ -1,5 +1,5 @@
 // src/components/Writing/ChapterGrid.jsx
-// 4-column grid view of all chapters with drag-drop reordering
+// Grid of chapter cards with lifted multi-select + drag-to-trash support
 
 import React from "react";
 import ChapterCard from "./ChapterCard";
@@ -7,44 +7,78 @@ import ChapterCard from "./ChapterCard";
 export default function ChapterGrid({
   chapters,
   selectedId,
-  onSelectChapter,
-  onAddChapter,
-  onMoveChapter,
-  onDeleteChapter,  // ← ADD THIS LINE
+  onSelectChapter,       // (id) => void
+  onAddChapter,          // () => void
+  onMoveChapter,         // (fromIdx, toIdx) => void (optional; unchanged)
+  onDeleteChapter,       // (id) => void (optional; unchanged)
+  // Lifted selection from ComposePage:
+  selectMode,            // boolean
+  selectedIds,           // Set<string>
+  onToggleSelect,        // (id, { additive?: boolean }) => void
+  onRangeSelect,         // (index) => void
+  lastClickedIndexRef,   // React.useRef<number|null>
 }) {
   return (
     <div className="max-w-7xl mx-auto px-4 py-6">
-      {/* Header with Add button */}
-      <div className="flex items-center justify-between mb-3">
-        <h1 className="text-xl font-semibold">Chapters</h1>
+      {/* Header */}
+      <div className="mb-3 flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-slate-800">Your Chapters</h3>
         <button
           onClick={onAddChapter}
-          className="text-sm px-3 py-1.5 rounded-md border bg-white hover:bg-slate-50"
+          className="text-xs px-3 py-1.5 rounded-lg border bg-white hover:bg-slate-50"
+          title="Add Chapter"
         >
           + Add Chapter
         </button>
       </div>
 
-      {/* 4-column grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4 gap-4">
-        {chapters.map((chapter, idx) => (
+      {/* Grid */}
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+        {/* New chapter tile */}
+        <button
+          onClick={onAddChapter}
+          className="rounded-xl border-2 border-dashed p-4 bg-white text-left hover:bg-slate-50"
+          title="Add Chapter"
+        >
+          <div className="text-sm font-medium">Create new chapter</div>
+          <div className="text-xs text-slate-500">Start fresh from a blank page</div>
+        </button>
+
+        {chapters.map((ch, idx) => (
           <ChapterCard
-            key={chapter.id}
-            chapter={chapter}
+            key={ch.id}
+            chapter={ch}
             index={idx}
-            moveCard={onMoveChapter}
-            active={chapter.id === selectedId}
-            onOpen={() => onSelectChapter(chapter.id)}
-            onDelete={onDeleteChapter}  // ← ADD THIS LINE
+            isActive={ch.id === selectedId}
+            isSelected={selectedIds?.has(ch.id)}
+            selectMode={!!selectMode}
+            selectedIds={selectedIds}
+            onOpen={() => onSelectChapter?.(ch.id)}
+            onSelectToggle={(additive) => {
+              onToggleSelect?.(ch.id, { additive });
+              if (lastClickedIndexRef) lastClickedIndexRef.current = idx;
+            }}
+            onRange={() => {
+              onRangeSelect?.(idx);
+              if (lastClickedIndexRef) lastClickedIndexRef.current = idx;
+            }}
+            // Keep existing hooks available
+            onMoveChapter={onMoveChapter}
+            onDeleteChapter={onDeleteChapter}
           />
         ))}
       </div>
 
-      {/* Empty state */}
       {chapters.length === 0 && (
-        <div className="text-center py-12 text-slate-500">
-          <p className="text-lg mb-2">No chapters yet</p>
-          <p className="text-sm">Click "+ Add Chapter" to get started</p>
+        <div className="text-center py-10 text-sm text-slate-500">
+          No chapters yet. Click “Add Chapter” to get started.
+        </div>
+      )}
+
+      {selectMode && (
+        <div className="mt-4 text-xs text-slate-600">
+          💡 Tip: Click to select, Shift+Click for range, Ctrl/Cmd+Click to toggle. Drag selected
+          cards to the Trash in the bottom-right to delete.
         </div>
       )}
     </div>
