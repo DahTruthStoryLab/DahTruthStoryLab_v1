@@ -35,6 +35,25 @@
 .ql-snow .ql-picker.ql-font .ql-picker-label[data-value="times"]::before,
 .ql-snow .ql-picker.ql-font .ql-picker-item[data-value="times"]::before { content: "Times"; }
 
+/* Quill toolbar normalization - keeps toolbar consistent with app design */
+.ql-toolbar, 
+.ql-toolbar * { 
+  font-size: 14px !important; 
+}
+
+.ql-toolbar .ql-picker-label::before { 
+  line-height: 1.2 !important; 
+}
+
+/* Ensure Quill toolbar buttons match app styling */
+.ql-toolbar button {
+  transition: background-color 0.15s ease;
+}
+
+.ql-toolbar button:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
 /* ================================
    Brand + Global Base (LIGHT THEME)
    ================================ */
