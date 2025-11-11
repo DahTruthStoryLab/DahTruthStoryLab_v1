@@ -1,6 +1,5 @@
 // src/hooks/useAIAssistant.js
 // Manages AI operations, prompts, and provider selection
-
 import { useState } from "react";
 import {
   runGrammar,
@@ -32,14 +31,22 @@ export function useAIAssistant() {
   const runAI = async (mode, html, customInstructions = null, customProvider = null) => {
     setAiError(null);
     setAiBusy(true);
-
+    
     try {
       const inputPlain = htmlToPlain(html || "");
+      
+      if (!inputPlain || inputPlain.trim().length === 0) {
+        throw new Error("No content to process. Please add some text first.");
+      }
+
       const useInstructions = customInstructions || instructions;
       const useProvider = customProvider || provider;
 
+      console.log(`🤖 Running AI mode: ${mode} with provider: ${useProvider}`);
+      
       let res;
-
+      
+      // All API calls now have better timeout handling via fetchWithTimeout in api.js
       switch (mode) {
         case "clarify":
           res = await clarify(inputPlain, useInstructions, useProvider);
@@ -63,16 +70,32 @@ export function useAIAssistant() {
       }
 
       const output = extractContent(res);
+      
+      if (!output || output.trim().length === 0) {
+        throw new Error("AI returned empty response. Please try again.");
+      }
 
       if (output && output !== inputPlain) {
         const newHtml = plainToSimpleHtml(output);
+        console.log("✅ AI processing complete");
         return newHtml;
       }
 
       return html;
     } catch (e) {
       console.error("[AI] error:", e);
-      const errorMsg = e?.message || "AI request failed";
+      
+      // Better error messages
+      let errorMsg = e?.message || "AI request failed";
+      
+      if (errorMsg.includes("timed out")) {
+        errorMsg = "⏱️ AI request timed out. Try with shorter text or try again.";
+      } else if (errorMsg.includes("429")) {
+        errorMsg = "⚠️ Too many requests. Please wait a moment and try again.";
+      } else if (errorMsg.includes("500") || errorMsg.includes("502") || errorMsg.includes("503")) {
+        errorMsg = "⚠️ AI service temporarily unavailable. Please try again.";
+      }
+      
       setAiError(errorMsg);
       alert(errorMsg);
       return null;
@@ -83,7 +106,7 @@ export function useAIAssistant() {
 
   const generateChapterPrompt = async (chapter) => {
     if (!chapter) return null;
-
+    
     const simplePrompt = `For "${chapter.title}": Focus on clear narrative flow and character development. Maintain consistent tone and pacing.`;
     
     const useIt = window.confirm(
@@ -94,7 +117,6 @@ export function useAIAssistant() {
       setInstructions(simplePrompt);
       return simplePrompt;
     }
-
     return null;
   };
 
