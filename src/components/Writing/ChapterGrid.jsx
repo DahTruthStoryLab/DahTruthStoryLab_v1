@@ -1,85 +1,95 @@
-// src/components/Writing/ChapterGrid.jsx
-// Grid of chapter cards with lifted multi-select + drag-to-trash support
+// src/components/Writing/ChapterCard.jsx
+// A single chapter card that supports lifted multi-select, checkbox, and multi-drag
 
 import React from "react";
-import ChapterCard from "./ChapterCard";
+import { useDrag } from "react-dnd";
 
-export default function ChapterGrid({
-  chapters,
-  selectedId,
-  onSelectChapter,       // (id) => void
-  onAddChapter,          // () => void
-  onMoveChapter,         // (fromIdx, toIdx) => void (optional; unchanged)
-  onDeleteChapter,       // (id) => void (optional; unchanged)
-  // Lifted selection from ComposePage:
-  selectMode,            // boolean
+export default function ChapterCard({
+  chapter,
+  index,
+  isActive,
+  isSelected,
+  selectMode,
   selectedIds,           // Set<string>
-  onToggleSelect,        // (id, { additive?: boolean }) => void
-  onRangeSelect,         // (index) => void
-  lastClickedIndexRef,   // React.useRef<number|null>
+  onOpen,                // () => void
+  onSelectToggle,        // (additive:boolean) => void
+  onRange,               // () => void
+  // optional existing callbacks
+  onMoveChapter,
+  onDeleteChapter,
 }) {
+  // Drag payload: all selected if any, else just this card
+  const selectedArray =
+    selectedIds && selectedIds.size > 0 ? Array.from(selectedIds) : [chapter.id];
+
+  const [{ isDragging }, drag] = useDrag(
+    () => ({
+      type: "chapter",
+      item: { ids: selectedArray },
+      collect: (monitor) => ({ isDragging: monitor.isDragging() }),
+    }),
+    [chapter.id, selectedIds]
+  );
+
   return (
-    <div className="max-w-7xl mx-auto px-4 py-6">
-      {/* Header */}
-      <div className="mb-3 flex items-center justify-between">
-        <h3 className="text-sm font-semibold text-slate-800">Your Chapters</h3>
-        <button
-          onClick={onAddChapter}
-          className="text-xs px-3 py-1.5 rounded-lg border bg-white hover:bg-slate-50"
-          title="Add Chapter"
+    <div
+      ref={drag}
+      onClick={(e) => {
+        if (!selectMode) {
+          onOpen?.();
+          return;
+        }
+        if (e.shiftKey) {
+          onRange?.();
+          return;
+        }
+        const additive = e.ctrlKey || e.metaKey;
+        onSelectToggle?.(additive);
+      }}
+      className={[
+        "relative rounded-xl border p-4 bg-white transition cursor-pointer",
+        isActive ? "border-slate-900/20 shadow" : "border-slate-200 hover:border-slate-300",
+        isSelected ? "ring-2 ring-blue-300" : "",
+        isDragging ? "opacity-60" : "",
+      ].join(" ")}
+      title={chapter.title}
+    >
+      {/* Checkbox appears only in select mode */}
+      {selectMode && (
+        <label
+          className="absolute top-2 left-2 inline-flex items-center gap-1 text-xs bg-white/90 rounded px-1.5 py-0.5 border border-slate-200"
+          onClick={(e) => e.stopPropagation()} // don't let card click fire
         >
-          + Add Chapter
-        </button>
-      </div>
-
-      {/* Grid */}
-      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
-        {/* New chapter tile */}
-        <button
-          onClick={onAddChapter}
-          className="rounded-xl border-2 border-dashed p-4 bg-white text-left hover:bg-slate-50"
-          title="Add Chapter"
-        >
-          <div className="text-sm font-medium">Create new chapter</div>
-          <div className="text-xs text-slate-500">Start fresh from a blank page</div>
-        </button>
-
-        {chapters.map((ch, idx) => (
-          <ChapterCard
-            key={ch.id}
-            chapter={ch}
-            index={idx}
-            isActive={ch.id === selectedId}
-            isSelected={selectedIds?.has(ch.id)}
-            selectMode={!!selectMode}
-            selectedIds={selectedIds}
-            onOpen={() => onSelectChapter?.(ch.id)}
-            onSelectToggle={(additive) => {
-              onToggleSelect?.(ch.id, { additive });
-              if (lastClickedIndexRef) lastClickedIndexRef.current = idx;
-            }}
-            onRange={() => {
-              onRangeSelect?.(idx);
-              if (lastClickedIndexRef) lastClickedIndexRef.current = idx;
-            }}
-            // Keep existing hooks available
-            onMoveChapter={onMoveChapter}
-            onDeleteChapter={onDeleteChapter}
+          <input
+            type="checkbox"
+            className="mr-1 accent-blue-600"
+            checked={!!isSelected}
+            onChange={() => onSelectToggle?.(true /* additive */)}
           />
-        ))}
-      </div>
-
-      {chapters.length === 0 && (
-        <div className="text-center py-10 text-sm text-slate-500">
-          No chapters yet. Click “Add Chapter” to get started.
-        </div>
+          <span className="sr-only">
+            {isSelected ? "Deselect" : "Select"} {chapter.title}
+          </span>
+          {/* Count badge if multi-selected */}
+          {isSelected && selectedIds?.size > 1 && (
+            <span className="inline-flex items-center justify-center min-w-5 h-5 px-1 rounded-full bg-blue-600 text-white text-[10px] font-semibold">
+              {selectedIds.size}
+            </span>
+          )}
+        </label>
       )}
 
-      {selectMode && (
-        <div className="mt-4 text-xs text-slate-600">
-          💡 Tip: Click to select, Shift+Click for range, Ctrl/Cmd+Click to toggle. Drag selected
-          cards to the Trash in the bottom-right to delete.
-        </div>
+      {/* Active indicator */}
+      {isActive && (
+        <span className="absolute top-2 right-2 text-[11px] text-slate-500">Active</span>
+      )}
+
+      <div className="text-sm font-semibold truncate pr-8">{chapter.title}</div>
+      <div className="mt-1 text-xs text-slate-500">
+        {(chapter.wordCount || 0).toLocaleString()} words
+      </div>
+
+      {chapter.preview && (
+        <div className="mt-2 text-[12px] text-slate-600 line-clamp-3">{chapter.preview}</div>
       )}
     </div>
   );
