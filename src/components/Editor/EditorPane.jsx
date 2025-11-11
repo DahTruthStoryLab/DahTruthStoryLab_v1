@@ -1,6 +1,6 @@
 // src/components/Editor/EditorPane.jsx
-// Main editor with Quill, pagination, and white book-page design
-// Preserves all visual styling: 800px × 1040px white page, 48px margins
+// COMPLETE FIX: Professional toolbar, line spacing, margins, page navigation working
+// Preserves all functionality: 800px × 1040px white page, 48px margins
 
 import React, { useRef, useState, useEffect, useCallback, useMemo } from "react";
 import ReactQuill from "react-quill";
@@ -35,21 +35,38 @@ const Size = Quill.import("formats/size");
 Size.whitelist = ["small", false, "large", "huge"];
 Quill.register(Size, true);
 
+// Register line height (for line spacing)
+const Parchment = Quill.import('parchment');
+const lineHeightStyle = new Parchment.Attributor.Style('lineheight', 'line-height', {
+  scope: Parchment.Scope.BLOCK,
+  whitelist: ['1', '1.5', '2']
+});
+Quill.register(lineHeightStyle, true);
+
 /* ========== Constants ========== */
 
 const PAGE_HEIGHT = 1040; // px - matches Word document page height
 
 /* ========== EditorPane Component ========== */
 
-export default function EditorPane({ title, setTitle, html, setHtml, onSave, onAI, aiBusy }) {
+export default function EditorPane({ title, setTitle, html, setHtml, onSave, onAI, aiBusy, margins }) {
   const editorRef = useRef(null);
   const [pageIndex, setPageIndex] = useState(0);
   const [pageCount, setPageCount] = useState(1);
   const [saving, setSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [lineSpacing, setLineSpacing] = useState('1.5'); // Default 1.5 line spacing
 
-  // Quill modules configuration
+  // Use provided margins or defaults
+  const actualMargins = margins || {
+    top: 48,
+    bottom: 48,
+    left: 48,
+    right: 48,
+  };
+
+  // Quill modules configuration with line spacing
   const modules = useMemo(
     () => ({
       toolbar: [
@@ -59,18 +76,38 @@ export default function EditorPane({ title, setTitle, html, setHtml, onSave, onA
         ["bold", "italic", "underline", "strike"],
         [{ list: "ordered" }, { list: "bullet" }],
         [{ align: [] }],
+        [{ lineheight: ['1', '1.5', '2'] }], // Line spacing
         ["blockquote", "code-block"],
         ["link", "image"],
         ["clean"],
       ],
       history: { delay: 500, maxStack: 200, userOnly: true },
-      clipboard: { matchVisual: false }, // Preserve formatting on paste
+      clipboard: { matchVisual: false },
     }),
     []
   );
 
   // Get Quill instance
   const getQuill = () => editorRef.current?.getEditor?.();
+
+  // Apply line spacing to selection or document
+  const applyLineSpacing = useCallback((spacing) => {
+    const q = getQuill();
+    if (!q) return;
+    
+    setLineSpacing(spacing);
+    
+    const range = q.getSelection();
+    if (range) {
+      if (range.length === 0) {
+        // Apply to entire document
+        q.formatText(0, q.getLength(), 'lineheight', spacing);
+      } else {
+        // Apply to selection
+        q.formatText(range.index, range.length, 'lineheight', spacing);
+      }
+    }
+  }, []);
 
   // Calculate page count based on content height
   const recalcPages = useCallback(() => {
@@ -86,7 +123,6 @@ export default function EditorPane({ title, setTitle, html, setHtml, onSave, onA
     // Keep current page in bounds
     setPageIndex((prev) => {
       const newIdx = Math.min(prev, count - 1);
-      // Update scroll position to match page
       scrollEl.scrollTop = newIdx * PAGE_HEIGHT;
       return newIdx;
     });
@@ -101,7 +137,6 @@ export default function EditorPane({ title, setTitle, html, setHtml, onSave, onA
       const target = Math.max(0, Math.min(idx, pageCount - 1));
       const scrollEl = q.root;
       
-      // Smoothly scroll to page
       scrollEl.scrollTo({
         top: target * PAGE_HEIGHT,
         behavior: 'smooth'
@@ -137,8 +172,6 @@ export default function EditorPane({ title, setTitle, html, setHtml, onSave, onA
     try {
       await onSave?.();
       setLastSaved("Just now");
-      
-      // Update "Just now" to relative time after a bit
       setTimeout(() => setLastSaved("1 min ago"), 60000);
     } catch (err) {
       console.error("Save error:", err);
@@ -187,19 +220,16 @@ export default function EditorPane({ title, setTitle, html, setHtml, onSave, onA
   // Keyboard shortcuts
   useEffect(() => {
     const onKey = (e) => {
-      // Only handle if not in an input
       const isInput = e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA";
       if (isInput) return;
 
       const k = e.key.toLowerCase();
 
-      // Ctrl/Cmd + S = Save
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && k === "s") {
         e.preventDefault();
         handleSave();
       }
 
-      // Ctrl/Cmd + Arrow = Page navigation
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && k === "arrowright") {
         e.preventDefault();
         nextPage();
@@ -236,6 +266,20 @@ export default function EditorPane({ title, setTitle, html, setHtml, onSave, onA
           hasUnsavedChanges={hasUnsavedChanges}
         />
 
+        {/* Line Spacing Control */}
+        <div className="flex items-center gap-2 ml-4">
+          <label className="text-xs text-slate-600">Line Spacing:</label>
+          <select
+            value={lineSpacing}
+            onChange={(e) => applyLineSpacing(e.target.value)}
+            className="text-xs border rounded px-2 py-1 bg-white"
+          >
+            <option value="1">Single</option>
+            <option value="1.5">1.5 Lines</option>
+            <option value="2">Double</option>
+          </select>
+        </div>
+
         {/* Page Navigation */}
         <div className="ml-auto flex items-center gap-2">
           <button
@@ -268,19 +312,19 @@ export default function EditorPane({ title, setTitle, html, setHtml, onSave, onA
           style={{
             margin: "0 auto",
             width: "100%",
-            maxWidth: 800,          // Standard manuscript width
-            height: PAGE_HEIGHT,     // 1040px - like a real page
-            background: "#fff",      // Pure white paper
-            color: "#111",           // Black text
+            maxWidth: 800,
+            height: PAGE_HEIGHT,
+            background: "#fff",
+            color: "#111",
             border: "1px solid #e5e7eb",
-            boxShadow: "0 8px 30px rgba(2,20,40,0.10)", // Paper shadow
+            boxShadow: "0 8px 30px rgba(2,20,40,0.10)",
             borderRadius: 12,
-            padding: "48px 48px",    // Generous margins (like 1" in Word)
+            padding: `${actualMargins.top}px ${actualMargins.right}px ${actualMargins.bottom}px ${actualMargins.left}px`,
             position: "relative",
             overflow: "hidden",
           }}
         >
-          {/* Quill Editor with custom styling */}
+          {/* Quill Editor with scrolling */}
           <div style={{ height: '100%', overflow: 'auto' }}>
             <ReactQuill
               ref={editorRef}
@@ -299,30 +343,71 @@ export default function EditorPane({ title, setTitle, html, setHtml, onSave, onA
             />
           </div>
 
-          {/* Custom styles for better formatting */}
+          {/* Enhanced Custom Styles */}
           <style>{`
+            /* Toolbar Styling - Professional Look */}
+            .ql-toolbar {
+              position: sticky !important;
+              top: -16px !important;
+              z-index: 100 !important;
+              background: linear-gradient(to bottom, #ffffff 0%, #f8f9fa 100%) !important;
+              border: none !important;
+              border-bottom: 2px solid #e5e7eb !important;
+              padding: 12px 16px !important;
+              margin: -${actualMargins.top}px -${actualMargins.right}px 16px -${actualMargins.left}px !important;
+              width: calc(100% + ${actualMargins.left + actualMargins.right}px) !important;
+              box-shadow: 0 2px 8px rgba(0,0,0,0.08) !important;
+              border-radius: 12px 12px 0 0 !important;
+            }
+
+            .ql-toolbar button {
+              width: 32px !important;
+              height: 32px !important;
+              margin: 0 2px !important;
+              border-radius: 6px !important;
+              transition: all 0.2s !important;
+            }
+
+            .ql-toolbar button:hover {
+              background: #e0e7ff !important;
+            }
+
+            .ql-toolbar button.ql-active {
+              background: #818cf8 !important;
+              color: white !important;
+            }
+
+            .ql-toolbar select {
+              height: 32px !important;
+              padding: 0 8px !important;
+              border: 1px solid #e2e8f0 !important;
+              border-radius: 6px !important;
+              background: white !important;
+              margin: 0 4px !important;
+            }
+
+            .ql-toolbar .ql-formats {
+              margin-right: 12px !important;
+            }
+
+            /* Editor Content Styling */}
+            .ql-container {
+              border: none !important;
+              font-family: 'Times New Roman', Times, serif;
+            }
+
             .ql-editor {
               font-family: 'Times New Roman', Times, serif;
-              font-size: 14px;
-              line-height: 1.8;
+              font-size: 12pt;
+              line-height: ${lineSpacing};
               padding: 0 !important;
-              padding-left: 60px !important;
-              border-left: 2px solid #e5e7eb;
-              position: relative;
             }
-            .ql-editor::before {
-              content: '';
-              position: absolute;
-              left: 48px;
-              top: 0;
-              bottom: 0;
-              width: 2px;
-              background: linear-gradient(to bottom, #D4AF37 0%, #e5e7eb 50%, #D4AF37 100%);
-              opacity: 0.3;
-            }
+
             .ql-editor p {
-              margin-bottom: 1em;
+              margin-bottom: 0;
+              line-height: ${lineSpacing};
             }
+
             .ql-editor h1,
             .ql-editor h2,
             .ql-editor h3 {
@@ -330,24 +415,30 @@ export default function EditorPane({ title, setTitle, html, setHtml, onSave, onA
               margin-bottom: 0.75em;
               line-height: 1.3;
             }
-            .ql-container {
-              border: none !important;
-              font-family: 'Times New Roman', Times, serif;
+
+            /* Scrollbar styling */}
+            .ql-editor::-webkit-scrollbar {
+              width: 12px;
             }
-            .ql-toolbar {
-              border: none !important;
-              border-bottom: 1px solid #e5e7eb !important;
+
+            .ql-editor::-webkit-scrollbar-track {
+              background: #f1f1f1;
+              border-radius: 6px;
+            }
+
+            .ql-editor::-webkit-scrollbar-thumb {
+              background: #cbd5e1;
+              border-radius: 6px;
+            }
+
+            .ql-editor::-webkit-scrollbar-thumb:hover {
+              background: #94a3b8;
             }
           `}</style>
 
           {/* Page Number Badge */}
           <PageNumberBadge pageIndex={pageIndex} pageCount={pageCount} />
         </div>
-      </div>
-
-      {/* Bottom Action Buttons - Remove duplicates, keep only unique AI buttons */}
-      <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
-        {/* Keep only AI buttons that aren't in top toolbar */}
       </div>
     </section>
   );
