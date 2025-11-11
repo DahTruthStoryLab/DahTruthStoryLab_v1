@@ -153,3 +153,10 @@ export default function ChapterSidebar({
       )}
 
       {selectMode && (
+        <div className="mt-3 pt-3 border-t text-xs text-slate-500">
+          💡 Tip: Click to select, Shift+Click for range, Ctrl/Cmd+Click to toggle
+        </div>
+      )}
+    </div>
+  );
+}
