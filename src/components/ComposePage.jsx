@@ -122,21 +122,36 @@ export default function ComposePage() {
     });
   }
 
-  function rangeSelect(fromIdx, toIdx, idList /* array of chapter ids in order */) {
-    const [a, b] = [Math.min(fromIdx, toIdx), Math.max(fromIdx, toIdx)];
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      for (let i = a; i <= b; i++) next.add(idList[i]);
-      return next;
-    });
+ function rangeSelect(toIdx) {
+  const fromIdx = lastClickedIndexRef.current;
+  if (fromIdx === null) {
+    // No previous click, just select this one
+    const chapterId = chapters[toIdx]?.id;
+    if (chapterId) {
+      setSelectedIds(new Set([chapterId]));
+      lastClickedIndexRef.current = toIdx;
+    }
+    return;
   }
 
-  function toggleSelectMode() {
-    setSelectMode((s) => {
-      if (s) clearSelection(); // leaving select mode clears
-      return !s;
-    });
-  }
+  const [a, b] = [Math.min(fromIdx, toIdx), Math.max(fromIdx, toIdx)];
+  setSelectedIds((prev) => {
+    const next = new Set(prev);
+    for (let i = a; i <= b; i++) {
+      const chapterId = chapters[i]?.id;
+      if (chapterId) next.add(chapterId);
+    }
+    return next;
+  });
+  lastClickedIndexRef.current = toIdx;
+}
+
+function toggleSelectMode() {
+  setSelectMode((s) => {
+    if (s) clearSelection(); // leaving select mode clears
+    return !s;
+  });
+}
 
   // Keyboard delete (Delete/Backspace) for bulk selection
   useEffect(() => {
@@ -424,24 +439,20 @@ export default function ComposePage() {
                 }
               }}
               onAddChapter={addChapter}
-              onMoveChapter={moveChapter}
-              onDeleteChapter={deleteChapter}
-              selectMode={selectMode}
-              selectedIds={selectedIds}
-              onToggleSelect={toggleSelect}
-              onRangeSelect={(idx) => {
-                const list = chapters.map((c) => c.id);
-                if (lastClickedIndexRef.current == null) lastClickedIndexRef.current = idx;
-                rangeSelect(lastClickedIndexRef.current, idx, list);
-                lastClickedIndexRef.current = idx;
-              }}
-              lastClickedIndexRef={lastClickedIndexRef}
-            />
-            {/* Trash Dock for grid view */}
-            <TrashDock onDelete={handleDeleteMultiple} />
-          </>
-        )}
-
+               onMoveChapter={moveChapter}
+               onDeleteChapter={deleteChapter}
+               selectMode={selectMode}
+               selectedIds={selectedIds}
+               onToggleSelect={toggleSelect}
+               onRangeSelect={(idx) => {
+                 rangeSelect(idx);
+               }}
+               lastClickedIndexRef={lastClickedIndexRef}
+               />
+               {/* Trash Dock for grid view */}
+               <TrashDock onDelete={handleDeleteMultiple} />
+               </>
+               )}
         {/* ========== EDITOR VIEW ========== */}
         {view === "editor" && (
           <div
@@ -488,15 +499,11 @@ export default function ComposePage() {
                 selectedIds={selectedIds}
                 onToggleSelect={toggleSelect}
                 onRangeSelect={(idx) => {
-                  const list = chapters.map((c) => c.id);
-                  if (lastClickedIndexRef.current == null) lastClickedIndexRef.current = idx;
-                  rangeSelect(lastClickedIndexRef.current, idx, list);
-                  lastClickedIndexRef.current = idx;
-                }}
-                lastClickedIndexRef={lastClickedIndexRef}
-              />
-            </aside>
-
+                    rangeSelect(idx);
+                  }}
+                  lastClickedIndexRef={lastClickedIndexRef}
+                  />
+                  </aside>
             {/* Main Editor */}
             <EditorPane
               title={title}
