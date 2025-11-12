@@ -1,4 +1,4 @@
-// src/App.tsx
+// src/App.jsx
 import React, { useEffect, Suspense, lazy } from "react";
 import {
   BrowserRouter as Router,
@@ -20,10 +20,11 @@ import { MultiBackend, TouchTransition, MouseTransition } from "dnd-multi-backen
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { TouchBackend } from "react-dnd-touch-backend";
 
-import { UserProvider } from "./lib/userStore.jsx"; 
+// Global user context
+import { UserProvider } from "./lib/userStore.jsx";
+
 // force-load API bootstrap (adds window.__API_BASE__)
 import "./lib/api";
-
 
 // =========================
 // DnD Backend Configuration
@@ -101,6 +102,7 @@ function ScrollToTop() {
 // Auth gate (toggleable)
 // =========================
 const BYPASS_AUTH = true;
+
 function ProtectedRoute({ children }) {
   if (BYPASS_AUTH) return children;
   const user = localStorage.getItem("dt_auth_user");
@@ -129,9 +131,10 @@ export default function App() {
       console.log("VITE_API_BASE =", import.meta.env.VITE_API_BASE);
     }
   }, []);
+
   return (
     <UserProvider>
-    <DndProvider backend={MultiBackend} options={BACKENDS}>
+      <DndProvider backend={MultiBackend} options={BACKENDS}>
         <Router>
           <ScrollToTop />
           <Suspense fallback={<Fallback />}>
@@ -141,7 +144,7 @@ export default function App() {
               <Route path="/signin" element={<SignInPage />} />
               <Route path="/auth/register" element={<RegistrationPage />} />
 
-              {/* Protected */}
+              {/* Protected Dashboard */}
               <Route
                 path="/dashboard"
                 element={
@@ -164,7 +167,7 @@ export default function App() {
                 />
               ))}
 
-              {/* ================= STORY-LAB (no publishing pages here) ================= */}
+              {/* STORY-LAB (layout + nested routes) */}
               <Route
                 path="/story-lab/*"
                 element={
@@ -187,7 +190,7 @@ export default function App() {
               {/* Typo/alias redirect for old /storylab base (no hyphen) */}
               <Route path="/storylab/*" element={<Navigate to="/story-lab" replace />} />
 
-              {/* ================= TOP-LEVEL PUBLISHING PAGES (src/pages/*.tsx) ================= */}
+              {/* TOP-LEVEL PUBLISHING PAGES (src/pages/*.tsx) */}
               <Route
                 path="/publishing"
                 element={
@@ -238,14 +241,20 @@ export default function App() {
               <Route path="/story-lab/proof" element={<Navigate to="/proof" replace />} />
               <Route path="/story-lab/format" element={<Navigate to="/format" replace />} />
               <Route path="/story-lab/export" element={<Navigate to="/export" replace />} />
-              <Route path="/story-lab/publishing-prep" element={<Navigate to="/publishing-prep" replace />} />
+              <Route
+                path="/story-lab/publishing-prep"
+                element={<Navigate to="/publishing-prep" replace />}
+              />
 
-              {/* Legacy without hyphen, just in case */}
+              {/* Legacy without hyphen */}
               <Route path="/storylab/publishing" element={<Navigate to="/publishing" replace />} />
               <Route path="/storylab/proof" element={<Navigate to="/proof" replace />} />
               <Route path="/storylab/format" element={<Navigate to="/format" replace />} />
               <Route path="/storylab/export" element={<Navigate to="/export" replace />} />
-              <Route path="/storylab/publishing-prep" element={<Navigate to="/publishing-prep" replace />} />
+              <Route
+                path="/storylab/publishing-prep"
+                element={<Navigate to="/publishing-prep" replace />}
+              />
 
               {/* TOC */}
               <Route
@@ -335,6 +344,6 @@ export default function App() {
           </Suspense>
         </Router>
       </DndProvider>
-   </UserProvider>    // ← Then close UserProvider
+    </UserProvider>
   );
 }
