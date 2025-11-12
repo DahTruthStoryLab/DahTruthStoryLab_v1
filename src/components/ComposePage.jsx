@@ -65,7 +65,7 @@ export default function ComposePage() {
   // Chapter management (state, CRUD operations)
   const {
     book,
-    chapters = [],  // Add default empty array here
+    chapters = [],            // default empty array
     selectedId,
     selectedChapter,
     setSelectedId,
@@ -92,8 +92,8 @@ export default function ComposePage() {
   const [view, setView] = useState("grid");
 
   // Editor state
-  const [title, setTitle]   = useState(selectedChapter?.title   ?? "");
-  const [html,  setHtml]    = useState(selectedChapter?.content ?? "");
+  const [title, setTitle] = useState(selectedChapter?.title ?? "");
+  const [html, setHtml] = useState(selectedChapter?.content ?? "");
 
   // Publishing metadata
   const [author, setAuthor] = useState("Jacqueline Session Ausby");
@@ -110,7 +110,8 @@ export default function ComposePage() {
   const clearSelection = () => setSelectedIds(new Set());
 
   function toggleSelect(id, { additive = false } = {}) {
-    setSelectedIds(prev => {
+    if (!id) return;
+    setSelectedIds((prev) => {
       const next = new Set(additive ? prev : []);
       next.has(id) ? next.delete(id) : next.add(id);
       return next;
@@ -118,8 +119,12 @@ export default function ComposePage() {
   }
 
   function rangeSelect(toIdx) {
+    if (!Number.isInteger(toIdx) || toIdx < 0 || toIdx >= chapters.length) {
+      lastClickedIndexRef.current = null;
+      return;
+    }
     const fromIdx = lastClickedIndexRef.current;
-    if (fromIdx === null) {
+    if (fromIdx == null || fromIdx < 0 || fromIdx >= chapters.length) {
       const chapterId = chapters[toIdx]?.id;
       if (chapterId) {
         setSelectedIds(new Set([chapterId]));
@@ -128,7 +133,7 @@ export default function ComposePage() {
       return;
     }
     const [a, b] = [Math.min(fromIdx, toIdx), Math.max(fromIdx, toIdx)];
-    setSelectedIds(prev => {
+    setSelectedIds((prev) => {
       const next = new Set(prev);
       for (let i = a; i <= b; i++) {
         const cid = chapters[i]?.id;
@@ -140,7 +145,7 @@ export default function ComposePage() {
   }
 
   function toggleSelectMode() {
-    setSelectMode(s => {
+    setSelectMode((s) => {
       if (s) clearSelection();
       return !s;
     });
@@ -192,8 +197,6 @@ export default function ComposePage() {
 
   // Handle import (with robust optional split by headings/page-breaks)
   const handleImport = async (htmlContent, shouldSplit) => {
-    if (DEBUG_IMPORT) console.log("📥 Import started, shouldSplit:", shouldSplit);
-
     if (!shouldSplit) {
       if (hasChapter) {
         setHtml(htmlContent);
@@ -210,7 +213,6 @@ export default function ComposePage() {
     const root = document.createElement("div");
     root.innerHTML = htmlContent;
 
-    // Flatten elements + comments (for page-break comments)
     const nodes = [];
     const walker = document.createTreeWalker(
       root,
@@ -224,13 +226,13 @@ export default function ComposePage() {
     let currentTitle = "";
     let n = 1;
 
-    function push() {
+    const push = () => {
       if (!buffer.trim()) return;
       out.push({ title: currentTitle || `Chapter ${n}`, content: buffer });
       n += 1;
       buffer = "";
       currentTitle = "";
-    }
+    };
 
     for (const node of nodes) {
       if (isPageBreakNode(node)) {
@@ -257,7 +259,6 @@ export default function ComposePage() {
     }
     if (buffer.trim()) push();
 
-    if (DEBUG_IMPORT) console.log("📊 Chapters parsed:", out.length, out.map(c => c.title));
     if (out.length === 0) {
       alert("No chapters detected. Use H1/H2/H3 or ‘Chapter 1’, ‘Chapter 2’, etc.");
       return;
@@ -265,14 +266,15 @@ export default function ComposePage() {
 
     for (let i = 0; i < out.length; i++) {
       const c = out[i];
-      if (DEBUG_IMPORT) console.log(`🛠️ Creating chapter ${i + 1}/${out.length}: "${c.title}"`);
       const newId = addChapter();
-      await new Promise(r => setTimeout(r, 30));
+      await new Promise((r) => setTimeout(r, 30));
       updateChapter(newId, { title: c.title, content: c.content });
     }
 
-    const t1 = performance.now();
-    if (DEBUG_IMPORT) console.log(`⏱️ Import complete in ${(t1 - t0).toFixed(0)} ms`);
+    if (DEBUG_IMPORT) {
+      const t1 = performance.now();
+      console.log(`⏱️ Import complete in ${(t1 - t0).toFixed(0)} ms`);
+    }
     alert(`✅ Successfully imported ${out.length} chapters!`);
     setView("grid");
   };
@@ -300,7 +302,7 @@ export default function ComposePage() {
     if (!ids || ids.length === 0) return;
     if (!window.confirm(`Delete ${ids.length} chapter(s)? This cannot be undone.`)) return;
 
-    ids.forEach(id => deleteChapter(id));
+    ids.forEach((id) => deleteChapter(id));
     clearSelection();
 
     if (ids.includes(selectedId)) {
@@ -310,27 +312,48 @@ export default function ComposePage() {
 
   const goBack = () => navigate("/dashboard");
 
+  /* ===== Early loading fallback (single return path) ===== */
+  if (!Array.isArray(chapters)) {
+    return (
+      <div className="min-h-screen bg-[rgb(244,247,250)] flex items-center justify-center">
+        <div className="text-lg">Loading chapters...</div>
+      </div>
+    );
+  }
+
+  /* ===== Main render ===== */
   return (
     <DndProvider backend={HTML5Backend}>
       <div className="min-h-screen bg-[rgb(244,247,250)] text-slate-900">
         {/* ========== TOP BAR ========== */}
         <div className="sticky top-0 z-40 bg-white/80 backdrop-blur border-b border-slate-200">
           <div className="max-w-7xl mx-auto px-3 h-auto py-2 flex items-center gap-3 overflow-x-auto">
-            <GoldButton onClick={goBack} title="Back to Dashboard">← Dashboard</GoldButton>
+            <GoldButton onClick={goBack} title="Back to Dashboard">
+              ← Dashboard
+            </GoldButton>
+
             <WritingCrumb view={view} />
 
             {/* View Toggle */}
             <div className="ml-1 flex items-center gap-1">
               <button
                 onClick={() => setView("grid")}
-                className={`inline-flex items-center gap-2 rounded-md border px-2.5 py-1 text-[13px] ${view === "grid" ? "bg-slate-100" : "bg-white hover:bg-slate-50"}`}
+                className={`inline-flex items-center gap-2 rounded-md border px-2.5 py-1 text-[13px] ${
+                  view === "grid" ? "bg-slate-100" : "bg-white hover:bg-slate-50"
+                }`}
                 title="Chapter Grid"
-              >Grid</button>
+              >
+                Grid
+              </button>
               <button
                 onClick={() => setView("editor")}
-                className={`inline-flex items-center gap-2 rounded-md border px-2.5 py-1 text-[13px] ${view === "editor" ? "bg-slate-100" : "bg-white hover:bg-slate-50"}`}
+                className={`inline-flex items-center gap-2 rounded-md border px-2.5 py-1 text-[13px] ${
+                  view === "editor" ? "bg-slate-100" : "bg-white hover:bg-slate-50"
+                }`}
                 title="Open Editor"
-              >Editor</button>
+              >
+                Editor
+              </button>
             </div>
 
             {/* Select Mode Toggle */}
@@ -348,17 +371,23 @@ export default function ComposePage() {
             {/* Selection toolbar */}
             {selectMode && selectedIds.size > 0 && (
               <div className="flex items-center gap-2 px-3 py-1 bg-blue-50 rounded-md border border-blue-200">
-                <span className="text-xs font-medium text-blue-900">{selectedIds.size} selected</span>
+                <span className="text-xs font-medium text-blue-900">
+                  {selectedIds.size} selected
+                </span>
                 <button
                   onClick={() => handleDeleteMultiple(Array.from(selectedIds))}
                   className="text-xs px-2 py-0.5 rounded bg-red-500 text-white hover:bg-red-600"
                   title="Delete Selected"
-                >🗑️ Delete</button>
+                >
+                  🗑️ Delete
+                </button>
                 <button
                   onClick={clearSelection}
                   className="text-xs px-2 py-0.5 rounded border border-slate-300 bg-white hover:bg-slate-50"
                   title="Clear Selection"
-                >Clear</button>
+                >
+                  Clear
+                </button>
               </div>
             )}
 
@@ -389,20 +418,6 @@ export default function ComposePage() {
           </div>
         </div>
 
-const goBack = () => navigate("/dashboard");
-
-// Safety check - wait for chapters to load
-if (!chapters) {
-    return (
-      <div className="min-h-screen bg-[rgb(244,247,250)] flex items-center justify-center">
-        <div className="text-lg">Loading chapters...</div>
-      </div>
-    );
-  }
-
-return (
-  <DndProvider backend={HTML5Backend}>
-         
         {/* ========== GRID VIEW ========== */}
         {view === "grid" && (
           <>
@@ -410,6 +425,7 @@ return (
               chapters={chapters}
               selectedId={selectedId}
               onSelectChapter={(id) => {
+                if (!id) return;
                 if (selectMode) {
                   toggleSelect(id);
                 } else {
@@ -426,7 +442,6 @@ return (
               onRangeSelect={(idx) => rangeSelect(idx)}
               lastClickedIndexRef={lastClickedIndexRef}
             />
-            {/* Trash Dock for grid view */}
             <TrashDock onDelete={handleDeleteMultiple} />
           </>
         )}
@@ -453,7 +468,9 @@ return (
                 instructions={instructions}
                 setInstructions={setInstructions}
                 chapterTitle={selectedChapter?.title}
-                onGeneratePrompt={() => { if (hasChapter) generateChapterPrompt(selectedChapter); }}
+                onGeneratePrompt={() => {
+                  if (hasChapter) generateChapterPrompt(selectedChapter);
+                }}
                 aiBusy={aiBusy}
               />
 
