@@ -23,7 +23,7 @@ import { GoldButton, WritingCrumb } from "./UI/UIComponents";
 /* ============================
    Debug toggle for import logs
 ============================= */
-const DEBUG_IMPORT = false; // set true to see detailed console logs during import/split
+const DEBUG_IMPORT = false;
 
 /* ============================
    Import helpers (robust split)
@@ -36,18 +36,15 @@ function isHeadingEl(el) {
   if (tag === "h1" || tag === "h2" || tag === "h3") return true;
 
   const cls = (el.getAttribute("class") || "").toLowerCase();
-  // Word/Docs often: MsoHeading1, heading-1, title
   if (/\b(msoheading|heading|title)\b/.test(cls)) return true;
 
   const styles = (el.getAttribute("style") || "").toLowerCase();
-  // Some use CSS page-breaks on headings
   if (/page-break|break-before|break-after/.test(styles)) return true;
 
   return false;
 }
 
 function isPageBreakNode(node) {
-  // Comments like <!-- pagebreak --> or <hr> / CSS page-break
   if (node.nodeType === 8) return /pagebreak/i.test(node.nodeValue || "");
   if (node.nodeType === 1) {
     const tag = node.tagName.toLowerCase();
@@ -68,7 +65,6 @@ export default function ComposePage() {
   // Chapter management (state, CRUD operations)
   const {
     book,
-    setBook,
     chapters,
     selectedId,
     selectedChapter,
@@ -85,7 +81,6 @@ export default function ComposePage() {
     runAI,
     aiBusy,
     aiError,
-    setAiError,
     instructions,
     setInstructions,
     provider,
@@ -97,8 +92,8 @@ export default function ComposePage() {
   const [view, setView] = useState("grid");
 
   // Editor state
-  const [title, setTitle] = useState(selectedChapter?.title || "");
-  const [html, setHtml] = useState(selectedChapter?.content || "");
+  const [title, setTitle]   = useState(selectedChapter?.title   ?? "");
+  const [html,  setHtml]    = useState(selectedChapter?.content ?? "");
 
   // Publishing metadata
   const [author, setAuthor] = useState("Jacqueline Session Ausby");
@@ -109,51 +104,49 @@ export default function ComposePage() {
   const [selectMode, setSelectMode] = useState(false);
   const lastClickedIndexRef = useRef(null);
 
-  // Selection helpers
-  function clearSelection() {
-    setSelectedIds(new Set());
-  }
+  const hasChapter = !!selectedId && !!selectedChapter;
+
+  /* ===== Selection helpers ===== */
+  const clearSelection = () => setSelectedIds(new Set());
 
   function toggleSelect(id, { additive = false } = {}) {
-    setSelectedIds((prev) => {
+    setSelectedIds(prev => {
       const next = new Set(additive ? prev : []);
       next.has(id) ? next.delete(id) : next.add(id);
       return next;
     });
   }
 
- function rangeSelect(toIdx) {
-  const fromIdx = lastClickedIndexRef.current;
-  if (fromIdx === null) {
-    // No previous click, just select this one
-    const chapterId = chapters[toIdx]?.id;
-    if (chapterId) {
-      setSelectedIds(new Set([chapterId]));
-      lastClickedIndexRef.current = toIdx;
+  function rangeSelect(toIdx) {
+    const fromIdx = lastClickedIndexRef.current;
+    if (fromIdx === null) {
+      const chapterId = chapters[toIdx]?.id;
+      if (chapterId) {
+        setSelectedIds(new Set([chapterId]));
+        lastClickedIndexRef.current = toIdx;
+      }
+      return;
     }
-    return;
+    const [a, b] = [Math.min(fromIdx, toIdx), Math.max(fromIdx, toIdx)];
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      for (let i = a; i <= b; i++) {
+        const cid = chapters[i]?.id;
+        if (cid) next.add(cid);
+      }
+      return next;
+    });
+    lastClickedIndexRef.current = toIdx;
   }
 
-  const [a, b] = [Math.min(fromIdx, toIdx), Math.max(fromIdx, toIdx)];
-  setSelectedIds((prev) => {
-    const next = new Set(prev);
-    for (let i = a; i <= b; i++) {
-      const chapterId = chapters[i]?.id;
-      if (chapterId) next.add(chapterId);
-    }
-    return next;
-  });
-  lastClickedIndexRef.current = toIdx;
-}
+  function toggleSelectMode() {
+    setSelectMode(s => {
+      if (s) clearSelection();
+      return !s;
+    });
+  }
 
-function toggleSelectMode() {
-  setSelectMode((s) => {
-    if (s) clearSelection(); // leaving select mode clears
-    return !s;
-  });
-}
-
-  // Keyboard delete (Delete/Backspace) for bulk selection
+  // Keyboard delete for bulk selection
   useEffect(() => {
     const onKey = (e) => {
       const tag = (e.target && e.target.tagName) || "";
@@ -175,9 +168,9 @@ function toggleSelectMode() {
     }
   }, [selectedId, selectedChapter]);
 
-  // Handle save
+  /* ===== Actions ===== */
   const handleSave = () => {
-    if (!selectedId) return;
+    if (!hasChapter) return;
     updateChapter(selectedId, {
       title: title || selectedChapter?.title || "",
       content: html,
@@ -185,17 +178,15 @@ function toggleSelectMode() {
     saveProject({ book: { ...book, title: bookTitle }, chapters });
   };
 
-  // Handle AI operations
   const handleAI = async (mode) => {
+    if (!hasChapter) return;
     const result = await runAI(mode, html, instructions, provider);
     if (result) {
       setHtml(result);
-      if (selectedId) {
-        updateChapter(selectedId, {
-          title: title || selectedChapter?.title || "",
-          content: result,
-        });
-      }
+      updateChapter(selectedId, {
+        title: title || selectedChapter?.title || "",
+        content: result,
+      });
     }
   };
 
@@ -204,9 +195,8 @@ function toggleSelectMode() {
     if (DEBUG_IMPORT) console.log("📥 Import started, shouldSplit:", shouldSplit);
 
     if (!shouldSplit) {
-      if (DEBUG_IMPORT) console.log("📥 Importing into current chapter");
-      setHtml(htmlContent);
-      if (selectedId) {
+      if (hasChapter) {
+        setHtml(htmlContent);
         updateChapter(selectedId, {
           title: title || selectedChapter?.title || "",
           content: htmlContent,
@@ -247,7 +237,6 @@ function toggleSelectMode() {
         push();
         continue;
       }
-
       if (node.nodeType === 1) {
         if (isHeadingEl(node)) {
           const t = textOf(node);
@@ -268,7 +257,7 @@ function toggleSelectMode() {
     }
     if (buffer.trim()) push();
 
-    if (DEBUG_IMPORT) console.log("📊 Chapters parsed:", out.length, out.map((c) => c.title));
+    if (DEBUG_IMPORT) console.log("📊 Chapters parsed:", out.length, out.map(c => c.title));
     if (out.length === 0) {
       alert("No chapters detected. Use H1/H2/H3 or ‘Chapter 1’, ‘Chapter 2’, etc.");
       return;
@@ -278,7 +267,7 @@ function toggleSelectMode() {
       const c = out[i];
       if (DEBUG_IMPORT) console.log(`🛠️ Creating chapter ${i + 1}/${out.length}: "${c.title}"`);
       const newId = addChapter();
-      await new Promise((r) => setTimeout(r, 30));
+      await new Promise(r => setTimeout(r, 30));
       updateChapter(newId, { title: c.title, content: c.content });
     }
 
@@ -288,7 +277,6 @@ function toggleSelectMode() {
     setView("grid");
   };
 
-  // Handle export
   const handleExport = () => {
     const blob = new Blob([html], { type: "text/html" });
     const url = URL.createObjectURL(blob);
@@ -299,9 +287,8 @@ function toggleSelectMode() {
     URL.revokeObjectURL(url);
   };
 
-  // Handle delete current chapter
   const handleDeleteCurrent = () => {
-    if (!selectedChapter || !selectedId) return;
+    if (!hasChapter) return;
     if (window.confirm(`Delete "${title || selectedChapter.title}"?\n\nThis cannot be undone.`)) {
       deleteChapter(selectedId);
       setTimeout(() => setView("grid"), 100);
@@ -313,10 +300,9 @@ function toggleSelectMode() {
     if (!ids || ids.length === 0) return;
     if (!window.confirm(`Delete ${ids.length} chapter(s)? This cannot be undone.`)) return;
 
-    ids.forEach((id) => deleteChapter(id));
+    ids.forEach(id => deleteChapter(id));
     clearSelection();
 
-    // If current chapter was deleted, return to grid
     if (ids.includes(selectedId)) {
       setTimeout(() => setView("grid"), 100);
     }
@@ -330,37 +316,24 @@ function toggleSelectMode() {
         {/* ========== TOP BAR ========== */}
         <div className="sticky top-0 z-40 bg-white/80 backdrop-blur border-b border-slate-200">
           <div className="max-w-7xl mx-auto px-3 h-auto py-2 flex items-center gap-3 overflow-x-auto">
-            {/* Gold Dashboard Button */}
-            <GoldButton onClick={goBack} title="Back to Dashboard">
-              ← Dashboard
-            </GoldButton>
-
-            {/* Breadcrumb */}
+            <GoldButton onClick={goBack} title="Back to Dashboard">← Dashboard</GoldButton>
             <WritingCrumb view={view} />
 
             {/* View Toggle */}
             <div className="ml-1 flex items-center gap-1">
               <button
                 onClick={() => setView("grid")}
-                className={`inline-flex items-center gap-2 rounded-md border px-2.5 py-1 text-[13px] ${
-                  view === "grid" ? "bg-slate-100" : "bg-white hover:bg-slate-50"
-                }`}
+                className={`inline-flex items-center gap-2 rounded-md border px-2.5 py-1 text-[13px] ${view === "grid" ? "bg-slate-100" : "bg-white hover:bg-slate-50"}`}
                 title="Chapter Grid"
-              >
-                Grid
-              </button>
+              >Grid</button>
               <button
                 onClick={() => setView("editor")}
-                className={`inline-flex items-center gap-2 rounded-md border px-2.5 py-1 text-[13px] ${
-                  view === "editor" ? "bg-slate-100" : "bg-white hover:bg-slate-50"
-                }`}
+                className={`inline-flex items-center gap-2 rounded-md border px-2.5 py-1 text-[13px] ${view === "editor" ? "bg-slate-100" : "bg-white hover:bg-slate-50"}`}
                 title="Open Editor"
-              >
-                Editor
-              </button>
+              >Editor</button>
             </div>
 
-            {/* Select Mode Toggle (shown in both views) */}
+            {/* Select Mode Toggle */}
             <button
               onClick={toggleSelectMode}
               className={[
@@ -372,26 +345,20 @@ function toggleSelectMode() {
               {selectMode ? "✓ Select" : "Select"}
             </button>
 
-            {/* Selection toolbar (when items selected) */}
+            {/* Selection toolbar */}
             {selectMode && selectedIds.size > 0 && (
               <div className="flex items-center gap-2 px-3 py-1 bg-blue-50 rounded-md border border-blue-200">
-                <span className="text-xs font-medium text-blue-900">
-                  {selectedIds.size} selected
-                </span>
+                <span className="text-xs font-medium text-blue-900">{selectedIds.size} selected</span>
                 <button
                   onClick={() => handleDeleteMultiple(Array.from(selectedIds))}
                   className="text-xs px-2 py-0.5 rounded bg-red-500 text-white hover:bg-red-600"
                   title="Delete Selected"
-                >
-                  🗑️ Delete
-                </button>
+                >🗑️ Delete</button>
                 <button
                   onClick={clearSelection}
                   className="text-xs px-2 py-0.5 rounded border border-slate-300 bg-white hover:bg-slate-50"
                   title="Clear Selection"
-                >
-                  Clear
-                </button>
+                >Clear</button>
               </div>
             )}
 
@@ -410,7 +377,7 @@ function toggleSelectMode() {
 
             <div className="w-full sm:flex-1" />
 
-            {/* Editor Toolbar - All AI buttons, Save, etc. */}
+            {/* Editor Toolbar */}
             <EditorToolbar
               onAI={handleAI}
               onSave={handleSave}
@@ -430,65 +397,52 @@ function toggleSelectMode() {
               selectedId={selectedId}
               onSelectChapter={(id) => {
                 if (selectMode) {
-                  // In select mode: don't navigate, just toggle selection
                   toggleSelect(id);
                 } else {
-                  // Normal mode: navigate to editor
                   setSelectedId(id);
                   setView("editor");
                 }
               }}
               onAddChapter={addChapter}
-               onMoveChapter={moveChapter}
-               onDeleteChapter={deleteChapter}
-               selectMode={selectMode}
-               selectedIds={selectedIds}
-               onToggleSelect={toggleSelect}
-               onRangeSelect={(idx) => {
-                 rangeSelect(idx);
-               }}
-               lastClickedIndexRef={lastClickedIndexRef}
-               />
-               {/* Trash Dock for grid view */}
-               <TrashDock onDelete={handleDeleteMultiple} />
-               </>
-               )}
+              onMoveChapter={moveChapter}
+              onDeleteChapter={deleteChapter}
+              selectMode={selectMode}
+              selectedIds={selectedIds}
+              onToggleSelect={toggleSelect}
+              onRangeSelect={(idx) => rangeSelect(idx)}
+              lastClickedIndexRef={lastClickedIndexRef}
+            />
+            {/* Trash Dock for grid view */}
+            <TrashDock onDelete={handleDeleteMultiple} />
+          </>
+        )}
+
         {/* ========== EDITOR VIEW ========== */}
         {view === "editor" && (
           <div
             className="max-w-7xl mx-auto px-4 py-6 grid gap-6"
-            style={{
-              // Force two columns at all widths (prevents sidebar from becoming a top bar)
-              gridTemplateColumns: "280px minmax(0, 1fr)",
-              // Guard for narrow work panels/iframes
-              minWidth: 1024,
-            }}
+            style={{ gridTemplateColumns: "280px minmax(0, 1fr)", minWidth: 1024 }}
           >
             {/* Left Sidebar */}
             <aside className="sticky top-16 space-y-3" style={{ zIndex: 10 }}>
-              {/* Publishing Meta */}
               <PublishingMeta
                 bookTitle={bookTitle}
                 setBookTitle={setBookTitle}
                 author={author}
                 setAuthor={setAuthor}
-                onPublishingPrep={() => {
-                  // reserved for publishing prep flow
-                }}
+                onPublishingPrep={() => {}}
                 aiBusy={aiBusy}
                 aiError={aiError}
               />
 
-              {/* AI Instructions / prompt button */}
               <AIInstructions
                 instructions={instructions}
                 setInstructions={setInstructions}
                 chapterTitle={selectedChapter?.title}
-                onGeneratePrompt={() => generateChapterPrompt(selectedChapter)}
+                onGeneratePrompt={() => { if (hasChapter) generateChapterPrompt(selectedChapter); }}
                 aiBusy={aiBusy}
               />
 
-              {/* Chapters List */}
               <ChapterSidebar
                 chapters={chapters}
                 selectedId={selectedId}
@@ -498,12 +452,11 @@ function toggleSelectMode() {
                 selectMode={selectMode}
                 selectedIds={selectedIds}
                 onToggleSelect={toggleSelect}
-                onRangeSelect={(idx) => {
-                    rangeSelect(idx);
-                  }}
-                  lastClickedIndexRef={lastClickedIndexRef}
-                  />
-                  </aside>
+                onRangeSelect={(idx) => rangeSelect(idx)}
+                lastClickedIndexRef={lastClickedIndexRef}
+              />
+            </aside>
+
             {/* Main Editor */}
             <EditorPane
               title={title}
@@ -513,7 +466,7 @@ function toggleSelectMode() {
               onSave={handleSave}
               onAI={handleAI}
               aiBusy={aiBusy}
-              pageWidth={1000} // wider canvas; adjust if you like
+              pageWidth={1000}
             />
 
             {/* Trash Dock - Drag chapters here to delete */}
