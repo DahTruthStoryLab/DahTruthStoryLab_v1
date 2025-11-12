@@ -10,13 +10,15 @@ function ChapterItem({
   isSelected,
   isActive,
   selectMode,
-  selectedIds,          // Set<string>
-  onRowClick,           // (event) => void
+  selectedIds,
+  onRowClick,
 }) {
-  // Build drag payload: all selected if any, else just me
-  const selectedArray = (selectedIds && selectedIds.size > 0)
-    ? Array.from(selectedIds)
-    : [chapter.id];
+  if (!chapter || chapter.id == null) return null;
+
+  const selectedArray =
+    selectedIds && selectedIds.size > 0
+      ? Array.from(selectedIds)
+      : [chapter.id];
 
   const [{ isDragging }, drag] = useDrag(
     () => ({
@@ -24,7 +26,7 @@ function ChapterItem({
       item: { ids: selectedArray },
       collect: (monitor) => ({ isDragging: monitor.isDragging() }),
     }),
-    [chapter.id, selectedIds] // re-evaluate when selection changes
+    [chapter.id, selectedIds]
   );
 
   return (
@@ -67,32 +69,39 @@ export default function ChapterSidebar({
   selectedId,
   onSelectChapter,
   onAddChapter,
-  onDeleteMultiple,      // optional: bulk delete callback
-  // Lifted selection from ComposePage:
-  selectMode,            // boolean
-  selectedIds,           // Set<string>
-  onToggleSelect,        // (id, { additive?: boolean }) => void
-  onRangeSelect,         // (index) => void  (ComposePage will map index to id range)
-  lastClickedIndexRef,   // React.useRef<number|null>
+  onDeleteMultiple,
+  selectMode,
+  selectedIds,
+  onToggleSelect,
+  onRangeSelect,
+  lastClickedIndexRef,
 }) {
+  const safeChapters = Array.isArray(chapters)
+    ? chapters.filter((ch) => ch && ch.id != null)
+    : [];
+
   const handleRowClick = (chapterId, index) => (event) => {
+    if (!chapterId) return;
+
     if (!selectMode) {
-      // Normal navigation
-      onSelectChapter?.(chapterId);
+      onSelectChapter && onSelectChapter(chapterId);
       return;
     }
 
     const isShift = event.shiftKey;
     const isCtrlOrCmd = event.ctrlKey || event.metaKey;
 
-    if (isShift) {
-      // Range select using lifted helper
-      onRangeSelect?.(index);
-    } else {
-      // Toggle single with optional additive
-      onToggleSelect?.(chapterId, { additive: isCtrlOrCmd });
-      lastClickedIndexRef.current = index;
+    if (isShift && typeof onRangeSelect === "function") {
+      onRangeSelect(index);
+    } else if (typeof onToggleSelect === "function") {
+      onToggleSelect(chapterId, { additive: isCtrlOrCmd });
+      if (lastClickedIndexRef) lastClickedIndexRef.current = index;
     }
+  };
+
+  const handleDeleteSelected = () => {
+    if (!selectedIds || selectedIds.size === 0 || !onDeleteMultiple) return;
+    onDeleteMultiple(Array.from(selectedIds));
   };
 
   return (
@@ -113,7 +122,6 @@ export default function ChapterSidebar({
         </div>
       </div>
 
-      {/* Selection toolbar (optional, complements top toolbar) */}
       {selectMode && selectedIds?.size > 0 && (
         <div className="mb-3 p-2 bg-blue-50 rounded-lg flex items-center justify-between">
           <span className="text-xs font-medium text-blue-900">
@@ -122,7 +130,7 @@ export default function ChapterSidebar({
           <div className="flex items-center gap-2">
             {onDeleteMultiple && (
               <button
-                onClick={() => onDeleteMultiple(Array.from(selectedIds))}
+                onClick={handleDeleteSelected}
                 className="text-xs px-2 py-1 rounded bg-red-500 text-white hover:bg-red-600"
                 title="Delete Selected"
               >
@@ -134,7 +142,7 @@ export default function ChapterSidebar({
       )}
 
       <div className="space-y-1 max-h-96 overflow-y-auto">
-        {chapters.map((ch, idx) => (
+        {safeChapters.map((ch, idx) => (
           <ChapterItem
             key={ch.id}
             chapter={ch}
@@ -148,8 +156,10 @@ export default function ChapterSidebar({
         ))}
       </div>
 
-      {chapters.length === 0 && (
-        <div className="text-center py-6 text-sm text-slate-500">No chapters yet</div>
+      {safeChapters.length === 0 && (
+        <div className="text-center py-6 text-sm text-slate-500">
+          No chapters yet
+        </div>
       )}
 
       {selectMode && (
