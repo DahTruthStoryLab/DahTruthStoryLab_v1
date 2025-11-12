@@ -65,7 +65,7 @@ export default function ComposePage() {
   // Chapter management (state, CRUD operations)
   const {
     book,
-    chapters,
+    chapters = [],  // Add default empty array here
     selectedId,
     selectedChapter,
     setSelectedId,
@@ -389,6 +389,20 @@ export default function ComposePage() {
           </div>
         </div>
 
+const goBack = () => navigate("/dashboard");
+
+// Safety check - wait for chapters to load
+if (!chapters) {
+    return (
+      <div className="min-h-screen bg-[rgb(244,247,250)] flex items-center justify-center">
+        <div className="text-lg">Loading chapters...</div>
+      </div>
+    );
+  }
+
+return (
+  <DndProvider backend={HTML5Backend}>
+         
         {/* ========== GRID VIEW ========== */}
         {view === "grid" && (
           <>
