@@ -1,8 +1,6 @@
 // src/components/ComposePage.jsx
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { DndProvider } from "react-dnd";
-import { HTML5Backend } from "react-dnd-html5-backend";
 
 import EditorPane from "./Editor/EditorPane";
 import ChapterGrid from "./Writing/ChapterGrid";
@@ -16,6 +14,9 @@ import { useChapterManager } from "../hooks/useChapterManager";
 import { useAIAssistant } from "../hooks/useAIAssistant";
 import { GoldButton, WritingCrumb } from "./UI/UIComponents";
 
+/* ============================
+   Debug + import helpers
+============================= */
 const DEBUG_IMPORT = false;
 const HEADING_MATCH = /(chapter|ch\.?)\s*\d+|^chapter\b/i;
 
@@ -23,12 +24,16 @@ function isHeadingEl(el) {
   if (!el?.tagName) return false;
   const tag = el.tagName.toLowerCase();
   if (tag === "h1" || tag === "h2" || tag === "h3") return true;
+
   const cls = (el.getAttribute("class") || "").toLowerCase();
   if (/\b(msoheading|heading|title)\b/.test(cls)) return true;
+
   const styles = (el.getAttribute("style") || "").toLowerCase();
   if (/page-break|break-before|break-after/.test(styles)) return true;
+
   return false;
 }
+
 function isPageBreakNode(node) {
   if (node.nodeType === 8) return /pagebreak/i.test(node.nodeValue || "");
   if (node.nodeType === 1) {
@@ -39,11 +44,16 @@ function isPageBreakNode(node) {
   }
   return false;
 }
+
 const textOf = (el) => (el.textContent || "").trim();
 
+/* ============================
+   Main Component
+============================= */
 export default function ComposePage() {
   const navigate = useNavigate();
 
+  // Chapter management (state, CRUD operations)
   const {
     book,
     chapters: rawChapters = [],
@@ -57,6 +67,7 @@ export default function ComposePage() {
     saveProject,
   } = useChapterManager();
 
+  // AI operations
   const {
     runAI,
     aiBusy,
@@ -68,7 +79,7 @@ export default function ComposePage() {
     generateChapterPrompt,
   } = useAIAssistant();
 
-  // Filter out any null/undefined/invalid entries to avoid `.id` crashes
+  // Guard + normalize chapters
   const chapters = useMemo(
     () =>
       Array.isArray(rawChapters)
@@ -77,18 +88,27 @@ export default function ComposePage() {
     [rawChapters]
   );
 
+  // View state: 'grid' or 'editor'
   const [view, setView] = useState("grid");
+
+  // Editor state
   const [title, setTitle] = useState(selectedChapter?.title ?? "");
   const [html, setHtml] = useState(selectedChapter?.content ?? "");
+
+  // Publishing metadata
   const [author, setAuthor] = useState("Jacqueline Session Ausby");
   const [bookTitle, setBookTitle] = useState(book?.title || "Raising Daisy");
 
+  // Multi-select state shared with grid + sidebar + trash
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [selectMode, setSelectMode] = useState(false);
   const lastClickedIndexRef = useRef(null);
 
   const hasChapter = !!selectedId && !!selectedChapter;
 
+  /* ============================
+     Selection helpers
+  ============================= */
   const clearSelection = () => setSelectedIds(new Set());
 
   function toggleSelect(id, { additive = false } = {}) {
@@ -133,6 +153,9 @@ export default function ComposePage() {
     });
   }
 
+  /* ============================
+     Keyboard delete
+  ============================= */
   useEffect(() => {
     const onKey = (e) => {
       const tag = (e.target && e.target.tagName) || "";
@@ -146,6 +169,9 @@ export default function ComposePage() {
     return () => window.removeEventListener("keydown", onKey, { capture: true });
   }, [selectedIds]);
 
+  /* ============================
+     Sync editor when chapter changes
+  ============================= */
   useEffect(() => {
     if (selectedChapter) {
       setTitle(selectedChapter.title || "");
@@ -153,6 +179,9 @@ export default function ComposePage() {
     }
   }, [selectedId, selectedChapter]);
 
+  /* ============================
+     Actions
+  ============================= */
   const handleSave = () => {
     if (!hasChapter) return;
     updateChapter(selectedId, {
@@ -174,6 +203,7 @@ export default function ComposePage() {
     }
   };
 
+  // Import (optional split)
   const handleImport = async (htmlContent, shouldSplit) => {
     if (!shouldSplit) {
       if (hasChapter) {
@@ -274,14 +304,19 @@ export default function ComposePage() {
   const handleDeleteMultiple = (ids) => {
     if (!ids?.length) return;
     if (!window.confirm(`Delete ${ids.length} chapter(s)? This cannot be undone.`)) return;
+
     ids.forEach((id) => deleteChapter(id));
     clearSelection();
-    if (ids.includes(selectedId)) setTimeout(() => setView("grid"), 100);
+    if (ids.includes(selectedId)) {
+      setTimeout(() => setView("grid"), 100);
+    }
   };
 
   const goBack = () => navigate("/dashboard");
 
-  // Early fallback (single return path)
+  /* ============================
+     Simple "loading" guard
+  ============================= */
   if (!Array.isArray(chapters)) {
     return (
       <div className="min-h-screen bg-[rgb(244,247,250)] flex items-center justify-center">
@@ -290,164 +325,196 @@ export default function ComposePage() {
     );
   }
 
+  /* ============================
+     Render
+  ============================= */
   return (
-    <DndProvider backend={HTML5Backend}>
-      <div className="min-h-screen bg-[rgb(244,247,250)] text-slate-900">
-        {/* Top bar */}
-        <div className="sticky top-0 z-40 bg-white/80 backdrop-blur border-b border-slate-200">
-          <div className="max-w-7xl mx-auto px-3 h-auto py-2 flex items-center gap-3 overflow-x-auto">
-            <GoldButton onClick={goBack} title="Back to Dashboard">← Dashboard</GoldButton>
-            <WritingCrumb view={view} />
+    <div className="min-h-screen bg-[rgb(244,247,250)] text-slate-900">
+      {/* ========== TOP BAR ========== */}
+      <div className="sticky top-0 z-40 bg-white/80 backdrop-blur border-b border-slate-200">
+        <div className="max-w-7xl mx-auto px-3 h-auto py-2 flex items-center gap-3 overflow-x-auto">
+          {/* Gold Dashboard Button */}
+          <GoldButton onClick={goBack} title="Back to Dashboard">
+            ← Dashboard
+          </GoldButton>
 
-            <div className="ml-1 flex items-center gap-1">
-              <button
-                onClick={() => setView("grid")}
-                className={`inline-flex items-center gap-2 rounded-md border px-2.5 py-1 text-[13px] ${
-                  view === "grid" ? "bg-slate-100" : "bg-white hover:bg-slate-50"
-                }`}
-                title="Chapter Grid"
-              >Grid</button>
-              <button
-                onClick={() => setView("editor")}
-                className={`inline-flex items-center gap-2 rounded-md border px-2.5 py-1 text-[13px] ${
-                  view === "editor" ? "bg-slate-100" : "bg-white hover:bg-slate-50"
-                }`}
-                title="Open Editor"
-              >Editor</button>
-            </div>
+          {/* Breadcrumb */}
+          <WritingCrumb view={view} />
 
+          {/* View Toggle */}
+          <div className="ml-1 flex items-center gap-1">
             <button
-              onClick={toggleSelectMode}
-              className={[
-                "inline-flex items-center gap-2 rounded-md border px-2.5 py-1 text-[13px]",
-                selectMode ? "bg-blue-100 border-blue-300" : "bg-white hover:bg-slate-50",
-              ].join(" ")}
-              title="Toggle Select Mode"
+              onClick={() => setView("grid")}
+              className={`inline-flex items-center gap-2 rounded-md border px-2.5 py-1 text-[13px] ${
+                view === "grid" ? "bg-slate-100" : "bg-white hover:bg-slate-50"
+              }`}
+              title="Chapter Grid"
             >
-              {selectMode ? "✓ Select" : "Select"}
+              Grid
             </button>
+            <button
+              onClick={() => setView("editor")}
+              className={`inline-flex items-center gap-2 rounded-md border px-2.5 py-1 text-[13px] ${
+                view === "editor" ? "bg-slate-100" : "bg-white hover:bg-slate-50"
+              }`}
+              title="Open Editor"
+            >
+              Editor
+            </button>
+          </div>
 
-            {selectMode && selectedIds.size > 0 && (
-              <div className="flex items-center gap-2 px-3 py-1 bg-blue-50 rounded-md border border-blue-200">
-                <span className="text-xs font-medium text-blue-900">{selectedIds.size} selected</span>
-                <button
-                  onClick={() => handleDeleteMultiple(Array.from(selectedIds))}
-                  className="text-xs px-2 py-0.5 rounded bg-red-500 text-white hover:bg-red-600"
-                  title="Delete Selected"
-                >🗑️ Delete</button>
-                <button
-                  onClick={clearSelection}
-                  className="text-xs px-2 py-0.5 rounded border border-slate-300 bg-white hover:bg-slate-50"
-                  title="Clear Selection"
-                >Clear</button>
-              </div>
-            )}
+          {/* Select Mode Toggle */}
+          <button
+            onClick={toggleSelectMode}
+            className={[
+              "inline-flex items-center gap-2 rounded-md border px-2.5 py-1 text-[13px]",
+              selectMode ? "bg-blue-100 border-blue-300" : "bg-white hover:bg-slate-50",
+            ].join(" ")}
+            title="Toggle Select Mode"
+          >
+            {selectMode ? "✓ Select" : "Select"}
+          </button>
 
-            <div className="ml-2 flex items-center gap-1">
-              <label className="text-[12px] text-slate-600">Provider:</label>
-              <select
-                className="border rounded px-2 py-1 text-[12px]"
-                value={provider}
-                onChange={(e) => setProvider(e.target.value)}
+          {/* Selection toolbar */}
+          {selectMode && selectedIds.size > 0 && (
+            <div className="flex items-center gap-2 px-3 py-1 bg-blue-50 rounded-md border border-blue-200">
+              <span className="text-xs font-medium text-blue-900">
+                {selectedIds.size} selected
+              </span>
+              <button
+                onClick={() => handleDeleteMultiple(Array.from(selectedIds))}
+                className="text-xs px-2 py-0.5 rounded bg-red-500 text-white hover:bg-red-600"
+                title="Delete Selected"
               >
-                <option value="anthropic">Anthropic</option>
-                <option value="openai">OpenAI</option>
-              </select>
+                🗑️ Delete
+              </button>
+              <button
+                onClick={clearSelection}
+                className="text-xs px-2 py-0.5 rounded border border-slate-300 bg-white hover:bg-slate-50"
+                title="Clear Selection"
+              >
+                Clear
+              </button>
             </div>
+          )}
 
-            <div className="w-full sm:flex-1" />
+          {/* Provider Selector */}
+          <div className="ml-2 flex items-center gap-1">
+            <label className="text-[12px] text-slate-600">Provider:</label>
+            <select
+              className="border rounded px-2 py-1 text-[12px]"
+              value={provider}
+              onChange={(e) => setProvider(e.target.value)}
+            >
+              <option value="anthropic">Anthropic</option>
+              <option value="openai">OpenAI</option>
+            </select>
+          </div>
 
-            <EditorToolbar
-              onAI={handleAI}
-              onSave={handleSave}
-              onImport={handleImport}
-              onExport={handleExport}
-              onDelete={handleDeleteCurrent}
+          <div className="w-full sm:flex-1" />
+
+          {/* Editor Toolbar */}
+          <EditorToolbar
+            onAI={handleAI}
+            onSave={handleSave}
+            onImport={handleImport}
+            onExport={handleExport}
+            onDelete={handleDeleteCurrent}
+            aiBusy={aiBusy}
+          />
+        </div>
+      </div>
+
+      {/* ========== GRID VIEW ========== */}
+      {view === "grid" && (
+        <>
+          <ChapterGrid
+            chapters={chapters}
+            selectedId={selectedId}
+            onSelectChapter={(id) => {
+              if (!id) return;
+              if (selectMode) {
+                toggleSelect(id);
+              } else {
+                setSelectedId(id);
+                setView("editor");
+              }
+            }}
+            onAddChapter={addChapter}
+            onMoveChapter={moveChapter}
+            onDeleteChapter={deleteChapter}
+            selectMode={selectMode}
+            selectedIds={selectedIds}
+            onToggleSelect={toggleSelect}
+            onRangeSelect={(idx) => rangeSelect(idx)}
+            lastClickedIndexRef={lastClickedIndexRef}
+          />
+          {/* Trash Dock for grid view */}
+          <TrashDock onDelete={handleDeleteMultiple} />
+        </>
+      )}
+
+      {/* ========== EDITOR VIEW ========== */}
+      {view === "editor" && (
+        <div
+          className="max-w-7xl mx-auto px-4 py-6 grid gap-6"
+          style={{ gridTemplateColumns: "280px minmax(0, 1fr)", minWidth: 1024 }}
+        >
+          {/* Left Sidebar */}
+          <aside className="sticky top-16 space-y-3" style={{ zIndex: 10 }}>
+            {/* Publishing Meta */}
+            <PublishingMeta
+              bookTitle={bookTitle}
+              setBookTitle={setBookTitle}
+              author={author}
+              setAuthor={setAuthor}
+              onPublishingPrep={() => {}}
+              aiBusy={aiBusy}
+              aiError={aiError}
+            />
+
+            {/* AI Instructions */}
+            <AIInstructions
+              instructions={instructions}
+              setInstructions={setInstructions}
+              chapterTitle={selectedChapter?.title}
+              onGeneratePrompt={() => {
+                if (hasChapter) generateChapterPrompt(selectedChapter);
+              }}
               aiBusy={aiBusy}
             />
-          </div>
-        </div>
 
-        {/* GRID VIEW */}
-        {view === "grid" && (
-          <>
-            <ChapterGrid
+            {/* Chapters List */}
+            <ChapterSidebar
               chapters={chapters}
               selectedId={selectedId}
-              onSelectChapter={(id) => {
-                if (!id) return;
-                if (selectMode) {
-                  toggleSelect(id);
-                } else {
-                  setSelectedId(id);
-                  setView("editor");
-                }
-              }}
+              onSelectChapter={setSelectedId}
               onAddChapter={addChapter}
-              onMoveChapter={moveChapter}
-              onDeleteChapter={deleteChapter}
+              onDeleteMultiple={handleDeleteMultiple}
               selectMode={selectMode}
               selectedIds={selectedIds}
               onToggleSelect={toggleSelect}
               onRangeSelect={(idx) => rangeSelect(idx)}
               lastClickedIndexRef={lastClickedIndexRef}
             />
-            <TrashDock onDelete={handleDeleteMultiple} />
-          </>
-        )}
+          </aside>
 
-        {/* EDITOR VIEW */}
-        {view === "editor" && (
-          <div
-            className="max-w-7xl mx-auto px-4 py-6 grid gap-6"
-            style={{ gridTemplateColumns: "280px minmax(0, 1fr)", minWidth: 1024 }}
-          >
-            <aside className="sticky top-16 space-y-3" style={{ zIndex: 10 }}>
-              <PublishingMeta
-                bookTitle={bookTitle}
-                setBookTitle={setBookTitle}
-                author={author}
-                setAuthor={setAuthor}
-                onPublishingPrep={() => {}}
-                aiBusy={aiBusy}
-                aiError={aiError}
-              />
-              <AIInstructions
-                instructions={instructions}
-                setInstructions={setInstructions}
-                chapterTitle={selectedChapter?.title}
-                onGeneratePrompt={() => { if (hasChapter) generateChapterPrompt(selectedChapter); }}
-                aiBusy={aiBusy}
-              />
-              <ChapterSidebar
-                chapters={chapters}
-                selectedId={selectedId}
-                onSelectChapter={setSelectedId}
-                onAddChapter={addChapter}
-                onDeleteMultiple={handleDeleteMultiple}
-                selectMode={selectMode}
-                selectedIds={selectedIds}
-                onToggleSelect={toggleSelect}
-                onRangeSelect={(idx) => rangeSelect(idx)}
-                lastClickedIndexRef={lastClickedIndexRef}
-              />
-            </aside>
+          {/* Main Editor */}
+          <EditorPane
+            title={title}
+            setTitle={setTitle}
+            html={html}
+            setHtml={setHtml}
+            onSave={handleSave}
+            onAI={handleAI}
+            aiBusy={aiBusy}
+            pageWidth={1000}
+          />
 
-            <EditorPane
-              title={title}
-              setTitle={setTitle}
-              html={html}
-              setHtml={setHtml}
-              onSave={handleSave}
-              onAI={handleAI}
-              aiBusy={aiBusy}
-              pageWidth={1000}
-            />
-
-            <TrashDock onDelete={handleDeleteMultiple} />
-          </div>
-        )}
-      </div>
-    </DndProvider>
+          {/* Trash Dock - Drag chapters here to delete */}
+          <TrashDock onDelete={handleDeleteMultiple} />
+        </div>
+      )}
+    </div>
   );
 }
