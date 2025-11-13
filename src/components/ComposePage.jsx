@@ -14,10 +14,14 @@ import { useChapterManager } from "../hooks/useChapterManager";
 import { useAIAssistant } from "../hooks/useAIAssistant";
 import { GoldButton, WritingCrumb } from "./UI/UIComponents";
 
+// NEW: Import the document parser and rate limiter
+import { documentParser } from "../utils/documentParser";
+import { rateLimiter } from "../utils/rateLimiter";
+
 /* ============================
    Debug + import helpers
 ============================= */
-const DEBUG_IMPORT = false;
+const DEBUG_IMPORT = true; // Set to true to see detailed import logs
 const HEADING_MATCH = /(chapter|ch\.?)\s*\d+|^chapter\b/i;
 
 function isHeadingEl(el) {
@@ -104,7 +108,22 @@ export default function ComposePage() {
   const [selectMode, setSelectMode] = useState(false);
   const lastClickedIndexRef = useRef(null);
 
+  // NEW: Import state
+  const [isImporting, setIsImporting] = useState(false);
+  const [importProgress, setImportProgress] = useState("");
+  const [queueLength, setQueueLength] = useState(0);
+
   const hasChapter = !!selectedId && !!selectedChapter;
+
+  /* ============================
+     NEW: Monitor rate limiter queue
+  ============================= */
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setQueueLength(rateLimiter.getQueueLength());
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   /* ============================
      Selection helpers
@@ -193,94 +212,211 @@ export default function ComposePage() {
 
   const handleAI = async (mode) => {
     if (!hasChapter) return;
-    const result = await runAI(mode, html, instructions, provider);
-    if (result) {
-      setHtml(result);
-      updateChapter(selectedId, {
-        title: title || selectedChapter?.title || "",
-        content: result,
+    
+    // NEW: Use rate limiter for AI requests
+    try {
+      const result = await rateLimiter.addToQueue(async () => {
+        return await runAI(mode, html, instructions, provider);
       });
+      
+      if (result) {
+        setHtml(result);
+        updateChapter(selectedId, {
+          title: title || selectedChapter?.title || "",
+          content: result,
+        });
+      }
+    } catch (error) {
+      console.error("AI request error:", error);
+      // Error is already handled by useAIAssistant
     }
   };
 
-  // Import (optional split)
-  const handleImport = async (htmlContent, shouldSplit) => {
-    if (!shouldSplit) {
-      if (hasChapter) {
-        setHtml(htmlContent);
-        updateChapter(selectedId, {
-          title: title || selectedChapter?.title || "",
-          content: htmlContent,
-        });
+  /* ============================
+     NEW: Enhanced Import with Document Parser
+     Handles both .docx and HTML files
+  ============================= */
+  const handleImport = async (fileOrHtml, shouldSplit) => {
+    setIsImporting(true);
+    setImportProgress("Starting import...");
+
+    try {
+      let htmlContent;
+      let parsedDocument = null;
+
+      // Check if this is a File object (from file input) or HTML string
+      if (fileOrHtml instanceof File) {
+        const file = fileOrHtml;
+        setImportProgress(`Processing ${file.name}...`);
+
+        // Check file type
+        if (file.name.endsWith('.docx') || file.name.endsWith('.doc')) {
+          // Use document parser for Word files
+          if (DEBUG_IMPORT) console.log("Parsing Word document with mammoth...");
+          parsedDocument = await documentParser.parseWordDocument(file);
+          
+        } else if (file.name.endsWith('.txt') || file.name.endsWith('.md')) {
+          // Use document parser for text files
+          if (DEBUG_IMPORT) console.log("Parsing text document...");
+          parsedDocument = await documentParser.parseTextDocument(file);
+          
+        } else if (file.name.endsWith('.html') || file.name.endsWith('.htm')) {
+          // Read HTML file
+          htmlContent = await file.text();
+          
+        } else {
+          throw new Error('Unsupported file type. Please upload .docx, .doc, .txt, .md, or .html files.');
+        }
+
+      } else if (typeof fileOrHtml === 'string') {
+        // HTML string passed directly
+        htmlContent = fileOrHtml;
+      } else {
+        throw new Error('Invalid import format');
       }
-      alert("✅ Document imported into current chapter!");
-      return;
-    }
 
-    const root = document.createElement("div");
-    root.innerHTML = htmlContent;
+      // If we have a parsed document from documentParser, use it
+      if (parsedDocument) {
+        setImportProgress(`Importing ${parsedDocument.chapters.length} chapters...`);
+        
+        if (DEBUG_IMPORT) {
+          console.log("Parsed document:", {
+            title: parsedDocument.title,
+            chapters: parsedDocument.chapters.length,
+            wordCount: parsedDocument.totalWordCount,
+          });
+        }
 
-    const nodes = [];
-    const walker = document.createTreeWalker(
-      root,
-      NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_COMMENT,
-      null
-    );
-    while (walker.nextNode()) nodes.push(walker.currentNode);
+        // Create chapters from parsed document
+        for (let i = 0; i < parsedDocument.chapters.length; i++) {
+          const chapter = parsedDocument.chapters[i];
+          setImportProgress(`Creating chapter ${i + 1}/${parsedDocument.chapters.length}...`);
+          
+          const newId = addChapter();
+          await new Promise((resolve) => setTimeout(resolve, 50));
+          
+          updateChapter(newId, {
+            title: chapter.title,
+            content: chapter.content,
+          });
+        }
 
-    const out = [];
-    let buffer = "";
-    let currentTitle = "";
-    let n = 1;
-
-    const push = () => {
-      if (!buffer.trim()) return;
-      out.push({ title: currentTitle || `Chapter ${n}`, content: buffer });
-      n += 1;
-      buffer = "";
-      currentTitle = "";
-    };
-
-    for (const node of nodes) {
-      if (isPageBreakNode(node)) {
-        push();
-        continue;
+        setImportProgress("");
+        setIsImporting(false);
+        
+        alert(
+          `✅ Document imported successfully!\n\n` +
+          `• ${parsedDocument.chapters.length} chapters detected\n` +
+          `• ${parsedDocument.totalWordCount.toLocaleString()} total words\n` +
+          `• Table of contents generated`
+        );
+        
+        setView("grid");
+        return;
       }
-      if (node.nodeType === 1) {
-        if (isHeadingEl(node)) {
-          const t = textOf(node);
-          if (buffer.trim()) push();
-          currentTitle = HEADING_MATCH.test(t) ? t : t || `Chapter ${n}`;
+
+      // Fall back to original HTML-based import logic
+      if (!htmlContent) {
+        throw new Error('No content to import');
+      }
+
+      if (!shouldSplit) {
+        // Import into current chapter
+        if (hasChapter) {
+          setHtml(htmlContent);
+          updateChapter(selectedId, {
+            title: title || selectedChapter?.title || "",
+            content: htmlContent,
+          });
+        }
+        setImportProgress("");
+        setIsImporting(false);
+        alert("✅ Document imported into current chapter!");
+        return;
+      }
+
+      // Split HTML into chapters (original logic)
+      setImportProgress("Detecting chapters...");
+      
+      const root = document.createElement("div");
+      root.innerHTML = htmlContent;
+
+      const nodes = [];
+      const walker = document.createTreeWalker(
+        root,
+        NodeFilter.SHOW_ELEMENT | NodeFilter.SHOW_COMMENT,
+        null
+      );
+      while (walker.nextNode()) nodes.push(walker.currentNode);
+
+      const out = [];
+      let buffer = "";
+      let currentTitle = "";
+      let n = 1;
+
+      const push = () => {
+        if (!buffer.trim()) return;
+        out.push({ title: currentTitle || `Chapter ${n}`, content: buffer });
+        n += 1;
+        buffer = "";
+        currentTitle = "";
+      };
+
+      for (const node of nodes) {
+        if (isPageBreakNode(node)) {
+          push();
           continue;
         }
-        if (node.tagName.toLowerCase() === "p") {
-          const t = textOf(node);
-          if (HEADING_MATCH.test(t)) {
+        if (node.nodeType === 1) {
+          if (isHeadingEl(node)) {
+            const t = textOf(node);
             if (buffer.trim()) push();
-            currentTitle = t;
+            currentTitle = HEADING_MATCH.test(t) ? t : t || `Chapter ${n}`;
             continue;
           }
+          if (node.tagName.toLowerCase() === "p") {
+            const t = textOf(node);
+            if (HEADING_MATCH.test(t)) {
+              if (buffer.trim()) push();
+              currentTitle = t;
+              continue;
+            }
+          }
+          buffer += node.outerHTML || "";
         }
-        buffer += node.outerHTML || "";
       }
-    }
-    if (buffer.trim()) push();
+      if (buffer.trim()) push();
 
-    if (out.length === 0) {
-      alert("No chapters detected. Use H1/H2/H3 or ‘Chapter 1’, ‘Chapter 2’, etc.");
-      return;
-    }
+      if (out.length === 0) {
+        setImportProgress("");
+        setIsImporting(false);
+        alert("No chapters detected. Use H1/H2/H3 or 'Chapter 1', 'Chapter 2', etc.");
+        return;
+      }
 
-    for (let i = 0; i < out.length; i++) {
-      const c = out[i];
-      const newId = addChapter();
-      await new Promise((r) => setTimeout(r, 30));
-      updateChapter(newId, { title: c.title, content: c.content });
-    }
+      // Create chapters
+      for (let i = 0; i < out.length; i++) {
+        const c = out[i];
+        setImportProgress(`Creating chapter ${i + 1}/${out.length}...`);
+        
+        const newId = addChapter();
+        await new Promise((r) => setTimeout(r, 30));
+        updateChapter(newId, { title: c.title, content: c.content });
+      }
 
-    if (DEBUG_IMPORT) console.log("Imported chapters:", out.map((c) => c.title));
-    alert(`✅ Successfully imported ${out.length} chapters!`);
-    setView("grid");
+      if (DEBUG_IMPORT) console.log("Imported chapters:", out.map((c) => c.title));
+      
+      setImportProgress("");
+      setIsImporting(false);
+      alert(`✅ Successfully imported ${out.length} chapters!`);
+      setView("grid");
+
+    } catch (error) {
+      console.error("Import error:", error);
+      setImportProgress("");
+      setIsImporting(false);
+      alert(`Error importing document:\n\n${error.message}\n\nPlease try again or check the file format.`);
+    }
   };
 
   const handleExport = () => {
@@ -411,6 +547,23 @@ export default function ComposePage() {
             </select>
           </div>
 
+          {/* NEW: Queue status indicator */}
+          {queueLength > 0 && (
+            <div className="ml-2 flex items-center gap-1 px-2 py-1 bg-blue-50 rounded border border-blue-200">
+              <span className="text-xs text-blue-700">
+                ⏳ {queueLength} AI request{queueLength !== 1 ? 's' : ''} queued
+              </span>
+            </div>
+          )}
+
+          {/* NEW: Import progress indicator */}
+          {isImporting && (
+            <div className="ml-2 flex items-center gap-2 px-3 py-1 bg-amber-50 rounded border border-amber-200">
+              <div className="w-3 h-3 border-2 border-amber-600 border-t-transparent rounded-full animate-spin" />
+              <span className="text-xs text-amber-700">{importProgress}</span>
+            </div>
+          )}
+
           <div className="w-full sm:flex-1" />
 
           {/* Editor Toolbar */}
@@ -420,7 +573,7 @@ export default function ComposePage() {
             onImport={handleImport}
             onExport={handleExport}
             onDelete={handleDeleteCurrent}
-            aiBusy={aiBusy}
+            aiBusy={aiBusy || isImporting}
           />
         </div>
       </div>
@@ -518,3 +671,4 @@ export default function ComposePage() {
     </div>
   );
 }
+
