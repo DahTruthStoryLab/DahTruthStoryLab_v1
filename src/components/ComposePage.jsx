@@ -17,8 +17,6 @@ import { GoldButton, WritingCrumb } from "./UI/UIComponents";
 // NEW: Import the document parser and rate limiter
 import { documentParser } from "../utils/documentParser";
 import { rateLimiter } from "../utils/rateLimiter";
-import { documentParser } from "../lib/documentParser"; // adjust path if needed
-
 
 /* ============================
    Debug + import helpers
