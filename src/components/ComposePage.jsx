@@ -7,7 +7,7 @@ import ChapterGrid from "./Writing/ChapterGrid";
 import ChapterSidebar from "./Writing/ChapterSidebar";
 import EditorToolbar from "./Editor/EditorToolbar";
 import PublishingMeta from "./Editor/PublishingMeta";
-// AIInstructions REMOVED from imports
+// AIInstructions REMOVED on purpose for simplicity on this page
 // import AIInstructions from "./Editor/AIInstructions";
 import TrashDock from "./Writing/TrashDock";
 
@@ -51,13 +51,13 @@ export default function ComposePage() {
   } = useAIAssistant();
 
   // Guard + normalize chapters without being too strict about ID type
-const chapters = useMemo(
-  () =>
-    Array.isArray(rawChapters)
-      ? rawChapters.filter((c) => c && c.id != null) // just ensure each chapter exists and has some id
-      : [],
-  [rawChapters]
-);
+  const chapters = useMemo(
+    () =>
+      Array.isArray(rawChapters)
+        ? rawChapters.filter((c) => c && c.id != null)
+        : [],
+    [rawChapters]
+  );
 
   // View state
   const [view, setView] = useState("grid");
@@ -157,131 +157,130 @@ const chapters = useMemo(
     }
   }, [selectedId, selectedChapter]);
 
+  // Save current chapter + project
+  const handleSave = () => {
+    if (!hasChapter) return;
+    updateChapter(selectedId, {
+      title: title || selectedChapter?.title || "",
+      content: html,
+    });
+    saveProject({ book: { ...book, title: bookTitle }, chapters });
+  };
+
+  // AI (rewrite only, but no prompt panel shown)
   const handleAI = async (mode) => {
-  if (!hasChapter) return;
+    if (!hasChapter) return;
 
-  try {
-    const result = await rateLimiter.addToQueue(async () => {
-      return await runAI(mode, html, instructions, provider);
-    });
-
-    if (result) {
-      setHtml(result);
-      updateChapter(selectedId, {
-        title: title || selectedChapter?.title || "",
-        content: result,
+    try {
+      const result = await rateLimiter.addToQueue(async () => {
+        return await runAI(mode, html, instructions, provider);
       });
-    }
-  } catch (error) {
-    console.error("AI request error:", error);
-  }
-};
 
- const handleImport = async (file, options = {}) => {
-  if (!file) return;
-
-  const { splitByHeadings = true } = options;
-
-  try {
-    const name = file.name.toLowerCase();
-    let parsed;
-
-    // 1) Parse the file with your documentParser
-    if (name.endsWith(".doc") || name.endsWith(".docx")) {
-      // Use rate limiter for docx parsing since it may call AI later
-      parsed = await rateLimiter.addToQueue(() =>
-        documentParser.parseWordDocument(file)
-      );
-    } else if (name.endsWith(".txt") || name.endsWith(".md")) {
-      parsed = await documentParser.parseTextDocument(file);
-    } else {
-      alert("Unsupported file type. Please use .doc, .docx, .txt, or .md");
-      return;
-    }
-
-    if (!parsed) {
-      alert("Could not parse this document.");
-      return;
-    }
-
-    // Optional: sync book title to document title if present
-    if (parsed.title && parsed.title !== bookTitle) {
-      setBookTitle(parsed.title);
-    }
-
-    // 2) If splitByHeadings is ON and we have chapters, create one chapter per section
-    if (splitByHeadings && parsed.chapters && parsed.chapters.length > 0) {
-      for (const c of parsed.chapters) {
-        const newId = addChapter();
-        updateChapter(newId, {
-          title: c.title || "Untitled Chapter",
-          content: c.content || "",
-        });
-      }
-
-      alert(`✅ Imported ${parsed.chapters.length} chapter(s) from "${file.name}".`);
-
-      // Do NOT force view to grid — we stay where the user is
-    } else {
-      // 3) Fallback: import into a single chapter
-      const fullContent =
-        parsed.fullContent ||
-        (parsed.chapters && parsed.chapters.length
-          ? parsed.chapters.map((c) => c.content || "").join("\n\n")
-          : "");
-
-      if (hasChapter) {
-        // Overwrite current chapter
-        setHtml(fullContent);
+      if (result) {
+        setHtml(result);
         updateChapter(selectedId, {
-          title: title || selectedChapter?.title || parsed.title || "Imported Manuscript",
-          content: fullContent,
+          title: title || selectedChapter?.title || "",
+          content: result,
         });
+      }
+    } catch (error) {
+      console.error("AI request error:", error);
+    }
+  };
+
+  /* ============================
+     Simplified Import:
+     - If splitByHeadings true and chapters found → one card per chapter
+     - Else → whole manuscript into one chapter
+  ============================= */
+  const handleImport = async (file, options = {}) => {
+    if (!file) return;
+
+    const { splitByHeadings = true } = options;
+
+    setIsImporting(true);
+    setImportProgress("Importing document...");
+
+    try {
+      const name = file.name.toLowerCase();
+      let parsed;
+
+      // Parse the file with your documentParser
+      if (name.endsWith(".doc") || name.endsWith(".docx")) {
+        parsed = await rateLimiter.addToQueue(() =>
+          documentParser.parseWordDocument(file)
+        );
+      } else if (name.endsWith(".txt") || name.endsWith(".md")) {
+        parsed = await documentParser.parseTextDocument(file);
       } else {
-        // Create a brand new chapter
-        const newId = addChapter();
-        updateChapter(newId, {
-          title: parsed.title || "Imported Manuscript",
-          content: fullContent,
-        });
-        setSelectedId(newId);
-        setView("editor");
+        alert("Unsupported file type. Please use .doc, .docx, .txt, or .md");
+        return;
       }
 
-      alert(`✅ Document imported into a single chapter from "${file.name}".`);
-    }
+      if (!parsed) {
+        alert("Could not parse this document.");
+        return;
+      }
 
-    // 4) Save snapshot (optional, depends how your hook uses this)
-    saveProject({
-      book: { ...book, title: parsed.title || bookTitle },
-      chapters, // this will now include the new ones after the filter fix above
-    });
-  } catch (error) {
-    console.error("Import failed:", error);
-    alert(
-      `❌ Failed to import document: ${
-        error instanceof Error ? error.message : "Unknown error"
-      }`
-    );
-  }
-};
+      if (DEBUG_IMPORT) {
+        console.log("Parsed document:", parsed);
+      }
 
-      // Stay in editor view so author sees the manuscript immediately
-      setView("editor");
-
-      // Optionally sync book title if you like the parsed title
+      // Optional: sync book title to document title if present
       if (parsed.title && parsed.title !== bookTitle) {
         setBookTitle(parsed.title);
       }
 
+      // If splitByHeadings is ON and we have chapters, create one chapter per section
+      if (splitByHeadings && parsed.chapters && parsed.chapters.length > 0) {
+        for (const c of parsed.chapters) {
+          const newId = addChapter();
+          updateChapter(newId, {
+            title: c.title || "Untitled Chapter",
+            content: c.content || "",
+          });
+        }
+
+        alert(`✅ Imported ${parsed.chapters.length} chapter(s) from "${file.name}".`);
+        // We do NOT force view change; user stays where they are (grid or editor)
+      } else {
+        // Fallback: whole manuscript into a single chapter
+        const fullContent =
+          parsed.fullContent ||
+          (parsed.chapters && parsed.chapters.length
+            ? parsed.chapters.map((c) => c.content || "").join("\n\n")
+            : "");
+
+        if (hasChapter) {
+          // Overwrite current chapter
+          setHtml(fullContent);
+          updateChapter(selectedId, {
+            title:
+              title ||
+              selectedChapter?.title ||
+              parsed.title ||
+              "Imported Manuscript",
+            content: fullContent,
+          });
+        } else {
+          // Create a brand new chapter
+          const newId = addChapter();
+          updateChapter(newId, {
+            title: parsed.title || "Imported Manuscript",
+            content: fullContent,
+          });
+          setSelectedId(newId);
+          setView("editor");
+        }
+
+        alert(`✅ Document imported into a single chapter from "${file.name}".`);
+      }
+
+      // Save snapshot
       saveProject({
         book: { ...book, title: parsed.title || bookTitle },
         chapters,
       });
-
-      alert(
-        `✅ Imported manuscript "${chapterTitle}".\nYou can now create additional chapters and copy/paste sections into them.`
-      );
     } catch (error) {
       console.error("Import failed:", error);
       alert(
@@ -502,8 +501,7 @@ const chapters = useMemo(
               aiError={aiError}
             />
 
-            {/* AIInstructions REMOVED here to simplify writing page */}
-            {/* <AIInstructions ... /> */}
+            {/* AIInstructions REMOVED on this page to simplify author workflow */}
 
             <ChapterSidebar
               chapters={chapters}
