@@ -1,4 +1,4 @@
-// Rate Limiter for OpenAI API calls
+// src/lib/rateLimiter.ts
 class RateLimiter {
   private queue: Array<() => Promise<any>> = [];
   private processing = false;
@@ -17,7 +17,7 @@ class RateLimiter {
           reject(error);
         }
       });
-      
+
       if (!this.processing) {
         this.processQueue();
       }
@@ -29,7 +29,6 @@ class RateLimiter {
     retryCount = 0
   ): Promise<T> {
     try {
-      // Ensure minimum delay between requests
       const now = Date.now();
       const timeSinceLastRequest = now - this.lastRequestTime;
       if (timeSinceLastRequest < this.minDelay) {
@@ -37,12 +36,12 @@ class RateLimiter {
       }
 
       this.lastRequestTime = Date.now();
-      const result = await apiCall();
-      return result;
+      return await apiCall();
     } catch (error: any) {
-      // Check if it's a rate limit error
       if (error?.status === 429 && retryCount < this.maxRetries) {
-        console.warn(`Rate limit hit, retrying in ${this.retryDelay / 1000}s...`);
+        console.warn(
+          `Rate limit hit, retrying in ${this.retryDelay / 1000}s...`
+        );
         await this.sleep(this.retryDelay);
         return this.executeWithRetry(apiCall, retryCount + 1);
       }
@@ -52,21 +51,19 @@ class RateLimiter {
 
   private async processQueue() {
     if (this.processing || this.queue.length === 0) return;
-    
+
     this.processing = true;
-    
     while (this.queue.length > 0) {
       const task = this.queue.shift();
       if (task) {
         await task();
       }
     }
-    
     this.processing = false;
   }
 
   private sleep(ms: number): Promise<void> {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   getQueueLength(): number {
