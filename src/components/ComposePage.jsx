@@ -7,7 +7,8 @@ import ChapterGrid from "./Writing/ChapterGrid";
 import ChapterSidebar from "./Writing/ChapterSidebar";
 import EditorToolbar from "./Editor/EditorToolbar";
 import PublishingMeta from "./Editor/PublishingMeta";
-import AIInstructions from "./Editor/AIInstructions";
+// AIInstructions REMOVED from imports
+// import AIInstructions from "./Editor/AIInstructions";
 import TrashDock from "./Writing/TrashDock";
 
 import { useChapterManager } from "../hooks/useChapterManager";
@@ -18,46 +19,12 @@ import { GoldButton, WritingCrumb } from "./UI/UIComponents";
 import { documentParser } from "../utils/documentParser";
 import { rateLimiter } from "../utils/rateLimiter";
 
-/* ============================
-   Debug + import helpers
-============================= */
-const DEBUG_IMPORT = true; // Set to false when you’re done debugging
-const HEADING_MATCH = /(chapter|ch\.?)\s*\d+|^chapter\b/i;
+const DEBUG_IMPORT = false;
 
-function isHeadingEl(el) {
-  if (!el?.tagName) return false;
-  const tag = el.tagName.toLowerCase();
-  if (tag === "h1" || tag === "h2" || tag === "h3") return true;
-
-  const cls = (el.getAttribute("class") || "").toLowerCase();
-  if (/\b(msoheading|heading|title)\b/.test(cls)) return true;
-
-  const styles = (el.getAttribute("style") || "").toLowerCase();
-  if (/page-break|break-before|break-after/.test(styles)) return true;
-
-  return false;
-}
-
-function isPageBreakNode(node) {
-  if (node.nodeType === 8) return /pagebreak/i.test(node.nodeValue || "");
-  if (node.nodeType === 1) {
-    const tag = node.tagName.toLowerCase();
-    if (tag === "hr") return true;
-    const styles = (node.getAttribute("style") || "").toLowerCase();
-    if (/page-break/.test(styles)) return true;
-  }
-  return false;
-}
-
-const textOf = (el) => (el.textContent || "").trim();
-
-/* ============================
-   Main Component
-============================= */
 export default function ComposePage() {
   const navigate = useNavigate();
 
-  // Chapter management (state, CRUD operations)
+  // Chapter management
   const {
     book,
     chapters: rawChapters = [],
@@ -83,7 +50,7 @@ export default function ComposePage() {
     generateChapterPrompt,
   } = useAIAssistant();
 
-  // Guard + normalize chapters
+  // Normalize chapters (filter out nulls)
   const chapters = useMemo(
     () =>
       Array.isArray(rawChapters)
@@ -92,32 +59,30 @@ export default function ComposePage() {
     [rawChapters]
   );
 
-  // View state: 'grid' or 'editor'
+  // View state
   const [view, setView] = useState("grid");
 
   // Editor state
   const [title, setTitle] = useState(selectedChapter?.title ?? "");
   const [html, setHtml] = useState(selectedChapter?.content ?? "");
 
-  // Publishing metadata
+  // Book metadata
   const [author, setAuthor] = useState("Jacqueline Session Ausby");
   const [bookTitle, setBookTitle] = useState(book?.title || "Raising Daisy");
 
-  // Multi-select state shared with grid + sidebar + trash
+  // Selection state
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [selectMode, setSelectMode] = useState(false);
   const lastClickedIndexRef = useRef(null);
 
-  // Import + rate-limiter status
+  // Import + rate limiter indicators
   const [isImporting, setIsImporting] = useState(false);
   const [importProgress, setImportProgress] = useState("");
   const [queueLength, setQueueLength] = useState(0);
 
   const hasChapter = !!selectedId && !!selectedChapter;
 
-  /* ============================
-     Monitor rate limiter queue
-  ============================= */
+  // Monitor rate limiter queue (for AI)
   useEffect(() => {
     const interval = setInterval(() => {
       setQueueLength(rateLimiter.getQueueLength());
@@ -125,9 +90,7 @@ export default function ComposePage() {
     return () => clearInterval(interval);
   }, []);
 
-  /* ============================
-     Selection helpers
-  ============================= */
+  // Selection helpers
   const clearSelection = () => setSelectedIds(new Set());
 
   function toggleSelect(id, { additive = false } = {}) {
@@ -172,9 +135,7 @@ export default function ComposePage() {
     });
   }
 
-  /* ============================
-     Keyboard delete
-  ============================= */
+  // Keyboard delete
   useEffect(() => {
     const onKey = (e) => {
       const tag = (e.target && e.target.tagName) || "";
@@ -188,9 +149,7 @@ export default function ComposePage() {
     return () => window.removeEventListener("keydown", onKey, { capture: true });
   }, [selectedIds]);
 
-  /* ============================
-     Sync editor when chapter changes
-  ============================= */
+  // Sync editor with selected chapter
   useEffect(() => {
     if (selectedChapter) {
       setTitle(selectedChapter.title || "");
@@ -198,9 +157,7 @@ export default function ComposePage() {
     }
   }, [selectedId, selectedChapter]);
 
-  /* ============================
-     Actions
-  ============================= */
+  // Save
   const handleSave = () => {
     if (!hasChapter) return;
     updateChapter(selectedId, {
@@ -210,6 +167,7 @@ export default function ComposePage() {
     saveProject({ book: { ...book, title: bookTitle }, chapters });
   };
 
+  // AI (rewrite only, but no prompt panel shown)
   const handleAI = async (mode) => {
     if (!hasChapter) return;
 
@@ -227,98 +185,76 @@ export default function ComposePage() {
       }
     } catch (error) {
       console.error("AI request error:", error);
-      // useAIAssistant already tracks error for UI
     }
   };
 
-  /* ============================
-     Enhanced Import with Document Parser
-  ============================= */
-  const handleImport = async (file, options = {}) => {
+  // SIMPLE IMPORT: one manuscript → one chapter
+  const handleImport = async (file) => {
     if (!file) return;
 
-    const { splitByHeadings = true } = options;
-
     setIsImporting(true);
-    setImportProgress(`Reading ${file.name}...`);
+    setImportProgress(`Importing "${file.name}"...`);
 
     try {
       const name = file.name.toLowerCase();
       let parsed;
 
       if (name.endsWith(".doc") || name.endsWith(".docx")) {
-        if (DEBUG_IMPORT) console.log("Parsing Word document with mammoth…");
-        parsed = await rateLimiter.addToQueue(() =>
-          documentParser.parseWordDocument(file)
-        );
+        parsed = await documentParser.parseWordDocument(file);
       } else if (name.endsWith(".txt") || name.endsWith(".md")) {
-        if (DEBUG_IMPORT) console.log("Parsing text document…");
         parsed = await documentParser.parseTextDocument(file);
       } else {
         alert("Unsupported file type. Please use .doc, .docx, .txt, or .md");
         return;
       }
 
-      if (DEBUG_IMPORT) {
-        console.log("Parsed document:", {
-          title: parsed.title,
-          chapters: parsed.chapters?.length,
-          wordCount: parsed.totalWordCount,
+      if (DEBUG_IMPORT) console.log("Parsed document:", parsed);
+
+      const fullContent =
+        parsed.fullContent ||
+        (parsed.chapters && parsed.chapters.length
+          ? parsed.chapters.map((c) => c.content).join("\n\n")
+          : "");
+
+      const chapterTitle =
+        parsed.title ||
+        file.name.replace(/\.(docx|doc|txt|md)$/i, "") ||
+        "Imported Manuscript";
+
+      if (hasChapter) {
+        // Overwrite current chapter
+        setTitle(chapterTitle);
+        setHtml(fullContent);
+        updateChapter(selectedId, {
+          title: chapterTitle,
+          content: fullContent,
         });
+      } else {
+        // Create a brand new chapter
+        const newId = addChapter();
+        updateChapter(newId, {
+          title: chapterTitle,
+          content: fullContent,
+        });
+        setSelectedId(newId);
       }
 
-      // Optional: sync book title with parsed title
+      // Stay in editor view so author sees the manuscript immediately
+      setView("editor");
+
+      // Optionally sync book title if you like the parsed title
       if (parsed.title && parsed.title !== bookTitle) {
         setBookTitle(parsed.title);
       }
 
-      if (splitByHeadings && parsed.chapters && parsed.chapters.length > 0) {
-        setImportProgress(`Creating ${parsed.chapters.length} chapters…`);
-
-        for (const c of parsed.chapters) {
-          const newId = addChapter();
-          updateChapter(newId, {
-            title: c.title,
-            content: c.content,
-          });
-        }
-
-        alert(`✅ Imported ${parsed.chapters.length} chapter(s) from "${file.name}".`);
-
-        // Note: we do NOT call setView("grid") here,
-        // so the page stays on the current view.
-      } else {
-        // No splitting or no headings found: single chapter
-        const fullContent =
-          parsed.fullContent ||
-          (parsed.chapters && parsed.chapters.length
-            ? parsed.chapters.map((c) => c.content).join("\n\n")
-            : "");
-
-        if (hasChapter) {
-          setHtml(fullContent);
-          updateChapter(selectedId, {
-            title: title || selectedChapter?.title || parsed.title,
-            content: fullContent,
-          });
-        } else {
-          const newId = addChapter();
-          updateChapter(newId, {
-            title: parsed.title || "Imported Manuscript",
-            content: fullContent,
-          });
-          setSelectedId(newId);
-          setView("editor");
-        }
-
-        alert(`✅ Document imported into a single chapter from "${file.name}".`);
-      }
-
-      // Save project snapshot
       saveProject({
         book: { ...book, title: parsed.title || bookTitle },
         chapters,
       });
+
+      alert(
+        `✅ Imported manuscript "${chapterTitle}".\nYou can now create additional chapters and copy/paste sections into them.`
+      );
     } catch (error) {
       console.error("Import failed:", error);
       alert(
@@ -332,6 +268,7 @@ export default function ComposePage() {
     }
   };
 
+  // Export current chapter as HTML
   const handleExport = () => {
     const blob = new Blob([html], { type: "text/html" });
     const url = URL.createObjectURL(blob);
@@ -342,6 +279,7 @@ export default function ComposePage() {
     URL.revokeObjectURL(url);
   };
 
+  // Delete single
   const handleDeleteCurrent = () => {
     if (!hasChapter) return;
     if (
@@ -354,6 +292,7 @@ export default function ComposePage() {
     }
   };
 
+  // Bulk delete
   const handleDeleteMultiple = (ids) => {
     if (!ids?.length) return;
     if (!window.confirm(`Delete ${ids.length} chapter(s)? This cannot be undone.`))
@@ -368,9 +307,7 @@ export default function ComposePage() {
 
   const goBack = () => navigate("/dashboard");
 
-  /* ============================
-     Simple "loading" guard
-  ============================= */
+  // Simple guard
   if (!Array.isArray(chapters)) {
     return (
       <div className="min-h-screen bg-[rgb(244,247,250)] flex items-center justify-center">
@@ -379,23 +316,19 @@ export default function ComposePage() {
     );
   }
 
-  /* ============================
-     Render
-  ============================= */
+  // Render
   return (
     <div className="min-h-screen bg-[rgb(244,247,250)] text-slate-900">
-      {/* ========== TOP BAR ========== */}
+      {/* TOP BAR */}
       <div className="sticky top-0 z-40 bg-white/80 backdrop-blur border-b border-slate-200">
         <div className="max-w-7xl mx-auto px-3 h-auto py-2 flex items-center gap-3 overflow-x-auto">
-          {/* Gold Dashboard Button */}
           <GoldButton onClick={goBack} title="Back to Dashboard">
             ← Dashboard
           </GoldButton>
 
-          {/* Breadcrumb */}
           <WritingCrumb view={view} />
 
-          {/* View Toggle */}
+          {/* View toggle */}
           <div className="ml-1 flex items-center gap-1">
             <button
               onClick={() => setView("grid")}
@@ -417,7 +350,7 @@ export default function ComposePage() {
             </button>
           </div>
 
-          {/* Select Mode Toggle */}
+          {/* Select mode toggle */}
           <button
             onClick={toggleSelectMode}
             className={[
@@ -452,7 +385,7 @@ export default function ComposePage() {
             </div>
           )}
 
-          {/* Provider Selector */}
+          {/* Provider selector */}
           <div className="ml-2 flex items-center gap-1">
             <label className="text-[12px] text-slate-600">Provider:</label>
             <select
@@ -465,7 +398,7 @@ export default function ComposePage() {
             </select>
           </div>
 
-          {/* Queue status indicator */}
+          {/* AI queue indicator */}
           {queueLength > 0 && (
             <div className="ml-2 flex items-center gap-1 px-2 py-1 bg-blue-50 rounded border border-blue-200">
               <span className="text-xs text-blue-700">
@@ -474,7 +407,7 @@ export default function ComposePage() {
             </div>
           )}
 
-          {/* Import progress indicator */}
+          {/* Import progress */}
           {isImporting && (
             <div className="ml-2 flex items-center gap-2 px-3 py-1 bg-amber-50 rounded border border-amber-200">
               <div className="w-3 h-3 border-2 border-amber-600 border-t-transparent rounded-full animate-spin" />
@@ -484,7 +417,7 @@ export default function ComposePage() {
 
           <div className="w-full sm:flex-1" />
 
-          {/* Editor Toolbar */}
+          {/* Toolbar */}
           <EditorToolbar
             onAI={handleAI}
             onSave={handleSave}
@@ -496,7 +429,7 @@ export default function ComposePage() {
         </div>
       </div>
 
-      {/* ========== GRID VIEW ========== */}
+      {/* GRID VIEW */}
       {view === "grid" && (
         <>
           <ChapterGrid
@@ -520,12 +453,11 @@ export default function ComposePage() {
             onRangeSelect={(idx) => rangeSelect(idx)}
             lastClickedIndexRef={lastClickedIndexRef}
           />
-          {/* Trash Dock for grid view */}
           <TrashDock onDelete={handleDeleteMultiple} />
         </>
       )}
 
-      {/* ========== EDITOR VIEW ========== */}
+      {/* EDITOR VIEW */}
       {view === "editor" && (
         <div
           className="max-w-7xl mx-auto px-4 py-6 grid gap-6"
@@ -543,15 +475,8 @@ export default function ComposePage() {
               aiError={aiError}
             />
 
-            <AIInstructions
-              instructions={instructions}
-              setInstructions={setInstructions}
-              chapterTitle={selectedChapter?.title}
-              onGeneratePrompt={() => {
-                if (hasChapter) generateChapterPrompt(selectedChapter);
-              }}
-              aiBusy={aiBusy}
-            />
+            {/* AIInstructions REMOVED here to simplify writing page */}
+            {/* <AIInstructions ... /> */}
 
             <ChapterSidebar
               chapters={chapters}
@@ -579,7 +504,6 @@ export default function ComposePage() {
             pageWidth={1000}
           />
 
-          {/* Trash Dock - Drag chapters here to delete */}
           <TrashDock onDelete={handleDeleteMultiple} />
         </div>
       )}
