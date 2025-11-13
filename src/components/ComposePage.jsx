@@ -59,7 +59,6 @@ const chapters = useMemo(
   [rawChapters]
 );
 
-
   // View state
   const [view, setView] = useState("grid");
 
