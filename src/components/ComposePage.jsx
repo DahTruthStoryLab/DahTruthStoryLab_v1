@@ -158,36 +158,25 @@ const chapters = useMemo(
     }
   }, [selectedId, selectedChapter]);
 
-  // Save
-  const handleSave = () => {
-    if (!hasChapter) return;
-    updateChapter(selectedId, {
-      title: title || selectedChapter?.title || "",
-      content: html,
-    });
-    saveProject({ book: { ...book, title: bookTitle }, chapters });
-  };
-
-  // AI (rewrite only, but no prompt panel shown)
   const handleAI = async (mode) => {
-    if (!hasChapter) return;
+  if (!hasChapter) return;
 
-    try {
-      const result = await rateLimiter.addToQueue(async () => {
-        return await runAI(mode, html, instructions, provider);
+  try {
+    const result = await rateLimiter.addToQueue(async () => {
+      return await runAI(mode, html, instructions, provider);
+    });
+
+    if (result) {
+      setHtml(result);
+      updateChapter(selectedId, {
+        title: title || selectedChapter?.title || "",
+        content: result,
       });
-
-      if (result) {
-        setHtml(result);
-        updateChapter(selectedId, {
-          title: title || selectedChapter?.title || "",
-          content: result,
-        });
-      }
-    } catch (error) {
-      console.error("AI request error:", error);
     }
-  };
+  } catch (error) {
+    console.error("AI request error:", error);
+  }
+};
 
  const handleImport = async (file, options = {}) => {
   if (!file) return;
