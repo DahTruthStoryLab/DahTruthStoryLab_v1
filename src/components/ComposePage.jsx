@@ -50,14 +50,15 @@ export default function ComposePage() {
     generateChapterPrompt,
   } = useAIAssistant();
 
-  // Normalize chapters (filter out nulls)
-  const chapters = useMemo(
-    () =>
-      Array.isArray(rawChapters)
-        ? rawChapters.filter((c) => c && typeof c.id === "string")
-        : [],
-    [rawChapters]
-  );
+  // Guard + normalize chapters without being too strict about ID type
+const chapters = useMemo(
+  () =>
+    Array.isArray(rawChapters)
+      ? rawChapters.filter((c) => c && c.id != null) // just ensure each chapter exists and has some id
+      : [],
+  [rawChapters]
+);
+
 
   // View state
   const [view, setView] = useState("grid");
