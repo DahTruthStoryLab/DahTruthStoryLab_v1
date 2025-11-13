@@ -1,9 +1,7 @@
 // src/components/Editor/ImportButton.jsx
-// Word document import with Mammoth.js and chapter detection
-
+// Simplified - passes File object to ComposePage for processing
 import React, { useRef } from "react";
 import { Upload } from "lucide-react";
-import mammoth from "mammoth";
 
 export default function ImportButton({ onImport, aiBusy }) {
   const fileInputRef = useRef(null);
@@ -17,54 +15,44 @@ export default function ImportButton({ onImport, aiBusy }) {
     if (!file) return;
 
     const fileName = file.name.toLowerCase();
-    if (!fileName.endsWith(".docx")) {
-      alert("Please choose a .docx file (not .doc or other formats).");
+    
+    // Check file type
+    if (fileName.endsWith('.docx') || fileName.endsWith('.doc')) {
+      // Pass the File object directly to ComposePage for processing
+      console.log("Starting import of:", file.name);
+      
+      // Ask if they want to split into chapters
+      const shouldSplit = window.confirm(
+        "Would you like to split this document into separate chapters?\n\n" +
+        "Click OK to create separate chapters, or Cancel to import as one chapter."
+      );
+      
+      // Pass File object (not HTML) to ComposePage
+      onImport(file, shouldSplit);
+      
+    } else if (fileName.endsWith('.html') || fileName.endsWith('.htm')) {
+      // For HTML files, read as text
+      const text = await file.text();
+      const shouldSplit = window.confirm(
+        "Would you like to split this document into separate chapters?"
+      );
+      onImport(text, shouldSplit);
+      
+    } else if (fileName.endsWith('.txt') || fileName.endsWith('.md')) {
+      // Pass text files as File objects too
+      const shouldSplit = window.confirm(
+        "Would you like to split this document into separate chapters?"
+      );
+      onImport(file, shouldSplit);
+      
+    } else {
+      alert("Please choose a .docx, .doc, .txt, .md, or .html file.");
       e.target.value = "";
       return;
     }
 
-    console.log("Starting import of:", file.name);
-
-    try {
-      const arrayBuffer = await file.arrayBuffer();
-      console.log("File read, size:", arrayBuffer.byteLength, "bytes");
-
-      const result = await mammoth.convertToHtml(
-        { arrayBuffer },
-        {
-          styleMap: [
-            "p[style-name='Heading 1'] => h1:fresh",
-            "p[style-name='Heading 2'] => h2:fresh",
-            "p[style-name='Heading 3'] => h3:fresh",
-            "p[style-name='Title'] => h1:fresh",
-          ],
-          includeDefaultStyleMap: true,
-        }
-      );
-
-      const htmlContent = result.value;
-      console.log("Conversion complete, HTML length:", htmlContent.length);
-
-      const hasHeadings = /<h[123]>/i.test(htmlContent);
-
-      if (hasHeadings) {
-        const shouldSplit = window.confirm(
-          "This document contains headings. Would you like to split it into separate chapters?\n\n" +
-            "Click OK to create separate chapters, or Cancel to import as one chapter."
-        );
-
-        onImport(htmlContent, shouldSplit);
-      } else {
-        onImport(htmlContent, false);
-      }
-
-      alert("Document imported successfully!");
-    } catch (err) {
-      console.error("Import error:", err);
-      alert(`Failed to import document: ${err.message}\n\nPlease make sure this is a valid .docx file.`);
-    } finally {
-      e.target.value = "";
-    }
+    // Reset input
+    e.target.value = "";
   };
 
   return (
@@ -80,7 +68,7 @@ export default function ImportButton({ onImport, aiBusy }) {
       <input
         ref={fileInputRef}
         type="file"
-        accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        accept=".docx,.doc,.txt,.md,.html,.htm"
         className="hidden"
         onChange={handleFile}
       />
