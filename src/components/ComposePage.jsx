@@ -236,56 +236,87 @@ export default function ComposePage() {
      NEW: Enhanced Import with Document Parser
      Handles both .docx and HTML files
   ============================= */
-  const handleImport = async (fileOrHtml, shouldSplit) => {
-    setIsImporting(true);
-    setImportProgress("Starting import...");
+  const handleImport = async (file, options = {}) => {
+  if (!file) return;
 
-    try {
-      let htmlContent;
-      let parsedDocument = null;
+  const { splitByHeadings = true } = options;
 
-      // Check if this is a File object (from file input) or HTML string
-      if (fileOrHtml instanceof File) {
-        const file = fileOrHtml;
-        setImportProgress(`Processing ${file.name}...`);
+  try {
+    const name = file.name.toLowerCase();
+    let parsed;
 
-        // Check file type
-        if (file.name.endsWith('.docx') || file.name.endsWith('.doc')) {
-          // Use document parser for Word files
-          if (DEBUG_IMPORT) console.log("Parsing Word document with mammoth...");
-          parsedDocument = await documentParser.parseWordDocument(file);
-          
-        } else if (file.name.endsWith('.txt') || file.name.endsWith('.md')) {
-          // Use document parser for text files
-          if (DEBUG_IMPORT) console.log("Parsing text document...");
-          parsedDocument = await documentParser.parseTextDocument(file);
-          
-        } else if (file.name.endsWith('.html') || file.name.endsWith('.htm')) {
-          // Read HTML file
-          htmlContent = await file.text();
-          
-        } else {
-          throw new Error('Unsupported file type. Please upload .docx, .doc, .txt, .md, or .html files.');
-        }
+    // Use your documentParser + rateLimiter
+    if (name.endsWith(".doc") || name.endsWith(".docx")) {
+      parsed = await rateLimiter.addToQueue(() =>
+        documentParser.parseWordDocument(file)
+      );
+    } else if (name.endsWith(".txt") || name.endsWith(".md")) {
+      parsed = await documentParser.parseTextDocument(file);
+    } else {
+      alert("Unsupported file type. Please use .doc, .docx, .txt, or .md");
+      return;
+    }
 
-      } else if (typeof fileOrHtml === 'string') {
-        // HTML string passed directly
-        htmlContent = fileOrHtml;
-      } else {
-        throw new Error('Invalid import format');
+    // Optional: sync book title with parsed title
+    if (parsed.title && parsed.title !== bookTitle) {
+      setBookTitle(parsed.title);
+    }
+
+    // If we have chapters and the user wants to split by headings
+    if (splitByHeadings && parsed.chapters && parsed.chapters.length > 0) {
+      for (const c of parsed.chapters) {
+        const newId = addChapter();
+        updateChapter(newId, {
+          title: c.title,
+          content: c.content,
+        });
       }
 
-      // If we have a parsed document from documentParser, use it
-      if (parsedDocument) {
-        setImportProgress(`Importing ${parsedDocument.chapters.length} chapters...`);
-        
-        if (DEBUG_IMPORT) {
-          console.log("Parsed document:", {
-            title: parsedDocument.title,
-            chapters: parsedDocument.chapters.length,
-            wordCount: parsedDocument.totalWordCount,
-          });
-        }
+      alert(`✅ Imported ${parsed.chapters.length} chapter(s) from "${file.name}".`);
+
+      // Note: we do NOT call setView("grid") here,
+      // so the page stays on the current view.
+    } else {
+      // No splitting or no headings found: single chapter
+      const fullContent =
+        parsed.fullContent ||
+        (parsed.chapters && parsed.chapters.length
+          ? parsed.chapters.map((c) => c.content).join("\n\n")
+          : "");
+
+      if (hasChapter) {
+        setHtml(fullContent);
+        updateChapter(selectedId, {
+          title: title || selectedChapter?.title || parsed.title,
+          content: fullContent,
+        });
+      } else {
+        const newId = addChapter();
+        updateChapter(newId, {
+          title: parsed.title || "Imported Manuscript",
+          content: fullContent,
+        });
+        setSelectedId(newId);
+        setView("editor");
+      }
+
+      alert(`✅ Document imported into a single chapter from "${file.name}".`);
+    }
+
+    // Save project snapshot
+    saveProject({
+      book: { ...book, title: parsed.title || bookTitle },
+      chapters,
+    });
+  } catch (error) {
+    console.error("Import failed:", error);
+    alert(
+      `❌ Failed to import document: ${
+        error instanceof Error ? error.message : "Unknown error"
+      }`
+    );
+  }
+};
 
         // Create chapters from parsed document
         for (let i = 0; i < parsedDocument.chapters.length; i++) {
