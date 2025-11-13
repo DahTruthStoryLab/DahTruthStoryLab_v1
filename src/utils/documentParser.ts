@@ -1,11 +1,12 @@
-import mammoth from 'mammoth';
+// src/lib/documentParser.ts
+import mammoth from "mammoth";
 
 export interface ChapterCard {
   id: string;
   chapterNumber: number;
   title: string;
   content: string;
-  preview: string; // First 20 words
+  preview: string;
   wordCount: number;
   order: number;
 }
@@ -17,6 +18,7 @@ export interface ParsedDocument {
   fullContent: string;
   totalWordCount: number;
 }
+
 
 class DocumentParser {
   // Chapter detection patterns
