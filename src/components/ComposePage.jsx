@@ -189,56 +189,94 @@ const chapters = useMemo(
     }
   };
 
-  // SIMPLE IMPORT: one manuscript → one chapter
-  const handleImport = async (file) => {
-    if (!file) return;
+ const handleImport = async (file, options = {}) => {
+  if (!file) return;
 
-    setIsImporting(true);
-    setImportProgress(`Importing "${file.name}"...`);
+  const { splitByHeadings = true } = options;
 
-    try {
-      const name = file.name.toLowerCase();
-      let parsed;
+  try {
+    const name = file.name.toLowerCase();
+    let parsed;
 
-      if (name.endsWith(".doc") || name.endsWith(".docx")) {
-        parsed = await documentParser.parseWordDocument(file);
-      } else if (name.endsWith(".txt") || name.endsWith(".md")) {
-        parsed = await documentParser.parseTextDocument(file);
-      } else {
-        alert("Unsupported file type. Please use .doc, .docx, .txt, or .md");
-        return;
+    // 1) Parse the file with your documentParser
+    if (name.endsWith(".doc") || name.endsWith(".docx")) {
+      // Use rate limiter for docx parsing since it may call AI later
+      parsed = await rateLimiter.addToQueue(() =>
+        documentParser.parseWordDocument(file)
+      );
+    } else if (name.endsWith(".txt") || name.endsWith(".md")) {
+      parsed = await documentParser.parseTextDocument(file);
+    } else {
+      alert("Unsupported file type. Please use .doc, .docx, .txt, or .md");
+      return;
+    }
+
+    if (!parsed) {
+      alert("Could not parse this document.");
+      return;
+    }
+
+    // Optional: sync book title to document title if present
+    if (parsed.title && parsed.title !== bookTitle) {
+      setBookTitle(parsed.title);
+    }
+
+    // 2) If splitByHeadings is ON and we have chapters, create one chapter per section
+    if (splitByHeadings && parsed.chapters && parsed.chapters.length > 0) {
+      for (const c of parsed.chapters) {
+        const newId = addChapter();
+        updateChapter(newId, {
+          title: c.title || "Untitled Chapter",
+          content: c.content || "",
+        });
       }
 
-      if (DEBUG_IMPORT) console.log("Parsed document:", parsed);
+      alert(`✅ Imported ${parsed.chapters.length} chapter(s) from "${file.name}".`);
 
+      // Do NOT force view to grid — we stay where the user is
+    } else {
+      // 3) Fallback: import into a single chapter
       const fullContent =
         parsed.fullContent ||
         (parsed.chapters && parsed.chapters.length
-          ? parsed.chapters.map((c) => c.content).join("\n\n")
+          ? parsed.chapters.map((c) => c.content || "").join("\n\n")
           : "");
-
-      const chapterTitle =
-        parsed.title ||
-        file.name.replace(/\.(docx|doc|txt|md)$/i, "") ||
-        "Imported Manuscript";
 
       if (hasChapter) {
         // Overwrite current chapter
-        setTitle(chapterTitle);
         setHtml(fullContent);
         updateChapter(selectedId, {
-          title: chapterTitle,
+          title: title || selectedChapter?.title || parsed.title || "Imported Manuscript",
           content: fullContent,
         });
       } else {
         // Create a brand new chapter
         const newId = addChapter();
         updateChapter(newId, {
-          title: chapterTitle,
+          title: parsed.title || "Imported Manuscript",
           content: fullContent,
         });
         setSelectedId(newId);
+        setView("editor");
       }
+
+      alert(`✅ Document imported into a single chapter from "${file.name}".`);
+    }
+
+    // 4) Save snapshot (optional, depends how your hook uses this)
+    saveProject({
+      book: { ...book, title: parsed.title || bookTitle },
+      chapters, // this will now include the new ones after the filter fix above
+    });
+  } catch (error) {
+    console.error("Import failed:", error);
+    alert(
+      `❌ Failed to import document: ${
+        error instanceof Error ? error.message : "Unknown error"
+      }`
+    );
+  }
+};
 
       // Stay in editor view so author sees the manuscript immediately
       setView("editor");
