@@ -79,6 +79,7 @@ export default function ComposePage() {
   const [isImporting, setIsImporting] = useState(false);
   const [importProgress, setImportProgress] = useState("");
   const [queueLength, setQueueLength] = useState(0);
+  const [saveStatus, setSaveStatus] = useState("idle"); // 👈 NEW
 
   const hasChapter = !!selectedId && !!selectedChapter;
 
@@ -162,19 +163,36 @@ export default function ComposePage() {
     }
   }, [selectedId, selectedChapter]);
 
-  // Save – do NOT pass stale chapters into saveProject
-  const handleSave = () => {
+   // Save with visual feedback
+  const handleSave = async () => {
     if (!hasChapter) return;
+    if (saveStatus === "saving") return; // avoid double-taps
 
-    updateChapter(selectedId, {
-      title: title || selectedChapter?.title || "",
-      content: html,
-    });
+    setSaveStatus("saving");
 
-    saveProject({
-      book: { ...book, title: bookTitle },
-      // let useChapterManager grab latest chapters from state
-    });
+    try {
+      // Update the current chapter
+      updateChapter(selectedId, {
+        title: title || selectedChapter?.title || "",
+        content: html,
+      });
+
+      // Save the project – supports sync or async
+      await Promise.resolve(
+        saveProject({
+          book: { ...book, title: bookTitle },
+        })
+      );
+
+      // Brief "Saved" state
+      setSaveStatus("saved");
+      setTimeout(() => {
+        setSaveStatus("idle");
+      }, 2000);
+    } catch (error) {
+      console.error("Save failed:", error);
+      setSaveStatus("idle");
+    }
   };
 
   // Rename a chapter (used by sidebar rename ✏️)
@@ -473,17 +491,16 @@ export default function ComposePage() {
 
           <div className="w-full sm:flex-1" />
 
-          {/* Toolbar */}
-          <EditorToolbar
+        <EditorToolbar
             onAI={handleAI}
             onSave={handleSave}
             onImport={handleImport}
             onExport={handleExport}
             onDelete={handleDeleteCurrent}
             aiBusy={aiBusy || isImporting}
+            saveStatus={saveStatus}   // 👈 NEW
           />
-        </div>
-      </div>
+
 
       {/* GRID VIEW */}
       {view === "grid" && (
@@ -547,7 +564,7 @@ export default function ComposePage() {
           </aside>
 
           {/* Main Editor */}
-          <EditorPane
+         <EditorPane
             title={title}
             setTitle={setTitle}
             html={html}
@@ -556,7 +573,9 @@ export default function ComposePage() {
             onAI={handleAI}
             aiBusy={aiBusy}
             pageWidth={1000}
+            saveStatus={saveStatus}   // optional, only if you want to use it there
           />
+
 
           <TrashDock onDelete={handleDeleteMultiple} />
         </div>
