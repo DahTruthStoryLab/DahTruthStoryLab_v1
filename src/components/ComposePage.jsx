@@ -220,14 +220,18 @@ export default function ComposePage() {
   };
 
   // SIMPLE AI HANDLER — sends a safe slice so it doesn't time out
-  const handleAI = async (mode, targetHtmlOverride) => {
+    const handleAI = async (mode, targetHtmlOverride) => {
     if (!hasChapter) return;
 
-    const MAX_CHARS = 3000; // keep this small to be extra safe for now
+    const MAX_CHARS = 3000; // safe size for now
     const op = resolveAIMode(mode);
 
+    // Full chapter HTML
     const raw = (targetHtmlOverride ?? html) || "";
+    // Part we send to AI
     const target = raw.slice(0, MAX_CHARS);
+    // The rest we keep as-is
+    const remainder = raw.slice(target.length);
 
     if (!target.trim()) return;
 
@@ -245,10 +249,13 @@ export default function ComposePage() {
         return;
       }
 
-      setHtml(result);
+      // Combine edited part + untouched remainder
+      const combined = result + remainder;
+
+      setHtml(combined);
       updateChapter(selectedId, {
         title: title || selectedChapter?.title || "",
-        content: result,
+        content: combined,
       });
     } catch (error) {
       console.error("AI request error:", error);
@@ -257,7 +264,6 @@ export default function ComposePage() {
       );
     }
   };
-
 
   // NEW: simplified import using documentParser
   const handleImport = async (file, options = {}) => {
