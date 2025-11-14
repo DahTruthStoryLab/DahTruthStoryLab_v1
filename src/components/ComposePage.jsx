@@ -6,7 +6,7 @@ import EditorPane from "./Editor/EditorPane";
 import ChapterGrid from "./Writing/ChapterGrid";
 import ChapterSidebar from "./Writing/ChapterSidebar";
 import EditorToolbar from "./Editor/EditorToolbar";
-import PublishingMeta from "./Editor/PublishingMeta";
+
 // We removed AIInstructions from the writing page to simplify
 // import AIInstructions from "./Editor/AIInstructions";
 import TrashDock from "./Writing/TrashDock";
@@ -532,23 +532,13 @@ export default function ComposePage() {
       )}
 
       {/* EDITOR VIEW */}
-      {view === "editor" && (
+            {view === "editor" && (
         <div
           className="max-w-7xl mx-auto px-4 py-6 grid gap-6"
           style={{ gridTemplateColumns: "280px minmax(0, 1fr)", minWidth: 1024 }}
         >
           {/* Left Sidebar */}
           <aside className="sticky top-16 space-y-3" style={{ zIndex: 10 }}>
-            <PublishingMeta
-              bookTitle={bookTitle}
-              setBookTitle={setBookTitle}
-              author={author}
-              setAuthor={setAuthor}
-              onPublishingPrep={() => {}}
-              aiBusy={aiBusy}
-              aiError={aiError}
-            />
-
             <ChapterSidebar
               chapters={chapters}
               selectedId={selectedId}
@@ -563,6 +553,7 @@ export default function ComposePage() {
               onRenameChapter={handleRenameChapter}
             />
           </aside>
+
 
           {/* Main Editor */}
           <EditorPane
