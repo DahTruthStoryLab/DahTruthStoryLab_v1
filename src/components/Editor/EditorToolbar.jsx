@@ -2,10 +2,10 @@
 import React, { useRef } from "react";
 import {
   Save,
-  Wand2,
   Upload,
   Download,
   Trash2,
+  Wand2,
 } from "lucide-react";
 
 export default function EditorToolbar({
@@ -35,10 +35,9 @@ export default function EditorToolbar({
     }
   };
 
-  const handleAIRewrite = () => {
+  const handleAIMode = (mode) => {
     if (!onAI || aiBusy) return;
-    // You can change "rewrite" to another mode if needed
-    onAI("rewrite");
+    onAI(mode); // "grammar" | "proofread" | "readability" | "clarify" | etc.
   };
 
   const isSaving = saveStatus === "saving";
@@ -55,17 +54,18 @@ export default function EditorToolbar({
         onChange={handleFileChange}
       />
 
-      {/* Save button */}
+      {/* Save */}
       <button
         onClick={onSave}
         disabled={isSaving}
         className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-900 hover:bg-slate-50 disabled:opacity-60 disabled:cursor-not-allowed"
         title="Save current chapter"
       >
-        {isSaving && (
+        {isSaving ? (
           <span className="inline-block w-3 h-3 border-2 border-slate-500 border-t-transparent rounded-full animate-spin" />
+        ) : (
+          <Save className="w-3.5 h-3.5" />
         )}
-        {!isSaving && <Save className="w-3.5 h-3.5" />}
         <span>
           {isSaving
             ? "Saving..."
@@ -73,17 +73,6 @@ export default function EditorToolbar({
             ? "Saved"
             : "Save"}
         </span>
-      </button>
-
-      {/* AI Rewrite */}
-      <button
-        onClick={handleAIRewrite}
-        disabled={aiBusy}
-        className="inline-flex items-center gap-1 rounded-md border border-[#D4AF37]/40 bg-[#1a237e] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#0d47a1] disabled:opacity-60 disabled:cursor-not-allowed"
-        title="Use AI to rewrite or polish this chapter"
-      >
-        <Wand2 className="w-3.5 h-3.5" />
-        <span>{aiBusy ? "AI working..." : "AI Rewrite"}</span>
       </button>
 
       {/* Import */}
@@ -115,6 +104,17 @@ export default function EditorToolbar({
         <Trash2 className="w-3.5 h-3.5" />
         <span>Delete</span>
       </button>
-    </div>
-  );
-}
+
+      {/* Divider before AI tools */}
+      <div className="h-6 w-px bg-slate-200 mx-1" />
+
+      {/* AI tools group */}
+      <div className="flex items-center gap-1">
+        <span className="inline-flex items-center gap-1 text-[11px] text-slate-600">
+          <Wand2 className="w-3.5 h-3.5" />
+          <span>AI</span>
+        </span>
+
+        <button
+          onClick={() => handleAIMode("grammar")}
+          di
