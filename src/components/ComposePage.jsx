@@ -79,7 +79,9 @@ export default function ComposePage() {
   const [isImporting, setIsImporting] = useState(false);
   const [importProgress, setImportProgress] = useState("");
   const [queueLength, setQueueLength] = useState(0);
-  const [saveStatus, setSaveStatus] = useState("idle"); // 👈 NEW
+
+  // Save status
+  const [saveStatus, setSaveStatus] = useState("idle"); // "idle" | "saving" | "saved"
 
   const hasChapter = !!selectedId && !!selectedChapter;
 
@@ -163,7 +165,7 @@ export default function ComposePage() {
     }
   }, [selectedId, selectedChapter]);
 
-   // Save with visual feedback
+  // Save with visual feedback
   const handleSave = async () => {
     if (!hasChapter) return;
     if (saveStatus === "saving") return; // avoid double-taps
@@ -184,7 +186,6 @@ export default function ComposePage() {
         })
       );
 
-      // Brief "Saved" state
       setSaveStatus("saved");
       setTimeout(() => {
         setSaveStatus("idle");
@@ -412,9 +413,7 @@ export default function ComposePage() {
             <button
               onClick={() => setView("editor")}
               className={`inline-flex items-center gap-2 rounded-md border px-2.5 py-1 text-[13px] ${
-                view === "editor"
-                  ? "bg-slate-100"
-                  : "bg-white hover:bg-slate-50"
+                view === "editor" ? "bg-slate-100" : "bg-white hover:bg-slate-50"
               }`}
               title="Open Editor"
             >
@@ -491,16 +490,18 @@ export default function ComposePage() {
 
           <div className="w-full sm:flex-1" />
 
-        <EditorToolbar
+          {/* Toolbar */}
+          <EditorToolbar
             onAI={handleAI}
             onSave={handleSave}
             onImport={handleImport}
             onExport={handleExport}
             onDelete={handleDeleteCurrent}
             aiBusy={aiBusy || isImporting}
-            saveStatus={saveStatus}   // 👈 NEW
+            saveStatus={saveStatus}
           />
-
+        </div>
+      </div>
 
       {/* GRID VIEW */}
       {view === "grid" && (
@@ -564,7 +565,7 @@ export default function ComposePage() {
           </aside>
 
           {/* Main Editor */}
-         <EditorPane
+          <EditorPane
             title={title}
             setTitle={setTitle}
             html={html}
@@ -573,9 +574,7 @@ export default function ComposePage() {
             onAI={handleAI}
             aiBusy={aiBusy}
             pageWidth={1000}
-            saveStatus={saveStatus}   // optional, only if you want to use it there
           />
-
 
           <TrashDock onDelete={handleDeleteMultiple} />
         </div>
