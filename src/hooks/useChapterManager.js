@@ -5,6 +5,8 @@ import { useState, useEffect, useMemo } from "react";
 
 const STORAGE_KEY = "dahtruth-story-lab-toc-v3";
 
+// -------- Helpers --------
+
 // Load from localStorage
 const loadState = () => {
   try {
@@ -19,6 +21,7 @@ const loadState = () => {
 const saveState = (state) => {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    // Optional: broadcast that project changed
     window.dispatchEvent(new Event("project:change"));
   } catch (err) {
     console.error("Failed to save state:", err);
@@ -32,12 +35,13 @@ const ensureFirstChapter = (chapters) => {
   }
   return [
     {
-      id: Date.now(),
+      id: `chapter-${Date.now()}`,
       title: "Chapter 1: Untitled",
       content: "",
       wordCount: 0,
       lastEdited: "Just now",
       status: "draft",
+      order: 0,
     },
   ];
 };
@@ -49,19 +53,24 @@ const countWords = (html = "") => {
 };
 
 export function useChapterManager() {
-  // Load initial state
+  // Load initial state once
   const initial = useMemo(loadState, []);
-  
-  const [book, setBook] = useState(initial?.book || { title: "Untitled Book" });
+
+  const [book, setBook] = useState(
+    initial?.book || { title: "Untitled Book" }
+  );
+
   const [chapters, setChapters] = useState(
     ensureFirstChapter(initial?.chapters || [])
   );
-  const [selectedId, setSelectedId] = useState(chapters[0]?.id);
 
-  // Get currently selected chapter
-  const selectedChapter = chapters.find((c) => c.id === selectedId) || chapters[0];
+  const [selectedId, setSelectedId] = useState(chapters[0]?.id || null);
 
-  // Auto-save to localStorage when state changes (debounced)
+  // Currently selected chapter (fallback to first)
+  const selectedChapter =
+    chapters.find((c) => c.id === selectedId) || chapters[0] || null;
+
+  // -------- Auto-save whenever book/chapters change --------
   useEffect(() => {
     const timer = setTimeout(() => {
       const current = loadState() || {};
@@ -73,90 +82,109 @@ export function useChapterManager() {
         tocOutline: current.tocOutline || [],
       });
     }, 400);
+
     return () => clearTimeout(timer);
   }, [book, chapters]);
 
-  // Add new chapter
-// example: safe implementation
-const addChapter = () => {
-  const id = `chapter-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  // -------- CRUD operations --------
 
-  setChapters((prev) => {
-    const next = [
-      ...prev,
-      {
-        id,
-        title: `Chapter ${prev.length + 1}`,
-        content: "",
-        order: prev.length,
-      },
-    ];
-    return next;
-  });
+  // Add new chapter (append, do NOT replace existing)
+  const addChapter = () => {
+    const id = `chapter-${Date.now()}-${Math.random()
+      .toString(36)
+      .slice(2, 8)}`;
 
-  setSelectedId(id);
-  return id;
-};
+    setChapters((prev) => {
+      const next = [
+        ...prev,
+        {
+          id,
+          title: `Chapter ${prev.length + 1}`,
+          content: "",
+          wordCount: 0,
+          lastEdited: new Date().toLocaleString(),
+          status: "draft",
+          order: prev.length,
+        },
+      ];
+      return next;
+    });
 
-  // Update existing chapter
+    setSelectedId(id);
+    return id;
+  };
+
+  // Update an existing chapter by id
   const updateChapter = (id, updates) => {
     setChapters((prev) =>
       prev.map((ch) => {
         if (ch.id !== id) return ch;
-        
-        const updated = {
+
+        const newContent =
+          updates.content !== undefined ? updates.content : ch.content;
+
+        return {
           ...ch,
           ...updates,
-          wordCount: updates.content ? countWords(updates.content) : ch.wordCount,
+          content: newContent,
+          wordCount: countWords(newContent),
           lastEdited: new Date().toLocaleString(),
         };
-        return updated;
       })
     );
   };
 
- // Delete chapter - FIXED VERSION
-const deleteChapter = (id) => {
-  console.log("🗑️ DELETE called for chapter ID:", id);
-  console.log("📋 Current chapters:", chapters.map(c => ({ id: c.id, title: c.title })));
-  
-  setChapters((prev) => {
-    const filtered = prev.filter((c) => c.id !== id);
-    console.log("📋 After filter:", filtered.map(c => ({ id: c.id, title: c.title })));
-    
-    // Ensure at least one chapter remains
-    const result = filtered.length > 0 ? filtered : ensureFirstChapter([]);
-    console.log("📋 Final result:", result.map(c => ({ id: c.id, title: c.title })));
-    
-    return result;
-  });
-  
-  // If deleted chapter was selected, select another one
-  if (selectedId === id) {
-    const remaining = chapters.filter((c) => c.id !== id);
-    const newSelectedId = remaining[0]?.id;
-    console.log("🎯 Selecting new chapter:", newSelectedId);
-    if (newSelectedId) {
-      setSelectedId(newSelectedId);
-    }
-  }
-};
-  // Move chapter (for drag and drop)
-  const moveChapter = (fromIndex, toIndex) => {
+  // Delete a single chapter
+  const deleteChapter = (id) => {
     setChapters((prev) => {
-      const copy = [...prev];
-      const [moved] = copy.splice(fromIndex, 1);
-      copy.splice(toIndex, 0, moved);
-      return copy;
+      const filtered = prev.filter((c) => c.id !== id);
+
+      // Ensure at least one chapter remains
+      const result = ensureFirstChapter(filtered);
+
+      // If we just deleted the selected one, move selection
+      if (selectedId === id) {
+        const newSelected = result[0]?.id || null;
+        setSelectedId(newSelected);
+      }
+
+      return result;
     });
   };
 
-  // Manual save (for explicit save button)
+  // Move chapter (for drag + drop reordering)
+  const moveChapter = (fromIndex, toIndex) => {
+    setChapters((prev) => {
+      if (
+        fromIndex < 0 ||
+        toIndex < 0 ||
+        fromIndex >= prev.length ||
+        toIndex >= prev.length
+      ) {
+        return prev;
+      }
+
+      const copy = [...prev];
+      const [moved] = copy.splice(fromIndex, 1);
+      copy.splice(toIndex, 0, moved);
+
+      // Recompute order indices
+      return copy.map((ch, idx) => ({ ...ch, order: idx }));
+    });
+  };
+
+  // Explicit save (used when user clicks Save)
   const saveProject = (overrides = {}) => {
     const current = loadState() || {};
+
+    const finalBook = overrides.book || book;
+    // Important: if overrides.chapters is undefined, keep current chapters
+    const finalChapters =
+      overrides.chapters !== undefined ? overrides.chapters : chapters;
+
     saveState({
-      book: overrides.book || book,
-      chapters: overrides.chapters || chapters,
+      book: finalBook,
+      chapters: finalChapters,
       daily: current.daily || { goal: 500, counts: {} },
       settings: current.settings || { theme: "light", focusMode: false },
       tocOutline: current.tocOutline || [],
