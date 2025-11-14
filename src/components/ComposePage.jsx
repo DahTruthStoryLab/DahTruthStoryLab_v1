@@ -165,15 +165,15 @@ export default function ComposePage() {
     }
   }, [selectedId, selectedChapter]);
 
-  // Save current chapter + project
   const handleSave = () => {
-    if (!hasChapter) return;
-    updateChapter(selectedId, {
-      title: title || selectedChapter?.title || "",
-      content: html,
-    });
-    saveProject({ book: { ...book, title: bookTitle }, chapters });
-  };
+  if (!hasChapter) return;
+  updateChapter(selectedId, {
+    title: title || selectedChapter?.title || "",
+    content: html,
+  });
+  // Only update book metadata, let the hook keep chapters internally
+  saveProject({ book: { ...book, title: bookTitle } });
+};
 
   // AI (rewrite only)
   const handleAI = async (mode) => {
@@ -280,11 +280,11 @@ export default function ComposePage() {
         alert(`✅ Document imported into a single chapter from "${file.name}".`);
       }
 
-      // Save snapshot
-      saveProject({
-        book: { ...book, title: parsed.title || bookTitle },
-        chapters,
-      });
+     // 4) Save snapshot (only book; chapters are already in hook state)
+        saveProject({
+          book: { ...book, title: parsed.title || bookTitle },
+        });
+
     } catch (error) {
       console.error("Import failed:", error);
       alert(
