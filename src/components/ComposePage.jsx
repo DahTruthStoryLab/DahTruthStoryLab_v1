@@ -127,13 +127,60 @@ export default function ComposePage() {
     });
     lastClickedIndexRef.current = toIdx;
   }
-
-  function toggleSelectMode() {
-    setSelectMode((s) => {
-      if (s) clearSelection();
-      return !s;
-    });
+  function handleSelectAll() {
+    if (!chapters || chapters.length === 0) return;
+    setSelectedIds(new Set(chapters.map((c) => c.id)));
   }
+
+   // Selection helpers
+const clearSelection = () => setSelectedIds(new Set());
+
+function toggleSelect(id, { additive = false } = {}) {
+  if (!id) return;
+  setSelectedIds((prev) => {
+    const next = new Set(additive ? prev : []);
+    next.has(id) ? next.delete(id) : next.add(id);
+    return next;
+  });
+}
+
+function rangeSelect(toIdx) {
+  if (!Number.isInteger(toIdx) || toIdx < 0 || toIdx >= chapters.length) {
+    lastClickedIndexRef.current = null;
+    return;
+  }
+  const fromIdx = lastClickedIndexRef.current;
+  if (fromIdx == null || fromIdx < 0 || fromIdx >= chapters.length) {
+    const chapterId = chapters[toIdx]?.id;
+    if (chapterId) {
+      setSelectedIds(new Set([chapterId]));
+      lastClickedIndexRef.current = toIdx;
+    }
+    return;
+  }
+  const [a, b] = [Math.min(fromIdx, toIdx), Math.max(fromIdx, toIdx)];
+  setSelectedIds((prev) => {
+    const next = new Set(prev);
+    for (let i = a; i <= b; i++) {
+      const cid = chapters[i]?.id;
+      if (cid) next.add(cid);
+    }
+    return next;
+  });
+  lastClickedIndexRef.current = toIdx;
+}
+
+function toggleSelectMode() {
+  setSelectMode((s) => {
+    if (s) clearSelection();
+    return !s;
+  });
+}
+
+function handleSelectAll() {
+  if (!Array.isArray(chapters) || chapters.length === 0) return;
+  setSelectedIds(new Set(chapters.map((c) => c.id)));
+}
 
   // Keyboard delete
   useEffect(() => {
