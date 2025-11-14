@@ -512,40 +512,55 @@ function handleSelectAll() {
       )}
 
       {/* EDITOR VIEW */}
-     {view === "editor" && (
-  <div
-    className="max-w-7xl mx-auto px-4 py-6 grid gap-6"
-    style={{ gridTemplateColumns: "280px minmax(0, 1fr)", minWidth: 1024 }}
-  >
-    {/* Left Sidebar */}
-    <aside className="sticky top-16 space-y-3" style={{ zIndex: 10 }}>
-      <PublishingMeta
-        bookTitle={bookTitle}
-        setBookTitle={setBookTitle}
-        author={author}
-        setAuthor={setAuthor}
-        onPublishingPrep={() => {}}
-        aiBusy={aiBusy}
-        aiError={aiError}
-      />
+          {/* EDITOR VIEW */}
+      {view === "editor" && (
+        <div
+          className="max-w-7xl mx-auto px-4 py-6 grid gap-6"
+          style={{ gridTemplateColumns: "280px minmax(0, 1fr)", minWidth: 1024 }}
+        >
+          {/* Left Sidebar */}
+          <aside className="sticky top-16 space-y-3" style={{ zIndex: 10 }}>
+            <PublishingMeta
+              bookTitle={bookTitle}
+              setBookTitle={setBookTitle}
+              author={author}
+              setAuthor={setAuthor}
+              onPublishingPrep={() => {}}
+              aiBusy={aiBusy}
+              aiError={aiError}
+            />
 
-      <ChapterSidebar
-        chapters={chapters}
-        selectedId={selectedId}
-        onSelectChapter={setSelectedId}
-        onAddChapter={addChapter}
-        onDeleteMultiple={handleDeleteMultiple}
-        selectMode={selectMode}
-        selectedIds={selectedIds}
-        onToggleSelect={toggleSelect}
-        onRangeSelect={(idx) => rangeSelect(idx)}
-        lastClickedIndexRef={lastClickedIndexRef}
-        onRenameChapter={handleRenameChapter}  {/* ✅ NEW */}
-      />
-    </aside>
-    ...
-  </div>
-)}
+            <ChapterSidebar
+              chapters={chapters}
+              selectedId={selectedId}
+              onSelectChapter={setSelectedId}
+              onAddChapter={addChapter}
+              onDeleteMultiple={handleDeleteMultiple}
+              selectMode={selectMode}
+              selectedIds={selectedIds}
+              onToggleSelect={toggleSelect}
+              onRangeSelect={(idx) => rangeSelect(idx)}
+              lastClickedIndexRef={lastClickedIndexRef}
+              onRenameChapter={handleRenameChapter}
+            />
+          </aside>
+
+          {/* Main Editor */}
+          <EditorPane
+            title={title}
+            setTitle={setTitle}
+            html={html}
+            setHtml={setHtml}
+            onSave={handleSave}
+            onAI={handleAI}
+            aiBusy={aiBusy}
+            pageWidth={1000}
+          />
+
+          <TrashDock onDelete={handleDeleteMultiple} />
+        </div>
+      )}
+
 
           {/* Main Editor */}
           <EditorPane
