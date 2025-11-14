@@ -1,12 +1,6 @@
 // src/components/Editor/EditorToolbar.jsx
 import React, { useRef } from "react";
-import {
-  Save,
-  Upload,
-  Download,
-  Trash2,
-  Wand2,
-} from "lucide-react";
+import { Save, Upload, Download, Trash2, Wand2 } from "lucide-react";
 
 export default function EditorToolbar({
   onAI,
@@ -117,4 +111,40 @@ export default function EditorToolbar({
 
         <button
           onClick={() => handleAIMode("grammar")}
-          di
+          disabled={aiBusy}
+          className="px-2 py-1 rounded-md border border-slate-200 bg-white text-[11px] text-slate-800 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          title="Check grammar"
+        >
+          Grammar
+        </button>
+
+        <button
+          onClick={() => handleAIMode("proofread")}
+          disabled={aiBusy}
+          className="px-2 py-1 rounded-md border border-slate-200 bg-white text-[11px] text-slate-800 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          title="Proofread"
+        >
+          Proofread
+        </button>
+
+        <button
+          onClick={() => handleAIMode("readability")}
+          disabled={aiBusy}
+          className="px-2 py-1 rounded-md border border-slate-200 bg-white text-[11px] text-slate-800 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          title="Improve readability"
+        >
+          Readability
+        </button>
+
+        <button
+          onClick={() => handleAIMode("clarify")}
+          disabled={aiBusy}
+          className="px-2 py-1 rounded-md border border-slate-200 bg-white text-[11px] text-slate-800 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+          title="Clarify sentences"
+        >
+          Clarify
+        </button>
+      </div>
+    </div>
+  );
+}
