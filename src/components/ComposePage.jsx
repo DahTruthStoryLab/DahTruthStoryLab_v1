@@ -177,6 +177,14 @@ function handleSelectAll() {
     });
   };
 
+  // Rename a chapter (used by sidebar rename ✏️)
+  const handleRenameChapter = (chapterId, newTitle) => {
+    if (!chapterId || !newTitle) return;
+    updateChapter(chapterId, {
+      title: newTitle,
+    });
+  };
+  
   // AI (rewrite only)
   const handleAI = async (mode) => {
     if (!hasChapter) return;
@@ -504,39 +512,40 @@ function handleSelectAll() {
       )}
 
       {/* EDITOR VIEW */}
-      {view === "editor" && (
-        <div
-          className="max-w-7xl mx-auto px-4 py-6 grid gap-6"
-          style={{ gridTemplateColumns: "280px minmax(0, 1fr)", minWidth: 1024 }}
-        >
-          {/* Left Sidebar */}
-          <aside className="sticky top-16 space-y-3" style={{ zIndex: 10 }}>
-            <PublishingMeta
-              bookTitle={bookTitle}
-              setBookTitle={setBookTitle}
-              author={author}
-              setAuthor={setAuthor}
-              onPublishingPrep={() => {}}
-              aiBusy={aiBusy}
-              aiError={aiError}
-            />
+     {view === "editor" && (
+  <div
+    className="max-w-7xl mx-auto px-4 py-6 grid gap-6"
+    style={{ gridTemplateColumns: "280px minmax(0, 1fr)", minWidth: 1024 }}
+  >
+    {/* Left Sidebar */}
+    <aside className="sticky top-16 space-y-3" style={{ zIndex: 10 }}>
+      <PublishingMeta
+        bookTitle={bookTitle}
+        setBookTitle={setBookTitle}
+        author={author}
+        setAuthor={setAuthor}
+        onPublishingPrep={() => {}}
+        aiBusy={aiBusy}
+        aiError={aiError}
+      />
 
-            {/* AIInstructions intentionally removed to keep writing page simple */}
-            {/* <AIInstructions ... /> */}
-
-            <ChapterSidebar
-              chapters={chapters}
-              selectedId={selectedId}
-              onSelectChapter={setSelectedId}
-              onAddChapter={addChapter}
-              onDeleteMultiple={handleDeleteMultiple}
-              selectMode={selectMode}
-              selectedIds={selectedIds}
-              onToggleSelect={toggleSelect}
-              onRangeSelect={(idx) => rangeSelect(idx)}
-              lastClickedIndexRef={lastClickedIndexRef}
-            />
-          </aside>
+      <ChapterSidebar
+        chapters={chapters}
+        selectedId={selectedId}
+        onSelectChapter={setSelectedId}
+        onAddChapter={addChapter}
+        onDeleteMultiple={handleDeleteMultiple}
+        selectMode={selectMode}
+        selectedIds={selectedIds}
+        onToggleSelect={toggleSelect}
+        onRangeSelect={(idx) => rangeSelect(idx)}
+        lastClickedIndexRef={lastClickedIndexRef}
+        onRenameChapter={handleRenameChapter}  {/* ✅ NEW */}
+      />
+    </aside>
+    ...
+  </div>
+)}
 
           {/* Main Editor */}
           <EditorPane
