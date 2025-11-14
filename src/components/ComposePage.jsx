@@ -7,7 +7,7 @@ import ChapterGrid from "./Writing/ChapterGrid";
 import ChapterSidebar from "./Writing/ChapterSidebar";
 import EditorToolbar from "./Editor/EditorToolbar";
 import PublishingMeta from "./Editor/PublishingMeta";
-// AIInstructions intentionally removed on this page
+// We removed AIInstructions from the writing page to simplify
 // import AIInstructions from "./Editor/AIInstructions";
 import TrashDock from "./Writing/TrashDock";
 
@@ -50,7 +50,7 @@ export default function ComposePage() {
     generateChapterPrompt,
   } = useAIAssistant();
 
-  // Guard + normalize chapters
+  // Guard + normalize chapters (just require an id)
   const chapters = useMemo(
     () =>
       Array.isArray(rawChapters)
@@ -75,7 +75,7 @@ export default function ComposePage() {
   const [selectMode, setSelectMode] = useState(false);
   const lastClickedIndexRef = useRef(null);
 
-  // Import + AI indicators
+  // Import + rate limiter indicators
   const [isImporting, setIsImporting] = useState(false);
   const [importProgress, setImportProgress] = useState("");
   const [queueLength, setQueueLength] = useState(0);
@@ -92,10 +92,6 @@ export default function ComposePage() {
 
   // Selection helpers
   const clearSelection = () => setSelectedIds(new Set());
-
-  const selectAllChapters = () => {
-    setSelectedIds(new Set(chapters.map((c) => c.id)));
-  };
 
   function toggleSelect(id, { additive = false } = {}) {
     if (!id) return;
@@ -139,7 +135,7 @@ export default function ComposePage() {
     });
   }
 
-  // Keyboard delete for multi-select
+  // Keyboard delete
   useEffect(() => {
     const onKey = (e) => {
       const tag = (e.target && e.target.tagName) || "";
@@ -151,39 +147,31 @@ export default function ComposePage() {
     };
     window.addEventListener("keydown", onKey, { capture: true });
     return () => window.removeEventListener("keydown", onKey, { capture: true });
-  }, [selectedIds, chapters, selectedId]);
+  }, [selectedIds]);
 
   // Sync editor with selected chapter
   useEffect(() => {
     if (selectedChapter) {
       setTitle(selectedChapter.title || "");
       setHtml(selectedChapter.content || "");
-    } else {
-      // If no chapter is selected, clear editor fields
-      setTitle("");
-      setHtml("");
     }
   }, [selectedId, selectedChapter]);
 
+  // Save – do NOT pass stale chapters into saveProject
   const handleSave = () => {
-  if (!hasChapter) return;
-  updateChapter(selectedId, {
-    title: title || selectedChapter?.title || "",
-    content: html,
-  });
-  // Only update book metadata, let the hook keep chapters internally
-   saveProject({
-      book: { ...book, title: parsed.title || bookTitle },
+    if (!hasChapter) return;
+
+    updateChapter(selectedId, {
+      title: title || selectedChapter?.title || "",
+      content: html,
     });
-  } catch (error) {
-    console.error("Import failed:", error);
-    alert(
-      `❌ Failed to import document: ${
-        error instanceof Error ? error.message : "Unknown error"
-      }`
-    );
-  }
-};
+
+    saveProject({
+      book: { ...book, title: bookTitle },
+      // let useChapterManager grab latest chapters from state
+    });
+  };
+
   // AI (rewrite only)
   const handleAI = async (mode) => {
     if (!hasChapter) return;
@@ -205,22 +193,21 @@ export default function ComposePage() {
     }
   };
 
-  /* ============================
-     Simplified Import
-  ============================= */
+  // NEW: simplified import using documentParser
   const handleImport = async (file, options = {}) => {
     if (!file) return;
 
     const { splitByHeadings = true } = options;
 
     setIsImporting(true);
-    setImportProgress("Importing document...");
+    setImportProgress("Parsing document...");
 
     try {
       const name = file.name.toLowerCase();
       let parsed;
 
       if (name.endsWith(".doc") || name.endsWith(".docx")) {
+        // Use rate limiter for Word docs (if parser ever hits AI)
         parsed = await rateLimiter.addToQueue(() =>
           documentParser.parseWordDocument(file)
         );
@@ -237,27 +224,39 @@ export default function ComposePage() {
       }
 
       if (DEBUG_IMPORT) {
-        console.log("Parsed document:", parsed);
+        console.log("Parsed document:", {
+          title: parsed.title,
+          chapters: parsed.chapters?.length,
+          totalWordCount: parsed.totalWordCount,
+        });
       }
 
-      // Optional: sync book title
+      // Keep book title in sync if we like the parsed title
       if (parsed.title && parsed.title !== bookTitle) {
         setBookTitle(parsed.title);
       }
 
-      // Split into multiple chapters if possible
+      // Option A: split into multiple chapters when headings found
       if (splitByHeadings && parsed.chapters && parsed.chapters.length > 0) {
-        parsed.chapters.forEach((c) => {
+        setImportProgress(
+          `Creating ${parsed.chapters.length} chapter(s) from "${file.name}"...`
+        );
+
+        for (const c of parsed.chapters) {
           const newId = addChapter();
           updateChapter(newId, {
             title: c.title || "Untitled Chapter",
             content: c.content || "",
           });
-        });
+        }
 
-        alert(`✅ Imported ${parsed.chapters.length} chapter(s) from "${file.name}".`);
+        alert(
+          `✅ Imported ${parsed.chapters.length} chapter(s) from "${file.name}".`
+        );
       } else {
-        // Single-chapter import
+        // Fallback: single-chapter import
+        setImportProgress("Importing manuscript into a single chapter...");
+
         const fullContent =
           parsed.fullContent ||
           (parsed.chapters && parsed.chapters.length
@@ -276,7 +275,7 @@ export default function ComposePage() {
             content: fullContent,
           });
         } else {
-          // Create a new chapter
+          // Create a brand new chapter
           const newId = addChapter();
           updateChapter(newId, {
             title: parsed.title || "Imported Manuscript",
@@ -286,14 +285,15 @@ export default function ComposePage() {
           setView("editor");
         }
 
-        alert(`✅ Document imported into a single chapter from "${file.name}".`);
+        alert(
+          `✅ Document imported into a single chapter from "${file.name}".`
+        );
       }
 
-     // 4) Save snapshot (only book; chapters are already in hook state)
-        saveProject({
-          book: { ...book, title: parsed.title || bookTitle },
-        });
-
+      // Save snapshot using latest chapters from state
+      saveProject({
+        book: { ...book, title: parsed.title || bookTitle },
+      });
     } catch (error) {
       console.error("Import failed:", error);
       alert(
@@ -318,55 +318,29 @@ export default function ComposePage() {
     URL.revokeObjectURL(url);
   };
 
-  // Delete single chapter WITHOUT forcing view change
+  // Delete single chapter
   const handleDeleteCurrent = () => {
     if (!hasChapter) return;
     if (
-      !window.confirm(
+      window.confirm(
         `Delete "${title || selectedChapter.title}"?\n\nThis cannot be undone.`
       )
     ) {
-      return;
-    }
-
-    // Compute next chapter selection before delete
-    const idx = chapters.findIndex((c) => c.id === selectedId);
-    const remaining = chapters.filter((c) => c.id !== selectedId);
-
-    deleteChapter(selectedId);
-
-    if (remaining.length > 0) {
-      const nextIdx = Math.min(idx, remaining.length - 1);
-      const nextId = remaining[nextIdx].id;
-      setSelectedId(nextId);
-    } else {
-      // No chapters left
-      setSelectedId(null);
-      setTitle("");
-      setHtml("");
+      deleteChapter(selectedId);
+      setTimeout(() => setView("grid"), 100);
     }
   };
 
-  // Bulk delete WITHOUT forcing view change
+  // Bulk delete
   const handleDeleteMultiple = (ids) => {
     if (!ids?.length) return;
     if (!window.confirm(`Delete ${ids.length} chapter(s)? This cannot be undone.`))
       return;
 
-    const idsSet = new Set(ids);
-    const remaining = chapters.filter((c) => !idsSet.has(c.id));
-
     ids.forEach((id) => deleteChapter(id));
     clearSelection();
-
-    if (idsSet.has(selectedId)) {
-      if (remaining.length > 0) {
-        setSelectedId(remaining[0].id);
-      } else {
-        setSelectedId(null);
-        setTitle("");
-        setHtml("");
-      }
+    if (ids.includes(selectedId)) {
+      setTimeout(() => setView("grid"), 100);
     }
   };
 
@@ -420,26 +394,27 @@ export default function ComposePage() {
             onClick={toggleSelectMode}
             className={[
               "inline-flex items-center gap-2 rounded-md border px-2.5 py-1 text-[13px]",
-              selectMode ? "bg-blue-100 border-blue-300" : "bg-white hover:bg-slate-50",
+              selectMode
+                ? "bg-blue-100 border-blue-300"
+                : "bg-white hover:bg-slate-50",
             ].join(" ")}
             title="Toggle Select Mode"
           >
             {selectMode ? "✓ Select" : "Select"}
           </button>
 
-          {/* Selection toolbar (now always visible in select mode) */}
-          {selectMode && (
+          {/* Selection toolbar */}
+          {selectMode && selectedIds.size > 0 && (
             <div className="flex items-center gap-2 px-3 py-1 bg-blue-50 rounded-md border border-blue-200">
               <span className="text-xs font-medium text-blue-900">
                 {selectedIds.size} selected
               </span>
               <button
                 onClick={() => handleDeleteMultiple(Array.from(selectedIds))}
-                className="text-xs px-2 py-0.5 rounded bg-red-500 text-white hover:bg-red-600 disabled:opacity-50"
+                className="text-xs px-2 py-0.5 rounded bg-red-500 text-white hover:bg-red-600"
                 title="Delete Selected"
-                disabled={selectedIds.size === 0}
               >
-                🗑️ Delete selected
+                🗑️ Delete
               </button>
               <button
                 onClick={clearSelection}
@@ -447,13 +422,6 @@ export default function ComposePage() {
                 title="Clear Selection"
               >
                 Clear
-              </button>
-              <button
-                onClick={selectAllChapters}
-                className="text-xs px-2 py-0.5 rounded border border-blue-300 bg-white hover:bg-blue-50"
-                title="Select All Chapters"
-              >
-                Select all
               </button>
             </div>
           )}
@@ -547,6 +515,9 @@ export default function ComposePage() {
               aiBusy={aiBusy}
               aiError={aiError}
             />
+
+            {/* AIInstructions intentionally removed to keep writing page simple */}
+            {/* <AIInstructions ... /> */}
 
             <ChapterSidebar
               chapters={chapters}
