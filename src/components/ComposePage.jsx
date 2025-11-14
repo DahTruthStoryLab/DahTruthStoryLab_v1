@@ -172,9 +172,18 @@ export default function ComposePage() {
     content: html,
   });
   // Only update book metadata, let the hook keep chapters internally
-  saveProject({ book: { ...book, title: bookTitle } });
+   saveProject({
+      book: { ...book, title: parsed.title || bookTitle },
+    });
+  } catch (error) {
+    console.error("Import failed:", error);
+    alert(
+      `❌ Failed to import document: ${
+        error instanceof Error ? error.message : "Unknown error"
+      }`
+    );
+  }
 };
-
   // AI (rewrite only)
   const handleAI = async (mode) => {
     if (!hasChapter) return;
