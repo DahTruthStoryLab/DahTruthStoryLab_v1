@@ -205,25 +205,97 @@ export default function ComposePage() {
   };
 
   // AI (rewrite only)
-  const handleAI = async (mode) => {
+   // Helper to chunk long content into manageable pieces for AI
+  const chunkHtmlForAI = (sourceHtml, maxChars = 8000) => {
+    if (!sourceHtml || sourceHtml.length <= maxChars) {
+      return [sourceHtml || ""];
+    }
+
+    const chunks = [];
+    let remaining = sourceHtml;
+
+    while (remaining.length > maxChars) {
+      // Try to break at a paragraph or sentence boundary near maxChars
+      let breakIndex =
+        remaining.lastIndexOf("</p>", maxChars) !== -1
+          ? remaining.lastIndexOf("</p>", maxChars) + 4
+          : remaining.lastIndexOf("\n\n", maxChars);
+
+      if (breakIndex === -1 || breakIndex < maxChars * 0.6) {
+        // fallback: break on space
+        breakIndex = remaining.lastIndexOf(" ", maxChars);
+      }
+      if (breakIndex === -1 || breakIndex < maxChars * 0.4) {
+        breakIndex = maxChars;
+      }
+
+      chunks.push(remaining.slice(0, breakIndex));
+      remaining = remaining.slice(breakIndex);
+    }
+
+    if (remaining.trim().length) {
+      chunks.push(remaining);
+    }
+
+    return chunks;
+  };
+
+  // AI handler that can work on full chapter OR a smaller snippet (later)
+  const handleAI = async (mode, targetHtmlOverride) => {
     if (!hasChapter) return;
 
-    try {
-      const result = await rateLimiter.addToQueue(async () => {
-        return await runAI(mode, html, instructions, provider);
-      });
+    const target = (targetHtmlOverride ?? html) || "";
+    if (!target.trim()) return;
 
-      if (result) {
-        setHtml(result);
-        updateChapter(selectedId, {
-          title: title || selectedChapter?.title || "",
-          content: result,
-        });
+    try {
+      const parts = chunkHtmlForAI(target);
+      let combinedResult = "";
+
+      for (const part of parts) {
+        const partial = await rateLimiter.addToQueue(async () =>
+          runAI(mode, part, instructions, provider)
+        );
+        combinedResult += partial ?? part;
       }
+
+      setHtml(combinedResult);
+      updateChapter(selectedId, {
+        title: title || selectedChapter?.title || "",
+        content: combinedResult,
+      });
     } catch (error) {
       console.error("AI request error:", error);
     }
   };
+
+  // AI handler that can work on full chapter OR a smaller snippet (later)
+  const handleAI = async (mode, targetHtmlOverride) => {
+    if (!hasChapter) return;
+
+    const target = (targetHtmlOverride ?? html) || "";
+    if (!target.trim()) return;
+
+    try {
+      const parts = chunkHtmlForAI(target);
+      let combinedResult = "";
+
+      for (const part of parts) {
+        const partial = await rateLimiter.addToQueue(async () =>
+          runAI(mode, part, instructions, provider)
+        );
+        combinedResult += partial ?? part;
+      }
+
+      setHtml(combinedResult);
+      updateChapter(selectedId, {
+        title: title || selectedChapter?.title || "",
+        content: combinedResult,
+      });
+    } catch (error) {
+      console.error("AI request error:", error);
+    }
+  };
+
 
   // NEW: simplified import using documentParser
   const handleImport = async (file, options = {}) => {
