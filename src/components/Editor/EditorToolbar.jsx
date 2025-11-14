@@ -1,131 +1,119 @@
 // src/components/Editor/EditorToolbar.jsx
-// Toolbar with all AI operations, Import, Export, Save buttons
-// Preserves all brand styling and functionality
+import React, { useRef } from "react";
+import {
+  Save,
+  Wand2,
+  Upload,
+  Download,
+  Trash2,
+} from "lucide-react";
 
-import React from "react";
-import { Bot, Save, RotateCcw, RotateCw, Download, Trash2 } from "lucide-react";
-import ImportButton from "./ImportButton";
+export default function EditorToolbar({
+  onAI,
+  onSave,
+  onImport,
+  onExport,
+  onDelete,
+  aiBusy,
+  saveStatus = "idle",
+}) {
+  const fileInputRef = useRef(null);
 
-export default function EditorToolbar({ onAI, onSave, onImport, onExport, onDelete, aiBusy, compact = false }) {
+  const handleImportClick = () => {
+    if (!onImport) return;
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleFileChange = (e) => {
+    if (!onImport) return;
+    const file = e.target.files?.[0];
+    if (file) {
+      onImport(file);
+    }
+  };
+
+  const handleAIRewrite = () => {
+    if (!onAI || aiBusy) return;
+    // You can change "rewrite" to another mode if needed
+    onAI("rewrite");
+  };
+
+  const isSaving = saveStatus === "saving";
+  const isSaved = saveStatus === "saved";
+
   return (
-    <div className="flex items-center gap-2 flex-wrap">
-      {/* Undo/Redo - only show if not compact */}
-      {!compact && (
-        <>
-          <button
-            onClick={() => {
-              // Undo will be handled by EditorPane
-            }}
-            className="rounded-lg border px-2 py-1.5 bg-white hover:bg-slate-50"
-            title="Undo (Ctrl+Z)"
-          >
-            <RotateCcw size={16} />
-          </button>
-          <button
-            onClick={() => {
-              // Redo will be handled by EditorPane
-            }}
-            className="rounded-lg border px-2 py-1.5 bg-white hover:bg-slate-50"
-            title="Redo (Ctrl+Shift+Z)"
-          >
-            <RotateCw size={16} />
-          </button>
-        </>
-      )}
+    <div className="flex items-center gap-2 text-xs text-slate-800">
+      {/* Hidden file input for import */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".doc,.docx,.txt,.md"
+        className="hidden"
+        onChange={handleFileChange}
+      />
 
-      {/* Import/Export */}
-      <ImportButton onImport={onImport} aiBusy={aiBusy} />
-
-     <button
-        onClick={onExport}
-        className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50 disabled:opacity-60"
-        title="Export to Word"
-        disabled={aiBusy}
-      >
-        <Download size={16} /> Export
-      </button>
-
-      {/* Delete Chapter Button */}
-      <button
-        onClick={onDelete}
-        className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-white hover:bg-red-50 text-slate-600 hover:text-red-600 disabled:opacity-60"
-        title="Delete Current Chapter"
-        disabled={aiBusy}
-      >
-        <Trash2 size={16} /> Delete
-      </button>
-
-      {/* AI Actions */}
-      <button
-        onClick={() => onAI("proofread")}
-        className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50 disabled:opacity-60"
-        disabled={aiBusy}
-        title="AI Proofread"
-      >
-        <Bot size={16} />
-        {aiBusy ? "AI…" : "Proofread"}
-      </button>
-
-      <button
-        onClick={() => onAI("clarify")}
-        className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50 disabled:opacity-60"
-        disabled={aiBusy}
-        title="AI Clarify"
-      >
-        <Bot size={16} />
-        {aiBusy ? "AI…" : "Clarify"}
-      </button>
-
-      <button
-        onClick={() => onAI("rewrite")}
-        className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50 disabled:opacity-60"
-        disabled={aiBusy}
-        title="AI Rewrite"
-      >
-        <Bot size={16} />
-        {aiBusy ? "AI…" : "Rewrite"}
-      </button>
-
-      {/* Extra AI buttons - only show if not compact */}
-      {!compact && (
-        <>
-          <button
-            onClick={() => onAI("grammar")}
-            className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50 disabled:opacity-60"
-            disabled={aiBusy}
-            title="AI Grammar Check"
-          >
-            🔤 Grammar
-          </button>
-
-          <button
-            onClick={() => onAI("style")}
-            className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50 disabled:opacity-60"
-            disabled={aiBusy}
-            title="AI Style Improvement"
-          >
-            🪶 Style
-          </button>
-
-          <button
-            onClick={() => onAI("readability")}
-            className="inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 bg-white hover:bg-slate-50 disabled:opacity-60"
-            disabled={aiBusy}
-            title="AI Readability Check"
-          >
-            📊 Readability
-          </button>
-        </>
-      )}
-
-      {/* Save Button (Gold) */}
+      {/* Save button */}
       <button
         onClick={onSave}
-        className="inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-white hover:opacity-90"
-        style={{ backgroundColor: "#D4AF37" }}
-        title="Save Chapter (Ctrl+S)"
+        disabled={isSaving}
+        className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-900 hover:bg-slate-50 disabled:opacity-60 disabled:cursor-not-allowed"
+        title="Save current chapter"
       >
-        <Save size={16} /> Save
+        {isSaving && (
+          <span className="inline-block w-3 h-3 border-2 border-slate-500 border-t-transparent rounded-full animate-spin" />
+        )}
+        {!isSaving && <Save className="w-3.5 h-3.5" />}
+        <span>
+          {isSaving
+            ? "Saving..."
+            : isSaved
+            ? "Saved"
+            : "Save"}
+        </span>
+      </button>
+
+      {/* AI Rewrite */}
+      <button
+        onClick={handleAIRewrite}
+        disabled={aiBusy}
+        className="inline-flex items-center gap-1 rounded-md border border-[#D4AF37]/40 bg-[#1a237e] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#0d47a1] disabled:opacity-60 disabled:cursor-not-allowed"
+        title="Use AI to rewrite or polish this chapter"
+      >
+        <Wand2 className="w-3.5 h-3.5" />
+        <span>{aiBusy ? "AI working..." : "AI Rewrite"}</span>
+      </button>
+
+      {/* Import */}
+      <button
+        onClick={handleImportClick}
+        className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white/90 px-3 py-1.5 text-xs font-medium text-slate-800 hover:bg-slate-50"
+        title="Import a Word or text document"
+      >
+        <Upload className="w-3.5 h-3.5" />
+        <span>Import</span>
+      </button>
+
+      {/* Export */}
+      <button
+        onClick={onExport}
+        className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white/90 px-3 py-1.5 text-xs font-medium text-slate-800 hover:bg-slate-50"
+        title="Export current chapter as HTML"
+      >
+        <Download className="w-3.5 h-3.5" />
+        <span>Export</span>
+      </button>
+
+      {/* Delete */}
+      <button
+        onClick={onDelete}
+        className="inline-flex items-center gap-1 rounded-md border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100"
+        title="Delete current chapter"
+      >
+        <Trash2 className="w-3.5 h-3.5" />
+        <span>Delete</span>
       </button>
     </div>
   );
