@@ -204,11 +204,27 @@ export default function ComposePage() {
     });
   };
 
-    // SIMPLE AI HANDLER — sends a safe slice so it doesn't time out
+      // Map friendly button labels to backend modes (in case backend doesn't know "proofread"/"clarify")
+  const resolveAIMode = (mode) => {
+    switch (mode) {
+      case "proofread":
+        // treat "Proofread" as a grammar check
+        return "grammar";
+      case "clarify":
+        // treat "Clarify" as a style/readability pass
+        return "style"; // or "readability" if your backend expects that
+      default:
+        return mode; // "grammar", "readability", etc.
+    }
+  };
+
+  // SIMPLE AI HANDLER — sends a safe slice so it doesn't time out
   const handleAI = async (mode, targetHtmlOverride) => {
     if (!hasChapter) return;
 
-    const MAX_CHARS = 9000; // safe size for most models
+    const MAX_CHARS = 9000; // safe size for most models / API limits
+    const op = resolveAIMode(mode);
+
     const raw = (targetHtmlOverride ?? html) || "";
     const target = raw.slice(0, MAX_CHARS);
 
@@ -216,10 +232,15 @@ export default function ComposePage() {
 
     try {
       const result = await rateLimiter.addToQueue(async () =>
-        runAI(mode, target, instructions, provider)
+        runAI(op, target, instructions, provider)
       );
 
-      if (!result) return;
+      if (!result) {
+        alert(
+          "The AI did not return any text. Please try again with a smaller section or a different mode."
+        );
+        return;
+      }
 
       setHtml(result);
       updateChapter(selectedId, {
@@ -228,6 +249,9 @@ export default function ComposePage() {
       });
     } catch (error) {
       console.error("AI request error:", error);
+      alert(
+        "There was an error calling the AI service. Please try again in a moment."
+      );
     }
   };
 
