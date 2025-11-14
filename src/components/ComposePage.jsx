@@ -204,69 +204,32 @@ export default function ComposePage() {
     });
   };
 
-    // Helper to chunk long content into manageable pieces for AI
-  const chunkHtmlForAI = (sourceHtml, maxChars = 8000) => {
-    if (!sourceHtml || sourceHtml.length <= maxChars) {
-      return [sourceHtml || ""];
-    }
-
-    const chunks = [];
-    let remaining = sourceHtml;
-
-    while (remaining.length > maxChars) {
-      // Try to break at a paragraph or sentence boundary near maxChars
-      let breakIndex =
-        remaining.lastIndexOf("</p>", maxChars) !== -1
-          ? remaining.lastIndexOf("</p>", maxChars) + 4
-          : remaining.lastIndexOf("\n\n", maxChars);
-
-      if (breakIndex === -1 || breakIndex < maxChars * 0.6) {
-        // fallback: break on space
-        breakIndex = remaining.lastIndexOf(" ", maxChars);
-      }
-      if (breakIndex === -1 || breakIndex < maxChars * 0.4) {
-        breakIndex = maxChars;
-      }
-
-      chunks.push(remaining.slice(0, breakIndex));
-      remaining = remaining.slice(breakIndex);
-    }
-
-    if (remaining.trim().length) {
-      chunks.push(remaining);
-    }
-
-    return chunks;
-  };
-
-  // AI handler that can work on full chapter OR a smaller snippet (later)
+    // SIMPLE AI HANDLER — sends a safe slice so it doesn't time out
   const handleAI = async (mode, targetHtmlOverride) => {
     if (!hasChapter) return;
 
-    const target = (targetHtmlOverride ?? html) || "";
+    const MAX_CHARS = 9000; // safe size for most models
+    const raw = (targetHtmlOverride ?? html) || "";
+    const target = raw.slice(0, MAX_CHARS);
+
     if (!target.trim()) return;
 
     try {
-      const parts = chunkHtmlForAI(target);
-      let combinedResult = "";
+      const result = await rateLimiter.addToQueue(async () =>
+        runAI(mode, target, instructions, provider)
+      );
 
-      for (const part of parts) {
-        const partial = await rateLimiter.addToQueue(async () =>
-          runAI(mode, part, instructions, provider)
-        );
-        combinedResult += partial ?? part;
-      }
+      if (!result) return;
 
-      setHtml(combinedResult);
+      setHtml(result);
       updateChapter(selectedId, {
         title: title || selectedChapter?.title || "",
-        content: combinedResult,
+        content: result,
       });
     } catch (error) {
       console.error("AI request error:", error);
     }
   };
-
 
 
   // NEW: simplified import using documentParser
