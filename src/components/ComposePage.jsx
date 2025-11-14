@@ -91,54 +91,54 @@ export default function ComposePage() {
   }, []);
 
   // Selection helpers
-const clearSelection = () => setSelectedIds(new Set());
+  const clearSelection = () => setSelectedIds(new Set());
 
-function toggleSelect(id, { additive = false } = {}) {
-  if (!id) return;
-  setSelectedIds((prev) => {
-    const next = new Set(additive ? prev : []);
-    next.has(id) ? next.delete(id) : next.add(id);
-    return next;
-  });
-}
-
-function rangeSelect(toIdx) {
-  if (!Number.isInteger(toIdx) || toIdx < 0 || toIdx >= chapters.length) {
-    lastClickedIndexRef.current = null;
-    return;
+  function toggleSelect(id, { additive = false } = {}) {
+    if (!id) return;
+    setSelectedIds((prev) => {
+      const next = new Set(additive ? prev : []);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
   }
-  const fromIdx = lastClickedIndexRef.current;
-  if (fromIdx == null || fromIdx < 0 || fromIdx >= chapters.length) {
-    const chapterId = chapters[toIdx]?.id;
-    if (chapterId) {
-      setSelectedIds(new Set([chapterId]));
-      lastClickedIndexRef.current = toIdx;
+
+  function rangeSelect(toIdx) {
+    if (!Number.isInteger(toIdx) || toIdx < 0 || toIdx >= chapters.length) {
+      lastClickedIndexRef.current = null;
+      return;
     }
-    return;
+    const fromIdx = lastClickedIndexRef.current;
+    if (fromIdx == null || fromIdx < 0 || fromIdx >= chapters.length) {
+      const chapterId = chapters[toIdx]?.id;
+      if (chapterId) {
+        setSelectedIds(new Set([chapterId]));
+        lastClickedIndexRef.current = toIdx;
+      }
+      return;
+    }
+    const [a, b] = [Math.min(fromIdx, toIdx), Math.max(fromIdx, toIdx)];
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      for (let i = a; i <= b; i++) {
+        const cid = chapters[i]?.id;
+        if (cid) next.add(cid);
+      }
+      return next;
+    });
+    lastClickedIndexRef.current = toIdx;
   }
-  const [a, b] = [Math.min(fromIdx, toIdx), Math.max(fromIdx, toIdx)];
-  setSelectedIds((prev) => {
-    const next = new Set(prev);
-    for (let i = a; i <= b; i++) {
-      const cid = chapters[i]?.id;
-      if (cid) next.add(cid);
-    }
-    return next;
-  });
-  lastClickedIndexRef.current = toIdx;
-}
 
-function toggleSelectMode() {
-  setSelectMode((s) => {
-    if (s) clearSelection();
-    return !s;
-  });
-}
+  function toggleSelectMode() {
+    setSelectMode((s) => {
+      if (s) clearSelection();
+      return !s;
+    });
+  }
 
-function handleSelectAll() {
-  if (!Array.isArray(chapters) || chapters.length === 0) return;
-  setSelectedIds(new Set(chapters.map((c) => c.id)));
-}
+  function handleSelectAll() {
+    if (!Array.isArray(chapters) || chapters.length === 0) return;
+    setSelectedIds(new Set(chapters.map((c) => c.id)));
+  }
 
   // Keyboard delete
   useEffect(() => {
@@ -184,7 +184,7 @@ function handleSelectAll() {
       title: newTitle,
     });
   };
-  
+
   // AI (rewrite only)
   const handleAI = async (mode) => {
     if (!hasChapter) return;
@@ -394,7 +394,9 @@ function handleSelectAll() {
             <button
               onClick={() => setView("editor")}
               className={`inline-flex items-center gap-2 rounded-md border px-2.5 py-1 text-[13px] ${
-                view === "editor" ? "bg-slate-100" : "bg-white hover:bg-slate-50"
+                view === "editor"
+                  ? "bg-slate-100"
+                  : "bg-white hover:bg-slate-50"
               }`}
               title="Open Editor"
             >
@@ -512,7 +514,6 @@ function handleSelectAll() {
       )}
 
       {/* EDITOR VIEW */}
-          {/* EDITOR VIEW */}
       {view === "editor" && (
         <div
           className="max-w-7xl mx-auto px-4 py-6 grid gap-6"
@@ -544,23 +545,6 @@ function handleSelectAll() {
               onRenameChapter={handleRenameChapter}
             />
           </aside>
-
-          {/* Main Editor */}
-          <EditorPane
-            title={title}
-            setTitle={setTitle}
-            html={html}
-            setHtml={setHtml}
-            onSave={handleSave}
-            onAI={handleAI}
-            aiBusy={aiBusy}
-            pageWidth={1000}
-          />
-
-          <TrashDock onDelete={handleDeleteMultiple} />
-        </div>
-      )}
-
 
           {/* Main Editor */}
           <EditorPane
