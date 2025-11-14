@@ -65,13 +65,15 @@ const Writing = () => {
     ));
   };
 
-  const handleDeleteChapter = (chapterId) => {
-    if (window.confirm('Are you sure you want to delete this chapter?')) {
-      setChapters(chapters.filter(ch => ch.id !== chapterId));
-      if (selectedChapterId === chapterId) {
-        setSelectedChapterId(null);
-      }
-    }
+  // ✅ NEW: rename handler that keeps everything in sync
+  const handleRenameChapter = (chapterId, newTitle) => {
+    setChapters(prev =>
+      prev.map(ch =>
+        ch.id === chapterId
+          ? { ...ch, title: newTitle, updatedAt: new Date().toISOString() }
+          : ch
+      )
+    );
   };
 
   return (
@@ -143,8 +145,9 @@ const Writing = () => {
             chapters={chapters}
             onReorder={handleReorderChapters}
             onAddChapter={handleAddChapter}
-            selectedChapterId={selectedChapterId}
+            selectedId={selectedChapterId}            {/* ⬅ changed name */}
             onSelectChapter={handleSelectChapter}
+            onRenameChapter={handleRenameChapter}      {/* ⬅ NEW prop */}
           />
         )}
 
@@ -197,4 +200,3 @@ const Writing = () => {
 };
 
 export default Writing;
-
