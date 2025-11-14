@@ -204,8 +204,7 @@ export default function ComposePage() {
     });
   };
 
-  // AI (rewrite only)
-   // Helper to chunk long content into manageable pieces for AI
+    // Helper to chunk long content into manageable pieces for AI
   const chunkHtmlForAI = (sourceHtml, maxChars = 8000) => {
     if (!sourceHtml || sourceHtml.length <= maxChars) {
       return [sourceHtml || ""];
@@ -268,33 +267,6 @@ export default function ComposePage() {
     }
   };
 
-  // AI handler that can work on full chapter OR a smaller snippet (later)
-  const handleAI = async (mode, targetHtmlOverride) => {
-    if (!hasChapter) return;
-
-    const target = (targetHtmlOverride ?? html) || "";
-    if (!target.trim()) return;
-
-    try {
-      const parts = chunkHtmlForAI(target);
-      let combinedResult = "";
-
-      for (const part of parts) {
-        const partial = await rateLimiter.addToQueue(async () =>
-          runAI(mode, part, instructions, provider)
-        );
-        combinedResult += partial ?? part;
-      }
-
-      setHtml(combinedResult);
-      updateChapter(selectedId, {
-        title: title || selectedChapter?.title || "",
-        content: combinedResult,
-      });
-    } catch (error) {
-      console.error("AI request error:", error);
-    }
-  };
 
 
   // NEW: simplified import using documentParser
