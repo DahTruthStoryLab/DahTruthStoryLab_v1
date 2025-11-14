@@ -77,20 +77,26 @@ export function useChapterManager() {
   }, [book, chapters]);
 
   // Add new chapter
-  const addChapter = () => {
-    const id = Date.now();
-    const newChapter = {
-      id,
-      title: `Chapter ${chapters.length + 1}: Untitled`,
-      content: "",
-      wordCount: 0,
-      lastEdited: "Just now",
-      status: "draft",
-    };
-    setChapters((prev) => [newChapter, ...prev]);
-    setSelectedId(id);
-    return id;
-  };
+// example: safe implementation
+const addChapter = () => {
+  const id = `chapter-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+  setChapters((prev) => {
+    const next = [
+      ...prev,
+      {
+        id,
+        title: `Chapter ${prev.length + 1}`,
+        content: "",
+        order: prev.length,
+      },
+    ];
+    return next;
+  });
+
+  setSelectedId(id);
+  return id;
+};
 
   // Update existing chapter
   const updateChapter = (id, updates) => {
