@@ -1,7 +1,7 @@
 // src/components/Writing/ChapterSidebar.jsx
-// Sidebar list of chapters for navigation with multi-select and drag support
+// Sidebar list of chapters for navigation with multi-select, drag, and rename support
 
-import React from "react";
+import React, { useState } from "react";
 import { useDrag } from "react-dnd";
 
 function ChapterItem({
@@ -12,6 +12,7 @@ function ChapterItem({
   selectMode,
   selectedIds,
   onRowClick,
+  onRenameChapter,
 }) {
   if (!chapter || chapter.id == null) return null;
 
@@ -29,6 +30,32 @@ function ChapterItem({
     [chapter.id, selectedIds]
   );
 
+  const [isEditing, setIsEditing] = useState(false);
+  const [tempTitle, setTempTitle] = useState(chapter.title || "");
+
+  const startEdit = (event) => {
+    event.stopPropagation();
+    setTempTitle(chapter.title || "");
+    setIsEditing(true);
+  };
+
+  const finishEdit = () => {
+    const trimmed = (tempTitle || "").trim();
+    if (
+      trimmed &&
+      trimmed !== chapter.title &&
+      typeof onRenameChapter === "function"
+    ) {
+      onRenameChapter(chapter.id, trimmed);
+    }
+    setIsEditing(false);
+  };
+
+  const cancelEdit = () => {
+    setTempTitle(chapter.title || "");
+    setIsEditing(false);
+  };
+
   return (
     <button
       ref={drag}
@@ -43,22 +70,54 @@ function ChapterItem({
         isDragging ? "opacity-50" : "",
         "cursor-grab active:cursor-grabbing",
       ].join(" ")}
+      type="button"
     >
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
-          <div className="truncate">
-            {isSelected && selectedIds?.size > 1 && (
-              <span className="inline-block w-5 h-5 rounded bg-blue-500 text-white text-xs leading-5 text-center mr-2">
-                {selectedIds.size}
-              </span>
-            )}
-            {chapter.title}
-          </div>
-          <div className="text-xs text-slate-500 mt-0.5">
-            {(chapter.wordCount || 0).toLocaleString()} words
-          </div>
+          {isEditing ? (
+            <input
+              className="w-full text-xs border border-blue-300 rounded px-1 py-0.5 bg-white"
+              autoFocus
+              value={tempTitle}
+              onChange={(e) => setTempTitle(e.target.value)}
+              onBlur={finishEdit}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") finishEdit();
+                if (e.key === "Escape") cancelEdit();
+              }}
+              onClick={(e) => e.stopPropagation()}
+            />
+          ) : (
+            <>
+              <div className="truncate">
+                {isSelected && selectedIds?.size > 1 && (
+                  <span className="inline-block w-5 h-5 rounded bg-blue-500 text-white text-xs leading-5 text-center mr-2">
+                    {selectedIds.size}
+                  </span>
+                )}
+                {chapter.title}
+              </div>
+              <div className="text-xs text-slate-500 mt-0.5">
+                {(chapter.wordCount || 0).toLocaleString()} words
+              </div>
+            </>
+          )}
         </div>
-        {isActive && <div className="text-xs">▶</div>}
+
+        <div className="flex flex-col items-end gap-1">
+          {isActive && <div className="text-xs">▶</div>}
+
+          {!isEditing && (
+            <button
+              type="button"
+              onClick={startEdit}
+              className="text-[11px] text-blue-500 opacity-0 group-hover:opacity-100 hover:underline"
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              ✏️
+            </button>
+          )}
+        </div>
       </div>
     </button>
   );
@@ -75,6 +134,7 @@ export default function ChapterSidebar({
   onToggleSelect,
   onRangeSelect,
   lastClickedIndexRef,
+  onRenameChapter, // ✅ NEW PROP
 }) {
   const safeChapters = Array.isArray(chapters)
     ? chapters.filter((ch) => ch && ch.id != null)
@@ -106,7 +166,7 @@ export default function ChapterSidebar({
 
   return (
     <div
-      className="rounded-xl border bg-white/85 backdrop-blur-sm p-4"
+      className="rounded-xl border bg-white/85 backdrop-blur-sm p-4 group"
       style={{ boxShadow: "0 8px 30px rgba(2,20,40,0.10)" }}
     >
       <div className="flex items-center justify-between mb-3">
@@ -152,6 +212,7 @@ export default function ChapterSidebar({
             selectMode={!!selectMode}
             selectedIds={selectedIds}
             onRowClick={handleRowClick(ch.id, idx)}
+            onRenameChapter={onRenameChapter}
           />
         ))}
       </div>
@@ -164,7 +225,8 @@ export default function ChapterSidebar({
 
       {selectMode && (
         <div className="mt-3 pt-3 border-t text-xs text-slate-500">
-          💡 Tip: Click to select, Shift+Click for range, Ctrl/Cmd+Click to toggle
+          💡 Tip: Click to select, Shift+Click for range, Ctrl/Cmd+Click to
+          toggle
         </div>
       )}
     </div>
