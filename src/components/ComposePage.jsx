@@ -204,7 +204,8 @@ export default function ComposePage() {
     });
   };
 
-      // Map friendly button labels to backend modes (in case backend doesn't know "proofread"/"clarify")
+    // Map friendly button labels to backend modes
+  // (in case backend doesn't know "proofread"/"clarify")
   const resolveAIMode = (mode) => {
     switch (mode) {
       case "proofread":
@@ -222,7 +223,7 @@ export default function ComposePage() {
   const handleAI = async (mode, targetHtmlOverride) => {
     if (!hasChapter) return;
 
-    const MAX_CHARS = 9000; // safe size for most models / API limits
+    const MAX_CHARS = 3000; // keep this small to be extra safe for now
     const op = resolveAIMode(mode);
 
     const raw = (targetHtmlOverride ?? html) || "";
@@ -234,6 +235,8 @@ export default function ComposePage() {
       const result = await rateLimiter.addToQueue(async () =>
         runAI(op, target, instructions, provider)
       );
+
+      console.log("AI mode:", op, "chars:", target.length, "result:", result);
 
       if (!result) {
         alert(
