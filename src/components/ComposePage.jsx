@@ -103,6 +103,9 @@ export default function ComposePage() {
   // Save status for the toolbar
   const [saveStatus, setSaveStatus] = useState("idle"); // "idle" | "saving" | "saved"
 
+  // TOC headings for the current chapter
+  const [headings, setHeadings] = useState([]); // [{level, text, id}]
+
   const hasChapter = !!selectedId && !!selectedChapter;
 
   // Monitor rate limiter queue (for AI)
@@ -183,6 +186,8 @@ export default function ComposePage() {
       setTitle(selectedChapter.title || "");
       setHtml(selectedChapter.content || "");
     }
+    // reset headings when switching chapters
+    setHeadings([]);
   }, [selectedId, selectedChapter]);
 
   // Save with visual feedback
@@ -328,7 +333,7 @@ export default function ComposePage() {
         setBookTitle(parsed.title);
       }
 
-      // ✅ Option A: split into multiple chapters when headings found
+      // Option A: split into multiple chapters when headings found
       if (splitByHeadings && parsed.chapters && parsed.chapters.length > 0) {
         setImportProgress(
           `Creating ${parsed.chapters.length} chapter(s) from "${file.name}"...`
@@ -347,7 +352,7 @@ export default function ComposePage() {
           `✅ Imported ${parsed.chapters.length} chapter(s) from "${file.name}".`
         );
       } else {
-        // ✅ Fallback: single-chapter import
+        // Fallback: single-chapter import
         setImportProgress("Importing manuscript into a single chapter...");
 
         const fullContentRaw =
@@ -381,7 +386,7 @@ export default function ComposePage() {
         }
 
         alert(
-          `✅ Document imported into a single chapter from "${file.name}" (no headings were detected).`
+          `✅ Document imported into a single chapter from "${file.name}".`
         );
       }
 
@@ -622,6 +627,35 @@ export default function ComposePage() {
               lastClickedIndexRef={lastClickedIndexRef}
               onRenameChapter={handleRenameChapter}
             />
+
+            {/* Simple TOC box under the chapters */}
+            {headings.length > 0 && (
+              <div className="mt-3 rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+                <div className="text-xs font-semibold text-slate-700 mb-2">
+                  Table of Contents
+                </div>
+                <ul className="space-y-1 max-h-64 overflow-auto text-xs">
+                  {headings.map((h, idx) => (
+                    <li
+                      key={`${h.level}-${idx}-${h.text}`}
+                      className="text-slate-700"
+                    >
+                      <span
+                        className={
+                          h.level === "h1"
+                            ? "font-semibold"
+                            : h.level === "h2"
+                            ? "ml-2"
+                            : "ml-4 text-slate-500"
+                        }
+                      >
+                        {h.text}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </aside>
 
           {/* Main Editor */}
@@ -634,6 +668,7 @@ export default function ComposePage() {
             onAI={handleAI}
             aiBusy={aiBusy}
             pageWidth={1000}
+            onHeadingsChange={setHeadings} // 👈 wire TOC data from editor
           />
 
           <TrashDock onDelete={handleDeleteMultiple} />
