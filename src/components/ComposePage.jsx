@@ -21,11 +21,25 @@ import { rateLimiter } from "../utils/rateLimiter";
 const DEBUG_IMPORT = false;
 
 // Helper: normalize to "double spaced" paragraphs on import
-const applyDoubleSpacing = (text = "") =>
-  text
-    .replace(/\r\n/g, "\n") // normalize Windows newlines
-    .replace(/\n/g, "\n\n") // make all newlines double
+const applyDoubleSpacing = (text = "") => {
+  if (!text) return "";
+
+  // If this looks like HTML with <p> tags, insert a blank paragraph between each
+  if (text.includes("<p")) {
+    return text
+      .replace(/\r\n/g, "\n")
+      // close each paragraph, then insert an empty spacer paragraph
+      .replace(/<\/p>/g, "</p><p>&nbsp;</p>")
+      // avoid stacking too many spacer paragraphs
+      .replace(/(<p>&nbsp;<\/p>){3,}/g, "<p>&nbsp;</p><p>&nbsp;</p>");
+  }
+
+  // Plain text fallback: convert single newlines to double
+  return text
+    .replace(/\r\n/g, "\n") // normalize
+    .replace(/\n/g, "\n\n") // double space
     .replace(/\n{3,}/g, "\n\n"); // collapse 3+ into exactly 2
+};
 
 export default function ComposePage() {
   const navigate = useNavigate();
@@ -314,7 +328,7 @@ export default function ComposePage() {
         setBookTitle(parsed.title);
       }
 
-      // Option A: split into multiple chapters when headings found
+      // ✅ Option A: split into multiple chapters when headings found
       if (splitByHeadings && parsed.chapters && parsed.chapters.length > 0) {
         setImportProgress(
           `Creating ${parsed.chapters.length} chapter(s) from "${file.name}"...`
@@ -333,7 +347,7 @@ export default function ComposePage() {
           `✅ Imported ${parsed.chapters.length} chapter(s) from "${file.name}".`
         );
       } else {
-        // Fallback: single-chapter import
+        // ✅ Fallback: single-chapter import
         setImportProgress("Importing manuscript into a single chapter...");
 
         const fullContentRaw =
@@ -367,7 +381,7 @@ export default function ComposePage() {
         }
 
         alert(
-          `✅ Document imported into a single chapter from "${file.name}".`
+          `✅ Document imported into a single chapter from "${file.name}" (no headings were detected).`
         );
       }
 
@@ -452,8 +466,7 @@ export default function ComposePage() {
           <div className="ml-1 flex items-center gap-1">
             <button
               onClick={() => setView("grid")}
-              className={`inline-flex items
-              -center gap-2 rounded-md border px-2.5 py-1 text-[13px] ${
+              className={`inline-flex items-center gap-2 rounded-md border px-2.5 py-1 text-[13px] ${
                 view === "grid" ? "bg-slate-100" : "bg-white hover:bg-slate-50"
               }`}
               title="Chapter Grid"
