@@ -6,7 +6,6 @@ import EditorPane from "./Editor/EditorPane";
 import ChapterGrid from "./Writing/ChapterGrid";
 import ChapterSidebar from "./Writing/ChapterSidebar";
 import EditorToolbar from "./Editor/EditorToolbar";
-
 // We removed AIInstructions from the writing page to simplify
 // import AIInstructions from "./Editor/AIInstructions";
 import TrashDock from "./Writing/TrashDock";
@@ -20,6 +19,13 @@ import { documentParser } from "../utils/documentParser";
 import { rateLimiter } from "../utils/rateLimiter";
 
 const DEBUG_IMPORT = false;
+
+// Helper: normalize to "double spaced" paragraphs on import
+const applyDoubleSpacing = (text = "") =>
+  text
+    .replace(/\r\n/g, "\n") // normalize Windows newlines
+    .replace(/\n/g, "\n\n") // make all newlines double
+    .replace(/\n{3,}/g, "\n\n"); // collapse 3+ into exactly 2
 
 export default function ComposePage() {
   const navigate = useNavigate();
@@ -80,7 +86,7 @@ export default function ComposePage() {
   const [importProgress, setImportProgress] = useState("");
   const [queueLength, setQueueLength] = useState(0);
 
-  // Save status
+  // Save status for the toolbar
   const [saveStatus, setSaveStatus] = useState("idle"); // "idle" | "saving" | "saved"
 
   const hasChapter = !!selectedId && !!selectedChapter;
@@ -204,7 +210,7 @@ export default function ComposePage() {
     });
   };
 
-    // Map friendly button labels to backend modes
+  // Map friendly button labels to backend modes
   // (in case backend doesn't know "proofread"/"clarify")
   const resolveAIMode = (mode) => {
     switch (mode) {
@@ -220,7 +226,7 @@ export default function ComposePage() {
   };
 
   // SIMPLE AI HANDLER — sends a safe slice so it doesn't time out
-    const handleAI = async (mode, targetHtmlOverride) => {
+  const handleAI = async (mode, targetHtmlOverride) => {
     if (!hasChapter) return;
 
     const MAX_CHARS = 3000; // safe size for now
@@ -316,9 +322,10 @@ export default function ComposePage() {
 
         for (const c of parsed.chapters) {
           const newId = addChapter();
+          const doubleSpacedContent = applyDoubleSpacing(c.content || "");
           updateChapter(newId, {
             title: c.title || "Untitled Chapter",
-            content: c.content || "",
+            content: doubleSpacedContent,
           });
         }
 
@@ -329,11 +336,13 @@ export default function ComposePage() {
         // Fallback: single-chapter import
         setImportProgress("Importing manuscript into a single chapter...");
 
-        const fullContent =
+        const fullContentRaw =
           parsed.fullContent ||
           (parsed.chapters && parsed.chapters.length
             ? parsed.chapters.map((c) => c.content || "").join("\n\n")
             : "");
+
+        const fullContent = applyDoubleSpacing(fullContentRaw);
 
         if (hasChapter) {
           // Overwrite current chapter
@@ -443,7 +452,8 @@ export default function ComposePage() {
           <div className="ml-1 flex items-center gap-1">
             <button
               onClick={() => setView("grid")}
-              className={`inline-flex items-center gap-2 rounded-md border px-2.5 py-1 text-[13px] ${
+              className={`inline-flex items
+              -center gap-2 rounded-md border px-2.5 py-1 text-[13px] ${
                 view === "grid" ? "bg-slate-100" : "bg-white hover:bg-slate-50"
               }`}
               title="Chapter Grid"
@@ -494,6 +504,13 @@ export default function ComposePage() {
                 title="Clear Selection"
               >
                 Clear
+              </button>
+              <button
+                onClick={handleSelectAll}
+                className="text-xs px-2 py-0.5 rounded border border-slate-300 bg-white hover:bg-slate-50"
+                title="Select All Chapters"
+              >
+                Select All
               </button>
             </div>
           )}
@@ -572,7 +589,7 @@ export default function ComposePage() {
       )}
 
       {/* EDITOR VIEW */}
-            {view === "editor" && (
+      {view === "editor" && (
         <div
           className="max-w-7xl mx-auto px-4 py-6 grid gap-6"
           style={{ gridTemplateColumns: "280px minmax(0, 1fr)", minWidth: 1024 }}
@@ -593,7 +610,6 @@ export default function ComposePage() {
               onRenameChapter={handleRenameChapter}
             />
           </aside>
-
 
           {/* Main Editor */}
           <EditorPane
