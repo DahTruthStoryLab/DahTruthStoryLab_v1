@@ -12,7 +12,7 @@ import ReactQuill from "react-quill";
 import Quill from "quill";
 import "react-quill/dist/quill.snow.css";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { PageNumberBadge, SaveStatus } from "../UI/UIComponents";
+import { PageNumberBadge } from "../UI/UIComponents"; // 👈 SaveStatus removed
 import { countWords } from "../../utils/textFormatting";
 
 /* ========== Quill Configuration ========== */
@@ -40,7 +40,7 @@ const Size = Quill.import("formats/size");
 Size.whitelist = ["small", false, "large", "huge"];
 Quill.register(Size, true);
 
-// Line-height
+// Line-height (still registered but we’ll keep behavior simple)
 const Parchment = Quill.import("parchment");
 const lineHeightStyle = new Parchment.Attributor.Style(
   "lineheight",
@@ -64,15 +64,12 @@ export default function EditorPane({
   onAI,
   aiBusy,
   margins,
-  onHeadingsChange,   // optional; emits [{level, text, id}], no UI rendered
-  pageWidth = 960,    // 👈 NEW: adjustable writing canvas width (px)
+  onHeadingsChange, // optional; emits [{level, text, id}], no UI rendered
+  pageWidth = 960, // adjustable writing canvas width (px)
 }) {
   const editorRef = useRef(null);
   const [pageIndex, setPageIndex] = useState(0);
   const [pageCount, setPageCount] = useState(1);
-  const [saving, setSaving] = useState(false);
-  const [lastSaved, setLastSaved] = useState(null);
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [lineSpacing, setLineSpacing] = useState("1.5");
 
   const actualMargins = margins || {
@@ -94,18 +91,9 @@ export default function EditorPane({
 
   const getQuill = () => editorRef.current?.getEditor?.();
 
+  // 🟣 Simpler: line spacing now just updates CSS so it always “does something”
   const applyLineSpacing = useCallback((spacing) => {
-    const q = getQuill();
-    if (!q) return;
     setLineSpacing(spacing);
-    const range = q.getSelection();
-    if (range) {
-      if (range.length === 0) {
-        q.formatText(0, q.getLength(), "lineheight", spacing);
-      } else {
-        q.formatText(range.index, range.length, "lineheight", spacing);
-      }
-    }
   }, []);
 
   const recalcPages = useCallback(() => {
@@ -130,7 +118,6 @@ export default function EditorPane({
       if (!q) return;
       const target = Math.max(0, Math.min(idx, pageCount - 1));
       const scrollEl = q.root;
-      // immediate jump for precise paging
       scrollEl.scrollTop = target * PAGE_HEIGHT;
       setPageIndex(target);
     },
@@ -140,24 +127,12 @@ export default function EditorPane({
   const nextPage = () => pageIndex < pageCount - 1 && goToPage(pageIndex + 1);
   const prevPage = () => pageIndex > 0 && goToPage(pageIndex - 1);
 
-  // mark unsaved
-  useEffect(() => {
-    setHasUnsavedChanges(true);
-  }, [html, title]);
-
-  // save
+  // Save: now just delegates to parent – no local "unsaved changes" UI
   const handleSave = async () => {
-    setSaving(true);
-    setHasUnsavedChanges(false);
     try {
       await onSave?.();
-      setLastSaved("Just now");
-      setTimeout(() => setLastSaved("1 min ago"), 60000);
     } catch (err) {
       console.error("Save error:", err);
-      setHasUnsavedChanges(true);
-    } finally {
-      setSaving(false);
     }
   };
 
@@ -215,8 +190,9 @@ export default function EditorPane({
       const isInput =
         tag === "INPUT" || tag === "TEXTAREA" || e.target.isContentEditable;
 
-      // allow ctrl/cmd+S inside/outside editor
       const k = e.key.toLowerCase();
+
+      // allow ctrl/cmd+S inside/outside editor
       if ((e.ctrlKey || e.metaKey) && !e.shiftKey && k === "s") {
         e.preventDefault();
         handleSave();
@@ -250,7 +226,10 @@ export default function EditorPane({
       {/* Sticky top toolbar (no extra sidebar here) */}
       <div className="sticky top-0 z-50 bg-white/90 backdrop-blur border-b border-slate-200">
         <div className="mx-auto w-full max-w-[1200px] px-4">
-          <div id="editor-toolbar" className="ql-toolbar ql-snow !border-0 !py-2 !px-0">
+          <div
+            id="editor-toolbar"
+            className="ql-toolbar ql-snow !border-0 !py-2 !px-0"
+          >
             <span className="ql-formats">
               <select className="ql-header">
                 <option value="1">H1</option>
@@ -283,6 +262,7 @@ export default function EditorPane({
               <button className="ql-clean"></button>
             </span>
 
+            {/* Line spacing control – now clearly affects the whole page */}
             <span className="ql-formats">
               <label className="text-xs text-slate-600 mr-2">Line</label>
               <select
@@ -312,12 +292,7 @@ export default function EditorPane({
           {countWords(html).toLocaleString()} words
         </div>
 
-        <SaveStatus
-          saving={saving}
-          lastSaved={lastSaved}
-          hasUnsavedChanges={hasUnsavedChanges}
-        />
-
+        {/* SaveStatus removed — save state handled in toolbar via saveStatus prop */}
         <div className="ml-auto flex items-center gap-2">
           <button
             onClick={prevPage}
@@ -355,7 +330,7 @@ export default function EditorPane({
           style={{
             margin: "0 auto",
             width: "100%",
-            maxWidth: pageWidth, // 👈 wider canvas
+            maxWidth: pageWidth, // wider canvas
             height: PAGE_HEIGHT,
             background: "#fff",
             color: "#111",
@@ -374,7 +349,6 @@ export default function EditorPane({
               value={html}
               onChange={(value) => {
                 setHtml(value);
-                // quick recalc after keystrokes
                 setTimeout(recalcPages, 10);
               }}
               modules={modules}
