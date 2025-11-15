@@ -4,7 +4,6 @@ import {
   BrowserRouter as Router,
   Routes,
   Route,
-  useSearchParams,
   useLocation,
   Navigate,
 } from "react-router-dom";
@@ -16,7 +15,11 @@ Amplify.configure(awsconfig);
 // ---------------------------
 // DnD Multi-backend (desktop + mobile)
 import { DndProvider } from "react-dnd";
-import { MultiBackend, TouchTransition, MouseTransition } from "dnd-multi-backend";
+import {
+  MultiBackend,
+  TouchTransition,
+  MouseTransition,
+} from "dnd-multi-backend";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { TouchBackend } from "react-dnd-touch-backend";
 
@@ -39,7 +42,11 @@ const BACKENDS = {
     {
       id: "touch",
       backend: TouchBackend,
-      options: { enableMouseEvents: true, delayTouchStart: 0, ignoreContextMenu: true },
+      options: {
+        enableMouseEvents: true,
+        delayTouchStart: 0,
+        ignoreContextMenu: true,
+      },
       transition: TouchTransition,
     },
   ],
@@ -48,35 +55,50 @@ const BACKENDS = {
 // =========================
 // Lazy-loaded pages
 // =========================
-const LandingPage          = lazy(() => import("./components/LandingPage"));
-const RegistrationPage     = lazy(() => import("./components/RegistrationPage"));
-const SignInPage           = lazy(() => import("./components/SignInPage"));
-const Dashboard            = lazy(() => import("./components/Dashboard"));
-const TOCPage              = lazy(() => import("./components/TOCPage"));
-const TOCPage2             = lazy(() => import("./components/TOCPage2"));
-const ProjectPage          = lazy(() => import("./components/ProjectPage"));
-const WhoAmI               = lazy(() => import("./components/WhoAmI"));
-const ComposePage          = lazy(() => import("./components/ComposePage"));
-const Calendar             = lazy(() => import("./components/Calendar"));
-const StoryLabLanding      = lazy(() => import("./lib/storylab/StoryLabLanding"));
-const StoryPromptsWorkshop = lazy(() => import("./lib/storylab/StoryPromptsWorkshop"));
-const StoryWorkshop        = lazy(() => import("./components/storylab/StoryWorkshop"));
-const PriorityCards        = lazy(() => import("./components/storylab/PriorityCards"));
-const CharacterRoadmap     = lazy(() => import("./components/storylab/CharacterRoadmap"));
-const Clothesline          = lazy(() => import("./components/storylab/Clothesline"));
-const HopesFearsLegacy     = lazy(() => import("./components/storylab/HopesFearsLegacy"));
-const WorkshopCohort       = lazy(() => import("./components/storylab/WorkshopCohort.jsx"));
-const Publishing           = lazy(() => import("./pages/Publishing.tsx"));
-const Proof                = lazy(() => import("./pages/Proof.tsx"));
-const Format               = lazy(() => import("./pages/Format.tsx"));
-const Export               = lazy(() => import("./pages/Export.tsx"));
-const PublishingPrep       = lazy(() => import("./pages/PublishingPrep.tsx"));
-const Profile              = lazy(() => import("./components/Profile"));
-const PlansPage            = lazy(() => import("./components/PlansPage"));
-const BillingSuccess       = lazy(() => import("./pages/BillingSuccess.jsx"));
-const AiTools              = lazy(() => import("./pages/AiTools"));
-const StoryLabLayout       = lazy(() => import("./components/storylab/StoryLabLayout.jsx"));
-const NarrativeArc         = lazy(() => import("./components/storylab/NarrativeArc.jsx"));
+const LandingPage = lazy(() => import("./components/LandingPage"));
+const RegistrationPage = lazy(() => import("./components/RegistrationPage"));
+const SignInPage = lazy(() => import("./components/SignInPage"));
+const Dashboard = lazy(() => import("./components/Dashboard"));
+// TOCPage/TOCPage2 removed from imports
+const ProjectPage = lazy(() => import("./components/ProjectPage"));
+const WhoAmI = lazy(() => import("./components/WhoAmI"));
+const ComposePage = lazy(() => import("./components/ComposePage"));
+const Calendar = lazy(() => import("./components/Calendar"));
+const StoryLabLanding = lazy(() => import("./lib/storylab/StoryLabLanding"));
+const StoryPromptsWorkshop = lazy(() =>
+  import("./lib/storylab/StoryPromptsWorkshop")
+);
+const StoryWorkshop = lazy(() =>
+  import("./components/storylab/StoryWorkshop")
+);
+const PriorityCards = lazy(() =>
+  import("./components/storylab/PriorityCards")
+);
+const CharacterRoadmap = lazy(() =>
+  import("./components/storylab/CharacterRoadmap")
+);
+const Clothesline = lazy(() => import("./components/storylab/Clothesline"));
+const HopesFearsLegacy = lazy(() =>
+  import("./components/storylab/HopesFearsLegacy")
+);
+const WorkshopCohort = lazy(() =>
+  import("./components/storylab/WorkshopCohort.jsx")
+);
+const Publishing = lazy(() => import("./pages/Publishing.tsx"));
+const Proof = lazy(() => import("./pages/Proof.tsx"));
+const Format = lazy(() => import("./pages/Format.tsx"));
+const Export = lazy(() => import("./pages/Export.tsx"));
+const PublishingPrep = lazy(() => import("./pages/PublishingPrep.tsx"));
+const Profile = lazy(() => import("./components/Profile"));
+const PlansPage = lazy(() => import("./components/PlansPage"));
+const BillingSuccess = lazy(() => import("./pages/BillingSuccess.jsx"));
+const AiTools = lazy(() => import("./pages/AiTools"));
+const StoryLabLayout = lazy(() =>
+  import("./components/storylab/StoryLabLayout.jsx")
+);
+const NarrativeArc = lazy(() =>
+  import("./components/storylab/NarrativeArc.jsx")
+);
 
 // =========================
 // Global UI helpers
@@ -107,19 +129,6 @@ function ProtectedRoute({ children }) {
   if (BYPASS_AUTH) return children;
   const user = localStorage.getItem("dt_auth_user");
   return user ? children : <Navigate to="/signin" replace />;
-}
-
-// =========================
-// TOC version selector
-// =========================
-function TableOfContentsRouter() {
-  const [params] = useSearchParams();
-  const paramV = params.get("v");
-  const key = "tocVersion";
-  const stored = localStorage.getItem(key);
-  const chosen = paramV || stored || "2";
-  if (chosen !== stored) localStorage.setItem(key, chosen);
-  return chosen === "1" ? <TOCPage /> : <TOCPage2 />;
 }
 
 // =========================
@@ -167,6 +176,16 @@ export default function App() {
                 />
               ))}
 
+              {/* TOC → use ComposePage (chapter grid as TOC) */}
+              <Route
+                path="/toc"
+                element={
+                  <ProtectedRoute>
+                    <ComposePage />
+                  </ProtectedRoute>
+                }
+              />
+
               {/* STORY-LAB (layout + nested routes) */}
               <Route
                 path="/story-lab/*"
@@ -179,16 +198,31 @@ export default function App() {
                 <Route index element={<StoryLabLanding />} />
                 <Route path="narrative-arc" element={<NarrativeArc />} />
                 <Route path="workshop" element={<StoryWorkshop />} />
-                <Route path="workshop/priorities" element={<PriorityCards />} />
-                <Route path="workshop/roadmap" element={<CharacterRoadmap />} />
-                <Route path="workshop/clothesline" element={<Clothesline />} />
-                <Route path="workshop/hfl" element={<HopesFearsLegacy />} />
+                <Route
+                  path="workshop/priorities"
+                  element={<PriorityCards />}
+                />
+                <Route
+                  path="workshop/roadmap"
+                  element={<CharacterRoadmap />}
+                />
+                <Route
+                  path="workshop/clothesline"
+                  element={<Clothesline />}
+                />
+                <Route
+                  path="workshop/hfl"
+                  element={<HopesFearsLegacy />}
+                />
                 <Route path="prompts" element={<StoryPromptsWorkshop />} />
                 <Route path="community" element={<WorkshopCohort />} />
               </Route>
 
               {/* Typo/alias redirect for old /storylab base (no hyphen) */}
-              <Route path="/storylab/*" element={<Navigate to="/story-lab" replace />} />
+              <Route
+                path="/storylab/*"
+                element={<Navigate to="/story-lab" replace />}
+              />
 
               {/* TOP-LEVEL PUBLISHING PAGES (src/pages/*.tsx) */}
               <Route
@@ -233,53 +267,57 @@ export default function App() {
               />
 
               {/* Aliases that all point to the top-level publishing routes */}
-              <Route path="/publish" element={<Navigate to="/publishing" replace />} />
-              <Route path="/publishing-suite" element={<Navigate to="/publishing" replace />} />
+              <Route
+                path="/publish"
+                element={<Navigate to="/publishing" replace />}
+              />
+              <Route
+                path="/publishing-suite"
+                element={<Navigate to="/publishing" replace />}
+              />
 
               {/* Legacy Story-Lab URLs → new top-level pages */}
-              <Route path="/story-lab/publishing" element={<Navigate to="/publishing" replace />} />
-              <Route path="/story-lab/proof" element={<Navigate to="/proof" replace />} />
-              <Route path="/story-lab/format" element={<Navigate to="/format" replace />} />
-              <Route path="/story-lab/export" element={<Navigate to="/export" replace />} />
+              <Route
+                path="/story-lab/publishing"
+                element={<Navigate to="/publishing" replace />}
+              />
+              <Route
+                path="/story-lab/proof"
+                element={<Navigate to="/proof" replace />}
+              />
+              <Route
+                path="/story-lab/format"
+                element={<Navigate to="/format" replace />}
+              />
+              <Route
+                path="/story-lab/export"
+                element={<Navigate to="/export" replace />}
+              />
               <Route
                 path="/story-lab/publishing-prep"
                 element={<Navigate to="/publishing-prep" replace />}
               />
 
               {/* Legacy without hyphen */}
-              <Route path="/storylab/publishing" element={<Navigate to="/publishing" replace />} />
-              <Route path="/storylab/proof" element={<Navigate to="/proof" replace />} />
-              <Route path="/storylab/format" element={<Navigate to="/format" replace />} />
-              <Route path="/storylab/export" element={<Navigate to="/export" replace />} />
+              <Route
+                path="/storylab/publishing"
+                element={<Navigate to="/publishing" replace />}
+              />
+              <Route
+                path="/storylab/proof"
+                element={<Navigate to="/proof" replace />}
+              />
+              <Route
+                path="/storylab/format"
+                element={<Navigate to="/format" replace />}
+              />
+              <Route
+                path="/storylab/export"
+                element={<Navigate to="/export" replace />}
+              />
               <Route
                 path="/storylab/publishing-prep"
                 element={<Navigate to="/publishing-prep" replace />}
-              />
-
-              {/* TOC */}
-              <Route
-                path="/toc"
-                element={
-                  <ProtectedRoute>
-                    <TableOfContentsRouter />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/toc/v1"
-                element={
-                  <ProtectedRoute>
-                    <TOCPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/toc/v2"
-                element={
-                  <ProtectedRoute>
-                    <TOCPage2 />
-                  </ProtectedRoute>
-                }
               />
 
               {/* Project */}
