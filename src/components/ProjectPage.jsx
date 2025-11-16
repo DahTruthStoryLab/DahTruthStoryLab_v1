@@ -118,6 +118,15 @@ export default function ProjectPage() {
   const fileInputRefs = useRef({}); // per-project file inputs
   const [projects, setProjects] = useState(() => loadProjects());
   const [uploadingId, setUploadingId] = useState(null);
+  const [statusFilter, setStatusFilter] = useState("All");
+
+  const filteredProjects = projects.filter((p) => {
+    if (statusFilter === "All") return true;
+    const status = (p.status || "Draft").toLowerCase();
+    const target = statusFilter.toLowerCase();
+    return status === target;
+  });
+
 
   // Sync with other tabs / writer page updates
   useEffect(() => {
@@ -271,15 +280,37 @@ export default function ProjectPage() {
                 </p>
               </div>
             </div>
-            <button
-              onClick={handleAddProject}
-              className="btn-gold inline-flex items-center gap-2 text-sm"
-            >
-              <Plus size={16} />
-              Add Project
-            </button>
-          </div>
+
+          <div className="flex flex-col items-stretch gap-2 md:items-end">
+            {/* Filters */}
+            <div className="inline-flex rounded-full bg-white border border-[hsl(var(--border))] p-1 text-xs">
+              {["All", "Draft", "In Progress", "Completed"].map((label) => (
+                <button
+                  key={label}
+                  onClick={() => setStatusFilter(label)}
+                  className={[
+                    "px-3 py-1 rounded-full transition-colors",
+                    statusFilter === label
+                      ? "bg-[color:var(--color-primary)] text-[color:var(--color-ink)]"
+                      : "text-muted hover:bg-slate-50",
+                  ].join(" ")}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+          {/* Add project */}
+          <button
+            onClick={handleAddProject}
+            className="btn-gold inline-flex items-center gap-2 text-sm"
+          >
+            <Plus size={16} />
+            Add Project
+          </button>
         </div>
+      </div>
+    </div>
 
         {/* Empty state */}
         {projects.length === 0 && (
@@ -299,13 +330,13 @@ export default function ProjectPage() {
           </div>
         )}
 
-        {/* Project Cards */}
+       {/* Project Cards */}
         <div className="space-y-4">
-          {projects.map((project) => (
-            <div
-              key={project.id}
-              className="glass-panel p-5 flex flex-col md:flex-row gap-4 md:items-stretch"
-            >
+          {filteredProjects.map((project) => (
+            ...
+          ))}
+        </div>
+
               {/* Cover */}
               <div className="w-full md:w-40 flex flex-col items-center">
                 <div className="w-32 h-44 rounded-xl overflow-hidden border border-[hsl(var(--border))] bg-[color:var(--color-primary)]/40 flex items-center justify-center relative">
