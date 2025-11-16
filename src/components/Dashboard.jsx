@@ -42,19 +42,9 @@ const Card = ({ children, className = "", onClick }) => (
     {children}
   </div>
 );
-
-const CardBody = ({ children, className = "" }) => (
-  <div className={`p-5 ${className}`}>{children}</div>
-);
-
-const StatLabel = ({ children }) => (
-  <p className="text-xs uppercase tracking-wide text-muted">{children}</p>
-);
-
-const StatValue = ({ children }) => (
-  <p className="text-3xl font-semibold text-ink mt-1">{children}</p>
-);
-
+const CardBody = ({ children, className = "" }) => <div className={`p-5 ${className}`}>{children}</div>;
+const StatLabel = ({ children }) => <p className="text-xs uppercase tracking-wide text-muted">{children}</p>;
+const StatValue = ({ children }) => <p className="text-3xl font-semibold text-ink mt-1">{children}</p>;
 const Progress = ({ value }) => (
   <div className="h-2 w-full rounded-full bg-primary/20">
     <div
@@ -70,10 +60,7 @@ function readAuthorProfile() {
   let avatarUrl = "";
 
   try {
-    // Project/Profile can save here:
-    // localStorage.setItem("dt_profile", JSON.stringify({ displayName, avatarUrl }))
     const keys = ["dt_profile", "userProfile", "profile", "currentUser"];
-
     for (const key of keys) {
       const raw = localStorage.getItem(key);
       if (!raw) continue;
@@ -101,46 +88,33 @@ function readAuthorProfile() {
       }
     }
   } catch {
-    // fall back to defaults
+    // ignore and fall back to defaults
   }
 
   return { name, avatarUrl };
 }
 
 // --------- Sidebar ---------
-const Sidebar = ({
-  isOpen,
-  onClose,
-  authorName,
-  authorAvatar,
-  navigate,
-  userNovels = [],
-}) => {
+const Sidebar = ({ isOpen, onClose, authorName, authorAvatar, navigate, userNovels = [] }) => {
   const { pathname } = useLocation();
 
-  // Menu with Store last
   const menuItems = [
-    { icon: Home, label: "Dashboard", path: "/dashboard" },
-    { icon: PencilLine, label: "Write", path: "/writer" },
-    { icon: BookOpen, label: "Table of Contents", path: "/toc" },
-    { icon: Layers, label: "Project", path: "/project" },
-    { icon: Calendar, label: "Calendar", path: "/calendar" },
-    { icon: Layers, label: "Story Lab", path: "/story-lab" },
-    { icon: UploadCloud, label: "Publishing", path: "/publishing" },
-    { icon: User, label: "Profile", path: "/profile" },
-    { icon: Info, label: "About", path: "/about" },
-    { icon: Store, label: "Store", path: "/store" }, // last
+    { icon: Home,       label: "Dashboard",         path: "/dashboard" },
+    { icon: PencilLine, label: "Write",             path: "/writer" },
+    { icon: BookOpen,   label: "Table of Contents", path: "/toc" },
+    { icon: Layers,     label: "Project",           path: "/project" },
+    { icon: Calendar,   label: "Calendar",          path: "/calendar" },
+    { icon: Layers,     label: "Story Lab",         path: "/story-lab" },
+    { icon: UploadCloud,label: "Publishing",        path: "/publishing" },
+    { icon: User,       label: "Profile",           path: "/profile" },
+    { icon: Info,       label: "About",             path: "/about" },
+    { icon: Store,      label: "Store",             path: "/store" }, // 👈 Store last
   ];
 
   return (
     <>
       {/* Mobile overlay */}
-      {isOpen && (
-        <div
-          className="fixed inset-0 bg-black/30 z-40 lg:hidden"
-          onClick={onClose}
-        />
-      )}
+      {isOpen && <div className="fixed inset-0 bg-black/30 z-40 lg:hidden" onClick={onClose} />}
 
       {/* Floating glassmorphic sidebar */}
       <div
@@ -150,11 +124,11 @@ const Sidebar = ({
           ${isOpen ? "translate-x-0" : "-translate-x-full"}
           lg:top-4 lg:left-4 lg:bottom-4 lg:h-auto lg:w-80
           lg:rounded-3xl lg:shadow-glass lg:border lg:border-white/60
-          lg:translate-x-0 lg:z-auto
+          lg:translate-x-0 lg:z-40
           flex flex-col overflow-hidden
         `}
       >
-        {/* Header with DahTruth logo — pinned at the very top */}
+        {/* Header with DahTruth logo */}
         <div className="px-5 py-3 border-b border-white/60 flex-shrink-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -170,9 +144,7 @@ const Sidebar = ({
                 >
                   DahTruth
                 </span>
-                <span className="block text-xs text-muted -mt-0.5">
-                  StoryLab
-                </span>
+                <span className="block text-xs text-muted -mt-0.5">StoryLab</span>
               </div>
             </div>
             <button
@@ -183,12 +155,10 @@ const Sidebar = ({
               <X size={20} />
             </button>
           </div>
-          <p className="text-xs text-muted mt-1">
-            Where your story comes to life
-          </p>
+          <p className="text-xs text-muted mt-1">Where your story comes to life</p>
         </div>
 
-        {/* Aerodynamic Menu with translucent hover highlight */}
+        {/* Menu */}
         <nav className="p-3 space-y-1.5 flex-1 overflow-y-auto">
           {menuItems.map((item) => {
             const isActive = pathname === item.path;
@@ -214,11 +184,7 @@ const Sidebar = ({
                 <span
                   className={`
                     absolute left-0 top-1.5 bottom-1.5 w-1 rounded-full transition-all
-                    ${
-                      isActive
-                        ? "bg-primary"
-                        : "bg-transparent group-hover:bg-primary/60"
-                    }
+                    ${isActive ? "bg-primary" : "bg-transparent group-hover:bg-primary/60"}
                   `}
                 />
                 {/* translucent hover veil */}
@@ -226,15 +192,9 @@ const Sidebar = ({
                 {/* content */}
                 <item.icon
                   size={18}
-                  className={`relative z-10 ${
-                    isActive ? "text-ink" : "text-ink/80"
-                  }`}
+                  className={`relative z-10 ${isActive ? "text-ink" : "text-ink/80"}`}
                 />
-                <span
-                  className={`relative z-10 font-medium ${
-                    isActive ? "text-ink" : "text-ink/90"
-                  }`}
-                >
+                <span className={`relative z-10 font-medium ${isActive ? "text-ink" : "text-ink/90"}`}>
                   {item.label}
                 </span>
               </button>
@@ -261,9 +221,7 @@ const Sidebar = ({
             {userNovels.length === 0 ? (
               <div className="p-3 rounded-lg glass-soft text-center">
                 <p className="text-xs text-muted">No novels yet</p>
-                <p className="text-xs text-muted mt-1">
-                  Click + to create your first story
-                </p>
+                <p className="text-xs text-muted mt-1">Click + to create your first story</p>
               </div>
             ) : (
               userNovels.map((novel, i) => (
@@ -279,10 +237,7 @@ const Sidebar = ({
                     {novel.words || novel.wordCount || 0} words
                     {novel.lastModified && (
                       <span className="ml-2 opacity-75">
-                        •{" "}
-                        {new Date(
-                          novel.lastModified
-                        ).toLocaleDateString()}
+                        • {new Date(novel.lastModified).toLocaleDateString()}
                       </span>
                     )}
                   </p>
@@ -292,7 +247,7 @@ const Sidebar = ({
           </div>
         </div>
 
-        {/* Author info (card opens Profile) */}
+        {/* Author info */}
         <div className="p-4 border-t border-white/60 flex-shrink-0">
           <div
             className="p-4 glass-soft rounded-xl hover:bg-white/80 transition-colors cursor-pointer"
@@ -315,9 +270,7 @@ const Sidebar = ({
                 )}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-ink truncate">
-                  {authorName || "Author"}
-                </p>
+                <p className="text-sm font-medium text-ink truncate">{authorName || "Author"}</p>
                 <p className="text-xs text-muted">Author</p>
               </div>
               <button
@@ -369,9 +322,9 @@ export default function Dashboard() {
 
   // init profile + novels
   useEffect(() => {
-    const { name, avatarUrl } = readAuthorProfile();
-    setAuthorName(name);
-    setAuthorAvatar(avatarUrl || "");
+    const profile = readAuthorProfile();
+    setAuthorName(profile.name);
+    setAuthorAvatar(profile.avatarUrl);
 
     const projectData = localStorage.getItem("userProjects");
     const novelsData = localStorage.getItem("userNovels");
@@ -393,18 +346,20 @@ export default function Dashboard() {
     }
   }, []);
 
-  // live refresh name + avatar on profile update or storage changes
+  // live refresh profile on storage changes
   useEffect(() => {
     const refresh = () => {
-      const { name, avatarUrl } = readAuthorProfile();
-      setAuthorName(name);
-      setAuthorAvatar(avatarUrl || "");
+      const profile = readAuthorProfile();
+      setAuthorName(profile.name);
+      setAuthorAvatar(profile.avatarUrl);
     };
     window.addEventListener("storage", refresh);
     window.addEventListener("profile:updated", refresh);
+    window.addEventListener("project:change", refresh);
     return () => {
       window.removeEventListener("storage", refresh);
       window.removeEventListener("profile:updated", refresh);
+      window.removeEventListener("project:change", refresh);
     };
   }, []);
 
@@ -426,20 +381,20 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-base bg-radial-fade text-ink">
-      <div className="flex">
-        {/* Sidebar */}
-        <Sidebar
-          isOpen={sidebarOpen}
-          onClose={() => setSidebarOpen(false)}
-          authorName={authorName}
-          authorAvatar={authorAvatar}
-          userNovels={userNovels}
-          navigate={navigate}
-        />
+      {/* Floating sidebar */}
+      <Sidebar
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        authorName={authorName}
+        authorAvatar={authorAvatar}
+        userNovels={userNovels}
+        navigate={navigate}
+      />
 
-        {/* Main */}
-        <div className="flex-1 min-h-screen flex flex-col">
-          {/* Header (no top banner; pulled to top) */}
+      {/* Main content — give room for sidebar on large screens */}
+      <div className="flex min-h-screen">
+        <div className="flex-1 flex flex-col lg:ml-[21rem]">
+          {/* Header */}
           <div className="sticky top-0 z-30 bg-white/70 backdrop-blur-xl border-b border-white/60 shadow">
             <div className="px-6 py-4">
               <div className="flex items-center justify-between">
@@ -458,13 +413,9 @@ export default function Dashboard() {
                       {authorName ? `, ${authorName}` : ""} — Ready to Write?
                     </h1>
                     <div className="mt-1 flex items-center gap-4">
-                      <p className="font-medium text-sm text-ink/80">
-                        Start your writing journey today
-                      </p>
+                      <p className="font-medium text-sm text-ink/80">Start your writing journey today</p>
                       <span className="text-muted">•</span>
-                      <p className="text-sm text-muted">
-                        Transform your ideas into compelling stories
-                      </p>
+                      <p className="text-sm text-muted">Transform your ideas into compelling stories</p>
                     </div>
                     <p className="text-xs text-muted mt-1">
                       Create your first novel and begin tracking your progress
@@ -487,7 +438,6 @@ export default function Dashboard() {
                       <Play size={16} /> Quick Start
                     </button>
                   </div>
-                  {/* Search + Bell moved beneath quick-start buttons */}
                   <div className="flex items-center gap-2">
                     <button
                       className="p-2 rounded-lg glass-soft hover:bg-white/80 transition-colors"
@@ -532,10 +482,8 @@ export default function Dashboard() {
                     Welcome to DahTruth StoryLab!
                   </h2>
                   <p className="text-ink/80 mb-5 max-w-xl mx-auto text-sm">
-                    Ready to bring your stories to life? Start by creating your
-                    first novel and set your writing goals. Track your progress,
-                    stay motivated, and turn your ideas into compelling
-                    narratives.
+                    Ready to bring your stories to life? Start by creating your first novel and set your writing goals.
+                    Track your progress, stay motivated, and turn your ideas into compelling narratives.
                   </p>
                   <div className="flex gap-3 justify-center">
                     <button
@@ -581,9 +529,7 @@ export default function Dashboard() {
                     <StatValue>0</StatValue>
                     <span className="text-2xl">🗓️</span>
                   </div>
-                  <p className="text-muted text-sm mt-2">
-                    Start your streak today!
-                  </p>
+                  <p className="text-muted text-sm mt-2">Start your streak today!</p>
                 </CardBody>
               </Card>
 
@@ -609,18 +555,13 @@ export default function Dashboard() {
                   <div className="text-center">
                     <div className="flex items-center justify-center gap-2 mb-2">
                       <Calendar size={16} className="text-primary" />
-                      <span className="text-xs text-muted uppercase tracking-wide">
-                        Today
-                      </span>
+                      <span className="text-xs text-muted uppercase tracking-wide">Today</span>
                     </div>
                     <div className="text-5xl font-bold bg-gradient-to-r from-accent via-primary to-gold bg-clip-text text-transparent">
                       {new Date().getDate()}
                     </div>
                     <div className="text-muted text-sm uppercase tracking-wide">
-                      {new Date().toLocaleDateString("en-US", {
-                        month: "short",
-                        weekday: "short",
-                      })}
+                      {new Date().toLocaleDateString("en-US", { month: "short", weekday: "short" })}
                     </div>
                   </div>
                 </CardBody>
@@ -629,10 +570,7 @@ export default function Dashboard() {
 
             {/* Quick Access */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <Card
-                className="cursor-pointer hover:border-white/60"
-                onClick={() => navigate("/toc")}
-              >
+              <Card className="cursor-pointer hover:border-white/60" onClick={() => navigate("/toc")}>
                 <CardBody className="text-center">
                   <BookOpen size={24} className="mx-auto mb-2 text-ink" />
                   <p className="font-semibold">Table of Contents</p>
@@ -640,10 +578,7 @@ export default function Dashboard() {
                 </CardBody>
               </Card>
 
-              <Card
-                className="cursor-pointer hover:border-white/60"
-                onClick={() => navigate("/writer")}
-              >
+              <Card className="cursor-pointer hover:border-white/60" onClick={() => navigate("/writer")}>
                 <CardBody className="text-center">
                   <PencilLine size={24} className="mx-auto mb-2 text-ink" />
                   <p className="font-semibold">Writer</p>
@@ -651,10 +586,7 @@ export default function Dashboard() {
                 </CardBody>
               </Card>
 
-              <Card
-                className="cursor-pointer hover:border-white/60"
-                onClick={() => navigate("/project")}
-              >
+              <Card className="cursor-pointer hover:border-white/60" onClick={() => navigate("/project")}>
                 <CardBody className="text-center">
                   <Layers size={24} className="mx-auto mb-2 text-ink" />
                   <p className="font-semibold">Project</p>
@@ -662,10 +594,7 @@ export default function Dashboard() {
                 </CardBody>
               </Card>
 
-              <Card
-                className="cursor-pointer hover:border-white/60"
-                onClick={() => navigate("/calendar")}
-              >
+              <Card className="cursor-pointer hover:border-white/60" onClick={() => navigate("/calendar")}>
                 <CardBody className="text-center">
                   <Calendar size={24} className="mx-auto mb-2 text-ink" />
                   <p className="font-semibold">Calendar</p>
@@ -679,13 +608,9 @@ export default function Dashboard() {
               <Card className="xl:col-span-2">
                 <CardBody>
                   <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-xl font-bold text-ink">
-                      Writing Activity
-                    </h2>
+                    <h2 className="text-xl font-bold text-ink">Writing Activity</h2>
                     <div className="flex gap-2">
-                      <button className="px-3 py-1 rounded-lg bg-primary text-ink text-sm">
-                        7 days
-                      </button>
+                      <button className="px-3 py-1 rounded-lg bg-primary text-ink text-sm">7 days</button>
                       <button className="px-3 py-1 rounded-lg text-ink/70 hover:bg-white/70 text-sm transition-colors">
                         30 days
                       </button>
@@ -698,17 +623,8 @@ export default function Dashboard() {
                   <div className="h-64">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={writingActivity}>
-                        <XAxis
-                          dataKey="day"
-                          axisLine={false}
-                          tickLine={false}
-                          className="text-ink/70"
-                        />
-                        <YAxis
-                          axisLine={false}
-                          tickLine={false}
-                          className="text-ink/70"
-                        />
+                        <XAxis dataKey="day" axisLine={false} tickLine={false} className="text-ink/70" />
+                        <YAxis axisLine={false} tickLine={false} className="text-ink/70" />
                         <Tooltip
                           contentStyle={{
                             backgroundColor: "rgba(255,255,255,0.95)",
@@ -719,22 +635,12 @@ export default function Dashboard() {
                           }}
                         />
                         <defs>
-                          <linearGradient
-                            id="brandGradient"
-                            x1="0%"
-                            y1="0%"
-                            x2="0%"
-                            y2="100%"
-                          >
+                          <linearGradient id="brandGradient" x1="0%" y1="0%" x2="0%" y2="100%">
                             <stop offset="0%" stopColor="#CAB1D6" />
                             <stop offset="100%" stopColor="#EAF2FF" />
                           </linearGradient>
                         </defs>
-                        <Bar
-                          dataKey="words"
-                          fill="url(#brandGradient)"
-                          radius={[4, 4, 0, 0]}
-                        />
+                        <Bar dataKey="words" fill="url(#brandGradient)" radius={[4, 4, 0, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
@@ -746,9 +652,7 @@ export default function Dashboard() {
                     </div>
                     <div>
                       <p className="text-2xl font-bold text-ink">0</p>
-                      <p className="text-xs text-muted uppercase">
-                        Last Week
-                      </p>
+                      <p className="text-xs text-muted uppercase">Last Week</p>
                     </div>
                     <div>
                       <p className="text-2xl font-bold text-ink">0</p>
@@ -761,9 +665,7 @@ export default function Dashboard() {
               <Card>
                 <CardBody>
                   <div className="flex items-center justify-between mb-6">
-                    <h2 className="text-xl font-bold text-ink">
-                      Recent Activity
-                    </h2>
+                    <h2 className="text-xl font-bold text-ink">Recent Activity</h2>
                     <ChevronRight
                       size={20}
                       className="text-ink/60 hover:text-ink transition-colors cursor-pointer"
@@ -776,12 +678,8 @@ export default function Dashboard() {
                         <div className="w-12 h-12 glass-soft rounded-full flex items-center justify-center mx-auto mb-3">
                           <FileText size={20} className="text-ink/70" />
                         </div>
-                        <p className="text-sm text-muted mb-2">
-                          No activity yet
-                        </p>
-                        <p className="text-xs text-ink/60">
-                          Start writing to see your progress here
-                        </p>
+                        <p className="text-sm text-muted mb-2">No activity yet</p>
+                        <p className="text-xs text-ink/60">Start writing to see your progress here</p>
                       </div>
                     ) : (
                       recentChapters.map((chapter) => (
