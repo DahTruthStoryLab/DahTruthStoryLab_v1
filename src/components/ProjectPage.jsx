@@ -174,6 +174,43 @@ const getStatusColor = (status) => {
   return colors[status] || colors.Draft;
 };
 
+// Collect other saved projects/novels from localStorage
+function loadOtherProjects(currentTitle) {
+  const seen = new Set();
+  const out = [];
+
+  const addFromKey = (key, sourceLabel) => {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) return;
+      const arr = JSON.parse(raw);
+      if (!Array.isArray(arr)) return;
+
+      arr.forEach((p) => {
+        if (!p || typeof p !== "object") return;
+        const title = (p.title || "").trim();
+        if (!title || title === currentTitle || seen.has(title)) return;
+
+        seen.add(title);
+        out.push({
+          title,
+          status: p.status || "Draft",
+          source: sourceLabel,
+        });
+      });
+    } catch {
+      // ignore parsing errors
+    }
+  };
+
+  // These keys match the ones we already looked at earlier (writer side)
+  addFromKey("userProjects", "Project");
+  addFromKey("userNovels", "Novel");
+
+  return out;
+}
+
+
 // -------------------- Main Component --------------------
 export default function ProjectPage() {
   const navigate = useNavigate();
@@ -230,6 +267,7 @@ export default function ProjectPage() {
   const [newTag, setNewTag] = useState("");
   const [lastSaved, setLastSaved] = useState(Date.now());
   const [uploadingCover, setUploadingCover] = useState(false);
+  const [otherProjects, setOtherProjects] = useState([]);
 
   const profileDisplayName = useMemo(() => {
     if (store?.user?.displayName) return store.user.displayName;
@@ -301,6 +339,23 @@ export default function ProjectPage() {
       window.removeEventListener("storage", sync);
     };
   }, []);
+
+  useEffect(() => {
+  // Initial load
+  setOtherProjects(loadOtherProjects(book.title));
+
+  const handleRefresh = () => {
+    setOtherProjects(loadOtherProjects(book.title));
+  };
+
+  window.addEventListener("storage", handleRefresh);
+  window.addEventListener("project:change", handleRefresh);
+
+  return () => {
+    window.removeEventListener("storage", handleRefresh);
+    window.removeEventListener("project:change", handleRefresh);
+  };
+}, [book.title]);
 
   // Auto-save when book object changes (title, cover, etc.)
   useEffect(() => {
@@ -741,49 +796,80 @@ export default function ProjectPage() {
               </div>
             </div>
 
-            {/* Writing Statistics */}
-            <div className="glass-panel p-6">
-              <div className="text-lg font-semibold mb-4 flex items-center gap-2 heading-serif">
-                <BarChart3 size={18} className="text-[color:var(--color-ink)]/80" />
-                Writing Statistics
-              </div>
+           {/* Writing Statistics */}
+<div className="glass-panel p-6">
+  <div className="text-lg font-semibold mb-4 flex items-center gap-2 heading-serif">
+    <BarChart3 size={18} className="text-[color:var(--color-ink)]/80" />
+    Writing Statistics
+  </div>
 
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="text-center">
-                  <div className="text-2xl font-bold">{totalWords.toLocaleString()}</div>
-                  <div className="text-xs text-muted">Total Words</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold">{chapters.length}</div>
-                  <div className="text-xs text-muted">Chapters</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold">{avgWordsPerChapter.toLocaleString()}</div>
-                  <div className="text-xs text-muted">Avg/Chapter</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold">{totalReadingTime}m</div>
-                  <div className="text-xs text-muted">Read Time</div>
-                </div>
-              </div>
+  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+    <div className="text-center">
+      <div className="text-2xl font-bold">{totalWords.toLocaleString()}</div>
+      <div className="text-xs text-muted">Total Words</div>
+    </div>
+    <div className="text-center">
+      <div className="text-2xl font-bold">{chapters.length}</div>
+      <div className="text-xs text-muted">Chapters</div>
+    </div>
+    <div className="text-center">
+      <div className="text-2xl font-bold">{avgWordsPerChapter.toLocaleString()}</div>
+      <div className="text-xs text-muted">Avg/Chapter</div>
+    </div>
+    <div className="text-center">
+      <div className="text-2xl font-bold">{totalReadingTime}m</div>
+      <div className="text-xs text-muted">Read Time</div>
+    </div>
+  </div>
 
-              <div className="mt-6 p-4 rounded-lg bg-[color:var(--color-primary)]/50 border border-[hsl(var(--border))]">
-                <div className="flex justify-between items-center mb-2">
-                  <span className="text-sm">Word Count Progress</span>
-                  <span className="text-sm text-muted">
-                    {totalWords.toLocaleString()} / {book.targetWords.toLocaleString()}
-                  </span>
-                </div>
-                <div className="w-full bg-white rounded-full h-3 border border-[hsl(var(--border))]">
-                  <div
-                    className="bg-[color:var(--color-accent)] h-3 rounded-full transition-all duration-700 relative overflow-hidden"
-                    style={{ width: `${Math.min(pct, 100)}%` }}
-                  >
-                    <div className="absolute inset-0 bg-white/30 animate-pulse" />
-                  </div>
-                </div>
-              </div>
-            </div>
+  <div className="mt-6 p-4 rounded-lg bg-[color:var(--color-primary)]/50 border border-[hsl(var(--border))]">
+    <div className="flex justify-between items-center mb-2">
+      <span className="text-sm">Word Count Progress</span>
+      <span className="text-sm text-muted">
+        {totalWords.toLocaleString()} / {book.targetWords.toLocaleString()}
+      </span>
+    </div>
+    <div className="w-full bg-white rounded-full h-3 border border-[hsl(var(--border))]">
+      <div
+        className="bg-[color:var(--color-accent)] h-3 rounded-full transition-all duration-700 relative overflow-hidden"
+        style={{ width: `${Math.min(pct, 100)}%` }}
+      >
+        <div className="absolute inset-0 bg-white/30 animate-pulse" />
+      </div>
+    </div>
+  </div>
+</div>
+
+{/* Other Projects & Novels */}
+{otherProjects.length > 0 && (
+  <div className="glass-panel p-6">
+    <div className="text-lg font-semibold mb-4 flex items-center gap-2 heading-serif">
+      <BookOpen size={18} className="text-[color:var(--color-ink)]/80" />
+      Other Projects &amp; Novels
+    </div>
+
+    <ul className="space-y-2">
+      {otherProjects.map((p, idx) => (
+        <li
+          key={`${p.title}-${idx}`}
+          className="flex items-center justify-between text-sm"
+        >
+          <div>
+            <div className="font-medium">{p.title}</div>
+            <div className="text-xs text-muted">{p.source}</div>
+          </div>
+          <span
+            className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs ${getStatusColor(
+              p.status
+            )}`}
+          >
+            {p.status}
+          </span>
+        </li>
+      ))}
+    </ul>
+  </div>
+)}
 
             {/* Empty-state CTA */}
             {chapters.length === 0 && (
