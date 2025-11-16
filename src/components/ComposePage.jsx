@@ -301,6 +301,24 @@ const handleAI = async (mode, targetHtmlOverride) => {
   let target = "";
   let useSelection = false;
 
+  // 🔹 Capture current scroll position of the editor so we can restore it after AI
+  let prevScrollTop = 0;
+  if (typeof window !== "undefined") {
+    try {
+      const editorEl = document.querySelector(".ql-editor");
+      const scroller =
+        editorEl?.parentElement ||
+        editorEl?.closest(".ql-container") ||
+        null;
+
+      if (scroller) {
+        prevScrollTop = scroller.scrollTop || 0;
+      }
+    } catch (err) {
+      console.warn("Could not read editor scroll position:", err);
+    }
+  }
+
   // 1) Try to grab selected HTML from the editor (Quill uses .ql-editor)
   if (!targetHtmlOverride && typeof window !== "undefined") {
     try {
@@ -354,14 +372,13 @@ const handleAI = async (mode, targetHtmlOverride) => {
 
     if (useSelection) {
       // 3A) Replace ONLY the selected fragment inside the chapter HTML
-      // We assume the selected HTML (or its sliced version) appears once in the fullHtml.
       const idx = fullHtml.indexOf(target);
 
       if (idx !== -1) {
         combinedHtml =
           fullHtml.slice(0, idx) + result + fullHtml.slice(idx + target.length);
       } else {
-        // Fallback: try a simple replace once
+        // Fallback: simple replace once
         const replacedOnce = fullHtml.replace(target, result);
         combinedHtml =
           replacedOnce === fullHtml ? result + fullHtml : replacedOnce;
@@ -377,6 +394,25 @@ const handleAI = async (mode, targetHtmlOverride) => {
       title: title || selectedChapter?.title || "",
       content: combinedHtml,
     });
+
+    // 🔹 Restore scroll position AFTER the editor has updated
+    if (typeof window !== "undefined") {
+      setTimeout(() => {
+        try {
+          const editorEl = document.querySelector(".ql-editor");
+          const scroller =
+            editorEl?.parentElement ||
+            editorEl?.closest(".ql-container") ||
+            null;
+
+          if (scroller && typeof prevScrollTop === "number") {
+            scroller.scrollTop = prevScrollTop;
+          }
+        } catch (err) {
+          console.warn("Could not restore editor scroll position:", err);
+        }
+      }, 50);
+    }
   } catch (error) {
     console.error("AI request error:", error);
     alert(
@@ -384,6 +420,7 @@ const handleAI = async (mode, targetHtmlOverride) => {
     );
   }
 };
+
 
 
   // NEW: simplified import using documentParser
