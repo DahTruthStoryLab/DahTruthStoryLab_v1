@@ -86,7 +86,7 @@ export default function ComposePage() {
   const [title, setTitle] = useState(selectedChapter?.title ?? "");
   const [html, setHtml] = useState(selectedChapter?.content ?? "");
 
-  // Book metadata
+  // Book metadata (kept for future use)
   const [author, setAuthor] = useState("Jacqueline Session Ausby");
   const [bookTitle, setBookTitle] = useState(book?.title || "Raising Daisy");
 
@@ -106,6 +106,12 @@ export default function ComposePage() {
   // TOC headings for the current chapter
   const [headings, setHeadings] = useState([]); // [{level, text, id}]
 
+  // NEW: remember which AI tab/mode is active across sessions
+  const [activeAiTab, setActiveAiTab] = useState("proofread");
+
+  // NEW: remember where you were on the page so AI does not jump you back to top
+  const [lastScrollY, setLastScrollY] = useState(0);
+
   const hasChapter = !!selectedId && !!selectedChapter;
 
   // Monitor rate limiter queue (for AI)
@@ -115,6 +121,27 @@ export default function ComposePage() {
     }, 1000);
     return () => clearInterval(interval);
   }, []);
+
+  // Load active AI tab from localStorage on mount
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("dt_activeAiTab");
+      if (stored) setActiveAiTab(stored);
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  // Persist active AI tab when it changes
+  useEffect(() => {
+    try {
+      if (activeAiTab) {
+        localStorage.setItem("dt_activeAiTab", activeAiTab);
+      }
+    } catch {
+      // ignore
+    }
+  }, [activeAiTab]);
 
   // Selection helpers
   const clearSelection = () => setSelectedIds(new Set());
@@ -230,7 +257,6 @@ export default function ComposePage() {
   };
 
   // Map friendly button labels to backend modes
-  // (in case backend doesn't know "proofread"/"clarify")
   const resolveAIMode = (mode) => {
     switch (mode) {
       case "proofread":
@@ -244,12 +270,36 @@ export default function ComposePage() {
     }
   };
 
+  // Helpers to remember & restore scroll
+  const rememberScrollPosition = () => {
+    try {
+      setLastScrollY(window.scrollY || 0);
+    } catch {
+      // ignore
+    }
+  };
+
+  const restoreScrollPositionSoon = () => {
+    try {
+      window.requestAnimationFrame(() => {
+        window.scrollTo({ top: lastScrollY, behavior: "auto" });
+      });
+    } catch {
+      // ignore
+    }
+  };
+
   // SIMPLE AI HANDLER — sends a safe slice so it doesn't time out
   const handleAI = async (mode, targetHtmlOverride) => {
     if (!hasChapter) return;
 
     const MAX_CHARS = 3000; // safe size for now
-    const op = resolveAIMode(mode);
+    const op = resolveAIMode(mode || activeAiTab);
+
+    // Remember which tab/mode the user triggered
+    if (mode && mode !== activeAiTab) {
+      setActiveAiTab(mode);
+    }
 
     // Full chapter HTML
     const raw = (targetHtmlOverride ?? html) || "";
@@ -259,6 +309,9 @@ export default function ComposePage() {
     const remainder = raw.slice(target.length);
 
     if (!target.trim()) return;
+
+    // Remember where the user is before we touch the DOM
+    rememberScrollPosition();
 
     try {
       const result = await rateLimiter.addToQueue(async () =>
@@ -287,6 +340,9 @@ export default function ComposePage() {
       alert(
         "There was an error calling the AI service. Please try again in a moment."
       );
+    } finally {
+      // Put the user back where they were in the document
+      restoreScrollPositionSoon();
     }
   };
 
@@ -574,6 +630,8 @@ export default function ComposePage() {
             onDelete={handleDeleteCurrent}
             aiBusy={aiBusy || isImporting}
             saveStatus={saveStatus}
+            activeAiTab={activeAiTab}      // 👈 lets toolbar highlight current tab
+            setActiveAiTab={setActiveAiTab} // 👈 toolbar can update the selection
           />
         </div>
       </div>
