@@ -12,8 +12,10 @@ try {
   useUser = require("../lib/state/userStore").useUser;
 } catch {}
 
+// -------------------- Storage Keys --------------------
 const STORAGE_KEY = "dahtruth-story-lab-toc-v3";
 
+// Load saved project state
 const loadState = () => {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -24,39 +26,65 @@ const loadState = () => {
   }
 };
 
-// Whatever you already have above...
+// Try to infer current book title from Writer-related storage
+function getCurrentBookTitle() {
+  try {
+    // 1) currentStory (common pattern for a single active work)
+    const rawStory = localStorage.getItem("currentStory");
+    if (rawStory) {
+      const s = JSON.parse(rawStory);
+      if (s && s.title) return s.title;
+    }
+
+    // 2) userProjects array (first project)
+    const rawProjects = localStorage.getItem("userProjects");
+    if (rawProjects) {
+      const arr = JSON.parse(rawProjects);
+      if (Array.isArray(arr) && arr[0]?.title) return arr[0].title;
+    }
+
+    // 3) userNovels array (first novel)
+    const rawNovels = localStorage.getItem("userNovels");
+    if (rawNovels) {
+      const arr = JSON.parse(rawNovels);
+      if (Array.isArray(arr) && arr[0]?.title) return arr[0].title;
+    }
+  } catch {
+    // ignore and fall back
+  }
+  return "";
+}
+
+// Save project state + keep dt_profile in sync
 const saveState = (state) => {
   try {
-    // 1) Save the full project state as you already do
+    // 1) Save main project state
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 
-    // 2) Derive an "author profile" from the project state
-    //    Adjust these field names to match your actual structure.
-    const source =
-      Array.isArray(state?.projects) && state.projects.length > 0
-        ? state.projects[0]          // if you store projects in an array
-        : state;                     // otherwise just use state itself
+    const book = state?.book || {};
 
+    // 2) Derive profile name from book
     const displayName =
-      source.authorName ||          // e.g. main author name field
-      source.penName ||             // or pen name
-      source.projectAuthor ||       // or another name field you use
-      source.title ||               // fall back to project title
+      book.author ||
+      book.authorName ||
+      book.penName ||
+      book.projectAuthor ||
+      book.title ||
       "New Author";
 
+    // 3) Derive avatar from book (cover doubles as avatar for now)
     const avatarUrl =
-      source.avatarUrl ||           // explicit avatar from project
-      source.authorAvatar ||        // or another avatar key you use
-      source.coverImageUrl ||       // or cover art if you reuse that as avatar
+      book.authorAvatar ||
+      book.avatarUrl ||
+      book.cover ||
       "";
 
-    // 3) Save the profile object used by the Dashboard
     localStorage.setItem(
       "dt_profile",
       JSON.stringify({ displayName, avatarUrl })
     );
 
-    // 4) Let the app know both project + profile changed
+    // 4) Notify the rest of the app
     window.dispatchEvent(new Event("project:change"));
     window.dispatchEvent(new Event("profile:updated"));
   } catch (err) {
@@ -64,7 +92,7 @@ const saveState = (state) => {
   }
 };
 
-
+// -------------------- Profile helpers --------------------
 function readProfileObject() {
   try {
     const keys = ["dt_profile", "userProfile", "profile", "currentUser"];
@@ -87,6 +115,7 @@ function extractDisplayName(obj) {
   return "";
 }
 
+// -------------------- Image helpers --------------------
 async function heicArrayBufferToJpegDataUrl(arrayBuffer, quality = 0.9) {
   const blob = new Blob([arrayBuffer], { type: "image/heic" });
   const jpegBlob = await heic2any({ blob, toType: "image/jpeg", quality });
@@ -99,6 +128,27 @@ async function heicArrayBufferToJpegDataUrl(arrayBuffer, quality = 0.9) {
   return dataUrl;
 }
 
+async function downscaleDataUrl(dataUrl, maxDim = 2000, quality = 0.9) {
+  const img = await new Promise((resolve, reject) => {
+    const x = new Image();
+    x.onload = () => resolve(x);
+    x.onerror = reject;
+    x.src = dataUrl;
+  });
+  let { width, height } = img;
+  if (Math.max(width, height) <= maxDim) return dataUrl;
+  const scale = maxDim / Math.max(width, height);
+  width = Math.round(width * scale);
+  height = Math.round(height * scale);
+  const canvas = document.createElement("canvas");
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext("2d");
+  ctx.drawImage(img, 0, 0, width, height);
+  return canvas.toDataURL("image/jpeg", quality);
+}
+
+// -------------------- Misc helpers --------------------
 const countWords = (s = "") => s.trim().split(/\s+/).filter(Boolean).length;
 const daysUntil = (yyyy_mm_dd) => {
   if (!yyyy_mm_dd) return null;
@@ -124,26 +174,7 @@ const getStatusColor = (status) => {
   return colors[status] || colors.Draft;
 };
 
-async function downscaleDataUrl(dataUrl, maxDim = 2000, quality = 0.9) {
-  const img = await new Promise((resolve, reject) => {
-    const x = new Image();
-    x.onload = () => resolve(x);
-    x.onerror = reject;
-    x.src = dataUrl;
-  });
-  let { width, height } = img;
-  if (Math.max(width, height) <= maxDim) return dataUrl;
-  const scale = maxDim / Math.max(width, height);
-  width = Math.round(width * scale);
-  height = Math.round(height * scale);
-  const canvas = document.createElement("canvas");
-  canvas.width = width;
-  canvas.height = height;
-  const ctx = canvas.getContext("2d");
-  ctx.drawImage(img, 0, 0, width, height);
-  return canvas.toDataURL("image/jpeg", quality);
-}
-
+// -------------------- Main Component --------------------
 export default function ProjectPage() {
   const navigate = useNavigate();
   const store = useUser();
@@ -168,20 +199,31 @@ export default function ProjectPage() {
     settings: { theme: "light", focusMode: false },
   };
 
-  const [book, setBook] = useState({
-    title: "Untitled Book",
-    subtitle: "",
-    author: "",
-    genre: "",
-    tags: [],
-    targetWords: 25000,
-    deadline: "",
-    status: "Draft",
-    logline: "",
-    synopsis: "",
-    cover: "",
-    ...(existing.book || {}),
+  // Infer title from writer storage if book has no meaningful title yet
+  const inferredTitle = getCurrentBookTitle();
+
+  const [book, setBook] = useState(() => {
+    const base = {
+      title: "Untitled Book",
+      subtitle: "",
+      author: "",
+      genre: "",
+      tags: [],
+      targetWords: 25000,
+      deadline: "",
+      status: "Draft",
+      logline: "",
+      synopsis: "",
+      cover: "",
+      ...(existing.book || {}),
+    };
+
+    if (!base.title || base.title === "Untitled Book") {
+      base.title = inferredTitle || base.title;
+    }
+    return base;
   });
+
   const [chapters, setChapters] = useState(existing.chapters || []);
   const [daily, setDaily] = useState(existing.daily || { goal: 500, counts: {} });
   const [settings, setSettings] = useState(existing.settings || { theme: "light", focusMode: false });
@@ -195,6 +237,7 @@ export default function ProjectPage() {
     return extractDisplayName(obj) || "";
   }, [store?.user?.displayName]);
 
+  // If author is empty, seed from profile name
   useEffect(() => {
     if (!book.author && profileDisplayName) {
       setBook((b) => {
@@ -210,8 +253,10 @@ export default function ProjectPage() {
       });
       setLastSaved(Date.now());
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Update author if profile changes and author is still blank
   useEffect(() => {
     const onProfileChange = () => {
       const obj = readProfileObject();
@@ -239,6 +284,7 @@ export default function ProjectPage() {
     };
   }, [chapters, daily, settings]);
 
+  // Keep in sync if other tabs / parts of app modify project
   useEffect(() => {
     const sync = () => {
       const s = loadState();
@@ -256,6 +302,7 @@ export default function ProjectPage() {
     };
   }, []);
 
+  // Auto-save when book object changes (title, cover, etc.)
   useEffect(() => {
     const t = setTimeout(() => {
       const current = loadState() || {};
@@ -268,7 +315,7 @@ export default function ProjectPage() {
       setLastSaved(Date.now());
     }, 800);
     return () => clearTimeout(t);
-  }, [book]);
+  }, [book, chapters, daily, settings]);
 
   const saveNow = () => {
     const current = loadState() || {};
@@ -296,6 +343,7 @@ export default function ProjectPage() {
     URL.revokeObjectURL(url);
   };
 
+  // Cover upload (handles iPhone HEIC, PNG, JPG, etc.)
   const onCoverPicked = async (file) => {
     if (!file) return;
     setUploadingCover(true);
@@ -354,12 +402,11 @@ export default function ProjectPage() {
     setBook((b) => ({ ...b, tags: [...(b.tags || []), t] }));
     setNewTag("");
   };
-  
+
   const removeTag = (tag) =>
     setBook((b) => ({ ...b, tags: (b.tags || []).filter((x) => x !== tag) }));
 
   const handleGoBack = () => {
-    // Try to go back in history, or fallback to home/landing page
     if (window.history.length > 1) {
       navigate(-1);
     } else {
@@ -464,6 +511,7 @@ export default function ProjectPage() {
 
         <div className="mt-6 grid lg:grid-cols-[320px,1fr] gap-6">
           <div className="space-y-6">
+            {/* Cover / Photo (used as avatar too) */}
             <div className="glass-panel p-6">
               <div className="text-lg font-semibold mb-4 flex items-center gap-2 heading-serif">
                 <Image size={18} className="text-[color:var(--color-ink)]/80" />
@@ -523,6 +571,7 @@ export default function ProjectPage() {
               </div>
             </div>
 
+            {/* Tags & Genre */}
             <div className="glass-panel p-6">
               <div className="text-lg font-semibold mb-4 flex items-center gap-2 heading-serif">
                 <Tag size={18} className="text-[color:var(--color-ink)]/80" />
@@ -561,6 +610,7 @@ export default function ProjectPage() {
               </div>
             </div>
 
+            {/* Goals & Deadline */}
             <div className="glass-panel p-6">
               <div className="text-lg font-semibold mb-4 flex items-center gap-2 heading-serif">
                 <Target size={18} className="text-[color:var(--color-ink)]/80" />
@@ -575,7 +625,12 @@ export default function ProjectPage() {
                     min="1000"
                     step="500"
                     value={book.targetWords || 0}
-                    onChange={(e) => setBook((b) => ({ ...b, targetWords: clamp(Number(e.target.value) || 0, 0, 5000000) }))}
+                    onChange={(e) =>
+                      setBook((b) => ({
+                        ...b,
+                        targetWords: clamp(Number(e.target.value) || 0, 0, 5000000),
+                      }))
+                    }
                     className="w-full rounded-lg bg-white border border-[hsl(var(--border))] px-4 py-3 text-sm outline-none"
                     style={{ fontFamily: "Playfair Display, ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif" }}
                   />
@@ -593,7 +648,9 @@ export default function ProjectPage() {
                   {book.deadline && (
                     <div className="text-xs text-muted mt-2">
                       {daysLeft >= 0 ? `${daysLeft} days remaining` : `${Math.abs(daysLeft)} days overdue`}
-                      {wordsPerDayNeeded && <div className="mt-1">Need {wordsPerDayNeeded.toLocaleString()} words/day</div>}
+                      {wordsPerDayNeeded && (
+                        <div className="mt-1">Need {wordsPerDayNeeded.toLocaleString()} words/day</div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -601,7 +658,9 @@ export default function ProjectPage() {
             </div>
           </div>
 
+          {/* Right side: story details, stats, empty-state CTA */}
           <div className="space-y-6">
+            {/* Story Details */}
             <div className="glass-panel p-6">
               <div className="text-lg font-semibold mb-4 flex items-center gap-2 heading-serif">
                 <Edit3 size={18} className="text-[color:var(--color-ink)]/80" />
@@ -610,7 +669,9 @@ export default function ProjectPage() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                 <div className="md:col-span-2">
-                  <label className="text-xs text-muted mb-1 block">Title (updates across entire app)</label>
+                  <label className="text-xs text-muted mb-1 block">
+                    Title (updates across entire app)
+                  </label>
                   <input
                     value={book.title}
                     onChange={(e) => setBook((b) => ({ ...b, title: e.target.value }))}
@@ -680,6 +741,7 @@ export default function ProjectPage() {
               </div>
             </div>
 
+            {/* Writing Statistics */}
             <div className="glass-panel p-6">
               <div className="text-lg font-semibold mb-4 flex items-center gap-2 heading-serif">
                 <BarChart3 size={18} className="text-[color:var(--color-ink)]/80" />
@@ -723,6 +785,7 @@ export default function ProjectPage() {
               </div>
             </div>
 
+            {/* Empty-state CTA */}
             {chapters.length === 0 && (
               <div className="glass-panel p-6 text-center">
                 <AlertCircle className="mx-auto mb-3 text-[color:var(--color-ink)]/70" size={32} />
