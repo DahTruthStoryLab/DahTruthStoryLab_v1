@@ -24,12 +24,46 @@ const loadState = () => {
   }
 };
 
+// Whatever you already have above...
 const saveState = (state) => {
   try {
+    // 1) Save the full project state as you already do
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+
+    // 2) Derive an "author profile" from the project state
+    //    Adjust these field names to match your actual structure.
+    const source =
+      Array.isArray(state?.projects) && state.projects.length > 0
+        ? state.projects[0]          // if you store projects in an array
+        : state;                     // otherwise just use state itself
+
+    const displayName =
+      source.authorName ||          // e.g. main author name field
+      source.penName ||             // or pen name
+      source.projectAuthor ||       // or another name field you use
+      source.title ||               // fall back to project title
+      "New Author";
+
+    const avatarUrl =
+      source.avatarUrl ||           // explicit avatar from project
+      source.authorAvatar ||        // or another avatar key you use
+      source.coverImageUrl ||       // or cover art if you reuse that as avatar
+      "";
+
+    // 3) Save the profile object used by the Dashboard
+    localStorage.setItem(
+      "dt_profile",
+      JSON.stringify({ displayName, avatarUrl })
+    );
+
+    // 4) Let the app know both project + profile changed
     window.dispatchEvent(new Event("project:change"));
-  } catch {}
+    window.dispatchEvent(new Event("profile:updated"));
+  } catch (err) {
+    console.error("Failed to save project state:", err);
+  }
 };
+
 
 function readProfileObject() {
   try {
