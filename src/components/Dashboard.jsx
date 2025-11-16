@@ -202,47 +202,77 @@ const Sidebar = ({ isOpen, onClose, authorName, authorAvatar, navigate, userNove
           })}
         </nav>
 
-        {/* Your Novels */}
+             {/* Your Projects / Novels */}
         <div className="p-4 border-t border-white/60 flex-shrink-0">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-semibold text-muted uppercase tracking-wide">
-              Your Novels ({userNovels.length})
+              Your Projects ({userNovels.length})
             </h3>
             <button
-              onClick={() => navigate("/writer")}
+              onClick={() => navigate("/project")}
               className="text-ink hover:opacity-80 p-1 rounded-lg hover:bg-white/70 transition-colors"
-              aria-label="Create novel"
+              aria-label="Create project"
             >
               <Plus size={16} />
             </button>
           </div>
 
-          <div className="space-y-2 max-h-32 overflow-y-auto">
+          <div className="space-y-2 max-h-40 overflow-y-auto">
             {userNovels.length === 0 ? (
               <div className="p-3 rounded-lg glass-soft text-center">
-                <p className="text-xs text-muted">No novels yet</p>
-                <p className="text-xs text-muted mt-1">Click + to create your first story</p>
+                <p className="text-xs text-muted">No projects yet</p>
+                <p className="text-xs text-muted mt-1">
+                  Click + to create your first story project
+                </p>
               </div>
             ) : (
-              userNovels.map((novel, i) => (
-                <button
-                  key={novel.id || i}
-                  onClick={() => navigate("/writer")}
-                  className="w-full text-left p-3 rounded-lg glass-soft hover:bg-white/80 transition-colors"
-                >
-                  <h4 className="text-sm font-medium text-ink truncate">
-                    {novel.title || "Untitled Story"}
-                  </h4>
-                  <p className="text-xs text-muted">
-                    {novel.words || novel.wordCount || 0} words
-                    {novel.lastModified && (
-                      <span className="ml-2 opacity-75">
-                        • {new Date(novel.lastModified).toLocaleDateString()}
-                      </span>
-                    )}
-                  </p>
-                </button>
-              ))
+              userNovels.map((project, i) => {
+                const title = project.title || "Untitled Story";
+                const words = project.words || project.wordCount || 0;
+                const status = project.status || "Draft";
+                const lastModified = project.lastModified;
+
+                const handleOpen = () => {
+                  try {
+                    // Set the active story so Writer / Compose knows what to open
+                    const snapshot = {
+                      id: project.id || i,
+                      title,
+                      status,
+                      wordCount: words,
+                      lastModified: lastModified || new Date().toISOString(),
+                    };
+                    localStorage.setItem("currentStory", JSON.stringify(snapshot));
+                    window.dispatchEvent(new Event("project:change"));
+                  } catch (err) {
+                    console.error("Failed to set currentStory from sidebar:", err);
+                  }
+                  navigate("/writer");
+                };
+
+                return (
+                  <button
+                    key={project.id || i}
+                    onClick={handleOpen}
+                    className="w-full text-left p-3 rounded-lg glass-soft hover:bg-white/80 transition-colors"
+                  >
+                    <h4 className="text-sm font-medium text-ink truncate">{title}</h4>
+                    <p className="text-xs text-muted mt-0.5">
+                      {words.toLocaleString()} words
+                      {status && (
+                        <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full bg-white/70 border border-white/60 text-[10px] uppercase tracking-wide text-muted">
+                          {status}
+                        </span>
+                      )}
+                      {lastModified && (
+                        <span className="ml-2 opacity-75">
+                          • {new Date(lastModified).toLocaleDateString()}
+                        </span>
+                      )}
+                    </p>
+                  </button>
+                );
+              })
             )}
           </div>
         </div>
@@ -320,31 +350,54 @@ export default function Dashboard() {
   const [authorAvatar, setAuthorAvatar] = useState("");
   const [userNovels, setUserNovels] = useState([]);
 
-  // init profile + novels
+  // live refresh profile + sidebar projects on storage changes
   useEffect(() => {
-    const profile = readAuthorProfile();
-    setAuthorName(profile.name);
-    setAuthorAvatar(profile.avatarUrl);
+    const refresh = () => {
+      const profile = readAuthorProfile();
+      setAuthorName(profile.name);
+      setAuthorAvatar(profile.avatarUrl);
 
-    const projectData = localStorage.getItem("userProjects");
-    const novelsData = localStorage.getItem("userNovels");
-    if (projectData) setUserNovels(JSON.parse(projectData));
-    else if (novelsData) setUserNovels(JSON.parse(novelsData));
-    else {
-      const storyData = localStorage.getItem("currentStory");
-      if (storyData) {
-        const s = JSON.parse(storyData);
-        setUserNovels([
-          {
-            id: s.id || 1,
-            title: s.title || "Untitled Story",
-            words: s.wordCount || 0,
-            lastModified: s.lastModified || new Date().toISOString(),
-          },
-        ]);
+      try {
+        const projectData = localStorage.getItem("userProjects");
+        const novelsData = localStorage.getItem("userNovels");
+
+        if (projectData) {
+          setUserNovels(JSON.parse(projectData));
+        } else if (novelsData) {
+          setUserNovels(JSON.parse(novelsData));
+        } else {
+          const storyData = localStorage.getItem("currentStory");
+          if (storyData) {
+            const s = JSON.parse(storyData);
+            setUserNovels([
+              {
+                id: s.id || 1,
+                title: s.title || "Untitled Story",
+                words: s.wordCount || 0,
+                lastModified: s.lastModified || new Date().toISOString(),
+                status: s.status || "Draft",
+              },
+            ]);
+          } else {
+            setUserNovels([]);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to refresh sidebar projects:", err);
       }
-    }
+    };
+
+    window.addEventListener("storage", refresh);
+    window.addEventListener("profile:updated", refresh);
+    window.addEventListener("project:change", refresh);
+
+    return () => {
+      window.removeEventListener("storage", refresh);
+      window.removeEventListener("profile:updated", refresh);
+      window.removeEventListener("project:change", refresh);
+    };
   }, []);
+
 
   // live refresh profile on storage changes
   useEffect(() => {
