@@ -289,62 +289,102 @@ export default function ComposePage() {
     }
   };
 
-  // SIMPLE AI HANDLER — sends a safe slice so it doesn't time out
-  const handleAI = async (mode, targetHtmlOverride) => {
-    if (!hasChapter) return;
+ // SMART AI HANDLER — prefers selected text, falls back to first chunk
+const handleAI = async (mode, targetHtmlOverride) => {
+  if (!hasChapter) return;
 
-    const MAX_CHARS = 3000; // safe size for now
-    const op = resolveAIMode(mode || activeAiTab);
+  const MAX_CHARS = 3000; // safe size for now
+  const op = resolveAIMode(mode);
 
-    // Remember which tab/mode the user triggered
-    if (mode && mode !== activeAiTab) {
-      setActiveAiTab(mode);
-    }
+  // Always work off the latest full chapter HTML
+  const fullHtml = (html || "").toString();
+  let target = "";
+  let useSelection = false;
 
-    // Full chapter HTML
-    const raw = (targetHtmlOverride ?? html) || "";
-    // Part we send to AI
-    const target = raw.slice(0, MAX_CHARS);
-    // The rest we keep as-is
-    const remainder = raw.slice(target.length);
-
-    if (!target.trim()) return;
-
-    // Remember where the user is before we touch the DOM
-    rememberScrollPosition();
-
+  // 1) Try to grab selected HTML from the editor (Quill uses .ql-editor)
+  if (!targetHtmlOverride && typeof window !== "undefined") {
     try {
-      const result = await rateLimiter.addToQueue(async () =>
-        runAI(op, target, instructions, provider)
-      );
+      const selection = window.getSelection();
+      const editorEl = document.querySelector(".ql-editor");
 
-      console.log("AI mode:", op, "chars:", target.length, "result:", result);
+      if (
+        selection &&
+        selection.rangeCount > 0 &&
+        editorEl &&
+        editorEl.contains(selection.getRangeAt(0).commonAncestorContainer)
+      ) {
+        const range = selection.getRangeAt(0);
+        const container = document.createElement("div");
+        container.appendChild(range.cloneContents());
+        const selectedHtml = container.innerHTML.trim();
 
-      if (!result) {
-        alert(
-          "The AI did not return any text. Please try again with a smaller section or a different mode."
-        );
-        return;
+        if (selectedHtml) {
+          useSelection = true;
+          target = selectedHtml.slice(0, MAX_CHARS);
+        }
       }
-
-      // Combine edited part + untouched remainder
-      const combined = result + remainder;
-
-      setHtml(combined);
-      updateChapter(selectedId, {
-        title: title || selectedChapter?.title || "",
-        content: combined,
-      });
-    } catch (error) {
-      console.error("AI request error:", error);
-      alert(
-        "There was an error calling the AI service. Please try again in a moment."
-      );
-    } finally {
-      // Put the user back where they were in the document
-      restoreScrollPositionSoon();
+    } catch (err) {
+      console.warn("AI selection detection failed, falling back:", err);
     }
-  };
+  }
+
+  // 2) If no valid selection, fall back to the first chunk (old behavior)
+  if (!useSelection) {
+    const raw = (targetHtmlOverride ?? fullHtml) || "";
+    target = raw.slice(0, MAX_CHARS);
+  }
+
+  if (!target || !target.trim()) return;
+
+  try {
+    const result = await rateLimiter.addToQueue(async () =>
+      runAI(op, target, instructions, provider)
+    );
+
+    console.log("AI mode:", op, "chars:", target.length, "result length:", result?.length);
+
+    if (!result) {
+      alert(
+        "The AI did not return any text. Please try again with a smaller section or a different mode."
+      );
+      return;
+    }
+
+    let combinedHtml = fullHtml;
+
+    if (useSelection) {
+      // 3A) Replace ONLY the selected fragment inside the chapter HTML
+      // We assume the selected HTML (or its sliced version) appears once in the fullHtml.
+      const idx = fullHtml.indexOf(target);
+
+      if (idx !== -1) {
+        combinedHtml =
+          fullHtml.slice(0, idx) + result + fullHtml.slice(idx + target.length);
+      } else {
+        // Fallback: try a simple replace once
+        const replacedOnce = fullHtml.replace(target, result);
+        combinedHtml =
+          replacedOnce === fullHtml ? result + fullHtml : replacedOnce;
+      }
+    } else {
+      // 3B) Chunk mode: keep old behavior (edited chunk + remainder)
+      const remainder = fullHtml.slice(target.length);
+      combinedHtml = result + remainder;
+    }
+
+    setHtml(combinedHtml);
+    updateChapter(selectedId, {
+      title: title || selectedChapter?.title || "",
+      content: combinedHtml,
+    });
+  } catch (error) {
+    console.error("AI request error:", error);
+    alert(
+      "There was an error calling the AI service. Please try again in a moment."
+    );
+  }
+};
+
 
   // NEW: simplified import using documentParser
   const handleImport = async (file, options = {}) => {
