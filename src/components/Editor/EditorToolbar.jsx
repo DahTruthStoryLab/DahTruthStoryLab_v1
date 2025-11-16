@@ -1,6 +1,5 @@
 // src/components/Editor/EditorToolbar.jsx
 import React, { useRef } from "react";
-import { Save, Upload, Download, Trash2, Wand2 } from "lucide-react";
 
 export default function EditorToolbar({
   onAI,
@@ -8,13 +7,14 @@ export default function EditorToolbar({
   onImport,
   onExport,
   onDelete,
-  aiBusy,
-  saveStatus = "idle",
+  aiBusy = false,
+  saveStatus = "idle", // "idle" | "saving" | "saved"
+  activeAiTab = "proofread",
+  setActiveAiTab, // optional; ComposePage passes this in
 }) {
   const fileInputRef = useRef(null);
 
-  const handleImportClick = () => {
-    if (!onImport) return;
+  const handleFileClick = () => {
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
       fileInputRef.current.click();
@@ -22,129 +22,139 @@ export default function EditorToolbar({
   };
 
   const handleFileChange = (e) => {
-    if (!onImport) return;
     const file = e.target.files?.[0];
-    if (file) {
-      onImport(file);
+    if (file && onImport) {
+      onImport(file, { splitByHeadings: true });
     }
   };
 
-  const handleAIMode = (mode) => {
-    if (!onAI || aiBusy) return;
-    onAI(mode); // "grammar" | "proofread" | "readability" | "clarify" | etc.
+  const handleAiClick = (mode) => {
+    // remember active tab (if the parent provided the setter)
+    if (typeof setActiveAiTab === "function") {
+      setActiveAiTab(mode);
+    }
+    if (onAI) {
+      onAI(mode);
+    }
   };
 
-  const isSaving = saveStatus === "saving";
-  const isSaved = saveStatus === "saved";
+  const renderSaveLabel = () => {
+    if (saveStatus === "saving") return "Saving...";
+    if (saveStatus === "saved") return "Saved ✓";
+    return "Save";
+  };
+
+  const renderSaveClass = () => {
+    if (saveStatus === "saving") return "bg-slate-200 cursor-wait";
+    if (saveStatus === "saved") return "bg-emerald-100 text-emerald-800";
+    return "bg-slate-900 text-white hover:bg-slate-800";
+  };
+
+  const aiButtonBase =
+    "px-3 py-1.5 rounded-full text-xs font-medium border transition-colors";
+  const aiInactive =
+    "bg-white text-slate-700 border-slate-200 hover:bg-slate-50";
+  const aiActive =
+    "bg-slate-900 text-white border-slate-900 shadow-sm";
 
   return (
-    <div className="flex items-center gap-2 text-xs text-slate-800">
-      {/* Hidden file input for import */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept=".doc,.docx,.txt,.md"
-        className="hidden"
-        onChange={handleFileChange}
-      />
+    <div className="flex items-center gap-2">
+      {/* AI Actions */}
+      <div className="flex items-center gap-1 rounded-full bg-slate-50 border border-slate-200 px-1 py-1">
+        <button
+          type="button"
+          disabled={aiBusy}
+          onClick={() => handleAiClick("proofread")}
+          className={[
+            aiButtonBase,
+            activeAiTab === "proofread" ? aiActive : aiInactive,
+            aiBusy ? "opacity-60 cursor-not-allowed" : "",
+          ].join(" ")}
+          title="Check grammar and fix basic errors"
+        >
+          {aiBusy && activeAiTab === "proofread" ? "Working…" : "Proofread"}
+        </button>
+
+        <button
+          type="button"
+          disabled={aiBusy}
+          onClick={() => handleAiClick("clarify")}
+          className={[
+            aiButtonBase,
+            activeAiTab === "clarify" ? aiActive : aiInactive,
+            aiBusy ? "opacity-60 cursor-not-allowed" : "",
+          ].join(" ")}
+          title="Improve clarity and flow"
+        >
+          {aiBusy && activeAiTab === "clarify" ? "Working…" : "Clarify"}
+        </button>
+
+        <button
+          type="button"
+          disabled={aiBusy}
+          onClick={() => handleAiClick("readability")}
+          className={[
+            aiButtonBase,
+            activeAiTab === "readability" ? aiActive : aiInactive,
+            aiBusy ? "opacity-60 cursor-not-allowed" : "",
+          ].join(" ")}
+          title="Enhance readability and pacing"
+        >
+          {aiBusy && activeAiTab === "readability" ? "Working…" : "Readability"}
+        </button>
+      </div>
+
+      {/* Import / Export */}
+      <div className="flex items-center gap-1">
+        <button
+          type="button"
+          onClick={handleFileClick}
+          className="px-3 py-1.5 rounded-md border border-slate-200 bg-white text-xs hover:bg-slate-50"
+          title="Import manuscript (.docx, .txt, .md)"
+        >
+          Import
+        </button>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".doc,.docx,.txt,.md"
+          className="hidden"
+          onChange={handleFileChange}
+        />
+
+        <button
+          type="button"
+          onClick={onExport}
+          className="px-3 py-1.5 rounded-md border border-slate-200 bg-white text-xs hover:bg-slate-50"
+          title="Export current chapter as HTML"
+        >
+          Export
+        </button>
+      </div>
 
       {/* Save */}
       <button
+        type="button"
         onClick={onSave}
-        disabled={isSaving}
-        className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-900 hover:bg-slate-50 disabled:opacity-60 disabled:cursor-not-allowed"
-        title="Save current chapter"
+        disabled={saveStatus === "saving"}
+        className={[
+          "ml-2 px-4 py-1.5 rounded-full text-xs font-semibold shadow-sm",
+          renderSaveClass(),
+        ].join(" ")}
+        title="Save project"
       >
-        {isSaving ? (
-          <span className="inline-block w-3 h-3 border-2 border-slate-500 border-t-transparent rounded-full animate-spin" />
-        ) : (
-          <Save className="w-3.5 h-3.5" />
-        )}
-        <span>
-          {isSaving
-            ? "Saving..."
-            : isSaved
-            ? "Saved"
-            : "Save"}
-        </span>
-      </button>
-
-      {/* Import */}
-      <button
-        onClick={handleImportClick}
-        className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white/90 px-3 py-1.5 text-xs font-medium text-slate-800 hover:bg-slate-50"
-        title="Import a Word or text document"
-      >
-        <Upload className="w-3.5 h-3.5" />
-        <span>Import</span>
-      </button>
-
-      {/* Export */}
-      <button
-        onClick={onExport}
-        className="inline-flex items-center gap-1 rounded-md border border-slate-300 bg-white/90 px-3 py-1.5 text-xs font-medium text-slate-800 hover:bg-slate-50"
-        title="Export current chapter as HTML"
-      >
-        <Download className="w-3.5 h-3.5" />
-        <span>Export</span>
+        {renderSaveLabel()}
       </button>
 
       {/* Delete */}
       <button
+        type="button"
         onClick={onDelete}
-        className="inline-flex items-center gap-1 rounded-md border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 hover:bg-red-100"
+        className="px-3 py-1.5 rounded-full text-xs border border-red-200 text-red-700 bg-red-50 hover:bg-red-100"
         title="Delete current chapter"
       >
-        <Trash2 className="w-3.5 h-3.5" />
-        <span>Delete</span>
+        Delete
       </button>
-
-      {/* Divider before AI tools */}
-      <div className="h-6 w-px bg-slate-200 mx-1" />
-
-      {/* AI tools group */}
-      <div className="flex items-center gap-1">
-        <span className="inline-flex items-center gap-1 text-[11px] text-slate-600">
-          <Wand2 className="w-3.5 h-3.5" />
-          <span>AI</span>
-        </span>
-
-        <button
-          onClick={() => handleAIMode("grammar")}
-          disabled={aiBusy}
-          className="px-2 py-1 rounded-md border border-slate-200 bg-white text-[11px] text-slate-800 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
-          title="Check grammar"
-        >
-          Grammar
-        </button>
-
-        <button
-          onClick={() => handleAIMode("proofread")}
-          disabled={aiBusy}
-          className="px-2 py-1 rounded-md border border-slate-200 bg-white text-[11px] text-slate-800 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
-          title="Proofread"
-        >
-          Proofread
-        </button>
-
-        <button
-          onClick={() => handleAIMode("readability")}
-          disabled={aiBusy}
-          className="px-2 py-1 rounded-md border border-slate-200 bg-white text-[11px] text-slate-800 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
-          title="Improve readability"
-        >
-          Readability
-        </button>
-
-        <button
-          onClick={() => handleAIMode("clarify")}
-          disabled={aiBusy}
-          className="px-2 py-1 rounded-md border border-slate-200 bg-white text-[11px] text-slate-800 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
-          title="Clarify sentences"
-        >
-          Clarify
-        </button>
-      </div>
     </div>
   );
 }
