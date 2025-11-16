@@ -18,6 +18,65 @@ import { GoldButton, WritingCrumb } from "./UI/UIComponents";
 import { documentParser } from "../utils/documentParser";
 import { rateLimiter } from "../utils/rateLimiter";
 
+// Keys shared with ProjectPage for cross-page sync
+const CURRENT_STORY_KEY = "currentStory";
+const USER_PROJECTS_KEY = "userProjects";
+
+// Save a simple "current story" snapshot for ProjectPage to read
+function saveCurrentStorySnapshot({ title }) {
+  if (!title) return;
+  try {
+    const snapshot = {
+      id: "main",                   // you can customize later if you support multiple
+      title: title.trim(),
+      status: "Draft",              // or pull real status if you add it here
+      updatedAt: new Date().toISOString(),
+    };
+    localStorage.setItem(CURRENT_STORY_KEY, JSON.stringify(snapshot));
+  } catch (err) {
+    console.error("Failed to save currentStory:", err);
+  }
+}
+
+// Maintain a small list of projects/novels in localStorage
+function upsertUserProject({ title }) {
+  if (!title) return;
+  try {
+    const t = title.trim();
+    if (!t) return;
+
+    const raw = localStorage.getItem(USER_PROJECTS_KEY);
+    let arr = [];
+    try {
+      arr = raw ? JSON.parse(raw) : [];
+    } catch {
+      arr = [];
+    }
+    if (!Array.isArray(arr)) arr = [];
+
+    const index = arr.findIndex((p) => p && p.title === t);
+    const base = {
+      title: t,
+      status: "Draft",
+      source: "Project",          // matches what ProjectPage expects
+      updatedAt: new Date().toISOString(),
+    };
+
+    if (index >= 0) {
+      // update existing entry
+      arr[index] = { ...arr[index], ...base };
+    } else {
+      arr.push(base);
+    }
+
+    localStorage.setItem(USER_PROJECTS_KEY, JSON.stringify(arr));
+    // Let other tabs/pages (like ProjectPage) know something changed
+    window.dispatchEvent(new Event("project:change"));
+  } catch (err) {
+    console.error("Failed to update userProjects:", err);
+  }
+}
+
 const DEBUG_IMPORT = false;
 
 // Helper: normalize to "double spaced" paragraphs on import
@@ -218,35 +277,45 @@ export default function ComposePage() {
   }, [selectedId, selectedChapter]);
 
   // Save with visual feedback
-  const handleSave = async () => {
-    if (!hasChapter) return;
-    if (saveStatus === "saving") return; // avoid double-taps
+  // Save with visual feedback
+const handleSave = async () => {
+  if (!hasChapter) return;
+  if (saveStatus === "saving") return; // avoid double-taps
 
-    setSaveStatus("saving");
+  setSaveStatus("saving");
 
-    try {
-      // Update the current chapter
-      updateChapter(selectedId, {
-        title: title || selectedChapter?.title || "",
-        content: html,
-      });
+  try {
+    // Update the current chapter
+    updateChapter(selectedId, {
+      title: title || selectedChapter?.title || "",
+      content: html,
+    });
 
-      // Save the project – supports sync or async
-      await Promise.resolve(
-        saveProject({
-          book: { ...book, title: bookTitle },
-        })
-      );
+    // Save the project – supports sync or async
+    await Promise.resolve(
+      saveProject({
+        book: { ...book, title: bookTitle },
+      })
+    );
 
-      setSaveStatus("saved");
-      setTimeout(() => {
-        setSaveStatus("idle");
-      }, 2000);
-    } catch (error) {
-      console.error("Save failed:", error);
+    // 🔹 NEW: sync title to ProjectPage via localStorage
+    const safeTitle =
+      (bookTitle && bookTitle.trim()) ||
+      (book?.title && book.title.trim()) ||
+      "Untitled Book";
+
+    saveCurrentStorySnapshot({ title: safeTitle });
+    upsertUserProject({ title: safeTitle });
+
+    setSaveStatus("saved");
+    setTimeout(() => {
       setSaveStatus("idle");
-    }
-  };
+    }, 2000);
+  } catch (error) {
+    console.error("Save failed:", error);
+    setSaveStatus("idle");
+  }
+};
 
   // Rename a chapter (used by sidebar rename ✏️)
   const handleRenameChapter = (chapterId, newTitle) => {
