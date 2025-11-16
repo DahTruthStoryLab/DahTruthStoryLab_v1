@@ -106,7 +106,7 @@ const Sidebar = ({ isOpen, onClose, authorName, authorAvatar, navigate, userNove
     { icon: Calendar,   label: "Calendar",          path: "/calendar" },
     { icon: Layers,     label: "Story Lab",         path: "/story-lab" },
     { icon: UploadCloud,label: "Publishing",        path: "/publishing" },
-    { icon: User,       label: "Profile",           path: "/profile" },
+    { icon: Layers,     label: "Projects",          path: "/project" },
     { icon: Info,       label: "About",             path: "/about" },
     { icon: Store,      label: "Store",             path: "/store" }, // 👈 Store last
   ];
@@ -639,11 +639,11 @@ export default function Dashboard() {
                 </CardBody>
               </Card>
 
-              <Card className="cursor-pointer hover:border-white/60" onClick={() => navigate("/project")}>
+             <Card className="cursor-pointer hover:border-white/60" onClick={() => navigate("/project")}>
                 <CardBody className="text-center">
                   <Layers size={24} className="mx-auto mb-2 text-ink" />
-                  <p className="font-semibold">Project</p>
-                  <p className="text-xs text-muted mt-1">Manage project</p>
+                  <p className="font-semibold">Projects</p>
+                  <p className="text-xs text-muted mt-1">Manage all projects</p>
                 </CardBody>
               </Card>
 
