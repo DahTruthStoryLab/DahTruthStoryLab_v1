@@ -1,45 +1,30 @@
 // src/components/ProjectPage.js
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   BookOpen,
   Plus,
   Upload,
-  Image,
-  Edit3,
-  FileText,
-  Layers,
   Trash2,
+  PencilLine,
+  BarChart3,
+  Clock,
+  Layers,
   ArrowLeft,
+  Loader2,
+  Image as ImageIcon,
 } from "lucide-react";
 import heic2any from "heic2any";
 
-// -------------------- Storage Keys --------------------
-const USER_PROJECTS_KEY = "userProjects";
-const CURRENT_STORY_KEY = "currentStory";
-
-// -------------------- Helpers: load/save projects --------------------
-function normalizeProjects(rawArr) {
-  if (!Array.isArray(rawArr)) return [];
-  return rawArr.map((p, idx) => ({
-    id: p.id || `${p.title || "project"}-${idx}`,
-    title: p.title || "Untitled Project",
-    status: p.status || "Draft", // Draft | In Progress | Completed
-    pages: p.pages || p.pageCount || 0,
-    logline: p.logline || "",
-    synopsis: p.synopsis || "",
-    cover: p.cover || "",
-    source: p.source || "Project",
-    updatedAt: p.updatedAt || null,
-  }));
-}
+// -------------------- Storage helpers --------------------
+const PROJECTS_KEY = "userProjects";
 
 function loadProjects() {
   try {
-    const raw = localStorage.getItem(USER_PROJECTS_KEY);
+    const raw = localStorage.getItem(PROJECTS_KEY);
     if (!raw) return [];
-    const arr = JSON.parse(raw);
-    return normalizeProjects(arr);
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];
   }
@@ -47,25 +32,14 @@ function loadProjects() {
 
 function saveProjects(projects) {
   try {
-    localStorage.setItem(USER_PROJECTS_KEY, JSON.stringify(projects));
+    localStorage.setItem(PROJECTS_KEY, JSON.stringify(projects));
     window.dispatchEvent(new Event("project:change"));
   } catch (err) {
     console.error("Failed to save projects:", err);
   }
 }
 
-function formatUpdatedAt(iso) {
-  if (!iso) return "";
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleDateString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
-
-// -------------------- Image helpers (HEIC, downscale) --------------------
+// -------------------- Image helpers --------------------
 async function heicArrayBufferToJpegDataUrl(arrayBuffer, quality = 0.9) {
   const blob = new Blob([arrayBuffer], { type: "image/heic" });
   const jpegBlob = await heic2any({ blob, toType: "image/jpeg", quality });
@@ -98,41 +72,63 @@ async function downscaleDataUrl(dataUrl, maxDim = 2000, quality = 0.9) {
   return canvas.toDataURL("image/jpeg", quality);
 }
 
-// -------------------- Status badge styling --------------------
-function getStatusBadgeClasses(status) {
-  const base = "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border";
-  switch (status) {
-    case "Completed":
-      return `${base} bg-emerald-50 text-emerald-700 border-emerald-200`;
-    case "In Progress":
-      return `${base} bg-amber-50 text-amber-700 border-amber-200`;
-    case "Draft":
-    default:
-      return `${base} bg-slate-50 text-slate-700 border-slate-200`;
-  }
-}
+// -------------------- Misc helpers --------------------
+const countWords = (s = "") => s.trim().split(/\s+/).filter(Boolean).length;
+const getReadingTime = (wordCount) => Math.ceil(wordCount / 200);
+const progressPct = (cur, tgt) =>
+  Math.min((cur / Math.max(tgt || 1, 1)) * 100, 100);
+
+const getStatusColor = (status) => {
+  const pill = (bg, text, border) =>
+    `bg-[${bg}] text-[${text}] border ${border} rounded-full`;
+  const colors = {
+    Idea: pill(
+      "color:rgba(202,177,214,0.20)",
+      "color:#6B4F7A",
+      "border-[hsl(var(--border))]"
+    ),
+    Outline: pill(
+      "color:rgba(234,242,255,0.60)",
+      "color:#0F172A",
+      "border-[hsl(var(--border))]"
+    ),
+    Draft: pill(
+      "color:rgba(255,213,0,0.15)",
+      "color:#7A5E00",
+      "border-[hsl(var(--border))]"
+    ),
+    Revision: pill(
+      "color:rgba(255,173,51,0.18)",
+      "color:#7A3E00",
+      "border-[hsl(var(--border))]"
+    ),
+    Editing: pill(
+      "color:rgba(46,204,113,0.18)",
+      "color:#1E6B43",
+      "border-[hsl(var(--border))]"
+    ),
+    Published: pill(
+      "color:rgba(212,175,55,0.18)",
+      "color:#6B5A1E",
+      "border-[hsl(var(--border))]"
+    ),
+  };
+  return colors[status] || colors.Draft;
+};
 
 // -------------------- Main Component --------------------
 export default function ProjectPage() {
   const navigate = useNavigate();
-  const fileInputRefs = useRef({}); // per-project file inputs
-  const [projects, setProjects] = useState(() => loadProjects());
-  const [uploadingId, setUploadingId] = useState(null);
-  const [statusFilter, setStatusFilter] = useState("All");
+  const [projects, setProjects] = useState([]);
+  const [coverUploadId, setCoverUploadId] = useState(null);
 
-  const filteredProjects = projects.filter((p) => {
-    if (statusFilter === "All") return true;
-    const status = (p.status || "Draft").toLowerCase();
-    const target = statusFilter.toLowerCase();
-    return status === target;
-  });
-
-
-  // Sync with other tabs / writer page updates
   useEffect(() => {
-    const sync = () => {
-      setProjects(loadProjects());
-    };
+    setProjects(loadProjects());
+  }, []);
+
+  // Keep in sync if other tabs / parts of app modify projects
+  useEffect(() => {
+    const sync = () => setProjects(loadProjects());
     window.addEventListener("storage", sync);
     window.addEventListener("project:change", sync);
     return () => {
@@ -145,80 +141,79 @@ export default function ProjectPage() {
     if (window.history.length > 1) {
       navigate(-1);
     } else {
-      navigate("/");
+      navigate("/dashboard");
     }
   };
 
-  const handleAddProject = () => {
+  const addProject = () => {
     const now = new Date().toISOString();
-    const next = [
-      ...projects,
-      {
-        id: `project-${Date.now()}`,
+    setProjects((prev) => {
+      const newProject = {
+        id: Date.now().toString(),
         title: "Untitled Project",
-        status: "Draft",
-        pages: 0,
         logline: "",
         synopsis: "",
+        status: "Draft",
+        targetWords: 25000,
+        wordCount: 0,
         cover: "",
-        source: "Project",
-        updatedAt: now,
-      },
-    ];
-    setProjects(next);
-    saveProjects(next);
+        createdAt: now,
+        lastModified: now,
+      };
+      const updated = [newProject, ...prev];
+      saveProjects(updated);
+      return updated;
+    });
   };
 
   const updateProject = (id, patch) => {
     setProjects((prev) => {
-      const next = prev.map((p) =>
-        p.id === id ? { ...p, ...patch, updatedAt: new Date().toISOString() } : p
+      const now = new Date().toISOString();
+      const updated = prev.map((p) =>
+        p.id === id ? { ...p, ...patch, lastModified: now } : p
       );
-      saveProjects(next);
-      return next;
+      saveProjects(updated);
+      return updated;
     });
   };
 
-  const removeProject = (id) => {
+  const deleteProject = (id) => {
     if (!window.confirm("Delete this project? This cannot be undone.")) return;
     setProjects((prev) => {
-      const next = prev.filter((p) => p.id !== id);
-      saveProjects(next);
-      return next;
+      const updated = prev.filter((p) => p.id !== id);
+      saveProjects(updated);
+      return updated;
     });
   };
 
-  const handleOpenWriter = (project) => {
+  const openInWriter = (project) => {
+    // Lightweight "current story" handoff for Writer page
+    const snapshot = {
+      id: project.id,
+      title: project.title,
+      wordCount: project.wordCount || 0,
+      lastModified: project.lastModified || new Date().toISOString(),
+      status: project.status || "Draft",
+      targetWords: project.targetWords || 25000,
+    };
     try {
-      const snapshot = {
-        id: project.id,
-        title: project.title,
-        status: project.status || "Draft",
-        updatedAt: new Date().toISOString(),
-      };
-      localStorage.setItem(CURRENT_STORY_KEY, JSON.stringify(snapshot));
+      localStorage.setItem("currentStory", JSON.stringify(snapshot));
       window.dispatchEvent(new Event("project:change"));
     } catch (err) {
       console.error("Failed to set currentStory:", err);
     }
-    navigate("/compose");
+    navigate("/writer");
   };
 
-  const triggerUpload = (projectId) => {
-    const input = fileInputRefs.current[projectId];
-    if (input && !uploadingId) {
-      input.click();
-    }
-  };
-
-  const handleCoverPicked = async (projectId, file) => {
+  // Handle cover upload per project (JPG/PNG/HEIC, including iPhone photos)
+  const handleCoverChange = async (projectId, fileInputEvent) => {
+    const file = fileInputEvent.target.files?.[0];
     if (!file) return;
-    setUploadingId(projectId);
+    setCoverUploadId(projectId);
     try {
       const maxSize = 10 * 1024 * 1024;
       if (file.size > maxSize) {
         alert("Image is too large. Please choose an image under 10MB.");
-        setUploadingId(null);
         return;
       }
 
@@ -228,7 +223,7 @@ export default function ProjectPage() {
         file.type === "image/heic" ||
         file.type === "image/heif";
 
-      let dataUrl;
+      let dataUrl = "";
       if (isHEIC) {
         const ab = await file.arrayBuffer();
         const jpegDataUrl = await heicArrayBufferToJpegDataUrl(ab, 0.9);
@@ -248,9 +243,8 @@ export default function ProjectPage() {
       console.error("Error uploading cover:", err);
       alert("Failed to upload image. Please try again or use a different image.");
     } finally {
-      setUploadingId(null);
-      const input = fileInputRefs.current[projectId];
-      if (input) input.value = "";
+      setCoverUploadId(null);
+      fileInputEvent.target.value = "";
     }
   };
 
@@ -267,255 +261,261 @@ export default function ProjectPage() {
         </button>
 
         {/* Header */}
-        <div className="glass-panel mb-6">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between px-6 py-5">
+        <div className="glass-panel">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between px-6 py-5">
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 rounded-xl bg-[color:var(--color-primary)] grid place-items-center">
-                <BookOpen size={20} className="text-[color:var(--color-ink)]/80" />
+                <Layers size={20} className="text-[color:var(--color-ink)]/80" />
               </div>
               <div>
                 <h1 className="text-3xl heading-serif">Projects</h1>
-                <p className="text-sm text-muted mt-1">
-                  Manage all your novels and story projects in one place.
-                </p>
+                <div className="text-sm text-muted mt-1">
+                  Manage all of your novels and writing projects in one place.
+                </div>
               </div>
             </div>
-
-          <div className="flex flex-col items-stretch gap-2 md:items-end">
-            {/* Filters */}
-            <div className="inline-flex rounded-full bg-white border border-[hsl(var(--border))] p-1 text-xs">
-              {["All", "Draft", "In Progress", "Completed"].map((label) => (
-                <button
-                  key={label}
-                  onClick={() => setStatusFilter(label)}
-                  className={[
-                    "px-3 py-1 rounded-full transition-colors",
-                    statusFilter === label
-                      ? "bg-[color:var(--color-primary)] text-[color:var(--color-ink)]"
-                      : "text-muted hover:bg-slate-50",
-                  ].join(" ")}
-                >
-                  {label}
-                </button>
-              ))}
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                onClick={addProject}
+                className="btn-primary inline-flex items-center gap-2"
+              >
+                <Plus size={16} /> New Project
+              </button>
             </div>
-
-          {/* Add project */}
-          <button
-            onClick={handleAddProject}
-            className="btn-gold inline-flex items-center gap-2 text-sm"
-          >
-            <Plus size={16} />
-            Add Project
-          </button>
-        </div>
-      </div>
-    </div>
-
-        {/* Empty state */}
-        {projects.length === 0 && (
-          <div className="glass-panel p-8 text-center">
-            <Layers className="mx-auto mb-3 text-[color:var(--color-ink)]/70" size={36} />
-            <div className="text-lg font-medium mb-2">No projects yet</div>
-            <div className="text-sm text-muted mb-4">
-              Start your first project to track your stories, covers, and summaries.
-            </div>
-            <button
-              onClick={handleAddProject}
-              className="btn-primary inline-flex items-center gap-2 text-sm"
-            >
-              <Plus size={16} />
-              Create Your First Project
-            </button>
           </div>
-        )}
-
-       {/* Project Cards */}
-        <div className="space-y-4">
-          {filteredProjects.map((project) => (
-            ...
-          ))}
         </div>
 
-              {/* Cover */}
-              <div className="w-full md:w-40 flex flex-col items-center">
-                <div className="w-32 h-44 rounded-xl overflow-hidden border border-[hsl(var(--border))] bg-[color:var(--color-primary)]/40 flex items-center justify-center relative">
-                  {uploadingId === project.id ? (
-                    <div className="text-center text-xs text-muted px-2">
-                      <div className="animate-pulse mb-1">Processing…</div>
-                    </div>
-                  ) : project.cover ? (
-                    <img
-                      src={project.cover}
-                      alt={`${project.title} cover`}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="text-center text-muted">
-                      <Image size={24} className="mx-auto mb-1 opacity-60" />
-                      <div className="text-xs">Upload cover</div>
-                    </div>
-                  )}
-                </div>
-                <div className="mt-2 flex gap-2">
-                  <button
-                    onClick={() => triggerUpload(project.id)}
-                    disabled={uploadingId === project.id}
-                    className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-white border border-[hsl(var(--border))] hover:bg-gray-50 text-[11px] disabled:opacity-50"
-                  >
-                    <Upload size={12} />
-                    Cover
-                  </button>
-                  {project.cover && (
-                    <button
-                      onClick={() => updateProject(project.id, { cover: "" })}
-                      className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-white border border-[hsl(var(--border))] hover:bg-gray-50 text-[11px]"
-                    >
-                      ✕
-                    </button>
-                  )}
-                </div>
-                <input
-                  ref={(el) => {
-                    fileInputRefs.current[project.id] = el;
-                  }}
-                  type="file"
-                  accept="image/*,.heic,.heif"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) handleCoverPicked(project.id, file);
-                  }}
-                />
+        {/* Content */}
+        <div className="mt-6">
+          {projects.length === 0 ? (
+            <div className="glass-panel p-8 text-center">
+              <div className="w-14 h-14 rounded-full bg-[color:var(--color-primary)]/60 flex items-center justify-center mx-auto mb-4">
+                <BookOpen size={24} className="text-[color:var(--color-ink)]/80" />
               </div>
-
-              {/* Details */}
-              <div className="flex-1 space-y-3">
-                {/* Title + status row */}
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
-                  <div className="flex-1">
-                    <label className="text-[11px] text-muted mb-1 block">Project Title</label>
-                    <input
-                      value={project.title}
-                      onChange={(e) =>
-                        updateProject(project.id, { title: e.target.value || "Untitled Project" })
-                      }
-                      className="w-full rounded-lg bg-white border border-[hsl(var(--border))] px-3 py-2 text-sm font-semibold outline-none"
-                      placeholder="Name of your book or project..."
-                      style={{
-                        fontFamily:
-                          "Playfair Display, ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif",
-                      }}
-                    />
-                  </div>
-                  <div className="w-full md:w-40">
-                    <label className="text-[11px] text-muted mb-1 block">Status</label>
-                    <select
-                      value={project.status || "Draft"}
-                      onChange={(e) =>
-                        updateProject(project.id, { status: e.target.value || "Draft" })
-                      }
-                      className="w-full rounded-lg bg-white border border-[hsl(var(--border))] px-3 py-2 text-xs outline-none"
-                    >
-                      <option>Draft</option>
-                      <option>In Progress</option>
-                      <option>Completed</option>
-                    </select>
-                    <div className="mt-1">{/* status pill */}</div>
-                    <div className="mt-1">
-                      <span className={getStatusBadgeClasses(project.status)}>
-                        {project.status || "Draft"}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Pages + logline */}
-                <div className="grid grid-cols-1 md:grid-cols-[120px,1fr] gap-3">
-                  <div>
-                    <label className="text-[11px] text-muted mb-1 block">Page Count</label>
-                    <input
-                      type="number"
-                      min={0}
-                      value={project.pages || 0}
-                      onChange={(e) =>
-                        updateProject(project.id, {
-                          pages: Math.max(0, Number(e.target.value) || 0),
-                        })
-                      }
-                      className="w-full rounded-lg bg-white border border-[hsl(var(--border))] px-3 py-2 text-sm outline-none"
-                      placeholder="0"
-                    />
-                    <div className="text-[11px] text-muted mt-1">
-                      You can treat this as pages or chapters.
-                    </div>
-                  </div>
-                  <div>
-                    <label className="text-[11px] text-muted mb-1 block">Logline</label>
-                    <div className="flex items-start gap-2">
-                      <FileText size={14} className="mt-2 text-[color:var(--color-ink)]/60" />
-                      <input
-                        value={project.logline || ""}
-                        onChange={(e) =>
-                          updateProject(project.id, { logline: e.target.value || "" })
-                        }
-                        className="flex-1 rounded-lg bg-white border border-[hsl(var(--border))] px-3 py-2 text-sm outline-none"
-                        placeholder="One-sentence hook for your story..."
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Synopsis */}
-                <div>
-                  <label className="text-[11px] text-muted mb-1 block">Synopsis</label>
-                  <div className="flex items-start gap-2">
-                    <Edit3 size={14} className="mt-2 text-[color:var(--color-ink)]/60" />
-                    <textarea
-                      value={project.synopsis || ""}
-                      onChange={(e) =>
-                        updateProject(project.id, { synopsis: e.target.value || "" })
-                      }
-                      className="flex-1 rounded-lg bg-white border border-[hsl(var(--border))] px-3 py-2 text-sm outline-none resize-vertical min-h-[90px]"
-                      placeholder="Brief summary of this project..."
-                    />
-                  </div>
-                </div>
-
-                {/* Footer row: updatedAt + actions */}
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 pt-2 border-t border-slate-100">
-                  <div className="text-[11px] text-muted flex items-center gap-1">
-                    <Layers size={12} />
-                    {project.source && (
-                      <span className="mr-2 capitalize">{project.source}</span>
-                    )}
-                    {project.updatedAt && (
-                      <>
-                        <span>•</span>
-                        <span>Updated {formatUpdatedAt(project.updatedAt)}</span>
-                      </>
-                    )}
-                  </div>
-                  <div className="flex gap-2 justify-end">
-                    <button
-                      onClick={() => handleOpenWriter(project)}
-                      className="btn-primary inline-flex items-center gap-2 text-xs px-3 py-1.5"
-                    >
-                      <BookOpen size={14} />
-                      Open in Writer
-                    </button>
-                    <button
-                      onClick={() => removeProject(project.id)}
-                      className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white border border-red-200 text-[11px] text-red-700 hover:bg-red-50"
-                    >
-                      <Trash2 size={12} />
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              </div>
+              <h2 className="text-xl font-semibold mb-2 heading-serif">
+                No projects yet
+              </h2>
+              <p className="text-sm text-muted mb-4 max-w-md mx-auto">
+                Create your first project to start tracking your novels, covers,
+                word counts, and story details.
+              </p>
+              <button
+                onClick={addProject}
+                className="btn-primary inline-flex items-center gap-2"
+              >
+                <Plus size={16} /> Create Your First Project
+              </button>
             </div>
-          ))}
+          ) : (
+            <div className="grid gap-5 md:grid-cols-2">
+              {projects.map((project) => {
+                const wordCount = project.wordCount || 0;
+                const targetWords = project.targetWords || 0;
+                const pct = progressPct(wordCount, targetWords || 25000);
+                const readTime = getReadingTime(wordCount);
+                const lastUpdated = project.lastModified
+                  ? new Date(project.lastModified).toLocaleDateString()
+                  : "—";
+
+                return (
+                  <div key={project.id} className="glass-panel p-5 rounded-2xl flex flex-col gap-4">
+                    {/* Top row: cover + main details */}
+                    <div className="flex gap-4">
+                      {/* Cover */}
+                      <div className="w-28 md:w-32 flex-shrink-0">
+                        <div className="rounded-xl overflow-hidden border border-[hsl(var(--border))] bg-[color:var(--color-primary)]/40 aspect-[3/4] flex items-center justify-center relative">
+                          {coverUploadId === project.id ? (
+                            <div className="text-center">
+                              <Loader2
+                                size={24}
+                                className="mx-auto mb-1 animate-spin text-[color:var(--color-ink)]/70"
+                              />
+                              <div className="text-[10px] text-muted">
+                                Processing...
+                              </div>
+                            </div>
+                          ) : project.cover ? (
+                            <img
+                              src={project.cover}
+                              alt={`${project.title} cover`}
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className="text-center text-muted px-2">
+                              <ImageIcon
+                                size={20}
+                                className="mx-auto mb-1 opacity-70"
+                              />
+                              <div className="text-[11px]">
+                                Add a cover image
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        <label className="mt-2 block">
+                          <span className="inline-flex items-center justify-center gap-1 w-full px-2 py-1.5 rounded-lg bg-white border border-[hsl(var(--border))] text-[11px] text-ink cursor-pointer hover:bg-gray-50 transition-colors">
+                            <Upload size={12} />
+                            {project.cover ? "Change Cover" : "Upload Cover"}
+                          </span>
+                          <input
+                            type="file"
+                            accept="image/*,.heic,.heif"
+                            className="hidden"
+                            onChange={(e) => handleCoverChange(project.id, e)}
+                          />
+                        </label>
+                      </div>
+
+                      {/* Main info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1 min-w-0">
+                            <input
+                              value={project.title || ""}
+                              onChange={(e) =>
+                                updateProject(project.id, {
+                                  title: e.target.value,
+                                })
+                              }
+                              placeholder="Project title..."
+                              className="w-full bg-transparent border border-transparent hover:border-[hsl(var(--border))] rounded-lg px-2 py-1 text-base font-semibold outline-none focus:border-[hsl(var(--border))]"
+                              style={{
+                                fontFamily:
+                                  "Playfair Display, ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif",
+                              }}
+                            />
+                            <input
+                              value={project.logline || ""}
+                              onChange={(e) =>
+                                updateProject(project.id, {
+                                  logline: e.target.value,
+                                })
+                              }
+                              placeholder="One-sentence logline..."
+                              className="mt-1 w-full bg-transparent border border-transparent hover:border-[hsl(var(--border))] rounded-lg px-2 py-1 text-xs text-muted outline-none focus:border-[hsl(var(--border))]"
+                            />
+                          </div>
+
+                          <select
+                            value={project.status || "Draft"}
+                            onChange={(e) =>
+                              updateProject(project.id, {
+                                status: e.target.value,
+                              })
+                            }
+                            className={`ml-2 px-3 py-1 text-xs font-medium ${getStatusColor(
+                              project.status || "Draft"
+                            )}`}
+                          >
+                            {[
+                              "Idea",
+                              "Outline",
+                              "Draft",
+                              "Revision",
+                              "Editing",
+                              "Published",
+                            ].map((s) => (
+                              <option key={s} value={s}>
+                                {s}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <textarea
+                          value={project.synopsis || ""}
+                          onChange={(e) =>
+                            updateProject(project.id, {
+                              synopsis: e.target.value,
+                            })
+                          }
+                          placeholder="Short synopsis of this project..."
+                          className="mt-2 w-full bg-transparent border border-[hsl(var(--border))] rounded-lg px-2 py-2 text-xs text-ink/80 outline-none min-h-[72px] resize-vertical"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Stats row */}
+                    <div className="grid grid-cols-2 gap-3 text-xs text-muted">
+                      <div>
+                        <div className="flex items-center gap-1 mb-1">
+                          <BarChart3
+                            size={14}
+                            className="text-[color:var(--color-ink)]/70"
+                          />
+                          <span>Word Count</span>
+                        </div>
+                        <div className="text-sm font-semibold text-ink">
+                          {wordCount.toLocaleString()}{" "}
+                          {targetWords
+                            ? ` / ${targetWords.toLocaleString()}`
+                            : ""}
+                        </div>
+                        {targetWords > 0 && (
+                          <div className="mt-1 w-full bg-[color:var(--color-primary)]/40 rounded-full h-1.5">
+                            <div
+                              className="bg-[color:var(--color-accent)] h-1.5 rounded-full transition-all duration-500"
+                              style={{ width: `${pct}%` }}
+                            />
+                          </div>
+                        )}
+                      </div>
+
+                      <div>
+                        <div className="flex items-center gap-1 mb-1">
+                          <Clock
+                            size={14}
+                            className="text-[color:var(--color-ink)]/70"
+                          />
+                          <span>Est. Read Time</span>
+                        </div>
+                        <div className="text-sm font-semibold text-ink">
+                          {readTime} min
+                        </div>
+                        <div className="mt-1 text-[11px] text-muted">
+                          Last updated: {lastUpdated}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Target words + actions */}
+                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 pt-3 border-t border-[hsl(var(--border))]">
+                      <div className="flex items-center gap-2 text-xs">
+                        <span className="text-muted">Target words:</span>
+                        <input
+                          type="number"
+                          min="0"
+                          step="500"
+                          value={targetWords}
+                          onChange={(e) =>
+                            updateProject(project.id, {
+                              targetWords: Number(e.target.value) || 0,
+                            })
+                          }
+                          className="w-24 rounded-lg bg-white border border-[hsl(var(--border))] px-2 py-1 text-xs outline-none"
+                        />
+                      </div>
+
+                      <div className="flex items-center gap-2 justify-end">
+                        <button
+                          onClick={() => openInWriter(project)}
+                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[color:var(--color-accent)] text-xs font-semibold hover:opacity-90"
+                        >
+                          <PencilLine size={14} /> Open in Writer
+                        </button>
+                        <button
+                          onClick={() => deleteProject(project.id)}
+                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white border border-[hsl(var(--border))] text-xs text-red-600 hover:bg-red-50"
+                        >
+                          <Trash2 size={14} /> Delete
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
     </div>
