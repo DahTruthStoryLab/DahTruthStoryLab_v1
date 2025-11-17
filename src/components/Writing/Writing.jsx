@@ -1,6 +1,6 @@
 // src/components/Writing.js (or Writer.js)
 import React, { useState, useEffect, useMemo } from "react";
-import { BookOpen, LayoutGrid, List, Plus } from "lucide-react";
+import { BookOpen, LayoutGrid, List, Plus, Edit3 } from "lucide-react";
 import ChapterGrid from "./ChapterGrid";
 import ChapterSidebar from "./ChapterSidebar";
 
@@ -9,20 +9,26 @@ import {
   syncProjectForCurrentStory,
 } from "../lib/projectsSync";
 
+const STORAGE_KEY = "dahtruth_chapters";
+
 const Writing = () => {
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const [viewMode, setViewMode] = useState("grid"); // "grid" | "list"
   const [chapters, setChapters] = useState([]);
-  const [selectedChapterId, setSelectedChapterId] = useState<string | null>(
-    null
-  );
+  const [selectedChapterId, setSelectedChapterId] = useState(null);
   const [showSidebar, setShowSidebar] = useState(true);
 
   // Load chapters from localStorage on mount
   useEffect(() => {
-    const savedChapters = localStorage.getItem("dahtruth_chapters");
+    const savedChapters = localStorage.getItem(STORAGE_KEY);
     if (savedChapters) {
       try {
-        setChapters(JSON.parse(savedChapters));
+        const parsed = JSON.parse(savedChapters);
+        if (Array.isArray(parsed)) {
+          setChapters(parsed);
+          if (parsed.length > 0) {
+            setSelectedChapterId(parsed[0].id);
+          }
+        }
       } catch {
         // ignore bad JSON
       }
@@ -31,7 +37,11 @@ const Writing = () => {
 
   // Save chapters to localStorage whenever they change
   useEffect(() => {
-    localStorage.setItem("dahtruth_chapters", JSON.stringify(chapters));
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(chapters));
+    } catch {
+      // ignore
+    }
   }, [chapters]);
 
   // 🔢 Compute total words across all chapters
@@ -44,13 +54,12 @@ const Writing = () => {
   useEffect(() => {
     syncProjectForCurrentStory({
       wordCount: totalWords,
-      // If you later track a per-book targetWords in Writer,
-      // you can pass it here as well:
-      // targetWords: someTargetWordsValue,
+      // If/when you track targetWords for this book, pass it here too.
     });
   }, [totalWords]);
 
   const handleAddChapter = () => {
+    const now = new Date().toISOString();
     const newChapter = {
       id: `chapter-${Date.now()}`,
       order: chapters.length + 1,
@@ -59,8 +68,8 @@ const Writing = () => {
       content: "",
       wordCount: 0,
       status: "draft",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
+      createdAt: now,
+      updatedAt: now,
     };
 
     setChapters((prev) => [...prev, newChapter]);
@@ -91,7 +100,7 @@ const Writing = () => {
     );
   };
 
-  // ✅ NEW: rename handler that keeps everything in sync
+  // ✅ Rename handler that keeps everything in sync
   const handleRenameChapter = (chapterId, newTitle) => {
     setChapters((prev) =>
       prev.map((ch) =>
@@ -102,11 +111,10 @@ const Writing = () => {
     );
   };
 
-  // ✅ NEW: delete handler (used by ChapterGrid)
+  // ✅ Delete handler (used by ChapterGrid)
   const handleDeleteChapter = (chapterId) => {
     setChapters((prev) => {
       const filtered = prev.filter((ch) => ch.id !== chapterId);
-      // re-number order
       return filtered.map((ch, index) => ({
         ...ch,
         order: index + 1,
@@ -117,6 +125,22 @@ const Writing = () => {
     if (selectedChapterId === chapterId) {
       setSelectedChapterId(null);
     }
+  };
+
+  // 🔍 Lookup selected chapter for outline editor
+  const selectedChapter = useMemo(
+    () => chapters.find((ch) => ch.id === selectedChapterId) || null,
+    [chapters, selectedChapterId]
+  );
+
+  const handleOutlineChange = (newOutline) => {
+    if (!selectedChapter) return;
+    handleUpdateChapter(selectedChapter.id, { summary: newOutline });
+  };
+
+  const handleTitleChangeFromEditor = (newTitle) => {
+    if (!selectedChapter) return;
+    handleRenameChapter(selectedChapter.id, newTitle);
   };
 
   return (
@@ -135,6 +159,9 @@ const Writing = () => {
               </h1>
               <p className="text-xs text-white/60">
                 Chapters, drafts, and manuscripts in one place
+              </p>
+              <p className="text-[10px] text-white/40 mt-0.5">
+                Total words: {totalWords.toLocaleString()}
               </p>
             </div>
           </div>
@@ -205,16 +232,75 @@ const Writing = () => {
         {/* Main Content */}
         <div className="flex-1 overflow-auto">
           {viewMode === "grid" ? (
-            <ChapterGrid
-              chapters={chapters}
-              onAddChapter={handleAddChapter}
-              onSelectChapter={handleSelectChapter}
-              onUpdateChapter={handleUpdateChapter}
-              onDeleteChapter={handleDeleteChapter}
-            />
+            // Grid view + small outline editor
+            <div className="h-full grid grid-rows-[minmax(0,1.5fr),minmax(0,1fr)] lg:grid-rows-none lg:grid-cols-[minmax(0,2fr),minmax(0,1.3fr)]">
+              {/* Left: Chapters grid */}
+              <div className="p-4 lg:p-6 overflow-auto">
+                <ChapterGrid
+                  chapters={chapters}
+                  onAddChapter={handleAddChapter}
+                  onSelectChapter={handleSelectChapter}
+                  onUpdateChapter={handleUpdateChapter}
+                  onDeleteChapter={handleDeleteChapter}
+                  selectedId={selectedChapterId}
+                />
+              </div>
+
+              {/* Right: Small Chapter Outline editor */}
+              <div className="border-t border-white/10 lg:border-t-0 lg:border-l border-white/10 bg-white/5/40 backdrop-blur-xl px-4 py-4 lg:px-6 lg:py-6 flex flex-col">
+                {selectedChapter ? (
+                  <>
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex items-center gap-2">
+                        <div className="p-2 rounded-lg bg-white/5 border border-white/15">
+                          <Edit3 className="w-4 h-4 text-[#D4AF37]" />
+                        </div>
+                        <div>
+                          <p className="text-[10px] uppercase tracking-wide text-white/50">
+                            Chapter {selectedChapter.order ?? ""}
+                          </p>
+                          <input
+                            className="mt-0.5 w-full bg-transparent border-0 border-b border-white/10 focus:border-[#D4AF37]/60 text-sm font-semibold text-white outline-none placeholder:text-white/40"
+                            value={selectedChapter.title || ""}
+                            onChange={(e) =>
+                              handleTitleChangeFromEditor(e.target.value)
+                            }
+                            placeholder="Chapter title..."
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <label className="text-[11px] text-white/60 mb-1 block">
+                      Small Chapter Outline
+                    </label>
+                    <textarea
+                      className="flex-1 w-full rounded-lg border border-white/15 bg-[#050819]/60 px-3 py-2 text-sm text-white outline-none resize-none min-h-[140px] placeholder:text-white/40"
+                      placeholder="Briefly describe what happens in this chapter..."
+                      value={selectedChapter.summary || ""}
+                      onChange={(e) => handleOutlineChange(e.target.value)}
+                    />
+                    <p className="mt-2 text-[11px] text-white/50">
+                      This short outline is shared with your Table of Contents,
+                      so you can see each chapter’s purpose at a glance.
+                    </p>
+                  </>
+                ) : (
+                  <div className="flex-1 flex flex-col items-center justify-center text-center text-white/70">
+                    <Edit3 className="w-8 h-8 mb-3 opacity-70" />
+                    <p className="text-sm mb-1">
+                      Select a chapter to add a small outline.
+                    </p>
+                    <p className="text-xs text-white/60">
+                      Your outline stays synced with the Table of Contents view.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
           ) : (
+            // List view placeholder
             <div className="p-6">
-              {/* List View - Coming Soon */}
               <div className="bg-white/5 backdrop-blur-xl rounded-2xl border border-white/10 p-12 text-center">
                 <List className="w-16 h-16 text-[#D4AF37] mx-auto mb-4 opacity-50" />
                 <h3 className="text-xl font-semibold text-white mb-2">
@@ -231,8 +317,8 @@ const Writing = () => {
 
       {/* Empty State */}
       {chapters.length === 0 && (
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="text-center">
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="text-center pointer-events-auto">
             <div className="w-24 h-24 rounded-full bg-gradient-to-br from-[#1a237e]/20 to-[#0d47a1]/20 flex items-center justify-center mx-auto mb-6 border-2 border-[#D4AF37]/20">
               <BookOpen className="w-12 h-12 text-[#D4AF37]" />
             </div>
@@ -240,7 +326,7 @@ const Writing = () => {
               Start Your Story
             </h2>
             <p className="text-white/60 mb-6 max-w-md">
-              Create your first chapter and bring your narrative to life
+              Create your first chapter and bring your narrative to life.
             </p>
             <button
               onClick={handleAddChapter}
