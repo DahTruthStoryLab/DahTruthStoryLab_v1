@@ -268,7 +268,10 @@ export default function ProjectPage() {
                 <Layers size={20} className="text-[color:var(--color-ink)]/80" />
               </div>
               <div>
-                <h1 className="text-3xl heading-serif">Projects</h1>
+                <h1 className="text-3xl heading-serif flex items-center gap-2">
+                  <Layers size={20} className="text-[color:var(--color-ink)]/80" />
+                  Projects
+                </h1>
                 <div className="text-sm text-muted mt-1">
                   Manage all of your novels and writing projects in one place.
                 </div>
