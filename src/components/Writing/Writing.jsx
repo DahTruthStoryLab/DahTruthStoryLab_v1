@@ -1,6 +1,13 @@
 // src/components/Writing.js (or Writer.js)
-import React, { useState, useEffect, useMemo } from "react";
-import { BookOpen, LayoutGrid, List, Plus, Edit3 } from "lucide-react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
+import {
+  BookOpen,
+  LayoutGrid,
+  List,
+  Plus,
+  Edit3,
+  Image as ImageIcon,
+} from "lucide-react";
 import ChapterGrid from "./ChapterGrid";
 import ChapterSidebar from "./ChapterSidebar";
 
@@ -8,6 +15,7 @@ import {
   computeWordsFromChapters,
   syncProjectForCurrentStory,
 } from "../lib/projectsSync";
+import { uploadImage } from "../lib/uploads";
 
 const STORAGE_KEY = "dahtruth_chapters";
 
@@ -16,6 +24,9 @@ const Writing = () => {
   const [chapters, setChapters] = useState([]);
   const [selectedChapterId, setSelectedChapterId] = useState(null);
   const [showSidebar, setShowSidebar] = useState(true);
+
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const imageInputRef = useRef(null);
 
   // Load chapters from localStorage on mount
   useEffect(() => {
@@ -143,6 +154,46 @@ const Writing = () => {
     handleRenameChapter(selectedChapter.id, newTitle);
   };
 
+  // 🖼 Image upload handlers
+  const handleClickInsertImage = () => {
+    if (!selectedChapterId) return;
+    if (imageInputRef.current) {
+      imageInputRef.current.click();
+    }
+  };
+
+  const handleImageSelected = async (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file || !selectedChapterId) return;
+
+    try {
+      setIsUploadingImage(true);
+      const url = await uploadImage(file);
+
+      setChapters((prev) =>
+        prev.map((ch) =>
+          ch.id === selectedChapterId
+            ? {
+                ...ch,
+                content:
+                  (ch.content || "") +
+                  `\n\n![Image from DahTruth StoryLab](${url})\n`,
+                updatedAt: new Date().toISOString(),
+              }
+            : ch
+        )
+      );
+    } catch (err) {
+      console.error("Image upload failed", err);
+      alert("Sorry, the image upload failed. Please try again.");
+    } finally {
+      setIsUploadingImage(false);
+      if (imageInputRef.current) {
+        imageInputRef.current.value = "";
+      }
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#0a0e27] via-[#1a1f3a] to-[#0a0e27]">
       {/* Header */}
@@ -203,6 +254,24 @@ const Writing = () => {
               </button>
             </div>
 
+            {/* Insert Image */}
+            <button
+              onClick={handleClickInsertImage}
+              disabled={!selectedChapterId || isUploadingImage}
+              className="inline-flex items-center gap-1.5 rounded-md border border-white/15 bg-white/5 px-3 py-1.5 text-xs text-white/80 hover:bg-white/10 hover:border-[#D4AF37]/40 transition disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <ImageIcon className="w-3.5 h-3.5" />
+              <span>{isUploadingImage ? "Uploading..." : "Insert image"}</span>
+            </button>
+
+            <input
+              type="file"
+              accept="image/*"
+              ref={imageInputRef}
+              onChange={handleImageSelected}
+              className="hidden"
+            />
+
             {/* New chapter */}
             <button
               onClick={handleAddChapter}
@@ -214,6 +283,20 @@ const Writing = () => {
           </div>
         </div>
       </header>
+
+      {/* Chapters / Manuscript note */}
+      <div className="max-w-7xl mx-auto px-4 pt-3 pb-1">
+        <div className="bg-amber-50/5 border border-amber-200/40 rounded-xl px-3 py-2 text-[11px] text-amber-50">
+          <p className="font-semibold text-amber-100">Chapters & manuscripts</p>
+          <p className="mt-0.5">
+            Headings inside your text, like “Chapter 1,” do not automatically
+            create new chapters in StoryLab. To stay organized, upload your full
+            manuscript on the <span className="font-semibold">Manuscripts</span>{" "}
+            page, then create one card per chapter here and paste each section
+            into its own chapter.
+          </p>
+        </div>
+      </div>
 
       {/* Main Content Area */}
       <div className="flex h-[calc(100vh-120px)]">
