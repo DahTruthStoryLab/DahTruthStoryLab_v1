@@ -1,3 +1,35 @@
+// src/lib/uploads.js
+import { presignUpload, uploadToS3 } from "./uploader";
+
+const PRESIGN_URL = import.meta.env.VITE_UPLOAD_URL || "";
+
+/**
+ * Upload an image using your existing presign + S3 POST flow,
+ * and return the final public URL for that image.
+ *
+ * userId is optional here – you can wire it to your auth later.
+ */
+export async function uploadImage(file, userId = "local-user") {
+  if (!PRESIGN_URL) {
+    throw new Error("Missing VITE_UPLOAD_URL for image uploads");
+  }
+
+  // 1. Ask backend for presigned POST data
+  const { url, fields } = await presignUpload(PRESIGN_URL, {
+    userId,
+    file,
+  });
+
+  // 2. Upload file to S3 using POST
+  await uploadToS3(url, fields, file);
+
+  // 3. Build final file URL
+  // For standard S3 POST, "url" is bucket root, and "fields.key" is the object key.
+  const key = fields.key || fields.Key;
+  const finalUrl = key ? `${url}/${key}` : url;
+
+  return finalUrl;
+}
 // src/lib/uploads.ts
 const PRESIGN_URL: string =
   import.meta.env.VITE_UPLOAD_URL ||
