@@ -22,6 +22,8 @@ import {
   Search,
   FileText,
 } from "lucide-react";
+import { useToast } from "../components/ToastProvider";
+
 
 // --------- Demo/Default Data ---------
 const writingActivity = [
@@ -53,6 +55,7 @@ const Progress = ({ value }) => (
     />
   </div>
 );
+const { showToast } = useToast();
 
 // --------- Profile helper (name + avatar; live-updates) ---------
 function readAuthorProfile() {
@@ -511,6 +514,17 @@ export default function Dashboard() {
             </div>
           </div>
 
+            <button
+              onClick={() =>
+                showToast("This is a test toast from DahTruth StoryLab!", {
+                  type: "info",
+                })
+              }
+              className="fixed bottom-4 left-4 z-50 px-3 py-2 rounded bg-slate-700 text-white text-xs"
+            >
+              Test Toast
+            </button>
+          
           {/* Content */}
           <div className="flex-1 p-6 space-y-6 overflow-auto">
             {/* Welcome */}
