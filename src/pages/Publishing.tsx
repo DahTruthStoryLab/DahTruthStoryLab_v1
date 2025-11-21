@@ -1179,9 +1179,10 @@ export default function Publishing(): JSX.Element {
         </div>
 
         {/* MAIN GRID */}
-        <div
+         <div
           style={{
             display: "grid",
+            // narrower right sidebar, wider manuscript section
             gridTemplateColumns: isWide ? "minmax(0, 1fr) 180px" : "1fr",
             gap: 24,
           }}
