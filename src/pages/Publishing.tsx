@@ -1179,18 +1179,14 @@ export default function Publishing(): JSX.Element {
         </div>
 
         {/* MAIN GRID */}
-        <div style={{ ...styles.inner, ...styles.sectionShell }}>
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: isWide
-                ? "minmax(0, 2.3fr) minmax(260px, 1fr)"
-                : "1fr",
-              gap: 20,
-              alignItems: "flex-start",
-            }}
-          >
-            {/* LEFT: MANUSCRIPT EDITOR */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: isWide ? "minmax(0, 1fr) 180px" : "1fr",
+            gap: 24,
+          }}
+        >
+              {/* LEFT: MANUSCRIPT EDITOR */}
             <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
               {/* Project basics (small, not overwhelming) */}
               <div style={{ ...styles.glassCard }}>
