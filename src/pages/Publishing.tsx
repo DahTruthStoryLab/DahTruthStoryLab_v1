@@ -1,6 +1,6 @@
+// src/pages/Publishing.tsx
 // ===== SECTION A: Imports, theme, types, presets, styles, small components =====
 
-// src/pages/Publishing.tsx
 import React, {
   useEffect,
   useMemo,
@@ -236,7 +236,7 @@ const PLATFORM_PRESETS: Record<
 /* ---------- Styles ---------- */
 const styles = {
   outer: {
-    maxWidth: 1200,
+    maxWidth: 1320, // a bit wider so the main publishing area feels bigger
     margin: "32px auto",
     background: "var(--brand-white)",
     border: `1px solid ${theme.borderStrong}`,
@@ -245,7 +245,7 @@ const styles = {
     overflow: "hidden",
   } as React.CSSProperties,
   inner: { padding: "20px 24px" } as React.CSSProperties,
-  sectionShell: { maxWidth: 1120, margin: "0 auto" } as React.CSSProperties,
+  sectionShell: { maxWidth: 1280, margin: "0 auto" } as React.CSSProperties,
   glassCard: {
     background: theme.surface,
     border: `1px solid ${theme.border}`,
@@ -286,14 +286,6 @@ const styles = {
     background: theme.primary,
     color: theme.white,
     cursor: "pointer",
-  } as React.CSSProperties,
-  preview: {
-    border: `1px solid ${theme.border}`,
-    borderRadius: 12,
-    padding: 16,
-    background: theme.bg,
-    height: 360,
-    overflow: "auto",
   } as React.CSSProperties,
 } as const;
 
@@ -363,16 +355,12 @@ function AIActionButton({
   subtitle,
   onClick,
   busy,
-  theme,
-  styles,
 }: {
   icon: string;
   title: string;
   subtitle: string;
   onClick: () => void;
   busy?: boolean;
-  theme: any;
-  styles: any;
 }) {
   return (
     <button
@@ -454,7 +442,6 @@ export default function Publishing(): JSX.Element {
   });
 
   const [chapters, setChapters] = useState<Chapter[]>([
-    // You can later swap this out to load from localStorage if you want
     {
       id: "c1",
       title: "Chapter 1 – Beginnings",
@@ -1113,7 +1100,7 @@ export default function Publishing(): JSX.Element {
     [compiledPlain]
   );
 
-  // NEW: save compiled manuscript into localStorage for reuse
+  // Save compiled manuscript for reuse
   useEffect(() => {
     try {
       if (compiledPlain) {
@@ -1127,7 +1114,7 @@ export default function Publishing(): JSX.Element {
     }
   }, [compiledPlain]);
 
-  // NEW: Story materials state
+  // Story materials state
   const [materialKey, setMaterialKey] =
     useState<MaterialKey>("synopsis-short");
   const [materialOutput, setMaterialOutput] = useState<string>("");
@@ -1183,6 +1170,7 @@ export default function Publishing(): JSX.Element {
       }}
     >
       <div style={styles.outer}>
+        {/* Header */}
         <div
           style={{
             background: "rgba(202, 177, 214, 0.4)",
@@ -1198,6 +1186,7 @@ export default function Publishing(): JSX.Element {
               display: "flex",
               justifyContent: "space-between",
               alignItems: "center",
+              gap: 16,
             }}
           >
             <button
@@ -1245,25 +1234,48 @@ export default function Publishing(): JSX.Element {
                 Publishing Suite
               </h1>
             </div>
-            <div style={{ width: 110 }} />
+
+            <button
+              type="button"
+              onClick={() => setGoogleMode((m) => !m)}
+              style={{
+                ...styles.btn,
+                padding: "8px 10px",
+                fontSize: 11,
+                whiteSpace: "nowrap",
+              }}
+            >
+              Theme: {googleMode ? "Google Mode" : "StoryLab Mode"}
+            </button>
           </div>
         </div>
 
+        {/* Body */}
         <div style={{ ...styles.inner, ...styles.sectionShell }}>
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: isWide ? "1fr 220px" : "1fr",
+              gridTemplateColumns: isWide
+                ? "260px minmax(0, 1fr)"
+                : "1fr",
               gap: 24,
+              alignItems: "flex-start",
             }}
           >
-            <main>
-              {/* 📚 Publishing Tools */}
-              <div style={{ ...styles.glassCard, marginBottom: 16 }}>
+            {/* SIDEBAR: publishing menu + AI tools + detailed settings */}
+            <aside
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                gap: 16,
+              }}
+            >
+              {/* Publishing menu */}
+              <div style={styles.glassCard}>
                 <h3
                   style={{
                     margin: "0 0 12px 0",
-                    fontSize: 16,
+                    fontSize: 15,
                     color: theme.text,
                     fontWeight: 600,
                   }}
@@ -1273,131 +1285,318 @@ export default function Publishing(): JSX.Element {
 
                 <div
                   style={{
-                    display: "grid",
-                    gridTemplateColumns:
-                      "repeat(auto-fit, minmax(200px, 1fr))",
-                    gap: 10,
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 8,
                   }}
                 >
                   <button
                     style={{
                       ...styles.btn,
-                      padding: "10px 14px",
                       textAlign: "left",
                       display: "flex",
                       alignItems: "center",
                       gap: 10,
+                      fontSize: 12,
                     }}
                     onClick={() => navigate("/proof")}
                   >
-                    <span style={{ fontSize: 20 }}>✅</span>
-                    <div>
-                      <div
-                        style={{ fontSize: 13, fontWeight: 600 }}
-                      >
-                        Proof & Consistency
-                      </div>
-                      <div
-                        style={{
-                          fontSize: 11,
-                          color: theme.subtext,
-                        }}
-                      >
-                        Grammar, style, timeline
-                      </div>
-                    </div>
+                    <span style={{ fontSize: 18 }}>✅</span>
+                    <span>Proof & Consistency</span>
                   </button>
 
                   <button
                     style={{
                       ...styles.btn,
-                      padding: "10px 14px",
                       textAlign: "left",
                       display: "flex",
                       alignItems: "center",
                       gap: 10,
+                      fontSize: 12,
                     }}
                     onClick={() => navigate("/format")}
                   >
-                    <span style={{ fontSize: 20 }}>🎨</span>
-                    <div>
-                      <div
-                        style={{ fontSize: 13, fontWeight: 600 }}
-                      >
-                        Format & Styles
-                      </div>
-                      <div
-                        style={{
-                          fontSize: 11,
-                          color: theme.subtext,
-                        }}
-                      >
-                        Fonts, spacing, margins
-                      </div>
-                    </div>
+                    <span style={{ fontSize: 18 }}>🎨</span>
+                    <span>Format & Styles</span>
                   </button>
 
                   <button
                     style={{
                       ...styles.btn,
-                      padding: "10px 14px",
                       textAlign: "left",
                       display: "flex",
                       alignItems: "center",
                       gap: 10,
+                      fontSize: 12,
                     }}
                     onClick={() => navigate("/export")}
                   >
-                    <span style={{ fontSize: 20 }}>📦</span>
-                    <div>
-                      <div
-                        style={{ fontSize: 13, fontWeight: 600 }}
-                      >
-                        Export
-                      </div>
-                      <div
-                        style={{
-                          fontSize: 11,
-                          color: theme.subtext,
-                        }}
-                      >
-                        PDF, DOCX, EPUB
-                      </div>
-                    </div>
+                    <span style={{ fontSize: 18 }}>📦</span>
+                    <span>Export (PDF / DOCX / EPUB)</span>
                   </button>
 
                   <button
                     style={{
                       ...styles.btn,
-                      padding: "10px 14px",
                       textAlign: "left",
                       display: "flex",
                       alignItems: "center",
                       gap: 10,
+                      fontSize: 12,
                     }}
                     onClick={() => navigate("/publishing-prep")}
                   >
-                    <span style={{ fontSize: 20 }}>🚀</span>
-                    <div>
-                      <div
-                        style={{ fontSize: 13, fontWeight: 600 }}
-                      >
-                        Publishing Prep
-                      </div>
-                      <div
-                        style={{
-                          fontSize: 11,
-                          color: theme.subtext,
-                        }}
-                      >
-                        Query, synopsis, marketing
-                      </div>
-                    </div>
+                    <span style={{ fontSize: 18 }}>🚀</span>
+                    <span>Publishing Prep Workspace</span>
                   </button>
                 </div>
               </div>
 
-              {/* NEW: Story Materials card */}
+              {/* AI tools + Prep, now in sidebar */}
+              <div style={styles.glassCard}>
+                <h3
+                  style={{
+                    margin: "0 0 12px 0",
+                    fontSize: 15,
+                    color: theme.text,
+                    fontWeight: 600,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                  }}
+                >
+                  <span aria-hidden>🤖</span> AI Assistance
+                </h3>
+
+                <div style={{ marginBottom: 10 }}>
+                  <button
+                    style={{
+                      ...styles.btnPrimary,
+                      background: theme.primary,
+                      color: "white",
+                      width: "100%",
+                      fontSize: 12,
+                    }}
+                    onClick={() => navigate("/dashboard")}
+                  >
+                    ← Back to Dashboard
+                  </button>
+                </div>
+
+                <div style={{ marginBottom: 10 }}>
+                  <label
+                    style={{
+                      ...styles.label,
+                      display: "block",
+                      marginBottom: 4,
+                    }}
+                  >
+                    AI Provider
+                  </label>
+                  <select
+                    value={provider}
+                    onChange={(e) =>
+                      setProvider(
+                        e.target.value as "openai" | "anthropic"
+                      )
+                    }
+                    style={{ ...styles.input, fontSize: 12 }}
+                  >
+                    <option value="openai">OpenAI</option>
+                    <option value="anthropic">Anthropic</option>
+                  </select>
+                </div>
+
+                <div
+                  role="group"
+                  aria-label="AI tools"
+                  style={{
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 8,
+                    marginBottom: 10,
+                  }}
+                >
+                  {AI_ACTIONS.map((a) => (
+                    <AIActionButton
+                      key={a.key}
+                      icon={a.icon}
+                      title={a.title}
+                      subtitle={a.subtitle}
+                      busy={working === a.key}
+                      onClick={async () => {
+                        if (working) return;
+                        setWorking(a.key);
+                        try {
+                          const currentHtml =
+                            editorRef.current?.innerHTML ?? "";
+                          const currentText =
+                            stripHtml(currentHtml) || "";
+
+                          let res: any;
+                          if (a.key === "grammar") {
+                            res = await runGrammar(
+                              currentText,
+                              provider
+                            );
+                          } else if (a.key === "style") {
+                            res = await runStyle(
+                              currentText,
+                              provider
+                            );
+                          } else if (a.key === "readability") {
+                            res = await runReadability(
+                              currentText,
+                              provider
+                            );
+                          } else if (a.key === "assistant") {
+                            res = await runAssistant(
+                              currentText,
+                              "improve",
+                              "",
+                              provider
+                            );
+                          }
+
+                          const improvedText =
+                            res?.result ||
+                            res?.text ||
+                            res?.output ||
+                            currentText;
+
+                          const improved =
+                            improvedText !== currentText
+                              ? `<p>${improvedText
+                                  .split("\n\n")
+                                  .join("</p><p>")}</p>`.replace(
+                                  /<p><\/p>/g,
+                                  "<p><br/></p>"
+                                )
+                              : currentHtml;
+
+                          if (
+                            editorRef.current &&
+                            improved !== currentHtml
+                          ) {
+                            editorRef.current.innerHTML =
+                              improved;
+                          }
+
+                          setChapters((prev) => {
+                            const next = [...prev];
+                            const ch = next[activeIdx];
+                            if (ch)
+                              next[activeIdx] = {
+                                ...ch,
+                                textHTML: improved,
+                              };
+                            return next;
+                          });
+                        } catch (e: any) {
+                          console.error("[AI Error]:", e);
+                          alert(
+                            e?.message ||
+                              "AI request failed. Check console for details."
+                          );
+                        } finally {
+                          setWorking(null);
+                        }
+                      }}
+                    />
+                  ))}
+                </div>
+
+                <button
+                  style={{ ...styles.btnDark, width: "100%", fontSize: 12 }}
+                  disabled={working !== null}
+                  onClick={async () => {
+                    if (working) return;
+                    setWorking("assistant");
+                    try {
+                      const chaptersPlain = chapters
+                        .filter((c) => c.included)
+                        .map((c) => ({
+                          id: c.id,
+                          title: c.title,
+                          text: c.textHTML
+                            ? stripHtml(c.textHTML)
+                            : c.text,
+                        }));
+
+                      const res = await runPublishingPrep(
+                        meta,
+                        chaptersPlain,
+                        {
+                          tone: "professional/warm",
+                          audience: "agents_and_publishers",
+                        },
+                        provider
+                      );
+
+                      if (!res?.prep && !res?.result)
+                        throw new Error(
+                          "No prep content returned from AI."
+                        );
+                      navigate("/publishing-prep", {
+                        state: {
+                          generated:
+                            res.prep || res.result || res,
+                        },
+                      });
+                    } catch (e: any) {
+                      console.error(
+                        "[Publishing Prep Error]:",
+                        e
+                      );
+                      alert(
+                        e?.message ||
+                          "Couldn't generate publishing prep."
+                      );
+                    } finally {
+                      setWorking(null);
+                    }
+                  }}
+                >
+                  ✨ Generate Publishing Prep
+                </button>
+
+                <div
+                  style={{
+                    marginTop: 8,
+                    fontSize: 11,
+                    color: theme.subtext,
+                  }}
+                >
+                  Word count: {wordCount.toLocaleString()}
+                </div>
+              </div>
+
+              {/* Detailed meta / matter controls (your existing sidebar) */}
+              {isWide && (
+                <PublishingSidebar
+                  meta={meta}
+                  setMeta={setMeta}
+                  matter={matter}
+                  setMatter={setMatter}
+                  manuscriptPreset={manuscriptPreset}
+                  setManuscriptPreset={setManuscriptPreset}
+                  platformPreset={platformPreset}
+                  setPlatformPreset={setPlatformPreset}
+                  includeHeadersFooters={includeHeadersFooters}
+                  wordCount={wordCount}
+                  ms={ms}
+                  setMsOverrides={setMsOverrides}
+                  manuscriptEntries={manuscriptEntries}
+                  platformEntries={platformEntries}
+                  googleMode={googleMode}
+                  setGoogleMode={setGoogleMode}
+                />
+              )}
+            </aside>
+
+            {/* MAIN: Story materials + editor + chapters */}
+            <main>
+              {/* Story Materials card */}
               <div style={{ ...styles.glassCard, marginBottom: 16 }}>
                 <h3
                   style={{
@@ -1495,232 +1694,14 @@ export default function Publishing(): JSX.Element {
                 )}
               </div>
 
-              {/* 🤖 AI Tools card */}
-              <div style={{ ...styles.glassCard, marginBottom: 16 }}>
-                <h3
-                  style={{
-                    margin: "0 0 12px 0",
-                    fontSize: 16,
-                    color: theme.text,
-                    fontWeight: 600,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                  }}
-                >
-                  <span aria-hidden>🤖</span> AI Tools
-                </h3>
-
-                <div style={{ marginBottom: 16 }}>
-                  <button
-                    style={{
-                      ...styles.btnPrimary,
-                      background: theme.primary,
-                      color: "white",
-                    }}
-                    onClick={() => navigate("/dashboard")}
-                  >
-                    ← Back to Dashboard
-                  </button>
-                </div>
-
-                {/* Optional: Provider dropdown */}
-                <div style={{ marginBottom: 12 }}>
-                  <label
-                    style={{
-                      ...styles.label,
-                      display: "block",
-                      marginBottom: 4,
-                    }}
-                  >
-                    AI Provider:
-                  </label>
-                  <select
-                    value={provider}
-                    onChange={(e) =>
-                      setProvider(
-                        e.target.value as "openai" | "anthropic"
-                      )
-                    }
-                    style={{ ...styles.input, maxWidth: 200 }}
-                  >
-                    <option value="openai">OpenAI</option>
-                    <option value="anthropic">Anthropic</option>
-                  </select>
-                </div>
-
-                <div
-                  role="group"
-                  aria-label="AI tools"
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns:
-                      "repeat(auto-fit, minmax(220px, 1fr))",
-                    gap: 10,
-                  }}
-                >
-                  {AI_ACTIONS.map((a) => (
-                    <AIActionButton
-                      key={a.key}
-                      icon={a.icon}
-                      title={a.title}
-                      subtitle={a.subtitle}
-                      busy={working === a.key}
-                      theme={theme}
-                      styles={styles}
-                      onClick={async () => {
-                        if (working) return;
-                        setWorking(a.key);
-                        try {
-                          const currentHtml =
-                            editorRef.current?.innerHTML ?? "";
-                          const currentText =
-                            stripHtml(currentHtml) || "";
-
-                          let res: any;
-                          if (a.key === "grammar") {
-                            res = await runGrammar(
-                              currentText,
-                              provider
-                            );
-                          } else if (a.key === "style") {
-                            res = await runStyle(
-                              currentText,
-                              provider
-                            );
-                          } else if (a.key === "readability") {
-                            res = await runReadability(
-                              currentText,
-                              provider
-                            );
-                          } else if (a.key === "assistant") {
-                            res = await runAssistant(
-                              currentText,
-                              "improve",
-                              "",
-                              provider
-                            );
-                          }
-
-                          const improvedText =
-                            res?.result ||
-                            res?.text ||
-                            res?.output ||
-                            currentText;
-
-                          const improved =
-                            improvedText !== currentText
-                              ? `<p>${improvedText
-                                  .split("\n\n")
-                                  .join("</p><p>")}</p>`.replace(
-                                  /<p><\/p>/g,
-                                  "<p><br/></p>"
-                                )
-                              : currentHtml;
-
-                          if (
-                            editorRef.current &&
-                            improved !== currentHtml
-                          ) {
-                            editorRef.current.innerHTML =
-                              improved;
-                          }
-
-                          setChapters((prev) => {
-                            const next = [...prev];
-                            const ch = next[activeIdx];
-                            if (ch)
-                              next[activeIdx] = {
-                                ...ch,
-                                textHTML: improved,
-                              };
-                            return next;
-                          });
-                        } catch (e: any) {
-                          console.error("[AI Error]:", e);
-                          alert(
-                            e?.message ||
-                              "AI request failed. Check console for details."
-                          );
-                        } finally {
-                          setWorking(null);
-                        }
-                      }}
-                    />
-                  ))}
-                </div>
-
-                <div
-                  style={{
-                    marginTop: 10,
-                    display: "flex",
-                    justifyContent: "flex-end",
-                  }}
-                >
-                  <button
-                    style={{ ...styles.btnDark }}
-                    disabled={working !== null}
-                    onClick={async () => {
-                      if (working) return;
-                      setWorking("assistant");
-                      try {
-                        const chaptersPlain = chapters
-                          .filter((c) => c.included)
-                          .map((c) => ({
-                            id: c.id,
-                            title: c.title,
-                            text: c.textHTML
-                              ? stripHtml(c.textHTML)
-                              : c.text,
-                          }));
-
-                        const res = await runPublishingPrep(
-                          meta,
-                          chaptersPlain,
-                          {
-                            tone: "professional/warm",
-                            audience: "agents_and_publishers",
-                          },
-                          provider
-                        );
-
-                        if (!res?.prep && !res?.result)
-                          throw new Error(
-                            "No prep content returned from AI."
-                          );
-                        navigate("/publishing-prep", {
-                          state: {
-                            generated:
-                              res.prep || res.result || res,
-                          },
-                        });
-                      } catch (e: any) {
-                        console.error(
-                          "[Publishing Prep Error]:",
-                          e
-                        );
-                        alert(
-                          e?.message ||
-                            "Couldn't generate publishing prep."
-                        );
-                      } finally {
-                        setWorking(null);
-                      }
-                    }}
-                  >
-                    ✨ Generate Publishing Prep
-                  </button>
-                </div>
-              </div>
-
-              {/* ✍️ Editor + Chapters */}
+              {/* Editor + Chapters */}
               <div style={{ ...styles.glassCard, marginBottom: 16 }}>
                 <div
                   style={{
                     display: "grid",
                     gap: 16,
                     gridTemplateColumns: isWide
-                      ? "220px 1fr"
+                      ? "220px minmax(0, 1fr)"
                       : "1fr",
                   }}
                 >
@@ -1736,15 +1717,11 @@ export default function Publishing(): JSX.Element {
                       >
                         Chapters
                       </div>
-                      <div
-                        style={{ display: "grid", gap: 6 }}
-                      >
+                      <div style={{ display: "grid", gap: 6 }}>
                         {chapters.map((c) => (
                           <button
                             key={c.id}
-                            onClick={() =>
-                              setActiveChapterId(c.id)
-                            }
+                            onClick={() => setActiveChapterId(c.id)}
                             style={{
                               textAlign: "left",
                               padding: "8px 10px",
@@ -1764,8 +1741,7 @@ export default function Publishing(): JSX.Element {
                             }}
                             title={c.title}
                           >
-                            {c.included ? "✅ " : "🚫 "}{" "}
-                            {c.title}
+                            {c.included ? "✅ " : "🚫 "} {c.title}
                           </button>
                         ))}
                         <button
@@ -1783,7 +1759,7 @@ export default function Publishing(): JSX.Element {
                   )}
 
                   <section>
-                    {/* Toolbar (sticky) */}
+                    {/* Toolbar */}
                     <div
                       style={{
                         position: "sticky",
@@ -1802,9 +1778,7 @@ export default function Publishing(): JSX.Element {
                       }}
                     >
                       <select
-                        onChange={(e) =>
-                          setFont(e.target.value)
-                        }
+                        onChange={(e) => setFont(e.target.value)}
                         defaultValue="Times New Roman"
                         aria-label="Font family"
                         style={{
@@ -1825,9 +1799,7 @@ export default function Publishing(): JSX.Element {
 
                       <select
                         onChange={(e) =>
-                          setFontSizePt(
-                            parseInt(e.target.value, 10)
-                          )
+                          setFontSizePt(parseInt(e.target.value, 10))
                         }
                         defaultValue="16"
                         aria-label="Font size (pt)"
@@ -1962,9 +1934,7 @@ export default function Publishing(): JSX.Element {
                           minWidth: 24,
                           height: 24,
                         }}
-                        onClick={() =>
-                          exec("insertUnorderedList")
-                        }
+                        onClick={() => exec("insertUnorderedList")}
                         title="Bullet"
                       >
                         •
@@ -1977,9 +1947,7 @@ export default function Publishing(): JSX.Element {
                           minWidth: 24,
                           height: 24,
                         }}
-                        onClick={() =>
-                          exec("insertOrderedList")
-                        }
+                        onClick={() => exec("insertOrderedList")}
                         title="Number"
                       >
                         1.
@@ -2002,9 +1970,7 @@ export default function Publishing(): JSX.Element {
                           minWidth: 24,
                           height: 24,
                         }}
-                        onClick={() =>
-                          exec("justifyLeft")
-                        }
+                        onClick={() => exec("justifyLeft")}
                         title="Left"
                       >
                         ⟸
@@ -2017,9 +1983,7 @@ export default function Publishing(): JSX.Element {
                           minWidth: 24,
                           height: 24,
                         }}
-                        onClick={() =>
-                          exec("justifyCenter")
-                        }
+                        onClick={() => exec("justifyCenter")}
                         title="Center"
                       >
                         ⇔
@@ -2032,9 +1996,7 @@ export default function Publishing(): JSX.Element {
                           minWidth: 24,
                           height: 24,
                         }}
-                        onClick={() =>
-                          exec("justifyRight")
-                        }
+                        onClick={() => exec("justifyRight")}
                         title="Right"
                       >
                         ⟹
@@ -2086,8 +2048,7 @@ export default function Publishing(): JSX.Element {
                             accept=".docx"
                             style={{ display: "none" }}
                             onChange={(e) => {
-                              const f =
-                                e.target.files?.[0];
+                              const f = e.target.files?.[0];
                               if (f) importDocx(f, true);
                             }}
                           />
@@ -2110,10 +2071,8 @@ export default function Publishing(): JSX.Element {
                             accept=".html,.htm,.xhtml"
                             style={{ display: "none" }}
                             onChange={(e) => {
-                              const f =
-                                e.target.files?.[0];
-                              if (f)
-                                importHTML(f, true);
+                              const f = e.target.files?.[0];
+                              if (f) importHTML(f, true);
                             }}
                           />
                         </label>
@@ -2158,8 +2117,7 @@ export default function Publishing(): JSX.Element {
                           padding: "48px 48px",
                           lineHeight: ms.lineHeight,
                           fontFamily: ms.fontFamily,
-                          fontSize:
-                            ms.fontSizePt * (96 / 72),
+                          fontSize: ms.fontSizePt * (96 / 72),
                           outline: "none",
                           direction: "ltr",
                           unicodeBidi: "plaintext",
@@ -2183,7 +2141,7 @@ export default function Publishing(): JSX.Element {
                 </div>
               </div>
 
-              {/* 📦 Chapter Management */}
+              {/* Chapter Management */}
               <div style={styles.glassCard}>
                 <div
                   style={{
@@ -2381,10 +2339,8 @@ export default function Publishing(): JSX.Element {
                             accept=".docx"
                             style={{ display: "none" }}
                             onChange={(e) => {
-                              const f =
-                                e.target.files?.[0];
-                              if (f)
-                                importDocx(f, false);
+                              const f = e.target.files?.[0];
+                              if (f) importDocx(f, false);
                             }}
                           />
                         </label>
@@ -2400,10 +2356,8 @@ export default function Publishing(): JSX.Element {
                             accept=".html,.htm,.xhtml"
                             style={{ display: "none" }}
                             onChange={(e) => {
-                              const f =
-                                e.target.files?.[0];
-                              if (f)
-                                importHTML(f, false);
+                              const f = e.target.files?.[0];
+                              if (f) importHTML(f, false);
                             }}
                           />
                         </label>
@@ -2413,26 +2367,6 @@ export default function Publishing(): JSX.Element {
                 </div>
               </div>
             </main>
-            {isWide && (
-              <PublishingSidebar
-                meta={meta}
-                setMeta={setMeta}
-                matter={matter}
-                setMatter={setMatter}
-                manuscriptPreset={manuscriptPreset}
-                setManuscriptPreset={setManuscriptPreset}
-                platformPreset={platformPreset}
-                setPlatformPreset={setPlatformPreset}
-                includeHeadersFooters={includeHeadersFooters}
-                wordCount={wordCount}
-                ms={ms}
-                setMsOverrides={setMsOverrides}
-                manuscriptEntries={manuscriptEntries}
-                platformEntries={platformEntries}
-                googleMode={googleMode}
-                setGoogleMode={setGoogleMode}
-              />
-            )}
           </div>
         </div>
       </div>
@@ -2489,9 +2423,7 @@ const Toggle: React.FC<ToggleProps> = ({ checked, onChange, label }) => {
           }}
         />
       </span>
-      {label && (
-        <span style={{ fontSize: 14 }}>{label}</span>
-      )}
+      {label && <span style={{ fontSize: 14 }}>{label}</span>}
     </button>
   );
 };
