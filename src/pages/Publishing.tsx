@@ -1,5 +1,5 @@
 // src/pages/Publishing.tsx
-// ===== SECTION A: Imports, theme, types, presets, styles, small components =====
+// Cleaner layout: wide editor + right tool sidebar, no big Chapter Management block
 
 import React, {
   useEffect,
@@ -10,7 +10,6 @@ import React, {
 } from "react";
 import { useNavigate } from "react-router-dom";
 import PageShell from "../components/layout/PageShell.tsx";
-import PublishingSidebar from "../components/publishing/PublishingSidebar.tsx";
 import {
   runGrammar,
   runStyle,
@@ -78,7 +77,6 @@ type PlatformPresetKey =
   | "Draft2Digital_Eebook"
   | "Generic_Manuscript_Submission";
 
-// Added helper types
 type NumFmt =
   | "bullet"
   | "decimal"
@@ -194,7 +192,7 @@ const PLATFORM_PRESETS: Record<
     footers: true,
     pageNumbers: true,
     showTOCInEebook: false,
-  } as any, // keep existing shape
+  } as any,
   KDP_Paperback_5_5x8_5: {
     label: "KDP Paperback (5.5×8.5)",
     trim: { widthInch: 5.5, heightInch: 8.5 },
@@ -236,7 +234,7 @@ const PLATFORM_PRESETS: Record<
 /* ---------- Styles ---------- */
 const styles = {
   outer: {
-    maxWidth: 1320, // a bit wider so the main publishing area feels bigger
+    maxWidth: 1300,
     margin: "32px auto",
     background: "var(--brand-white)",
     border: `1px solid ${theme.borderStrong}`,
@@ -245,47 +243,50 @@ const styles = {
     overflow: "hidden",
   } as React.CSSProperties,
   inner: { padding: "20px 24px" } as React.CSSProperties,
-  sectionShell: { maxWidth: 1280, margin: "0 auto" } as React.CSSProperties,
+  sectionShell: { maxWidth: 1240, margin: "0 auto" } as React.CSSProperties,
   glassCard: {
     background: theme.surface,
     border: `1px solid ${theme.border}`,
     borderRadius: 16,
-    padding: 20,
+    padding: 16,
     boxShadow: "0 8px 30px rgba(2,20,40,.06)",
   } as React.CSSProperties,
   label: { fontSize: 12, color: theme.subtext } as React.CSSProperties,
   input: {
     border: `1px solid ${theme.border}`,
     borderRadius: 12,
-    padding: "10px 12px",
-    fontSize: 14,
+    padding: "8px 10px",
+    fontSize: 13,
     width: "100%",
     background: theme.white,
     color: theme.text,
   } as React.CSSProperties,
   btn: {
-    padding: "10px 14px",
+    padding: "8px 12px",
     borderRadius: 12,
     border: `1px solid ${theme.border}`,
     background: theme.white,
     color: theme.text,
     cursor: "pointer",
+    fontSize: 12,
   } as React.CSSProperties,
   btnPrimary: {
-    padding: "10px 14px",
+    padding: "9px 14px",
     borderRadius: 12,
     border: "none",
     background: theme.accent,
     color: theme.white,
     cursor: "pointer",
+    fontSize: 13,
   } as React.CSSProperties,
   btnDark: {
-    padding: "10px 14px",
+    padding: "9px 14px",
     borderRadius: 12,
     border: "none",
     background: theme.primary,
     color: theme.white,
     cursor: "pointer",
+    fontSize: 13,
   } as React.CSSProperties,
 } as const;
 
@@ -323,28 +324,12 @@ const AI_ACTIONS: Array<{
   },
 ];
 
-// NEW: Story materials operations for synopsis, query, etc.
 const MATERIAL_ACTIONS = [
-  {
-    key: "synopsis-short",
-    label: "Short Synopsis (200–300 words)",
-  },
-  {
-    key: "synopsis-long",
-    label: "Long Synopsis (500–800 words)",
-  },
-  {
-    key: "back-cover",
-    label: "Back-Cover Blurb",
-  },
-  {
-    key: "logline",
-    label: "Logline",
-  },
-  {
-    key: "query-letter",
-    label: "Query Letter",
-  },
+  { key: "synopsis-short", label: "Short Synopsis (200–300 words)" },
+  { key: "synopsis-long", label: "Long Synopsis (500–800 words)" },
+  { key: "back-cover", label: "Back-Cover Blurb" },
+  { key: "logline", label: "Logline" },
+  { key: "query-letter", label: "Query Letter" },
 ] as const;
 
 type MaterialKey = (typeof MATERIAL_ACTIONS)[number]["key"];
@@ -368,26 +353,18 @@ function AIActionButton({
       aria-label={title}
       disabled={busy}
       onClick={onClick}
-      data-testid={`ai-btn-${title.replace(/\s+/g, "-").toLowerCase()}`}
       style={{
         ...styles.btn,
-        padding: "10px 14px",
+        width: "100%",
         textAlign: "left",
         display: "flex",
         alignItems: "center",
         gap: 10,
         opacity: busy ? 0.7 : 1,
         cursor: busy ? "progress" : "pointer",
-        outline: "none",
-      }}
-      onKeyDown={(e) => {
-        if ((e.key === "Enter" || e.key === " ") && !busy) {
-          e.preventDefault();
-          onClick();
-        }
       }}
     >
-      <span aria-hidden style={{ fontSize: 20, lineHeight: 1 }}>
+      <span aria-hidden style={{ fontSize: 18, lineHeight: 1 }}>
         {icon}
       </span>
       <div style={{ flex: 1, minWidth: 0 }}>
@@ -416,7 +393,7 @@ function AIActionButton({
         </div>
       </div>
       {busy && (
-        <span aria-hidden style={{ fontSize: 12, color: theme.subtext }}>
+        <span aria-hidden style={{ fontSize: 11, color: theme.subtext }}>
           Working…
         </span>
       )}
@@ -428,9 +405,10 @@ function AIActionButton({
 const htmlEscape = (s: string) =>
   s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 
-/* ---------- Component ---------- */
+/* ======================== Component ======================== */
+
 export default function Publishing(): JSX.Element {
-  const [googleMode, setGoogleMode] = useState<boolean>(false);
+  const [googleMode] = useState<boolean>(false);
   const [working, setWorking] = useState<AIKey | null>(null);
   const navigate = useNavigate();
 
@@ -495,23 +473,6 @@ export default function Publishing(): JSX.Element {
   const pf = PLATFORM_PRESETS[platformPreset];
   const includeHeadersFooters = pf.headers || pf.footers;
 
-  const manuscriptEntries = useMemo(
-    () =>
-      Object.entries(MANUSCRIPT_PRESETS).map(
-        ([k, v]) => [k as ManuscriptPresetKey, v.label] as const
-      ),
-    []
-  );
-
-  const platformEntries = useMemo(
-    () =>
-      Object.entries(PLATFORM_PRESETS).map(
-        ([k, v]) => [k as PlatformPresetKey, v.label] as const
-      ),
-    []
-  );
-
-  /* --------------------- Builder: Word-like Editor --------------------- */
   const [activeChapterId, setActiveChapterId] = useState(
     chapters[0]?.id || ""
   );
@@ -519,11 +480,16 @@ export default function Publishing(): JSX.Element {
     0,
     chapters.findIndex((c) => c.id === activeChapterId)
   );
+  const activeChapter = chapters[activeIdx] || chapters[0];
+
   const editorRef = useRef<HTMLDivElement>(null);
 
-  const [isWide, setIsWide] = useState<boolean>(window.innerWidth >= 1280);
+  const [isWide, setIsWide] = useState<boolean>(
+    typeof window !== "undefined" ? window.innerWidth >= 1100 : true
+  );
   useEffect(() => {
-    const onResize = () => setIsWide(window.innerWidth >= 1280);
+    const onResize = () =>
+      setIsWide(typeof window !== "undefined" && window.innerWidth >= 1100);
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, []);
@@ -643,10 +609,7 @@ export default function Publishing(): JSX.Element {
           return;
         }
         const docXml = await docEntry.async("string");
-        const xml = new DOMParser().parseFromString(
-          docXml,
-          "application/xml"
-        );
+        const xml = new DOMParser().parseFromString(docXml, "application/xml");
 
         let relsEntry = zip.file("word/_rels/document.xml.rels");
         if (!relsEntry) {
@@ -657,18 +620,14 @@ export default function Publishing(): JSX.Element {
         }
         const relsXmlStr = relsEntry ? await relsEntry.async("string") : "";
         const relsXml = relsXmlStr
-          ? new DOMParser().parseFromString(
-              relsXmlStr,
-              "application/xml"
-            )
+          ? new DOMParser().parseFromString(relsXmlStr, "application/xml")
           : null;
         const relMap = new Map<string, string>();
         if (relsXml) {
           Array.from(relsXml.getElementsByTagName("*"))
             .filter((n) => n.localName === "Relationship")
             .forEach((rel) => {
-              const id =
-                rel.getAttribute("Id") || rel.getAttribute("r:id") || "";
+              const id = rel.getAttribute("Id") || rel.getAttribute("r:id") || "";
               let target = rel.getAttribute("Target") || "";
               if (!id || !target) return;
               if (!/^([a-z]+:)?\/\//i.test(target)) {
@@ -690,18 +649,15 @@ export default function Publishing(): JSX.Element {
           ? await numberingEntry.async("string")
           : "";
         const numberingXml = numberingXmlStr
-          ? new DOMParser().parseFromString(
-              numberingXmlStr,
-              "application/xml"
-            )
+          ? new DOMParser().parseFromString(numberingXmlStr, "application/xml")
           : null;
 
         const numIdToAbstract = new Map<string, string>();
         const abstractToFmt = new Map<string, NumFmt>();
         if (numberingXml) {
-          const nums = Array.from(
-            numberingXml.getElementsByTagName("*")
-          ).filter((n) => n.localName === "num");
+          const nums = Array.from(numberingXml.getElementsByTagName("*")).filter(
+            (n) => n.localName === "num"
+          );
           for (const num of nums) {
             const numId =
               num.getAttribute("w:numId") || num.getAttribute("numId") || "";
@@ -724,9 +680,7 @@ export default function Publishing(): JSX.Element {
               (x) => x.localName === "lvl"
             );
             const fmtNode = lvl
-              ? Array.from(lvl!.children).find(
-                  (x) => x.localName === "numFmt"
-                )
+              ? Array.from(lvl!.children).find((x) => x.localName === "numFmt")
               : null;
             const fmt =
               fmtNode?.getAttribute("w:val") ||
@@ -794,9 +748,9 @@ export default function Publishing(): JSX.Element {
           return html || "<br/>";
         }
 
-        const paras = Array.from(
-          xml.getElementsByTagName("*")
-        ).filter((n) => n.localName === "p");
+        const paras = Array.from(xml.getElementsByTagName("*")).filter(
+          (n) => n.localName === "p"
+        );
 
         let listOpenType: "ul" | "ol" | null = null;
         let listBuffer: string[] = [];
@@ -818,18 +772,14 @@ export default function Publishing(): JSX.Element {
         for (const p of paras) {
           let styleVal = "";
           let numId = "";
-          const pPr = Array.from(p.children).find(
-            (n) => n.localName === "pPr"
-          );
+          const pPr = Array.from(p.children).find((n) => n.localName === "pPr");
           if (pPr) {
             const pStyle = Array.from(pPr.children).find(
               (n) => n.localName === "pStyle"
             );
             if (pStyle)
               styleVal =
-                pStyle.getAttribute("w:val") ||
-                pStyle.getAttribute("val") ||
-                "";
+                pStyle.getAttribute("w:val") || pStyle.getAttribute("val") || "";
             const numPr = Array.from(pPr.children).find(
               (n) => n.localName === "numPr"
             );
@@ -929,8 +879,7 @@ export default function Publishing(): JSX.Element {
             const id = genId();
             const ch: Chapter = {
               id,
-              title:
-                file.name.replace(/\.docx$/i, "") || "Imported DOCX",
+              title: file.name.replace(/\.docx$/i, "") || "Imported DOCX",
               included: true,
               text: "",
               textHTML: fallbackHtml,
@@ -938,7 +887,7 @@ export default function Publishing(): JSX.Element {
             setChapters((prev) => [...prev, ch]);
             setActiveChapterId(id);
             alert(
-              `Imported "${file.name}" successfully! Click "Open" in Chapter Management to edit.`
+              `Imported "${file.name}" successfully! Use the chapter dropdown to open it.`
             );
           } else {
             const newChapters = chapterGroups.map((g) => ({
@@ -951,7 +900,7 @@ export default function Publishing(): JSX.Element {
             setChapters((prev) => [...prev, ...newChapters]);
             setActiveChapterId(newChapters[0].id);
             alert(
-              `Imported ${newChapters.length} chapters successfully! Click "Open" in Chapter Management to edit.`
+              `Imported ${newChapters.length} chapters successfully! Use the chapter dropdown to open them.`
             );
           }
         } else {
@@ -977,9 +926,7 @@ export default function Publishing(): JSX.Element {
         }
       } catch (err) {
         console.error(err);
-        alert(
-          "Sorry—import failed. The file may be malformed or not a valid .docx."
-        );
+        alert("Sorry—import failed. The file may be malformed or not a valid .docx.");
       }
     },
     [activeIdx, setChapters, setActiveChapterId]
@@ -995,8 +942,7 @@ export default function Publishing(): JSX.Element {
           const ch: Chapter = {
             id,
             title:
-              file.name.replace(/\.(html?|xhtml)$/i, "") ||
-              "Imported HTML",
+              file.name.replace(/\.(html?|xhtml)$/i, "") || "Imported HTML",
             included: true,
             text: "",
             textHTML: html,
@@ -1004,7 +950,7 @@ export default function Publishing(): JSX.Element {
           setChapters((prev) => [...prev, ch]);
           setActiveChapterId(id);
           alert(
-            `Imported "${ch.title}" successfully! Click "Open" in Chapter Management to edit.`
+            `Imported "${ch.title}" successfully! Use the chapter dropdown to open it.`
           );
         } else {
           setChapters((prev) => {
@@ -1026,9 +972,7 @@ export default function Publishing(): JSX.Element {
         }
       } catch (err) {
         console.error(err);
-        alert(
-          "Sorry—import failed. The file may be malformed or unreadable."
-        );
+        alert("Sorry—import failed. The file may be malformed or unreadable.");
       }
     },
     [activeIdx, setChapters, setActiveChapterId]
@@ -1041,10 +985,7 @@ export default function Publishing(): JSX.Element {
     chapters.forEach((c) => {
       if (!c.included) return;
       const html = c.textHTML || `<p>${htmlEscape(c.text)}</p>`;
-      const dom = new DOMParser().parseFromString(
-        `<div>${html}</div>`,
-        "text/html"
-      );
+      const dom = new DOMParser().parseFromString(`<div>${html}</div>`, "text/html");
       const hs = Array.from(dom.querySelectorAll("h1, h2, h3"));
       if (hs.length === 0) {
         items.push(c.title);
@@ -1065,16 +1006,14 @@ export default function Publishing(): JSX.Element {
 
     parts.push(vars(matter.titlePage));
     parts.push("\n\n" + vars(matter.copyright));
-    if (matter.dedication)
-      parts.push("\n\nDedication\n" + matter.dedication);
+    if (matter.dedication) parts.push("\n\nDedication\n" + matter.dedication);
     if (matter.epigraph) parts.push("\n\nEpigraph\n" + matter.epigraph);
     if (matter.toc) {
       const tocList = matter.tocFromHeadings
         ? tocFromHeadings
         : chapters.filter((c) => c.included).map((c) => c.title);
       parts.push(
-        "\n\nContents\n" +
-          tocList.map((t, i) => `${i + 1}. ${t}`).join("\n")
+        "\n\nContents\n" + tocList.map((t, i) => `${i + 1}. ${t}`).join("\n")
       );
     }
 
@@ -1087,9 +1026,7 @@ export default function Publishing(): JSX.Element {
     if (matter.acknowledgments)
       parts.push("\n\nAcknowledgments\n" + matter.acknowledgments);
     if (matter.aboutAuthor)
-      parts.push(
-        "\n\nAbout the Author\n" + vars(matter.aboutAuthor)
-      );
+      parts.push("\n\nAbout the Author\n" + vars(matter.aboutAuthor));
     if (matter.notes) parts.push("\n\nNotes\n" + matter.notes);
 
     return parts.join("\n").trim();
@@ -1100,17 +1037,13 @@ export default function Publishing(): JSX.Element {
     [compiledPlain]
   );
 
-  // Save compiled manuscript for reuse
   useEffect(() => {
     try {
       if (compiledPlain) {
-        localStorage.setItem(
-          "dahtruth_publishing_manuscript",
-          compiledPlain
-        );
+        localStorage.setItem("dahtruth_publishing_manuscript", compiledPlain);
       }
     } catch {
-      // ignore localStorage errors
+      /* ignore */
     }
   }, [compiledPlain]);
 
@@ -1131,24 +1064,13 @@ export default function Publishing(): JSX.Element {
     setMaterialBusy(true);
     setMaterialKey(key);
     try {
-      const res: any = await runAssistant(
-        compiledPlain,
-        key,
-        "",
-        provider
-      );
-      const text =
-        res?.result || res?.text || res?.output || compiledPlain;
-      if (!text) {
-        throw new Error("AI returned an empty response.");
-      }
+      const res: any = await runAssistant(compiledPlain, key, "", provider);
+      const text = res?.result || res?.text || res?.output || compiledPlain;
+      if (!text) throw new Error("AI returned an empty response.");
       setMaterialOutput(text);
     } catch (e: any) {
       console.error("[Story Material Error]:", e);
-      alert(
-        e?.message ||
-          "Could not generate story material. Please try again."
-      );
+      alert(e?.message || "Could not generate story material. Please try again.");
     } finally {
       setMaterialBusy(false);
     }
@@ -1170,218 +1092,568 @@ export default function Publishing(): JSX.Element {
       }}
     >
       <div style={styles.outer}>
-        {/* Header */}
+        {/* HEADER STRIP */}
         <div
           style={{
-            background: "rgba(202, 177, 214, 0.4)",
+            background: "linear-gradient(135deg, #3b3355, #a47bb8)",
             backdropFilter: "blur(12px)",
             color: theme.white,
-            padding: "20px 24px",
+            padding: "14px 24px",
           }}
         >
           <div
             style={{
-              maxWidth: 1120,
+              maxWidth: 1240,
               margin: "0 auto",
               display: "flex",
-              justifyContent: "space-between",
               alignItems: "center",
+              justifyContent: "space-between",
               gap: 16,
             }}
           >
             <button
-              onClick={() => navigate(-1)}
+              onClick={() => navigate("/dashboard")}
               style={{
                 ...styles.btn,
                 border: "none",
-                background: theme.gold,
+                background: "rgba(0,0,0,0.35)",
                 color: theme.white,
-                padding: "10px 18px",
-                fontSize: 15,
+                padding: "8px 14px",
+                fontSize: 13,
                 fontWeight: 600,
               }}
-              aria-label="Go back"
             >
-              ← Back
+              ← Back to Dashboard
             </button>
 
             <div
               style={{
-                textAlign: "center",
                 display: "flex",
-                gap: 12,
                 alignItems: "center",
+                gap: 10,
+                textAlign: "center",
               }}
             >
-              <svg
-                width="26"
-                height="26"
-                viewBox="0 0 24 24"
-                fill="currentColor"
-                aria-hidden="true"
-              >
-                <path d="M6 2h9a3 3 0 0 1 3 3v12.5a1.5 1.5 0 0 1-1.5 1.5H7a3 3 0 0 0-3 3V5a3 3 0 0 1 3-3zm0 2a1 1 0 0 0-1 1v13.764A4.99 4.99 0 0 1 7 18h9V5a1 1 0 0 0-1-1H6z" />
-              </svg>
-              <h1
-                style={{
-                  margin: 0,
-                  fontSize: 22,
-                  fontWeight: 600,
-                  letterSpacing: 0.4,
-                  fontFamily: "Garamond, Georgia, serif",
-                }}
-              >
-                Publishing Suite
-              </h1>
+              <span aria-hidden style={{ fontSize: 24 }}>
+                📖✒️
+              </span>
+              <div>
+                <h1
+                  style={{
+                    margin: 0,
+                    fontSize: 20,
+                    fontWeight: 600,
+                    letterSpacing: 0.4,
+                    fontFamily: "Garamond, Georgia, serif",
+                  }}
+                >
+                  Publishing Studio
+                </h1>
+                <div style={{ fontSize: 11, opacity: 0.9 }}>
+                  Format, polish, and prepare your manuscript for the world.
+                </div>
+              </div>
             </div>
 
-            <button
-              type="button"
-              onClick={() => setGoogleMode((m) => !m)}
+            <div
               style={{
-                ...styles.btn,
-                padding: "8px 10px",
-                fontSize: 11,
-                whiteSpace: "nowrap",
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "flex-end",
+                gap: 4,
+                minWidth: 140,
               }}
             >
-              Theme: {googleMode ? "Google Mode" : "StoryLab Mode"}
-            </button>
+              <div style={{ fontSize: 11 }}>
+                Word count:{" "}
+                <span style={{ fontWeight: 600 }}>{wordCount.toLocaleString()}</span>
+              </div>
+              <div style={{ fontSize: 11 }}>
+                Platform:{" "}
+                <span style={{ fontWeight: 600 }}>
+                  {PLATFORM_PRESETS[platformPreset].label}
+                </span>
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Body */}
+        {/* MAIN GRID */}
         <div style={{ ...styles.inner, ...styles.sectionShell }}>
           <div
             style={{
               display: "grid",
               gridTemplateColumns: isWide
-                ? "260px minmax(0, 1fr)"
+                ? "minmax(0, 2.3fr) minmax(260px, 1fr)"
                 : "1fr",
-              gap: 24,
+              gap: 20,
               alignItems: "flex-start",
             }}
           >
-            {/* SIDEBAR: publishing menu + AI tools + detailed settings */}
+            {/* LEFT: MANUSCRIPT EDITOR */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              {/* Project basics (small, not overwhelming) */}
+              <div style={{ ...styles.glassCard }}>
+                <div
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: 12,
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                  }}
+                >
+                  <div style={{ flex: 1, minWidth: 210 }}>
+                    <label style={{ ...styles.label, display: "block" }}>
+                      Project title
+                    </label>
+                    <input
+                      value={meta.title}
+                      onChange={(e) => setMeta((m) => ({ ...m, title: e.target.value }))}
+                      style={styles.input}
+                    />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 180 }}>
+                    <label style={{ ...styles.label, display: "block" }}>
+                      Author
+                    </label>
+                    <input
+                      value={meta.author}
+                      onChange={(e) =>
+                        setMeta((m) => ({ ...m, author: e.target.value }))
+                      }
+                      style={styles.input}
+                    />
+                  </div>
+                  <div style={{ width: 80 }}>
+                    <label style={{ ...styles.label, display: "block" }}>Year</label>
+                    <input
+                      value={meta.year}
+                      onChange={(e) =>
+                        setMeta((m) => ({ ...m, year: e.target.value }))
+                      }
+                      style={{ ...styles.input, textAlign: "center" }}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Editor card */}
+              <div style={{ ...styles.glassCard }}>
+                {/* Chapter controls */}
+                <div
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: 12,
+                    alignItems: "center",
+                    marginBottom: 12,
+                  }}
+                >
+                  <div style={{ flex: 1, minWidth: 200 }}>
+                    <label style={{ ...styles.label, display: "block" }}>
+                      Current chapter
+                    </label>
+                    <select
+                      value={activeChapter?.id}
+                      onChange={(e) => setActiveChapterId(e.target.value)}
+                      style={styles.input}
+                    >
+                      {chapters.map((c, idx) => (
+                        <option key={c.id} value={c.id}>
+                          {idx + 1}. {c.title}
+                          {c.included ? "" : " (excluded)"}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {activeChapter && (
+                    <Toggle
+                      checked={activeChapter.included}
+                      onChange={(v) =>
+                        setChapters((prev) =>
+                          prev.map((c) =>
+                            c.id === activeChapter.id ? { ...c, included: v } : c
+                          )
+                        )
+                      }
+                      label={activeChapter.included ? "Included in manuscript" : "Excluded"}
+                    />
+                  )}
+
+                  <button
+                    style={{ ...styles.btnPrimary, whiteSpace: "nowrap" }}
+                    onClick={addChapter}
+                  >
+                    + Add Chapter
+                  </button>
+                </div>
+
+                {/* Toolbar */}
+                <div
+                  style={{
+                    position: "sticky",
+                    top: 0,
+                    zIndex: 20,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 4,
+                    flexWrap: "wrap",
+                    padding: "6px 10px",
+                    border: `1px solid ${theme.border}`,
+                    borderRadius: 8,
+                    marginBottom: 12,
+                    background: theme.white,
+                    fontSize: 11,
+                  }}
+                >
+                  <select
+                    onChange={(e) => setFont(e.target.value)}
+                    defaultValue="Times New Roman"
+                    aria-label="Font family"
+                    style={{
+                      ...(styles.input as any),
+                      width: 140,
+                      padding: "3px 5px",
+                      fontSize: 10,
+                      height: 24,
+                    }}
+                  >
+                    <option>Times New Roman</option>
+                    <option>Georgia</option>
+                    <option>Garamond</option>
+                    <option>Palatino</option>
+                    <option>Calibri</option>
+                    <option>Arial</option>
+                  </select>
+
+                  <select
+                    onChange={(e) => setFontSizePt(parseInt(e.target.value, 10))}
+                    defaultValue="16"
+                    aria-label="Font size (pt)"
+                    style={{
+                      ...(styles.input as any),
+                      width: 45,
+                      padding: "3px 4px",
+                      fontSize: 10,
+                      height: 24,
+                    }}
+                  >
+                    <option value="14">14</option>
+                    <option value="16">16</option>
+                    <option value="18">18</option>
+                    <option value="20">20</option>
+                    <option value="22">22</option>
+                  </select>
+
+                  <ToolbarDivider />
+
+                  <ToolbarButton label="Bold" onClick={() => exec("bold")}>
+                    B
+                  </ToolbarButton>
+                  <ToolbarButton label="Italic" onClick={() => exec("italic")}>
+                    <em>I</em>
+                  </ToolbarButton>
+                  <ToolbarButton label="Underline" onClick={() => exec("underline")}>
+                    <u>U</u>
+                  </ToolbarButton>
+
+                  <ToolbarDivider />
+
+                  <ToolbarButton label="H1" onClick={() => setBlock("H1")} small>
+                    H1
+                  </ToolbarButton>
+                  <ToolbarButton label="H2" onClick={() => setBlock("H2")} small>
+                    H2
+                  </ToolbarButton>
+                  <ToolbarButton label="H3" onClick={() => setBlock("H3")} small>
+                    H3
+                  </ToolbarButton>
+
+                  <ToolbarDivider />
+
+                  <ToolbarButton
+                    label="Bullet"
+                    onClick={() => exec("insertUnorderedList")}
+                  >
+                    •
+                  </ToolbarButton>
+                  <ToolbarButton
+                    label="Number"
+                    onClick={() => exec("insertOrderedList")}
+                  >
+                    1.
+                  </ToolbarButton>
+
+                  <ToolbarDivider />
+
+                  <ToolbarButton label="Left" onClick={() => exec("justifyLeft")}>
+                    ⟸
+                  </ToolbarButton>
+                  <ToolbarButton label="Center" onClick={() => exec("justifyCenter")}>
+                    ⇔
+                  </ToolbarButton>
+                  <ToolbarButton label="Right" onClick={() => exec("justifyRight")}>
+                    ⟹
+                  </ToolbarButton>
+
+                  <ToolbarDivider />
+
+                  <ToolbarButton label="Page Break" onClick={insertPageBreak}>
+                    ⤓
+                  </ToolbarButton>
+
+                  <div
+                    style={{
+                      marginLeft: "auto",
+                      display: "flex",
+                      gap: 6,
+                      alignItems: "center",
+                    }}
+                  >
+                    <label
+                      style={{
+                        ...styles.btn,
+                        padding: "3px 8px",
+                        fontSize: 9,
+                        cursor: "pointer",
+                        height: 24,
+                        display: "flex",
+                        alignItems: "center",
+                      }}
+                    >
+                      📄 Word
+                      <input
+                        type="file"
+                        accept=".docx"
+                        style={{ display: "none" }}
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) importDocx(f, true);
+                        }}
+                      />
+                    </label>
+
+                    <label
+                      style={{
+                        ...styles.btn,
+                        padding: "3px 8px",
+                        fontSize: 9,
+                        cursor: "pointer",
+                        height: 24,
+                        display: "flex",
+                        alignItems: "center",
+                      }}
+                    >
+                      🌐 HTML
+                      <input
+                        type="file"
+                        accept=".html,.htm,.xhtml"
+                        style={{ display: "none" }}
+                        onChange={(e) => {
+                          const f = e.target.files?.[0];
+                          if (f) importHTML(f, true);
+                        }}
+                      />
+                    </label>
+
+                    <button
+                      style={{
+                        ...styles.btnPrimary,
+                        padding: "6px 12px",
+                        fontSize: 12,
+                        height: 28,
+                      }}
+                      onClick={saveActiveChapterHTML}
+                    >
+                      Save chapter
+                    </button>
+                  </div>
+                </div>
+
+                {/* Editor surface */}
+                <div
+                  style={{
+                    padding: 16,
+                    background: `linear-gradient(180deg, ${theme.bg}, #e6ebf2)`,
+                    borderRadius: 12,
+                    border: `1px solid ${theme.border}`,
+                  }}
+                >
+                  <div
+                    ref={editorRef}
+                    contentEditable
+                    suppressContentEditableWarning
+                    style={{
+                      margin: "0 auto",
+                      width: "100%",
+                      maxWidth: 840,
+                      minHeight: 1040,
+                      background: "#ffffff",
+                      color: "#111",
+                      border: "1px solid #e5e7eb",
+                      boxShadow: "0 8px 30px rgba(2,20,40,0.10)",
+                      borderRadius: 6,
+                      padding: "48px 48px",
+                      lineHeight: ms.lineHeight,
+                      fontFamily: ms.fontFamily,
+                      fontSize: ms.fontSizePt * (96 / 72),
+                      outline: "none",
+                      direction: "ltr",
+                      unicodeBidi: "plaintext",
+                      whiteSpace: "pre-wrap",
+                    }}
+                  ></div>
+                </div>
+
+                <div
+                  style={{
+                    color: theme.subtext,
+                    fontSize: 11,
+                    marginTop: 6,
+                    textAlign: "right",
+                  }}
+                >
+                  Tip: Use H1/H2/H3 for major sections so your contents page can
+                  build from headings.
+                </div>
+              </div>
+            </div>
+
+            {/* RIGHT: TOOL SIDEBAR */}
             <aside
               style={{
                 display: "flex",
                 flexDirection: "column",
-                gap: 16,
+                gap: 14,
               }}
             >
-              {/* Publishing menu */}
+              {/* Publishing tools menu */}
               <div style={styles.glassCard}>
                 <h3
                   style={{
-                    margin: "0 0 12px 0",
-                    fontSize: 15,
-                    color: theme.text,
-                    fontWeight: 600,
-                  }}
-                >
-                  📚 Publishing Tools
-                </h3>
-
-                <div
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 8,
-                  }}
-                >
-                  <button
-                    style={{
-                      ...styles.btn,
-                      textAlign: "left",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 10,
-                      fontSize: 12,
-                    }}
-                    onClick={() => navigate("/proof")}
-                  >
-                    <span style={{ fontSize: 18 }}>✅</span>
-                    <span>Proof & Consistency</span>
-                  </button>
-
-                  <button
-                    style={{
-                      ...styles.btn,
-                      textAlign: "left",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 10,
-                      fontSize: 12,
-                    }}
-                    onClick={() => navigate("/format")}
-                  >
-                    <span style={{ fontSize: 18 }}>🎨</span>
-                    <span>Format & Styles</span>
-                  </button>
-
-                  <button
-                    style={{
-                      ...styles.btn,
-                      textAlign: "left",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 10,
-                      fontSize: 12,
-                    }}
-                    onClick={() => navigate("/export")}
-                  >
-                    <span style={{ fontSize: 18 }}>📦</span>
-                    <span>Export (PDF / DOCX / EPUB)</span>
-                  </button>
-
-                  <button
-                    style={{
-                      ...styles.btn,
-                      textAlign: "left",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 10,
-                      fontSize: 12,
-                    }}
-                    onClick={() => navigate("/publishing-prep")}
-                  >
-                    <span style={{ fontSize: 18 }}>🚀</span>
-                    <span>Publishing Prep Workspace</span>
-                  </button>
-                </div>
-              </div>
-
-              {/* AI tools + Prep, now in sidebar */}
-              <div style={styles.glassCard}>
-                <h3
-                  style={{
-                    margin: "0 0 12px 0",
+                    margin: "0 0 10px",
                     fontSize: 15,
                     color: theme.text,
                     fontWeight: 600,
                     display: "flex",
                     alignItems: "center",
-                    gap: 8,
+                    gap: 6,
                   }}
                 >
-                  <span aria-hidden>🤖</span> AI Assistance
+                  <span aria-hidden>🧭</span> Publishing Tools
                 </h3>
+                <p
+                  style={{
+                    fontSize: 11,
+                    color: theme.subtext,
+                    marginBottom: 10,
+                  }}
+                >
+                  Quick routes into deeper tools when you are ready.
+                </p>
 
-                <div style={{ marginBottom: 10 }}>
+                <div style={{ display: "grid", gap: 8 }}>
                   <button
                     style={{
-                      ...styles.btnPrimary,
-                      background: theme.primary,
-                      color: "white",
-                      width: "100%",
-                      fontSize: 12,
+                      ...styles.btn,
+                      textAlign: "left",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
                     }}
-                    onClick={() => navigate("/dashboard")}
+                    onClick={() => navigate("/proof")}
                   >
-                    ← Back to Dashboard
+                    <span style={{ fontSize: 18 }}>✅</span>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 600 }}>
+                        Proof & Consistency
+                      </div>
+                      <div style={{ fontSize: 11, color: theme.subtext }}>
+                        Grammar, style, timeline
+                      </div>
+                    </div>
+                  </button>
+
+                  <button
+                    style={{
+                      ...styles.btn,
+                      textAlign: "left",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                    }}
+                    onClick={() => navigate("/format")}
+                  >
+                    <span style={{ fontSize: 18 }}>🎨</span>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 600 }}>
+                        Format & Styles
+                      </div>
+                      <div style={{ fontSize: 11, color: theme.subtext }}>
+                        Fonts, spacing, margins
+                      </div>
+                    </div>
+                  </button>
+
+                  <button
+                    style={{
+                      ...styles.btn,
+                      textAlign: "left",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                    }}
+                    onClick={() => navigate("/export")}
+                  >
+                    <span style={{ fontSize: 18 }}>📦</span>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 600 }}>Export</div>
+                      <div style={{ fontSize: 11, color: theme.subtext }}>
+                        PDF, DOCX, EPUB
+                      </div>
+                    </div>
+                  </button>
+
+                  <button
+                    style={{
+                      ...styles.btn,
+                      textAlign: "left",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 8,
+                    }}
+                    onClick={() => navigate("/publishing-prep")}
+                  >
+                    <span style={{ fontSize: 18 }}>🚀</span>
+                    <div>
+                      <div style={{ fontSize: 13, fontWeight: 600 }}>
+                        Publishing Prep
+                      </div>
+                      <div style={{ fontSize: 11, color: theme.subtext }}>
+                        Query, synopsis, marketing
+                      </div>
+                    </div>
                   </button>
                 </div>
+              </div>
+
+              {/* AI tools */}
+              <div style={styles.glassCard}>
+                <h3
+                  style={{
+                    margin: "0 0 10px",
+                    fontSize: 15,
+                    color: theme.text,
+                    fontWeight: 600,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 6,
+                  }}
+                >
+                  <span aria-hidden>🤖</span> Line-level AI Help
+                </h3>
 
                 <div style={{ marginBottom: 10 }}>
                   <label
@@ -1396,9 +1668,7 @@ export default function Publishing(): JSX.Element {
                   <select
                     value={provider}
                     onChange={(e) =>
-                      setProvider(
-                        e.target.value as "openai" | "anthropic"
-                      )
+                      setProvider(e.target.value as "openai" | "anthropic")
                     }
                     style={{ ...styles.input, fontSize: 12 }}
                   >
@@ -1410,12 +1680,7 @@ export default function Publishing(): JSX.Element {
                 <div
                   role="group"
                   aria-label="AI tools"
-                  style={{
-                    display: "flex",
-                    flexDirection: "column",
-                    gap: 8,
-                    marginBottom: 10,
-                  }}
+                  style={{ display: "grid", gap: 6 }}
                 >
                   {AI_ACTIONS.map((a) => (
                     <AIActionButton
@@ -1428,27 +1693,16 @@ export default function Publishing(): JSX.Element {
                         if (working) return;
                         setWorking(a.key);
                         try {
-                          const currentHtml =
-                            editorRef.current?.innerHTML ?? "";
-                          const currentText =
-                            stripHtml(currentHtml) || "";
+                          const currentHtml = editorRef.current?.innerHTML ?? "";
+                          const currentText = stripHtml(currentHtml) || "";
 
                           let res: any;
                           if (a.key === "grammar") {
-                            res = await runGrammar(
-                              currentText,
-                              provider
-                            );
+                            res = await runGrammar(currentText, provider);
                           } else if (a.key === "style") {
-                            res = await runStyle(
-                              currentText,
-                              provider
-                            );
+                            res = await runStyle(currentText, provider);
                           } else if (a.key === "readability") {
-                            res = await runReadability(
-                              currentText,
-                              provider
-                            );
+                            res = await runReadability(currentText, provider);
                           } else if (a.key === "assistant") {
                             res = await runAssistant(
                               currentText,
@@ -1459,10 +1713,7 @@ export default function Publishing(): JSX.Element {
                           }
 
                           const improvedText =
-                            res?.result ||
-                            res?.text ||
-                            res?.output ||
-                            currentText;
+                            res?.result || res?.text || res?.output || currentText;
 
                           const improved =
                             improvedText !== currentText
@@ -1474,22 +1725,14 @@ export default function Publishing(): JSX.Element {
                                 )
                               : currentHtml;
 
-                          if (
-                            editorRef.current &&
-                            improved !== currentHtml
-                          ) {
-                            editorRef.current.innerHTML =
-                              improved;
+                          if (editorRef.current && improved !== currentHtml) {
+                            editorRef.current.innerHTML = improved;
                           }
 
                           setChapters((prev) => {
                             const next = [...prev];
                             const ch = next[activeIdx];
-                            if (ch)
-                              next[activeIdx] = {
-                                ...ch,
-                                textHTML: improved,
-                              };
+                            if (ch) next[activeIdx] = { ...ch, textHTML: improved };
                             return next;
                           });
                         } catch (e: any) {
@@ -1506,102 +1749,64 @@ export default function Publishing(): JSX.Element {
                   ))}
                 </div>
 
-                <button
-                  style={{ ...styles.btnDark, width: "100%", fontSize: 12 }}
-                  disabled={working !== null}
-                  onClick={async () => {
-                    if (working) return;
-                    setWorking("assistant");
-                    try {
-                      const chaptersPlain = chapters
-                        .filter((c) => c.included)
-                        .map((c) => ({
-                          id: c.id,
-                          title: c.title,
-                          text: c.textHTML
-                            ? stripHtml(c.textHTML)
-                            : c.text,
-                        }));
-
-                      const res = await runPublishingPrep(
-                        meta,
-                        chaptersPlain,
-                        {
-                          tone: "professional/warm",
-                          audience: "agents_and_publishers",
-                        },
-                        provider
-                      );
-
-                      if (!res?.prep && !res?.result)
-                        throw new Error(
-                          "No prep content returned from AI."
-                        );
-                      navigate("/publishing-prep", {
-                        state: {
-                          generated:
-                            res.prep || res.result || res,
-                        },
-                      });
-                    } catch (e: any) {
-                      console.error(
-                        "[Publishing Prep Error]:",
-                        e
-                      );
-                      alert(
-                        e?.message ||
-                          "Couldn't generate publishing prep."
-                      );
-                    } finally {
-                      setWorking(null);
-                    }
-                  }}
-                >
-                  ✨ Generate Publishing Prep
-                </button>
-
                 <div
                   style={{
-                    marginTop: 8,
-                    fontSize: 11,
-                    color: theme.subtext,
+                    marginTop: 10,
+                    display: "flex",
+                    justifyContent: "flex-end",
                   }}
                 >
-                  Word count: {wordCount.toLocaleString()}
+                  <button
+                    style={styles.btnDark}
+                    disabled={working !== null}
+                    onClick={async () => {
+                      if (working) return;
+                      setWorking("assistant");
+                      try {
+                        const chaptersPlain = chapters
+                          .filter((c) => c.included)
+                          .map((c) => ({
+                            id: c.id,
+                            title: c.title,
+                            text: c.textHTML ? stripHtml(c.textHTML) : c.text,
+                          }));
+
+                        const res = await runPublishingPrep(
+                          meta,
+                          chaptersPlain,
+                          {
+                            tone: "professional/warm",
+                            audience: "agents_and_publishers",
+                          },
+                          provider
+                        );
+
+                        if (!res?.prep && !res?.result)
+                          throw new Error("No prep content returned from AI.");
+                        navigate("/publishing-prep", {
+                          state: { generated: res.prep || res.result || res },
+                        });
+                      } catch (e: any) {
+                        console.error("[Publishing Prep Error]:", e);
+                        alert(
+                          e?.message || "Couldn't generate publishing prep just yet."
+                        );
+                      } finally {
+                        setWorking(null);
+                      }
+                    }}
+                  >
+                    ✨ Full Publishing Prep
+                  </button>
                 </div>
               </div>
 
-              {/* Detailed meta / matter controls (your existing sidebar) */}
-              {isWide && (
-                <PublishingSidebar
-                  meta={meta}
-                  setMeta={setMeta}
-                  matter={matter}
-                  setMatter={setMatter}
-                  manuscriptPreset={manuscriptPreset}
-                  setManuscriptPreset={setManuscriptPreset}
-                  platformPreset={platformPreset}
-                  setPlatformPreset={setPlatformPreset}
-                  includeHeadersFooters={includeHeadersFooters}
-                  wordCount={wordCount}
-                  ms={ms}
-                  setMsOverrides={setMsOverrides}
-                  manuscriptEntries={manuscriptEntries}
-                  platformEntries={platformEntries}
-                  googleMode={googleMode}
-                  setGoogleMode={setGoogleMode}
-                />
-              )}
-            </aside>
-
-            {/* MAIN: Story materials + editor + chapters */}
-            <main>
-              {/* Story Materials card */}
-              <div style={{ ...styles.glassCard, marginBottom: 16 }}>
+              {/* Story materials */}
+              <div style={styles.glassCard}>
                 <h3
                   style={{
-                    margin: "0 0 12px 0",
-                    fontSize: 16,
+                    margin: "0 0 10px 0",
+                    fontSize: 15,
                     color: theme.text,
                     fontWeight: 600,
                     display: "flex",
@@ -1609,27 +1814,25 @@ export default function Publishing(): JSX.Element {
                     gap: 8,
                   }}
                 >
-                  <span aria-hidden>📄</span> Story Materials for
-                  Agents & Publishers
+                  <span aria-hidden>📄</span> Story Materials
                 </h3>
                 <p
                   style={{
-                    fontSize: 12,
+                    fontSize: 11,
                     color: theme.subtext,
                     marginBottom: 8,
                   }}
                 >
-                  These tools work from your compiled publishing
-                  manuscript (front matter + chapters). Choose what
-                  you need and the AI will draft it for you.
+                  Uses your compiled manuscript (front matter + chapters) to draft
+                  agent-ready materials.
                 </p>
 
                 <div
                   style={{
                     display: "flex",
                     flexWrap: "wrap",
-                    gap: 8,
-                    marginBottom: 12,
+                    gap: 6,
+                    marginBottom: 10,
                   }}
                 >
                   {MATERIAL_ACTIONS.map((opt) => (
@@ -1640,7 +1843,7 @@ export default function Publishing(): JSX.Element {
                       disabled={materialBusy}
                       style={{
                         ...styles.btn,
-                        padding: "6px 10px",
+                        padding: "5px 9px",
                         fontSize: 11,
                         borderRadius: 999,
                         border:
@@ -1648,9 +1851,7 @@ export default function Publishing(): JSX.Element {
                             ? `1px solid ${theme.accent}`
                             : `1px solid ${theme.border}`,
                         background:
-                          materialKey === opt.key
-                            ? theme.highlight
-                            : theme.white,
+                          materialKey === opt.key ? theme.highlight : theme.white,
                         opacity: materialBusy ? 0.7 : 1,
                       }}
                     >
@@ -1665,27 +1866,25 @@ export default function Publishing(): JSX.Element {
                   disabled={materialBusy}
                   style={{
                     ...styles.btnPrimary,
-                    padding: "8px 14px",
-                    fontSize: 13,
+                    padding: "7px 12px",
+                    fontSize: 12,
                   }}
                 >
-                  {materialBusy
-                    ? "Generating..."
-                    : "Generate Selected Material"}
+                  {materialBusy ? "Generating..." : "Generate selected"}
                 </button>
 
                 {materialOutput && (
                   <div
                     style={{
-                      marginTop: 12,
-                      borderRadius: 12,
+                      marginTop: 10,
+                      borderRadius: 10,
                       border: `1px solid ${theme.border}`,
                       background: "#050819",
-                      padding: 12,
-                      maxHeight: 280,
+                      padding: 10,
+                      maxHeight: 260,
                       overflow: "auto",
                       color: "#f9fafb",
-                      fontSize: 13,
+                      fontSize: 12,
                       whiteSpace: "pre-wrap",
                     }}
                   >
@@ -1693,680 +1892,7 @@ export default function Publishing(): JSX.Element {
                   </div>
                 )}
               </div>
-
-              {/* Editor + Chapters */}
-              <div style={{ ...styles.glassCard, marginBottom: 16 }}>
-                <div
-                  style={{
-                    display: "grid",
-                    gap: 16,
-                    gridTemplateColumns: isWide
-                      ? "220px minmax(0, 1fr)"
-                      : "1fr",
-                  }}
-                >
-                  {isWide && (
-                    <aside>
-                      <div
-                        style={{
-                          fontWeight: 700,
-                          marginBottom: 8,
-                          color: theme.text,
-                          fontSize: 13,
-                        }}
-                      >
-                        Chapters
-                      </div>
-                      <div style={{ display: "grid", gap: 6 }}>
-                        {chapters.map((c) => (
-                          <button
-                            key={c.id}
-                            onClick={() => setActiveChapterId(c.id)}
-                            style={{
-                              textAlign: "left",
-                              padding: "8px 10px",
-                              borderRadius: 10,
-                              border: `1px solid ${
-                                c.id === activeChapterId
-                                  ? theme.accent
-                                  : theme.border
-                              }`,
-                              background:
-                                c.id === activeChapterId
-                                  ? theme.highlight
-                                  : theme.white,
-                              color: theme.text,
-                              cursor: "pointer",
-                              fontSize: 12,
-                            }}
-                            title={c.title}
-                          >
-                            {c.included ? "✅ " : "🚫 "} {c.title}
-                          </button>
-                        ))}
-                        <button
-                          onClick={addChapter}
-                          style={{
-                            ...styles.btnPrimary,
-                            marginTop: 6,
-                            fontSize: 12,
-                          }}
-                        >
-                          + Add Chapter
-                        </button>
-                      </div>
-                    </aside>
-                  )}
-
-                  <section>
-                    {/* Toolbar */}
-                    <div
-                      style={{
-                        position: "sticky",
-                        top: 0,
-                        zIndex: 20,
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 4,
-                        flexWrap: "wrap",
-                        padding: "6px 10px",
-                        border: `1px solid ${theme.border}`,
-                        borderRadius: 8,
-                        marginBottom: 12,
-                        background: theme.white,
-                        fontSize: 11,
-                      }}
-                    >
-                      <select
-                        onChange={(e) => setFont(e.target.value)}
-                        defaultValue="Times New Roman"
-                        aria-label="Font family"
-                        style={{
-                          ...(styles.input as any),
-                          width: 120,
-                          padding: "3px 5px",
-                          fontSize: 10,
-                          height: 24,
-                        }}
-                      >
-                        <option>Times New Roman</option>
-                        <option>Georgia</option>
-                        <option>Garamond</option>
-                        <option>Palatino</option>
-                        <option>Calibri</option>
-                        <option>Arial</option>
-                      </select>
-
-                      <select
-                        onChange={(e) =>
-                          setFontSizePt(parseInt(e.target.value, 10))
-                        }
-                        defaultValue="16"
-                        aria-label="Font size (pt)"
-                        style={{
-                          ...(styles.input as any),
-                          width: 45,
-                          padding: "3px 4px",
-                          fontSize: 10,
-                          height: 24,
-                        }}
-                      >
-                        <option value="14">14</option>
-                        <option value="16">16</option>
-                        <option value="18">18</option>
-                        <option value="20">20</option>
-                        <option value="22">22</option>
-                      </select>
-
-                      <div
-                        style={{
-                          width: 1,
-                          height: 16,
-                          background: theme.border,
-                          margin: "0 2px",
-                        }}
-                      />
-
-                      <button
-                        style={{
-                          ...styles.btn,
-                          padding: "3px 6px",
-                          fontSize: 10,
-                          fontWeight: 700,
-                          minWidth: 24,
-                          height: 24,
-                        }}
-                        onClick={() => exec("bold")}
-                        title="Bold"
-                      >
-                        B
-                      </button>
-                      <button
-                        style={{
-                          ...styles.btn,
-                          padding: "3px 6px",
-                          fontSize: 10,
-                          minWidth: 24,
-                          height: 24,
-                        }}
-                        onClick={() => exec("italic")}
-                        title="Italic"
-                      >
-                        <em>I</em>
-                      </button>
-                      <button
-                        style={{
-                          ...styles.btn,
-                          padding: "3px 6px",
-                          fontSize: 10,
-                          minWidth: 24,
-                          height: 24,
-                        }}
-                        onClick={() => exec("underline")}
-                        title="Underline"
-                      >
-                        <u>U</u>
-                      </button>
-
-                      <div
-                        style={{
-                          width: 1,
-                          height: 16,
-                          background: theme.border,
-                          margin: "0 2px",
-                        }}
-                      />
-
-                      <button
-                        style={{
-                          ...styles.btn,
-                          padding: "3px 5px",
-                          fontSize: 9,
-                          minWidth: 24,
-                          height: 24,
-                        }}
-                        onClick={() => setBlock("H1")}
-                        title="H1"
-                      >
-                        H1
-                      </button>
-                      <button
-                        style={{
-                          ...styles.btn,
-                          padding: "3px 5px",
-                          fontSize: 9,
-                          minWidth: 24,
-                          height: 24,
-                        }}
-                        onClick={() => setBlock("H2")}
-                        title="H2"
-                      >
-                        H2
-                      </button>
-                      <button
-                        style={{
-                          ...styles.btn,
-                          padding: "3px 5px",
-                          fontSize: 9,
-                          minWidth: 24,
-                          height: 24,
-                        }}
-                        onClick={() => setBlock("H3")}
-                        title="H3"
-                      >
-                        H3
-                      </button>
-
-                      <div
-                        style={{
-                          width: 1,
-                          height: 16,
-                          background: theme.border,
-                          margin: "0 2px",
-                        }}
-                      />
-
-                      <button
-                        style={{
-                          ...styles.btn,
-                          padding: "3px 5px",
-                          fontSize: 9,
-                          minWidth: 24,
-                          height: 24,
-                        }}
-                        onClick={() => exec("insertUnorderedList")}
-                        title="Bullet"
-                      >
-                        •
-                      </button>
-                      <button
-                        style={{
-                          ...styles.btn,
-                          padding: "3px 5px",
-                          fontSize: 9,
-                          minWidth: 24,
-                          height: 24,
-                        }}
-                        onClick={() => exec("insertOrderedList")}
-                        title="Number"
-                      >
-                        1.
-                      </button>
-
-                      <div
-                        style={{
-                          width: 1,
-                          height: 16,
-                          background: theme.border,
-                          margin: "0 2px",
-                        }}
-                      />
-
-                      <button
-                        style={{
-                          ...styles.btn,
-                          padding: "3px 5px",
-                          fontSize: 9,
-                          minWidth: 24,
-                          height: 24,
-                        }}
-                        onClick={() => exec("justifyLeft")}
-                        title="Left"
-                      >
-                        ⟸
-                      </button>
-                      <button
-                        style={{
-                          ...styles.btn,
-                          padding: "3px 5px",
-                          fontSize: 9,
-                          minWidth: 24,
-                          height: 24,
-                        }}
-                        onClick={() => exec("justifyCenter")}
-                        title="Center"
-                      >
-                        ⇔
-                      </button>
-                      <button
-                        style={{
-                          ...styles.btn,
-                          padding: "3px 5px",
-                          fontSize: 9,
-                          minWidth: 24,
-                          height: 24,
-                        }}
-                        onClick={() => exec("justifyRight")}
-                        title="Right"
-                      >
-                        ⟹
-                      </button>
-
-                      <div
-                        style={{
-                          width: 1,
-                          height: 16,
-                          background: theme.border,
-                          margin: "0 2px",
-                        }}
-                      />
-
-                      <button
-                        style={{
-                          ...styles.btn,
-                          padding: "3px 7px",
-                          fontSize: 9,
-                          height: 24,
-                        }}
-                        onClick={insertPageBreak}
-                        title="Page Break"
-                      >
-                        ⤓
-                      </button>
-
-                      <div
-                        style={{
-                          marginLeft: "auto",
-                          display: "flex",
-                          gap: 6,
-                        }}
-                      >
-                        <label
-                          style={{
-                            ...styles.btn,
-                            padding: "3px 8px",
-                            fontSize: 9,
-                            cursor: "pointer",
-                            height: 24,
-                            display: "flex",
-                            alignItems: "center",
-                          }}
-                        >
-                          📄 Word
-                          <input
-                            type="file"
-                            accept=".docx"
-                            style={{ display: "none" }}
-                            onChange={(e) => {
-                              const f = e.target.files?.[0];
-                              if (f) importDocx(f, true);
-                            }}
-                          />
-                        </label>
-
-                        <label
-                          style={{
-                            ...styles.btn,
-                            padding: "3px 8px",
-                            fontSize: 9,
-                            cursor: "pointer",
-                            height: 24,
-                            display: "flex",
-                            alignItems: "center",
-                          }}
-                        >
-                          🌐 HTML
-                          <input
-                            type="file"
-                            accept=".html,.htm,.xhtml"
-                            style={{ display: "none" }}
-                            onChange={(e) => {
-                              const f = e.target.files?.[0];
-                              if (f) importHTML(f, true);
-                            }}
-                          />
-                        </label>
-
-                        <button
-                          style={{
-                            ...styles.btnPrimary,
-                            padding: "6px 12px",
-                            fontSize: 12,
-                            height: 28,
-                          }}
-                          onClick={saveActiveChapterHTML}
-                        >
-                          Save
-                        </button>
-                      </div>
-                    </div>
-
-                    <div
-                      style={{
-                        padding: 16,
-                        background: `linear-gradient(180deg, ${theme.bg}, #e6ebf2)`,
-                        borderRadius: 12,
-                        border: `1px solid ${theme.border}`,
-                      }}
-                    >
-                      <div
-                        ref={editorRef}
-                        contentEditable
-                        suppressContentEditableWarning
-                        style={{
-                          margin: "0 auto",
-                          width: "100%",
-                          maxWidth: 800,
-                          minHeight: 1040,
-                          background: "#ffffff",
-                          color: "#111",
-                          border: "1px solid #e5e7eb",
-                          boxShadow:
-                            "0 8px 30px rgba(2,20,40,0.10)",
-                          borderRadius: 6,
-                          padding: "48px 48px",
-                          lineHeight: ms.lineHeight,
-                          fontFamily: ms.fontFamily,
-                          fontSize: ms.fontSizePt * (96 / 72),
-                          outline: "none",
-                          direction: "ltr",
-                          unicodeBidi: "plaintext",
-                          whiteSpace: "pre-wrap",
-                        }}
-                      ></div>
-                    </div>
-
-                    <div
-                      style={{
-                        color: theme.subtext,
-                        fontSize: 12,
-                        marginTop: 6,
-                      }}
-                    >
-                      Tip: Use H1/H2/H3 for sections — if
-                      "Build Contents from Headings" is on, your
-                      TOC will include them.
-                    </div>
-                  </section>
-                </div>
-              </div>
-
-              {/* Chapter Management */}
-              <div style={styles.glassCard}>
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    marginBottom: 14,
-                  }}
-                >
-                  <h3
-                    style={{
-                      margin: 0,
-                      fontSize: 18,
-                      color: theme.text,
-                    }}
-                  >
-                    Chapter Management
-                  </h3>
-                  <button
-                    style={styles.btnPrimary}
-                    onClick={addChapter}
-                  >
-                    + Add Chapter
-                  </button>
-                </div>
-
-                <div
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns:
-                      "repeat(auto-fill, minmax(280px, 1fr))",
-                    gap: 12,
-                  }}
-                >
-                  {chapters.map((c, i) => (
-                    <div
-                      key={c.id}
-                      style={{
-                        border: `1px solid ${theme.border}`,
-                        borderRadius: 12,
-                        padding: 14,
-                        background: c.included
-                          ? theme.white
-                          : "#F9FBFD",
-                      }}
-                    >
-                      <div
-                        style={{
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "flex-start",
-                          marginBottom: 8,
-                        }}
-                      >
-                        <div style={{ flex: 1 }}>
-                          <div
-                            style={{
-                              fontSize: 14,
-                              fontWeight: 700,
-                              color: theme.text,
-                            }}
-                          >
-                            {c.title}
-                          </div>
-                          <div
-                            style={{
-                              fontSize: 12,
-                              color: theme.subtext,
-                              marginTop: 4,
-                            }}
-                          >
-                            {(
-                              c.textHTML
-                                ? stripHtml(c.textHTML)
-                                : c.text
-                            ).slice(0, 100)}
-                            …
-                          </div>
-                        </div>
-                        <div
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 8,
-                          }}
-                        >
-                          <div
-                            style={{
-                              display: "flex",
-                              flexDirection: "column",
-                              gap: 4,
-                            }}
-                          >
-                            <button
-                              style={{
-                                ...styles.btn,
-                                padding: "6px 8px",
-                              }}
-                              onClick={() =>
-                                setChapters((prev) => {
-                                  const next = [...prev];
-                                  const to = Math.max(
-                                    0,
-                                    Math.min(
-                                      next.length - 1,
-                                      i - 1
-                                    )
-                                  );
-                                  const [item] = next.splice(
-                                    i,
-                                    1
-                                  );
-                                  next.splice(to, 0, item);
-                                  return next;
-                                })
-                              }
-                              title="Move up"
-                            >
-                              ↑
-                            </button>
-                            <button
-                              style={{
-                                ...styles.btn,
-                                padding: "6px 8px",
-                              }}
-                              onClick={() =>
-                                setChapters((prev) => {
-                                  const next = [...prev];
-                                  const to = Math.max(
-                                    0,
-                                    Math.min(
-                                      next.length - 1,
-                                      i + 1
-                                    )
-                                  );
-                                  const [item] = next.splice(
-                                    i,
-                                    1
-                                  );
-                                  next.splice(to, 0, item);
-                                  return next;
-                                })
-                              }
-                              title="Move down"
-                            >
-                              ↓
-                            </button>
-                          </div>
-                          <Toggle
-                            checked={c.included}
-                            onChange={(v) =>
-                              setChapters((prev) =>
-                                prev.map((x) =>
-                                  x.id === c.id
-                                    ? {
-                                        ...x,
-                                        included: v,
-                                      }
-                                    : x
-                                )
-                              )
-                            }
-                            label={
-                              c.included
-                                ? "Included"
-                                : "Excluded"
-                            }
-                          />
-                        </div>
-                      </div>
-                      <div
-                        style={{
-                          display: "flex",
-                          gap: 8,
-                          marginTop: 8,
-                        }}
-                      >
-                        <button
-                          style={styles.btn}
-                          onClick={() =>
-                            setActiveChapterId(c.id)
-                          }
-                        >
-                          Open
-                        </button>
-                        <label
-                          style={{
-                            ...styles.btn,
-                            cursor: "pointer",
-                          }}
-                        >
-                          Replace with .docx
-                          <input
-                            type="file"
-                            accept=".docx"
-                            style={{ display: "none" }}
-                            onChange={(e) => {
-                              const f = e.target.files?.[0];
-                              if (f) importDocx(f, false);
-                            }}
-                          />
-                        </label>
-                        <label
-                          style={{
-                            ...styles.btn,
-                            cursor: "pointer",
-                          }}
-                        >
-                          Replace with .html
-                          <input
-                            type="file"
-                            accept=".html,.htm,.xhtml"
-                            style={{ display: "none" }}
-                            onChange={(e) => {
-                              const f = e.target.files?.[0];
-                              if (f) importHTML(f, false);
-                            }}
-                          />
-                        </label>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </main>
+            </aside>
           </div>
         </div>
       </div>
@@ -2374,7 +1900,8 @@ export default function Publishing(): JSX.Element {
   );
 }
 
-/* ---------- Small UI helpers (kept at bottom for clarity) ---------- */
+/* ---------- Small UI helpers ---------- */
+
 type ToggleProps = {
   checked: boolean;
   onChange: (v: boolean) => void;
@@ -2388,22 +1915,23 @@ const Toggle: React.FC<ToggleProps> = ({ checked, onChange, label }) => {
       style={{
         display: "inline-flex",
         alignItems: "center",
-        gap: 10,
-        padding: "8px 12px",
+        gap: 8,
+        padding: "6px 10px",
         borderRadius: 999,
         border: `1px solid ${theme.border}`,
         background: checked ? theme.highlight : theme.white,
         color: theme.text,
         cursor: "pointer",
+        fontSize: 11,
+        whiteSpace: "nowrap",
       }}
       aria-pressed={checked}
-      title={label}
       type="button"
     >
       <span
         style={{
-          width: 36,
-          height: 20,
+          width: 32,
+          height: 18,
           borderRadius: 999,
           background: checked ? theme.accent : "#CBD5E1",
           position: "relative",
@@ -2414,27 +1942,69 @@ const Toggle: React.FC<ToggleProps> = ({ checked, onChange, label }) => {
           style={{
             position: "absolute",
             top: 2,
-            left: checked ? 18 : 2,
-            width: 16,
-            height: 16,
+            left: checked ? 16 : 2,
+            width: 14,
+            height: 14,
             borderRadius: 999,
             background: theme.white,
             transition: "left .15s ease",
           }}
         />
       </span>
-      {label && <span style={{ fontSize: 14 }}>{label}</span>}
+      {label && <span>{label}</span>}
     </button>
   );
 };
 
-/* ---------- utilities ---------- */
-function safeFile(name: string): string {
-  return (name || "manuscript").replace(/[^\w\-]+/g, "_");
+function ToolbarDivider() {
+  return (
+    <div
+      style={{
+        width: 1,
+        height: 16,
+        background: theme.border,
+        margin: "0 2px",
+      }}
+    />
+  );
 }
 
+function ToolbarButton({
+  children,
+  label,
+  onClick,
+  small,
+}: {
+  children: React.ReactNode;
+  label: string;
+  onClick: () => void;
+  small?: boolean;
+}) {
+  return (
+    <button
+      style={{
+        ...styles.btn,
+        padding: small ? "3px 5px" : "3px 6px",
+        fontSize: small ? 9 : 10,
+        minWidth: 24,
+        height: 24,
+      }}
+      onClick={onClick}
+      title={label}
+      type="button"
+    >
+      {children}
+    </button>
+  );
+}
+
+/* ---------- utilities ---------- */
 function stripHtml(html: string): string {
   const div = document.createElement("div");
   div.innerHTML = html;
   return (div.textContent || div.innerText || "").trim();
+}
+
+function safeFile(name: string): string {
+  return (name || "manuscript").replace(/[^\w\-]+/g, "_");
 }
