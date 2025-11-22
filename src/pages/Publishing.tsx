@@ -1556,11 +1556,12 @@ export default function Publishing(): JSX.Element {
             whiteSpace: "pre-wrap",
           }}
         >
-          {materialOutput}
+        {materialOutput}
         </div>
       )}
-    </div>
-  </aside>
+    </div>              ← ADD THIS - closes the Story Materials glassCard
+  </aside>            ← closes aside
+</div>                ← closes the grid container
 
   {/* RIGHT: MANUSCRIPT EDITOR */}
   <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
@@ -1899,8 +1900,6 @@ export default function Publishing(): JSX.Element {
     </div>
   </div>
 </div>
-
-
           {/* RIGHT: TOOL SIDEBAR */}
           <aside
             style={{
