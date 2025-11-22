@@ -1180,24 +1180,31 @@ export default function Publishing(): JSX.Element {
           </div>
         </div>
 
-      {/* MAIN GRID */}
+{/* MAIN GRID */}
 <div
   style={{
     display: "grid",
     // LEFT: fixed-ish sidebar, RIGHT: flexible manuscript editor
     gridTemplateColumns: isWide ? "220px minmax(0, 1fr)" : "1fr",
+    gridTemplateAreas: isWide
+      ? '"sidebar editor"'
+      : '"editor" "sidebar"',
+    alignItems: "flex-start",
     gap: 24,
     padding: "20px 24px",
   }}
 >
+
   {/* LEFT: TOOL SIDEBAR */}
-  <aside
-    style={{
-      display: "flex",
-      flexDirection: "column",
-      gap: 14,
-    }}
-  >
+  {/* MANUSCRIPT EDITOR AREA */}
+<div
+  style={{
+    display: "flex",
+    flexDirection: "column",
+    gap: 16,
+    gridArea: "editor",
+  }}
+>
     {/* Publishing tools menu */}
     <div style={styles.glassCard}>
       <h3
@@ -1900,14 +1907,16 @@ export default function Publishing(): JSX.Element {
     </div>
   </div>
 </div>
-          {/* RIGHT: TOOL SIDEBAR */}
-          <aside
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: 14,
-            }}
-          >
+         {/* TOOL SIDEBAR AREA */}
+<aside
+  style={{
+    display: "flex",
+    flexDirection: "column",
+    gap: 14,
+    gridArea: "sidebar",
+  }}
+>
+
             {/* Publishing tools menu */}
             <div style={styles.glassCard}>
               <h3
