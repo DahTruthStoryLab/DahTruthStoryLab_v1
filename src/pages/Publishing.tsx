@@ -1142,7 +1142,6 @@ useEffect(() => {
   }
 };
 
-
   /* ---------- UI ---------- */
    return (
     <PageShell
@@ -2059,9 +2058,9 @@ useEffect(() => {
           </div>
         </div>
       </div>
-    </PageShell>
+     </PageShell>
   );
-
+}
 
 /* ---------- Small UI helpers ---------- */
 
