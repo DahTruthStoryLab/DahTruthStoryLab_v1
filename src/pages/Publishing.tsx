@@ -69,12 +69,13 @@ type ManuscriptPresetKey =
   | "Poetry_Minimal_12pt_Serif";
 
 type PlatformPresetKey =
-  | "KDP_Ebook"
-  | "KDP_Paperback_6x9"
   | "KDP_Paperback_5x8"
+  | "KDP_Paperback_5_25x8"
   | "KDP_Paperback_5_5x8_5"
-  | "Print_8_5x11"
-  | "Draft2Digital_Eebook"
+  | "KDP_Paperback_6x9"
+  | "KDP_Paperback_7x10"
+  | "KDP_Paperback_8x10"
+  | "KDP_Ebook"
   | "Generic_Manuscript_Submission";
 
 type NumFmt =
@@ -166,60 +167,117 @@ const PLATFORM_PRESETS: Record<
     showTOCInEbook: boolean;
   }
 > = {
-  KDP_Ebook: {
-    label: "KDP eBook",
-    trim: null,
-    margins: { top: 1, right: 1, bottom: 1, left: 1 },
-    headers: false,
-    footers: false,
-    pageNumbers: false,
-    showTOCInEbook: true,
-  },
-  KDP_Paperback_6x9: {
-    label: "KDP Paperback (6×9)",
-    trim: { widthInch: 6, heightInch: 9 },
-    margins: { top: 1, right: 0.75, bottom: 1, left: 0.75, gutter: 0.5 },
-    headers: true,
-    footers: true,
-    pageNumbers: true,
-    showTOCInEbook: false,
-  },
   KDP_Paperback_5x8: {
-    label: "KDP Paperback (5×8)",
+    label: "KDP Paperback – 5 x 8 in",
     trim: { widthInch: 5, heightInch: 8 },
-    margins: { top: 1, right: 0.75, bottom: 1, left: 0.75, gutter: 0.5 },
+    margins: {
+      top: 0.75,
+      bottom: 0.75,
+      left: 0.75,
+      right: 0.5,
+      gutter: 0.375,
+    },
     headers: true,
     footers: true,
     pageNumbers: true,
-    showTOCInEebook: false,
-  } as any,
+    showTOCInEbook: false,
+  },
+
+  KDP_Paperback_5_25x8: {
+    label: "KDP Paperback – 5.25 x 8 in",
+    trim: { widthInch: 5.25, heightInch: 8 },
+    margins: {
+      top: 0.75,
+      bottom: 0.75,
+      left: 0.75,
+      right: 0.5,
+      gutter: 0.375,
+    },
+    headers: true,
+    footers: true,
+    pageNumbers: true,
+    showTOCInEbook: false,
+  },
+
   KDP_Paperback_5_5x8_5: {
-    label: "KDP Paperback (5.5×8.5)",
+    label: "KDP Paperback – 5.5 x 8.5 in",
     trim: { widthInch: 5.5, heightInch: 8.5 },
-    margins: { top: 1, right: 0.75, bottom: 1, left: 0.75, gutter: 0.5 },
+    margins: {
+      top: 0.75,
+      bottom: 0.75,
+      left: 0.75,
+      right: 0.5,
+      gutter: 0.375,
+    },
     headers: true,
     footers: true,
     pageNumbers: true,
     showTOCInEbook: false,
   },
-  Print_8_5x11: {
-    label: "Print (8.5×11)",
-    trim: { widthInch: 8.5, heightInch: 11 },
-    margins: { top: 1, right: 1, bottom: 1, left: 1, gutter: 0.5 },
+
+  KDP_Paperback_6x9: {
+    label: "KDP Paperback – 6 x 9 in",
+    trim: { widthInch: 6, heightInch: 9 },
+    margins: {
+      top: 0.75,
+      bottom: 0.75,
+      left: 0.75,
+      right: 0.5,
+      gutter: 0.375,
+    },
     headers: true,
     footers: true,
     pageNumbers: true,
     showTOCInEbook: false,
   },
-  Draft2Digital_Eebook: {
-    label: "Draft2Digital eBook",
+
+  KDP_Paperback_7x10: {
+    label: "KDP Paperback – 7 x 10 in",
+    trim: { widthInch: 7, heightInch: 10 },
+    margins: {
+      top: 0.75,
+      bottom: 0.75,
+      left: 0.75,
+      right: 0.5,
+      gutter: 0.375,
+    },
+    headers: true,
+    footers: true,
+    pageNumbers: true,
+    showTOCInEbook: false,
+  },
+
+  KDP_Paperback_8x10: {
+    label: "KDP Paperback – 8 x 10 in",
+    trim: { widthInch: 8, heightInch: 10 },
+    margins: {
+      top: 0.75,
+      bottom: 0.75,
+      left: 0.75,
+      right: 0.5,
+      gutter: 0.375,
+    },
+    headers: true,
+    footers: true,
+    pageNumbers: true,
+    showTOCInEbook: false,
+  },
+
+  KDP_Ebook: {
+    label: "KDP Kindle eBook (reflowable)",
     trim: null,
-    margins: { top: 1, right: 1, bottom: 1, left: 1 },
+    margins: {
+      top: 0.2,
+      bottom: 0.2,
+      left: 0.2,
+      right: 0.2,
+    },
     headers: false,
     footers: false,
     pageNumbers: false,
     showTOCInEbook: true,
   },
+
   Generic_Manuscript_Submission: {
     label: "Generic Manuscript Submission (DOCX)",
     trim: null,
@@ -230,6 +288,7 @@ const PLATFORM_PRESETS: Record<
     showTOCInEbook: false,
   },
 };
+
 
 /* ---------- Styles ---------- */
 const styles = {
@@ -449,7 +508,7 @@ export default function Publishing(): JSX.Element {
     }));
   }, [manuscriptPreset]);
 
-   const ms = { ...MANUSCRIPT_PRESETS[manuscriptPreset], ...msOverrides };
+  const ms = { ...MANUSCRIPT_PRESETS[manuscriptPreset], ...msOverrides };
   const pf = PLATFORM_PRESETS[platformPreset];
   const includeHeadersFooters = pf.headers || pf.footers;
 
@@ -2018,30 +2077,29 @@ useEffect(() => {
                 }}
               >
                 <div
-                  ref={editorRef}
-                  contentEditable
-                  suppressContentEditableWarning
-                  style={{
-                    margin: "0 auto",
-                    width: "100%",
-                    maxWidth: 840,
-                    minHeight: 1040,
-                    background: "#ffffff",
-                    color: "#111",
-                    border: "1px solid #e5e7eb",
-                    boxShadow: "0 8px 30px rgba(2,20,40,0.10)",
-                    borderRadius: 6,
-                    padding: "48px 48px",
-                    lineHeight: ms.lineHeight,
-                    fontFamily: ms.fontFamily,
-                    fontSize: ms.fontSizePt * (96 / 72),
-                    outline: "none",
-                    direction: "ltr",
-                    unicodeBidi: "plaintext",
-                    whiteSpace: "pre-wrap",
-                  }}
-                ></div>
-              </div>
+                ref={editorRef}
+                contentEditable
+                suppressContentEditableWarning
+                style={{
+                  margin: "0 auto",
+                  width: "100%",
+                  maxWidth: pageWidthPx, // 🔁 was 840
+                  minHeight: 1040,
+                  background: "#ffffff",
+                  color: "#111",
+                  border: "1px solid #e5e7eb",
+                  boxShadow: "0 8px 30px rgba(2,20,40,0.10)",
+                  borderRadius: 6,
+                  padding: `48px ${rightPaddingPx}px 48px ${leftPaddingPx}px`, // 🔁 was "48px 48px"
+                  lineHeight: ms.lineHeight,
+                  fontFamily: ms.fontFamily,
+                  fontSize: ms.fontSizePt * (96 / 72),
+                  outline: "none",
+                  direction: "ltr",
+                  unicodeBidi: "plaintext",
+                  whiteSpace: "pre-wrap",
+                }}
+              ></div>
 
               <div
                 style={{
