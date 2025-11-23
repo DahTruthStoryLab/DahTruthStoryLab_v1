@@ -449,25 +449,24 @@ export default function Publishing(): JSX.Element {
     }));
   }, [manuscriptPreset]);
 
-  // Rough visual preview of page size based on platform trim/margins
-const inchToPx = (inch: number) => inch * 96; // CSS assumes 96 DPI
-
-const pageWidthPx =
-  pf.trim?.widthInch ? inchToPx(pf.trim.widthInch) : 840;
-
-const leftPaddingPx = pf.margins.left ? inchToPx(pf.margins.left) * 0.6 : 48;
-const rightPaddingPx = pf.margins.right ? inchToPx(pf.margins.right) * 0.6 : 48;
-
-const leftPaddingPx = pf.margins.left ? inchToPx(pf.margins.left) * 0.6 : 48;
-const rightPaddingPx = pf.margins.right ? inchToPx(pf.margins.right) * 0.6 : 48;
-
-  const ms = { ...MANUSCRIPT_PRESETS[manuscriptPreset], ...msOverrides };
+   const ms = { ...MANUSCRIPT_PRESETS[manuscriptPreset], ...msOverrides };
   const pf = PLATFORM_PRESETS[platformPreset];
   const includeHeadersFooters = pf.headers || pf.footers;
+
   // Rough visual preview of page size based on platform trim/margins
-  
-const leftPaddingPx = pf.margins.left ? inchToPx(pf.margins.left) * 0.6 : 48;
-const rightPaddingPx = pf.margins.right ? inchToPx(pf.margins.right) * 0.6 : 48;
+  const inchToPx = (inch: number) => inch * 96; // CSS assumes 96 DPI
+
+  const pageWidthPx = pf.trim?.widthInch
+    ? inchToPx(pf.trim.widthInch)
+    : 840;
+
+  const leftPaddingPx = pf.margins.left
+    ? inchToPx(pf.margins.left) * 0.6
+    : 48;
+
+  const rightPaddingPx = pf.margins.right
+    ? inchToPx(pf.margins.right) * 0.6
+    : 48;
 
   const [activeChapterId, setActiveChapterId] = useState(
     chapters[0]?.id || ""
