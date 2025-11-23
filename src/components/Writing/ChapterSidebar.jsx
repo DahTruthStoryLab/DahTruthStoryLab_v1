@@ -106,6 +106,10 @@ function ChapterItem({
                   {selectedIds.size}
                 </span>
               )}
+              {/* 📕 full manuscript vs 📖 normal chapter */}
+              <span className="text-[11px]">
+                {chapter.isFullManuscript ? "📕" : "📖"}
+              </span>
               <p className="truncate font-semibold text-[11px]">
                 {chapter.title || `Chapter ${index + 1}`}
               </p>
