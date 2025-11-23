@@ -449,9 +449,25 @@ export default function Publishing(): JSX.Element {
     }));
   }, [manuscriptPreset]);
 
+  // Rough visual preview of page size based on platform trim/margins
+const inchToPx = (inch: number) => inch * 96; // CSS assumes 96 DPI
+
+const pageWidthPx =
+  pf.trim?.widthInch ? inchToPx(pf.trim.widthInch) : 840;
+
+const leftPaddingPx = pf.margins.left ? inchToPx(pf.margins.left) * 0.6 : 48;
+const rightPaddingPx = pf.margins.right ? inchToPx(pf.margins.right) * 0.6 : 48;
+
+const leftPaddingPx = pf.margins.left ? inchToPx(pf.margins.left) * 0.6 : 48;
+const rightPaddingPx = pf.margins.right ? inchToPx(pf.margins.right) * 0.6 : 48;
+
   const ms = { ...MANUSCRIPT_PRESETS[manuscriptPreset], ...msOverrides };
   const pf = PLATFORM_PRESETS[platformPreset];
   const includeHeadersFooters = pf.headers || pf.footers;
+  // Rough visual preview of page size based on platform trim/margins
+  
+const leftPaddingPx = pf.margins.left ? inchToPx(pf.margins.left) * 0.6 : 48;
+const rightPaddingPx = pf.margins.right ? inchToPx(pf.margins.right) * 0.6 : 48;
 
   const [activeChapterId, setActiveChapterId] = useState(
     chapters[0]?.id || ""
@@ -1207,28 +1223,88 @@ useEffect(() => {
               </div>
             </div>
 
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "flex-end",
-                gap: 4,
-                minWidth: 140,
-              }}
-            >
-              <div style={{ fontSize: 11 }}>
-                Word count:{" "}
-                <span style={{ fontWeight: 600 }}>{wordCount.toLocaleString()}</span>
-              </div>
-              <div style={{ fontSize: 11 }}>
-                Platform:{" "}
-                <span style={{ fontWeight: 600 }}>
-                  {PLATFORM_PRESETS[platformPreset].label}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
+         <div
+  style={{
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "flex-end",
+    gap: 4,
+    minWidth: 180,
+  }}
+>
+  <div style={{ fontSize: 11 }}>
+    Word count:{" "}
+    <span style={{ fontWeight: 600 }}>{wordCount.toLocaleString()}</span>
+  </div>
+
+  <div
+    style={{
+      fontSize: 11,
+      display: "flex",
+      alignItems: "center",
+      gap: 6,
+    }}
+  >
+    <span>Platform:</span>
+    <select
+      value={platformPreset}
+      onChange={(e) =>
+        setPlatformPreset(e.target.value as PlatformPresetKey)
+      }
+      style={{
+        ...(styles.input as any),
+        width: 180,
+        padding: "4px 8px",
+        fontSize: 11,
+        height: 26,
+      }}
+    >
+      {(Object.keys(PLATFORM_PRESETS) as PlatformPresetKey[]).map((key) => (
+        <option key={key} value={key}>
+          {PLATFORM_PRESETS[key].label}
+        </option>
+      ))}
+    </select>
+  </div>
+</div>
+
+  style={{
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "flex-end",
+    gap: 4,
+    minWidth: 180,
+  }}
+>
+  <div style={{ fontSize: 11 }}>
+    Word count:{" "}
+    <span style={{ fontWeight: 600 }}>
+      {wordCount.toLocaleString()}
+    </span>
+  </div>
+
+  <div style={{ fontSize: 11 }}>
+    Platform layout:
+  </div>
+  <select
+    value={platformPreset}
+    onChange={(e) =>
+      setPlatformPreset(e.target.value as PlatformPresetKey)
+    }
+    style={{
+      ...styles.input,
+      fontSize: 11,
+      padding: "4px 8px",
+      width: "100%",
+    }}
+  >
+    {Object.entries(PLATFORM_PRESETS).map(([key, cfg]) => (
+      <option key={key} value={key}>
+        {cfg.label}
+      </option>
+    ))}
+  </select>
+</div>
 
         {/* MAIN GRID */}
         <div
@@ -1243,384 +1319,453 @@ useEffect(() => {
             padding: "20px 24px",
           }}
         >
-          {/* TOOL SIDEBAR (LEFT) */}
-          <aside
-            style={{
-              gridArea: "sidebar",
-              display: "flex",
-              flexDirection: "column",
-              gap: 14,
-            }}
-          >
-            {/* Publishing tools menu */}
-            <div style={styles.glassCard}>
-              <h3
-                style={{
-                  margin: "0 0 10px",
-                  fontSize: 15,
-                  color: theme.text,
-                  fontWeight: 600,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                }}
-              >
-                <span aria-hidden>🧭</span> Publishing Tools
-              </h3>
-              <p
-                style={{
-                  fontSize: 11,
-                  color: theme.subtext,
-                  marginBottom: 10,
-                }}
-              >
-                Quick routes into deeper tools when you are ready.
-              </p>
+      {/* TOOL SIDEBAR (LEFT) */}
+<aside
+  style={{
+    gridArea: "sidebar",
+    display: "flex",
+    flexDirection: "column",
+    gap: 14,
+  }}
+>
+  {/* Platform details: shows trim + margins for the current preset */}
+  <div style={styles.glassCard}>
+    <h3
+      style={{
+        margin: "0 0 10px",
+        fontSize: 15,
+        color: theme.text,
+        fontWeight: 600,
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
+      }}
+    >
+      <span aria-hidden>📐</span> Platform Details
+    </h3>
 
-              <div style={{ display: "grid", gap: 8 }}>
-                <button
-                  style={{
-                    ...styles.btn,
-                    textAlign: "left",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                  }}
-                  onClick={() => navigate("/proof")}
-                >
-                  <span style={{ fontSize: 18 }}>✅</span>
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 600 }}>
-                      Proof & Consistency
-                    </div>
-                    <div style={{ fontSize: 11, color: theme.subtext }}>
-                      Grammar, style, timeline
-                    </div>
-                  </div>
-                </button>
+    <p
+      style={{
+        fontSize: 11,
+        color: theme.subtext,
+        marginBottom: 10,
+      }}
+    >
+      Based on your selected platform, this preview approximates page size
+      and margins for the editor.
+    </p>
 
-                <button
-                  style={{
-                    ...styles.btn,
-                    textAlign: "left",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                  }}
-                  onClick={() => navigate("/format")}
-                >
-                  <span style={{ fontSize: 18 }}>🎨</span>
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 600 }}>
-                      Format & Styles
-                    </div>
-                    <div style={{ fontSize: 11, color: theme.subtext }}>
-                      Fonts, spacing, margins
-                    </div>
-                  </div>
-                </button>
+    <div style={{ fontSize: 11, display: "grid", gap: 4 }}>
+      <div>
+        <strong>Preset:</strong>{" "}
+        {pf.label}
+      </div>
 
-                <button
-                  style={{
-                    ...styles.btn,
-                    textAlign: "left",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                  }}
-                  onClick={() => navigate("/export")}
-                >
-                  <span style={{ fontSize: 18 }}>📦</span>
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 600 }}>Export</div>
-                    <div style={{ fontSize: 11, color: theme.subtext }}>
-                      PDF, DOCX, EPUB
-                    </div>
-                  </div>
-                </button>
+      <div>
+        <strong>Trim size:</strong>{" "}
+        {pf.trim
+          ? `${pf.trim.widthInch}" × ${pf.trim.heightInch}"`
+          : "Ebook / no fixed trim"}
+      </div>
 
-                <button
-                  style={{
-                    ...styles.btn,
-                    textAlign: "left",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                  }}
-                  onClick={() => navigate("/publishing-prep")}
-                >
-                  <span style={{ fontSize: 18 }}>🚀</span>
-                  <div>
-                    <div style={{ fontSize: 13, fontWeight: 600 }}>
-                      Publishing Prep
-                    </div>
-                    <div style={{ fontSize: 11, color: theme.subtext }}>
-                      Query, synopsis, marketing
-                    </div>
-                  </div>
-                </button>
-              </div>
-            </div>
+      <div>
+        <strong>Margins (top / right / bottom / left):</strong>{" "}
+        {pf.margins.top}" / {pf.margins.right}" / {pf.margins.bottom}" /{" "}
+        {pf.margins.left}"
+      </div>
 
-            {/* AI tools */}
-            <div style={styles.glassCard}>
-              <h3
-                style={{
-                  margin: "0 0 10px",
-                  fontSize: 15,
-                  color: theme.text,
-                  fontWeight: 600,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 6,
-                }}
-              >
-                <span aria-hidden>🤖</span> Line-level AI Help
-              </h3>
+      {typeof pf.margins.gutter === "number" && (
+        <div>
+          <strong>Gutter:</strong> {pf.margins.gutter}"
+        </div>
+      )}
 
-              <div style={{ marginBottom: 10 }}>
-                <label
-                  style={{
-                    ...styles.label,
-                    display: "block",
-                    marginBottom: 4,
-                  }}
-                >
-                  AI Provider
-                </label>
-                <select
-                  value={provider}
-                  onChange={(e) =>
-                    setProvider(e.target.value as "openai" | "anthropic")
-                  }
-                  style={{ ...styles.input, fontSize: 12 }}
-                >
-                  <option value="openai">OpenAI</option>
-                  <option value="anthropic">Anthropic</option>
-                </select>
-              </div>
+      <div>
+        <strong>Headers / footers:</strong>{" "}
+        {includeHeadersFooters ? "On" : "Off"}
+      </div>
 
-              <div
-                role="group"
-                aria-label="AI tools"
-                style={{ display: "grid", gap: 6 }}
-              >
-                {AI_ACTIONS.map((a) => (
-                  <AIActionButton
-                    key={a.key}
-                    icon={a.icon}
-                    title={a.title}
-                    subtitle={a.subtitle}
-                    busy={working === a.key}
-                    onClick={async () => {
-                      if (working) return;
-                      setWorking(a.key);
-                      try {
-                        const currentHtml =
-                          editorRef.current?.innerHTML ?? "";
-                        const currentText = stripHtml(currentHtml) || "";
+      <div>
+        <strong>Page numbers:</strong>{" "}
+        {pf.pageNumbers ? "Shown" : "Hidden"}
+      </div>
 
-                        let res: any;
-                        if (a.key === "grammar") {
-                          res = await runGrammar(currentText, provider);
-                        } else if (a.key === "style") {
-                          res = await runStyle(currentText, provider);
-                        } else if (a.key === "readability") {
-                          res = await runReadability(currentText, provider);
-                        } else if (a.key === "assistant") {
-                          res = await runAssistant(
-                            currentText,
-                            "improve",
-                            "",
-                            provider
-                          );
-                        }
+      <div>
+        <strong>Show TOC in ebook:</strong>{" "}
+        {pf.showTOCInEbook ? "Yes" : "No"}
+      </div>
+    </div>
+  </div>
 
-                        const improvedText =
-                          res?.result ||
-                          res?.text ||
-                          res?.output ||
-                          currentText;
+  {/* Publishing tools menu */}
+  <div style={styles.glassCard}>
+    <h3
+      style={{
+        margin: "0 0 10px",
+        fontSize: 15,
+        color: theme.text,
+        fontWeight: 600,
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
+      }}
+    >
+      <span aria-hidden>🧭</span> Publishing Tools
+    </h3>
+    <p
+      style={{
+        fontSize: 11,
+        color: theme.subtext,
+        marginBottom: 10,
+      }}
+    >
+      Quick routes into deeper tools when you are ready.
+    </p>
 
-                        const improved =
-                          improvedText !== currentText
-                            ? `<p>${improvedText
-                                .split("\n\n")
-                                .join("</p><p>")}</p>`.replace(
-                                /<p><\/p>/g,
-                                "<p><br/></p>"
-                              )
-                            : currentHtml;
+    <div style={{ display: "grid", gap: 8 }}>
+      <button
+        style={{
+          ...styles.btn,
+          textAlign: "left",
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+        }}
+        onClick={() => navigate("/proof")}
+      >
+        <span style={{ fontSize: 18 }}>✅</span>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 600 }}>
+            Proof & Consistency
+          </div>
+          <div style={{ fontSize: 11, color: theme.subtext }}>
+            Grammar, style, timeline
+          </div>
+        </div>
+      </button>
 
-                        if (editorRef.current && improved !== currentHtml) {
-                          editorRef.current.innerHTML = improved;
-                        }
+      <button
+        style={{
+          ...styles.btn,
+          textAlign: "left",
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+        }}
+        onClick={() => navigate("/format")}
+      >
+        <span style={{ fontSize: 18 }}>🎨</span>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 600 }}>
+            Format & Styles
+          </div>
+          <div style={{ fontSize: 11, color: theme.subtext }}>
+            Fonts, spacing, margins
+          </div>
+        </div>
+      </button>
 
-                        setChapters((prev) => {
-                          const next = [...prev];
-                          const ch = next[activeIdx];
-                          if (ch) next[activeIdx] = { ...ch, textHTML: improved };
-                          return next;
-                        });
-                      } catch (e: any) {
-                        console.error("[AI Error]:", e);
-                        alert(
-                          e?.message ||
-                            "AI request failed. Check console for details."
-                        );
-                      } finally {
-                        setWorking(null);
-                      }
-                    }}
-                  />
-                ))}
-              </div>
+      <button
+        style={{
+          ...styles.btn,
+          textAlign: "left",
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+        }}
+        onClick={() => navigate("/export")}
+      >
+        <span style={{ fontSize: 18 }}>📦</span>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 600 }}>Export</div>
+          <div style={{ fontSize: 11, color: theme.subtext }}>
+            PDF, DOCX, EPUB
+          </div>
+        </div>
+      </button>
 
-              <div
-                style={{
-                  marginTop: 10,
-                  display: "flex",
-                  justifyContent: "flex-end",
-                }}
-              >
-                <button
-                  style={styles.btnDark}
-                  disabled={working !== null}
-                  onClick={async () => {
-                    if (working) return;
-                    setWorking("assistant");
-                    try {
-                      const chaptersPlain = chapters
-                        .filter((c) => c.included)
-                        .map((c) => ({
-                          id: c.id,
-                          title: c.title,
-                          text: c.textHTML ? stripHtml(c.textHTML) : c.text,
-                        }));
+      <button
+        style={{
+          ...styles.btn,
+          textAlign: "left",
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+        }}
+        onClick={() => navigate("/publishing-prep")}
+      >
+        <span style={{ fontSize: 18 }}>🚀</span>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 600 }}>
+            Publishing Prep
+          </div>
+          <div style={{ fontSize: 11, color: theme.subtext }}>
+            Query, synopsis, marketing
+          </div>
+        </div>
+      </button>
+    </div>
+  </div>
 
-                      const res = await runPublishingPrep(
-                        meta,
-                        chaptersPlain,
-                        {
-                          tone: "professional/warm",
-                          audience: "agents_and_publishers",
-                        },
-                        provider
-                      );
+  {/* AI tools */}
+  <div style={styles.glassCard}>
+    <h3
+      style={{
+        margin: "0 0 10px",
+        fontSize: 15,
+        color: theme.text,
+        fontWeight: 600,
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
+      }}
+    >
+      <span aria-hidden>🤖</span> Line-level AI Help
+    </h3>
 
-                      if (!res?.prep && !res?.result)
-                        throw new Error("No prep content returned from AI.");
-                      navigate("/publishing-prep", {
-                        state: { generated: res.prep || res.result || res },
-                      });
-                    } catch (e: any) {
-                      console.error("[Publishing Prep Error]:", e);
-                      alert(
-                        e?.message ||
-                          "Couldn't generate publishing prep just yet."
-                      );
-                    } finally {
-                      setWorking(null);
-                    }
-                  }}
-                >
-                  ✨ Full Publishing Prep
-                </button>
-              </div>
-            </div>
+    <div style={{ marginBottom: 10 }}>
+      <label
+        style={{
+          ...styles.label,
+          display: "block",
+          marginBottom: 4,
+        }}
+      >
+        AI Provider
+      </label>
+      <select
+        value={provider}
+        onChange={(e) =>
+          setProvider(e.target.value as "openai" | "anthropic")
+        }
+        style={{ ...styles.input, fontSize: 12 }}
+      >
+        <option value="openai">OpenAI</option>
+        <option value="anthropic">Anthropic</option>
+      </select>
+    </div>
 
-            {/* Story materials */}
-            <div style={styles.glassCard}>
-              <h3
-                style={{
-                  margin: "0 0 10px 0",
-                  fontSize: 15,
-                  color: theme.text,
-                  fontWeight: 600,
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                }}
-              >
-                <span aria-hidden>📄</span> Story Materials
-              </h3>
-              <p
-                style={{
-                  fontSize: 11,
-                  color: theme.subtext,
-                  marginBottom: 8,
-                }}
-              >
-                Uses your compiled manuscript (front matter + chapters) to draft
-                agent-ready materials.
-              </p>
+    <div
+      role="group"
+      aria-label="AI tools"
+      style={{ display: "grid", gap: 6 }}
+    >
+      {AI_ACTIONS.map((a) => (
+        <AIActionButton
+          key={a.key}
+          icon={a.icon}
+          title={a.title}
+          subtitle={a.subtitle}
+          busy={working === a.key}
+          onClick={async () => {
+            if (working) return;
+            setWorking(a.key);
+            try {
+              const currentHtml =
+                editorRef.current?.innerHTML ?? "";
+              const currentText = stripHtml(currentHtml) || "";
 
-              <div
-                style={{
-                  display: "flex",
-                  flexWrap: "wrap",
-                  gap: 6,
-                  marginBottom: 10,
-                }}
-              >
-                {MATERIAL_ACTIONS.map((opt) => (
-                  <button
-                    key={opt.key}
-                    type="button"
-                    onClick={() => handleGenerateMaterial(opt.key)}
-                    disabled={materialBusy}
-                    style={{
-                      ...styles.btn,
-                      padding: "5px 9px",
-                      fontSize: 11,
-                      borderRadius: 999,
-                      border:
-                        materialKey === opt.key
-                          ? `1px solid ${theme.accent}`
-                          : `1px solid ${theme.border}`,
-                      background:
-                        materialKey === opt.key ? theme.highlight : theme.white,
-                      opacity: materialBusy ? 0.7 : 1,
-                    }}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
+              let res: any;
+              if (a.key === "grammar") {
+                res = await runGrammar(currentText, provider);
+              } else if (a.key === "style") {
+                res = await runStyle(currentText, provider);
+              } else if (a.key === "readability") {
+                res = await runReadability(currentText, provider);
+              } else if (a.key === "assistant") {
+                res = await runAssistant(
+                  currentText,
+                  "improve",
+                  "",
+                  provider
+                );
+              }
 
-              <button
-                type="button"
-                onClick={() => handleGenerateMaterial(materialKey)}
-                disabled={materialBusy}
-                style={{
-                  ...styles.btnPrimary,
-                  padding: "7px 12px",
-                  fontSize: 12,
-                }}
-              >
-                {materialBusy ? "Generating..." : "Generate selected"}
-              </button>
+              const improvedText =
+                res?.result ||
+                res?.text ||
+                res?.output ||
+                currentText;
 
-              {materialOutput && (
-                <div
-                  style={{
-                    marginTop: 10,
-                    borderRadius: 10,
-                    border: `1px solid ${theme.border}`,
-                    background: "#050819",
-                    padding: 10,
-                    maxHeight: 260,
-                    overflow: "auto",
-                    color: "#f9fafb",
-                    fontSize: 12,
-                    whiteSpace: "pre-wrap",
-                  }}
-                >
-                  {materialOutput}
-                </div>
-              )}
-            </div>
-          </aside>
+              const improved =
+                improvedText !== currentText
+                  ? `<p>${improvedText
+                      .split("\n\n")
+                      .join("</p><p>")}</p>`.replace(
+                      /<p><\/p>/g,
+                      "<p><br/></p>"
+                    )
+                  : currentHtml;
+
+              if (editorRef.current && improved !== currentHtml) {
+                editorRef.current.innerHTML = improved;
+              }
+
+              setChapters((prev) => {
+                const next = [...prev];
+                const ch = next[activeIdx];
+                if (ch) next[activeIdx] = { ...ch, textHTML: improved };
+                return next;
+              });
+            } catch (e: any) {
+              console.error("[AI Error]:", e);
+              alert(
+                e?.message ||
+                  "AI request failed. Check console for details."
+              );
+            } finally {
+              setWorking(null);
+            }
+          }}
+        />
+      ))}
+    </div>
+
+    <div
+      style={{
+        marginTop: 10,
+        display: "flex",
+        justifyContent: "flex-end",
+      }}
+    >
+      <button
+        style={styles.btnDark}
+        disabled={working !== null}
+        onClick={async () => {
+          if (working) return;
+          setWorking("assistant");
+          try {
+            const chaptersPlain = chapters
+              .filter((c) => c.included)
+              .map((c) => ({
+                id: c.id,
+                title: c.title,
+                text: c.textHTML ? stripHtml(c.textHTML) : c.text,
+              }));
+
+            const res = await runPublishingPrep(
+              meta,
+              chaptersPlain,
+              {
+                tone: "professional/warm",
+                audience: "agents_and_publishers",
+              },
+              provider
+            );
+
+            if (!res?.prep && !res?.result)
+              throw new Error("No prep content returned from AI.");
+            navigate("/publishing-prep", {
+              state: { generated: res.prep || res.result || res },
+            });
+          } catch (e: any) {
+            console.error("[Publishing Prep Error]:", e);
+            alert(
+              e?.message ||
+                "Couldn't generate publishing prep just yet."
+            );
+          } finally {
+            setWorking(null);
+          }
+        }}
+      >
+        ✨ Full Publishing Prep
+      </button>
+    </div>
+  </div>
+
+  {/* Story materials */}
+  <div style={styles.glassCard}>
+    <h3
+      style={{
+        margin: "0 0 10px 0",
+        fontSize: 15,
+        color: theme.text,
+        fontWeight: 600,
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+      }}
+    >
+      <span aria-hidden>📄</span> Story Materials
+    </h3>
+    <p
+      style={{
+        fontSize: 11,
+        color: theme.subtext,
+        marginBottom: 8,
+      }}
+    >
+      Uses your compiled manuscript (front matter + chapters) to draft
+      agent-ready materials.
+    </p>
+
+    <div
+      style={{
+        display: "flex",
+        flexWrap: "wrap",
+        gap: 6,
+        marginBottom: 10,
+      }}
+    >
+      {MATERIAL_ACTIONS.map((opt) => (
+        <button
+          key={opt.key}
+          type="button"
+          onClick={() => handleGenerateMaterial(opt.key)}
+          disabled={materialBusy}
+          style={{
+            ...styles.btn,
+            padding: "5px 9px",
+            fontSize: 11,
+            borderRadius: 999,
+            border:
+              materialKey === opt.key
+                ? `1px solid ${theme.accent}`
+                : `1px solid ${theme.border}`,
+            background:
+              materialKey === opt.key ? theme.highlight : theme.white,
+            opacity: materialBusy ? 0.7 : 1,
+          }}
+        >
+          {opt.label}
+        </button>
+      ))}
+    </div>
+
+    <button
+      type="button"
+      onClick={() => handleGenerateMaterial(materialKey)}
+      disabled={materialBusy}
+      style={{
+        ...styles.btnPrimary,
+        padding: "7px 12px",
+        fontSize: 12,
+      }}
+    >
+      {materialBusy ? "Generating..." : "Generate selected"}
+    </button>
+
+    {materialOutput && (
+      <div
+        style={{
+          marginTop: 10,
+          borderRadius: 10,
+          border: `1px solid ${theme.border}`,
+          background: "#050819",
+          padding: 10,
+          maxHeight: 260,
+          overflow: "auto",
+          color: "#f9fafb",
+          fontSize: 12,
+          whiteSpace: "pre-wrap",
+        }}
+      >
+        {materialOutput}
+      </div>
+    )}
+  </div>
+</aside>
 
           {/* MANUSCRIPT EDITOR (RIGHT) */}
           <div
@@ -1941,31 +2086,30 @@ useEffect(() => {
                 }}
               >
                 <div
-                  ref={editorRef}
-                  contentEditable
-                  suppressContentEditableWarning
-                  style={{
-                    margin: "0 auto",
-                    width: "100%",
-                    maxWidth: 840,
-                    minHeight: 1040,
-                    background: "#ffffff",
-                    color: "#111",
-                    border: "1px solid #e5e7eb",
-                    boxShadow: "0 8px 30px rgba(2,20,40,0.10)",
-                    borderRadius: 6,
-                    padding: "48px 48px",
-                    lineHeight: ms.lineHeight,
-                    fontFamily: ms.fontFamily,
-                    fontSize: ms.fontSizePt * (96 / 72),
-                    outline: "none",
-                    direction: "ltr",
-                    unicodeBidi: "plaintext",
-                    whiteSpace: "pre-wrap",
-                  }}
-                ></div>
-              </div>
-
+                ref={editorRef}
+                contentEditable
+                suppressContentEditableWarning
+                style={{
+                  margin: "0 auto",
+                  width: "100%",
+                  maxWidth: pageWidthPx, // 👈 was 840
+                  minHeight: 1040,
+                  background: "#ffffff",
+                  color: "#111",
+                  border: "1px solid #e5e7eb",
+                  boxShadow: "0 8px 30px rgba(2,20,40,0.10)",
+                  borderRadius: 6,
+                  padding: `48px ${rightPaddingPx}px 48px ${leftPaddingPx}px`, // 👈 was "48px 48px"
+                  lineHeight: ms.lineHeight,
+                  fontFamily: ms.fontFamily,
+                  fontSize: ms.fontSizePt * (96 / 72),
+                  outline: "none",
+                  direction: "ltr",
+                  unicodeBidi: "plaintext",
+                  whiteSpace: "pre-wrap",
+                }}
+              ></div>
+              
               <div
                 style={{
                   color: theme.subtext,
