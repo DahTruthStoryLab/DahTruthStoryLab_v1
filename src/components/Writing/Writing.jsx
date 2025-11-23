@@ -194,7 +194,21 @@ const Writing = () => {
     if (!selectedChapter) return;
     handleRenameChapter(selectedChapter.id, newTitle);
   };
+  const handleMoveChapter = (fromIndex, toIndex) => {
+    setChapters((prev) => {
+      const next = [...prev];
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, moved);
+      const now = new Date().toISOString();
+      return next.map((ch, idx) => ({
+        ...ch,
+        order: idx + 1,
+        updatedAt: now,
+      }));
+    });
+  };
 
+  
   // 🖼 Image upload handlers
   const handleClickInsertImage = () => {
     if (!selectedChapterId) return;
