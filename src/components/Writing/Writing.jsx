@@ -18,6 +18,7 @@ import {
 import { uploadImage } from "../lib/uploads";
 
 const STORAGE_KEY = "dahtruth_chapters";
+const META_KEY = "dahtruth_project_meta";
 
 const Writing = () => {
   const [viewMode, setViewMode] = useState("grid"); // "grid" | "list"
@@ -27,6 +28,37 @@ const Writing = () => {
 
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const imageInputRef = useRef(null);
+
+  // 🔹 Shared project meta (synced with Publishing page)
+  const [meta, setMeta] = useState({
+    title: "Working Title",
+    author: "Your Name",
+    year: new Date().getFullYear().toString(),
+  });
+
+  // Load project meta from localStorage on mount
+  useEffect(() => {
+    try {
+      const savedMeta = localStorage.getItem(META_KEY);
+      if (savedMeta) {
+        const parsed = JSON.parse(savedMeta);
+        if (parsed && typeof parsed === "object") {
+          setMeta((prev) => ({ ...prev, ...parsed }));
+        }
+      }
+    } catch (err) {
+      console.warn("Failed to load project meta", err);
+    }
+  }, []);
+
+  // Save project meta if it ever changes here
+  useEffect(() => {
+    try {
+      localStorage.setItem(META_KEY, JSON.stringify(meta));
+    } catch (err) {
+      console.warn("Failed to save project meta", err);
+    }
+  }, [meta]);
 
   // Load chapters from localStorage on mount
   useEffect(() => {
@@ -65,16 +97,25 @@ const Writing = () => {
   useEffect(() => {
     syncProjectForCurrentStory({
       wordCount: totalWords,
-      // If/when you track targetWords for this book, pass it here too.
+      title: meta.title,
+      // later we can add targetWords, genre, etc.
     });
-  }, [totalWords]);
+  }, [totalWords, meta.title]);
 
   const handleAddChapter = () => {
     const now = new Date().toISOString();
+    const chapterNumber = chapters.length + 1;
+
+    const baseTitle =
+      meta && meta.title && meta.title.trim()
+        ? meta.title.trim()
+        : "Story";
+
     const newChapter = {
       id: `chapter-${Date.now()}`,
-      order: chapters.length + 1,
-      title: `Chapter ${chapters.length + 1}`,
+      order: chapterNumber,
+      // 🔹 Use "Novel Name – Chapter #"
+      title: `${baseTitle} – Chapter ${chapterNumber}`,
       summary: "",
       content: "",
       wordCount: 0,
@@ -206,10 +247,12 @@ const Writing = () => {
             </div>
             <div className="flex flex-col">
               <h1 className="text-lg font-semibold text-white tracking-tight">
-                My Writing
+                {meta.title || "My Writing"}
               </h1>
               <p className="text-xs text-white/60">
-                Chapters, drafts, and manuscripts in one place
+                {meta.author
+                  ? `by ${meta.author}`
+                  : "Chapters, drafts, and manuscripts in one place"}
               </p>
               <p className="text-[10px] text-white/40 mt-0.5">
                 Total words: {totalWords.toLocaleString()}
