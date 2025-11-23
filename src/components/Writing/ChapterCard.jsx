@@ -1,9 +1,9 @@
 // src/components/Writing/ChapterCard.jsx
-// Individual chapter card with drag-and-drop, glassmorphic design
+// Individual chapter card with drag-and-drop, writerly design
 
 import React, { useRef } from "react";
 import { useDrag, useDrop } from "react-dnd";
-import { Trash2 } from "lucide-react";
+import { Trash2, PenSquare } from "lucide-react";
 
 const DND_TYPE = "CHAPTER_CARD";
 
@@ -11,20 +11,23 @@ const DND_TYPE = "CHAPTER_CARD";
 const getFirstWords = (html = "", wordCount = 20) => {
   // Strip HTML tags
   const text = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
-  
+
   if (!text) return "—";
-  
-  // Split into words and take first N words
+
   const words = text.split(/\s+/);
-  
-  if (words.length <= wordCount) {
-    return text;
-  }
-  
+  if (words.length <= wordCount) return text;
+
   return words.slice(0, wordCount).join(" ") + "...";
 };
 
-export default function ChapterCard({ chapter, index, moveCard, onOpen, active, onDelete }) {
+export default function ChapterCard({
+  chapter,
+  index,
+  moveCard,
+  onOpen,
+  active,
+  onDelete,
+}) {
   const ref = useRef(null);
 
   // Drop zone - allows cards to be dropped here
@@ -34,7 +37,7 @@ export default function ChapterCard({ chapter, index, moveCard, onOpen, active, 
       if (!ref.current) return;
       const dragIndex = item.index;
       if (dragIndex === index) return;
-      
+
       moveCard(dragIndex, index);
       item.index = index;
     },
@@ -47,7 +50,6 @@ export default function ChapterCard({ chapter, index, moveCard, onOpen, active, 
     collect: (monitor) => ({ isDragging: monitor.isDragging() }),
   });
 
-  // Combine drag and drop refs
   drag(drop(ref));
 
   const handleDelete = (e) => {
@@ -57,50 +59,67 @@ export default function ChapterCard({ chapter, index, moveCard, onOpen, active, 
     }
   };
 
+  const previewText =
+    chapter.summary && chapter.summary.trim().length > 0
+      ? chapter.summary.trim()
+      : getFirstWords(chapter.content, 24);
+
   return (
     <button
       ref={ref}
       type="button"
       onClick={onOpen}
       className={[
-        "group relative rounded-2xl border p-4 text-left transition bg-white",
-        active ? "ring-2 ring-primary/60" : "hover:shadow-md",
+        "group relative w-full text-left rounded-xl border border-transparent",
+        "bg-transparent px-1 py-1.5",
+        "transition-all duration-150",
+        active ? "bg-[#f8f1ff] border-[#e1cffe]" : "hover:bg-[#faf3ff]",
         isDragging ? "opacity-50" : "",
       ].join(" ")}
     >
       {/* Delete Button - Top Right */}
       <button
         onClick={handleDelete}
-        className="absolute top-2 right-2 p-1.5 rounded-lg bg-white/80 hover:bg-red-50 text-slate-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity z-10"
+        className="absolute top-1.5 right-1.5 p-1 rounded-full bg-white/90 hover:bg-red-50 text-[#9a7bc0] hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity z-10 shadow-sm"
         title="Delete chapter"
+        type="button"
       >
-        <Trash2 size={14} />
+        <Trash2 size={12} />
       </button>
 
-      {/* Progress bar decoration */}
-      <div className="h-2 rounded-md bg-gradient-to-r from-slate-200 via-slate-100 to-slate-200 mb-3" />
-      
-      {/* Title and Status */}
-      <div className="flex items-start justify-between gap-2">
-        <div className="font-semibold line-clamp-2 pr-6">{chapter.title}</div>
-        <span className="text-[11px] px-2 py-0.5 rounded bg-slate-100 text-slate-600">
-          {chapter.status || "draft"}
-        </span>
+      {/* Progress bar / accent line */}
+      <div className="h-1.5 rounded-full bg-gradient-to-r from-[#f5e4ff] via-[#D4AF37]/70 to-[#f5e4ff] mb-2 opacity-80" />
+
+      {/* Main content */}
+      <div className="flex items-start gap-2">
+        {/* Icon bubble */}
+        <div className="mt-0.5 flex-shrink-0">
+          <div className="w-7 h-7 rounded-full bg-[#f5e4ff] flex items-center justify-center shadow-sm">
+            <PenSquare className="w-3.5 h-3.5 text-[#2b143f]" />
+          </div>
+        </div>
+
+        {/* Text content */}
+        <div className="flex-1 min-w-0">
+          {/* Status pill */}
+          <div className="mb-1 flex items-center gap-2">
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-[#f8f1ff] text-[10px] font-medium text-[#7d5a9e] border border-[#e6d3ff]">
+              {chapter.status || "draft"}
+            </span>
+          </div>
+
+          {/* Preview text */}
+          <p className="text-[12px] leading-snug text-[#3b214f] line-clamp-3">
+            {previewText || "No outline or text yet. Start writing this chapter."}
+          </p>
+
+          {/* Meta row */}
+          <div className="mt-2 flex items-center justify-between text-[11px] text-[#8b72b0]">
+            <span>{(chapter.wordCount || 0).toLocaleString()} words</span>
+            <span>{chapter.lastEdited || "Last edited —"}</span>
+          </div>
+        </div>
       </div>
-
-      {/* Preview Text - First 20 Words */}
-      <p className="mt-2 text-[12px] text-slate-600 line-clamp-3">
-        {getFirstWords(chapter.content, 20)}
-      </p>
-
-      {/* Word Count and Last Edited */}
-      <div className="mt-3 text-[12px] text-slate-500 flex items-center justify-between">
-        <span>{(chapter.wordCount || 0).toLocaleString()} words</span>
-        <span>{chapter.lastEdited || "—"}</span>
-      </div>
-
-      {/* Hover ring effect */}
-      <div className="absolute inset-0 rounded-2xl ring-0 ring-primary/0 group-hover:ring-2 group-hover:ring-primary/10 pointer-events-none" />
     </button>
   );
 }
