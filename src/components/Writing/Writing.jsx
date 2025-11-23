@@ -107,9 +107,7 @@ const Writing = () => {
     const chapterNumber = chapters.length + 1;
 
     const baseTitle =
-      meta && meta.title && meta.title.trim()
-        ? meta.title.trim()
-        : "Story";
+      meta && meta.title && meta.title.trim() ? meta.title.trim() : "Story";
 
     const newChapter = {
       id: `chapter-${Date.now()}`,
@@ -126,15 +124,6 @@ const Writing = () => {
 
     setChapters((prev) => [...prev, newChapter]);
     setSelectedChapterId(newChapter.id);
-  };
-
-  const handleReorderChapters = (reorderedChapters) => {
-    const updatedChapters = reorderedChapters.map((chapter, index) => ({
-      ...chapter,
-      order: index + 1,
-      updatedAt: new Date().toISOString(),
-    }));
-    setChapters(updatedChapters);
   };
 
   const handleSelectChapter = (chapterId) => {
@@ -179,6 +168,21 @@ const Writing = () => {
     }
   };
 
+  // ✅ Move handler (used by ChapterGrid & ChapterSidebar)
+  const handleMoveChapter = (fromIndex, toIndex) => {
+    setChapters((prev) => {
+      const next = [...prev];
+      const [moved] = next.splice(fromIndex, 1);
+      next.splice(toIndex, 0, moved);
+      const now = new Date().toISOString();
+      return next.map((ch, idx) => ({
+        ...ch,
+        order: idx + 1,
+        updatedAt: now,
+      }));
+    });
+  };
+
   // 🔍 Lookup selected chapter for outline editor
   const selectedChapter = useMemo(
     () => chapters.find((ch) => ch.id === selectedChapterId) || null,
@@ -194,21 +198,7 @@ const Writing = () => {
     if (!selectedChapter) return;
     handleRenameChapter(selectedChapter.id, newTitle);
   };
-  const handleMoveChapter = (fromIndex, toIndex) => {
-    setChapters((prev) => {
-      const next = [...prev];
-      const [moved] = next.splice(fromIndex, 1);
-      next.splice(toIndex, 0, moved);
-      const now = new Date().toISOString();
-      return next.map((ch, idx) => ({
-        ...ch,
-        order: idx + 1,
-        updatedAt: now,
-      }));
-    });
-  };
 
-  
   // 🖼 Image upload handlers
   const handleClickInsertImage = () => {
     if (!selectedChapterId) return;
@@ -361,11 +351,11 @@ const Writing = () => {
         {showSidebar && (
           <ChapterSidebar
             chapters={chapters}
-            onReorder={handleReorderChapters}
-            onAddChapter={handleAddChapter}
             selectedId={selectedChapterId}
             onSelectChapter={handleSelectChapter}
+            onAddChapter={handleAddChapter}
             onRenameChapter={handleRenameChapter}
+            onMoveChapter={handleMoveChapter}   {/* 👈 drag-reorder in sidebar */}
           />
         )}
 
@@ -378,11 +368,12 @@ const Writing = () => {
               <div className="p-4 lg:p-6 overflow-auto">
                 <ChapterGrid
                   chapters={chapters}
-                  onAddChapter={handleAddChapter}
+                  selectedId={selectedChapterId}
                   onSelectChapter={handleSelectChapter}
+                  onAddChapter={handleAddChapter}
                   onUpdateChapter={handleUpdateChapter}
                   onDeleteChapter={handleDeleteChapter}
-                  selectedId={selectedChapterId}
+                  onMoveChapter={handleMoveChapter}  {/* 👈 drag-reorder in grid */}
                 />
               </div>
 
