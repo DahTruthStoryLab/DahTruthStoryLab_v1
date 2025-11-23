@@ -1,8 +1,11 @@
 // src/components/Writing/ChapterSidebar.jsx
 // Sidebar list of chapters for navigation with multi-select, drag, and rename support
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useDrag } from "react-dnd";
+import { BookOpen, Plus } from "lucide-react";
+
+const META_KEY = "dahtruth_project_meta";
 
 function ChapterItem({
   chapter,
@@ -56,68 +59,82 @@ function ChapterItem({
     setIsEditing(false);
   };
 
+  const isMultiSelected = isSelected && selectedIds?.size > 1;
+
   return (
     <button
       ref={drag}
       onClick={onRowClick}
-      className={[
-        "w-full text-left px-3 py-2 rounded-lg text-sm transition",
-        isActive
-          ? "bg-slate-100 font-medium"
-          : isSelected
-          ? "bg-blue-50 border-2 border-blue-300"
-          : "hover:bg-slate-50",
-        isDragging ? "opacity-50" : "",
-        "cursor-grab active:cursor-grabbing",
-      ].join(" ")}
       type="button"
+      className={[
+        "w-full text-left rounded-xl text-xs transition",
+        "cursor-grab active:cursor-grabbing",
+        "flex items-stretch gap-2 group border",
+        isActive
+          ? "bg-[#1a237e]/90 border-[#D4AF37]/60 text-white shadow-md"
+          : isSelected
+          ? "bg-white/10 border-[#D4AF37]/50 text-white"
+          : "bg-white/5 border-white/10 text-white/80 hover:bg-white/10",
+        isDragging ? "opacity-50" : "",
+      ].join(" ")}
     >
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex-1 min-w-0">
-          {isEditing ? (
-            <input
-              className="w-full text-xs border border-blue-300 rounded px-1 py-0.5 bg-white"
-              autoFocus
-              value={tempTitle}
-              onChange={(e) => setTempTitle(e.target.value)}
-              onBlur={finishEdit}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") finishEdit();
-                if (e.key === "Escape") cancelEdit();
-              }}
-              onClick={(e) => e.stopPropagation()}
-            />
-          ) : (
-            <>
-              <div className="truncate">
-                {isSelected && selectedIds?.size > 1 && (
-                  <span className="inline-block w-5 h-5 rounded bg-blue-500 text-white text-xs leading-5 text-center mr-2">
-                    {selectedIds.size}
-                  </span>
-                )}
-                {chapter.title}
-              </div>
-              <div className="text-xs text-slate-500 mt-0.5">
-                {(chapter.wordCount || 0).toLocaleString()} words
-              </div>
-            </>
-          )}
-        </div>
+      {/* Icon bubble */}
+      <div className="w-7 h-7 mt-2 ml-2 flex items-center justify-center rounded-full bg-black/30 flex-shrink-0">
+        <BookOpen className="w-3.5 h-3.5 text-[#D4AF37]" />
+      </div>
 
-        <div className="flex flex-col items-end gap-1">
-          {isActive && <div className="text-xs">▶</div>}
+      {/* Content */}
+      <div className="flex-1 min-w-0 py-2 pr-2">
+        {isEditing ? (
+          <input
+            className="w-full text-xs border border-[#D4AF37]/60 rounded px-1.5 py-0.5 bg-black/40 text-white outline-none"
+            autoFocus
+            value={tempTitle}
+            onChange={(e) => setTempTitle(e.target.value)}
+            onBlur={finishEdit}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") finishEdit();
+              if (e.key === "Escape") cancelEdit();
+            }}
+            onClick={(e) => e.stopPropagation()}
+          />
+        ) : (
+          <>
+            <div className="flex items-center gap-1.5">
+              {isMultiSelected && (
+                <span className="inline-flex items-center justify-center px-1.5 h-5 rounded-full bg-[#D4AF37]/80 text-[10px] font-semibold text-black">
+                  {selectedIds.size}
+                </span>
+              )}
+              <p className="truncate font-semibold text-[11px]">
+                {chapter.title || `Chapter ${index + 1}`}
+              </p>
+            </div>
+            <div className="text-[10px] text-white/50 mt-0.5">
+              {(chapter.wordCount || 0).toLocaleString()} words
+            </div>
+          </>
+        )}
+      </div>
 
-          {!isEditing && (
-            <button
-              type="button"
-              onClick={startEdit}
-              className="text-[11px] text-blue-500 opacity-0 group-hover:opacity-100 hover:underline"
-              onMouseDown={(e) => e.stopPropagation()}
-            >
-              ✏️
-            </button>
-          )}
-        </div>
+      {/* Right controls */}
+      <div className="flex flex-col items-end justify-between py-2 pr-2 gap-1">
+        {isActive && (
+          <span className="text-[10px] text-[#D4AF37] font-semibold">
+            ●
+          </span>
+        )}
+
+        {!isEditing && (
+          <button
+            type="button"
+            onClick={startEdit}
+            className="text-[10px] text-[#D4AF37] opacity-60 hover:opacity-100"
+            onMouseDown={(e) => e.stopPropagation()}
+          >
+            ✏️
+          </button>
+        )}
       </div>
     </button>
   );
@@ -134,11 +151,27 @@ export default function ChapterSidebar({
   onToggleSelect,
   onRangeSelect,
   lastClickedIndexRef,
-  onRenameChapter, // ✅ NEW PROP
+  onRenameChapter,
 }) {
   const safeChapters = Array.isArray(chapters)
     ? chapters.filter((ch) => ch && ch.id != null)
     : [];
+
+  // 🔹 Pull project title from shared meta so the sidebar can say "Project – X chapters"
+  const [projectTitle, setProjectTitle] = useState("My Project");
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(META_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object" && parsed.title) {
+        setProjectTitle(parsed.title);
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
 
   const handleRowClick = (chapterId, index) => (event) => {
     if (!chapterId) return;
@@ -165,43 +198,54 @@ export default function ChapterSidebar({
   };
 
   return (
-    <div
-      className="rounded-xl border bg-white/85 backdrop-blur-sm p-4 group"
-      style={{ boxShadow: "0 8px 30px rgba(2,20,40,0.10)" }}
-    >
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="font-semibold text-sm">Chapters</h3>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={onAddChapter}
-            className="text-xs px-2 py-1 rounded border hover:bg-slate-50"
-            title="Add New Chapter"
-          >
-            + Add
-          </button>
-        </div>
+    <aside className="w-60 lg:w-64 border-r border-white/10 bg-black/20 backdrop-blur-xl px-3 py-4 flex flex-col gap-3">
+      {/* Header: project + count */}
+      <div className="px-2">
+        <p className="text-[11px] text-white/60 font-semibold truncate">
+          {projectTitle || "My Project"}
+        </p>
+        <p className="text-[10px] text-white/40">
+          {safeChapters.length} chapter{safeChapters.length === 1 ? "" : "s"}
+        </p>
       </div>
 
+      {/* Actions bar */}
+      <div className="flex items-center justify-between px-2 mt-1">
+        <p className="text-[10px] uppercase tracking-wide text-white/40">
+          Table of Contents
+        </p>
+        <button
+          onClick={onAddChapter}
+          className="inline-flex items-center gap-1.5 rounded-full bg-[#1a237e] px-2 py-1 text-[10px] font-medium text-white border border-[#D4AF37]/50 hover:bg-[#0d47a1] transition"
+          title="Add New Chapter"
+          type="button"
+        >
+          <Plus className="w-3 h-3" />
+          <span>Add</span>
+        </button>
+      </div>
+
+      {/* Multi-select status */}
       {selectMode && selectedIds?.size > 0 && (
-        <div className="mb-3 p-2 bg-blue-50 rounded-lg flex items-center justify-between">
-          <span className="text-xs font-medium text-blue-900">
+        <div className="mx-1 mb-1 mt-1 p-2 bg-[#0b102b] border border-[#D4AF37]/40 rounded-xl flex items-center justify-between">
+          <span className="text-[10px] font-medium text-white">
             {selectedIds.size} selected
           </span>
-          <div className="flex items-center gap-2">
-            {onDeleteMultiple && (
-              <button
-                onClick={handleDeleteSelected}
-                className="text-xs px-2 py-1 rounded bg-red-500 text-white hover:bg-red-600"
-                title="Delete Selected"
-              >
-                🗑️ Delete
-              </button>
-            )}
-          </div>
+          {onDeleteMultiple && (
+            <button
+              onClick={handleDeleteSelected}
+              className="text-[10px] px-2 py-0.5 rounded-full bg-red-600 text-white hover:bg-red-700"
+              title="Delete Selected"
+              type="button"
+            >
+              🗑 Delete
+            </button>
+          )}
         </div>
       )}
 
-      <div className="space-y-1 max-h-96 overflow-y-auto">
+      {/* Chapters list */}
+      <div className="space-y-1 max-h-[calc(100vh-220px)] overflow-y-auto pr-1">
         {safeChapters.map((ch, idx) => (
           <ChapterItem
             key={ch.id}
@@ -215,20 +259,20 @@ export default function ChapterSidebar({
             onRenameChapter={onRenameChapter}
           />
         ))}
+
+        {safeChapters.length === 0 && (
+          <div className="text-center py-6 text-xs text-white/50">
+            No chapters yet
+          </div>
+        )}
       </div>
 
-      {safeChapters.length === 0 && (
-        <div className="text-center py-6 text-sm text-slate-500">
-          No chapters yet
-        </div>
-      )}
-
+      {/* Tips */}
       {selectMode && (
-        <div className="mt-3 pt-3 border-t text-xs text-slate-500">
-          💡 Tip: Click to select, Shift+Click for range, Ctrl/Cmd+Click to
-          toggle
+        <div className="mt-2 pt-2 border-t border-white/10 text-[10px] text-white/45 px-1">
+          💡 Click to select, Shift+Click for range, Ctrl/Cmd+Click to toggle.
         </div>
       )}
-    </div>
+    </aside>
   );
 }
