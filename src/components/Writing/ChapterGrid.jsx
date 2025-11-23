@@ -55,129 +55,96 @@ export default function ChapterGrid({
     (sum, ch) => sum + (ch.wordCount || 0),
     0
   );
+  const totalWordsLabel = `${totalWords.toLocaleString()} words across all chapters`;
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-6 space-y-4">
-      {/* Top header above the paper */}
+      {/* Header row: Story Outline + toggle pill */}
       <div className="flex items-center justify-between">
         <div>
           <div className="flex items-center gap-2">
-            <div className="p-2 rounded-xl bg-[#f5e4ff]/20 border border-[#f5e4ff]/40 backdrop-blur-sm">
-              <List className="w-4 h-4 text-[#D4AF37]" />
+            <div className="p-2 rounded-xl bg-white/40 border border-white/70 shadow-sm">
+              <BookOpen className="w-4 h-4 text-[#7b4aa8]" />
             </div>
-            <div>
-              <h1 className="text-lg font-semibold text-white tracking-tight flex items-center gap-2">
-                Story Outline
-                <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wide text-[#fcecff] border border-[#f5e4ff]/60 rounded-full px-2 py-0.5 bg-[#2b143f]/60">
-                  <BookOpen className="w-3 h-3" />
-                  Table of Contents
-                </span>
-              </h1>
-              <p className="text-xs text-white/70 mt-1">
-                See your chapters at a glance. Click any page to open and keep
-                writing.
-              </p>
-            </div>
+            <h1 className="text-lg font-semibold tracking-tight text-[#3b1e55]">
+              Story Outline
+            </h1>
+            <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-wide text-[#4a305f] border border-[#e4c9ff] rounded-full px-2 py-0.5 bg-[#f7ecff]">
+              <List className="w-3 h-3" />
+              Table of Contents
+            </span>
           </div>
+          <p className="text-xs text-[#4a305f] mt-1">
+            See your chapters at a glance. Click any page to open and keep
+            writing.
+          </p>
         </div>
 
         <button
           onClick={onAddChapter}
-          className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full bg-[#f5e4ff] text-[#2b143f] border border-[#D4AF37]/60 hover:bg-[#fff0ff] shadow-sm"
+          className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full bg-[#7b4aa8] text-white border border-[#D4AF37]/40 hover:bg-[#5d2f8a] shadow-sm"
         >
           <Plus className="w-3.5 h-3.5" />
           <span>New chapter</span>
         </button>
       </div>
 
-      {/* "Paper" container for the grid */}
-      <div className="relative">
-        {/* subtle shadow behind the sheet */}
-        <div className="absolute inset-0 translate-y-1 translate-x-1 rounded-3xl bg-black/40 opacity-40 blur-md pointer-events-none" />
-        <div className="relative bg-[#fdf9ff]/95 text-[#1b1034] backdrop-blur-xl rounded-3xl border border-[#ead7ff] shadow-[0_18px_45px_rgba(8,4,24,0.45)] p-4 sm:p-6">
-          {/* Top strip on the “paper” */}
-          <div className="flex flex-wrap items-center justify-between gap-2 mb-4 border-b border-[#ead7ff]/70 pb-2">
-            <div className="flex flex-col gap-0.5">
-              <p className="text-[11px] uppercase tracking-wide text-[#7d5a9e] font-semibold">
-                {chapterCountLabel}
-              </p>
-              <p className="text-[11px] text-[#9a7bc0]">
-                {totalWords.toLocaleString()} words across all chapters
-              </p>
-            </div>
-            {safeChapters.length > 0 && (
-              <p className="text-[11px] text-[#a488c7]">
-                Tip: Drag to reorder pages. Use Shift to select a range.
-              </p>
-            )}
-          </div>
-
-          {safeChapters.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4 gap-4">
-              {safeChapters.map((chapter, idx) => (
-                <div
-                  key={chapter.id}
-                  className="relative group"
-                >
-                  {/* little “stacked page” shadow */}
-                  <div className="absolute inset-0 translate-y-1 translate-x-1 rounded-2xl bg-[#e9d4ff]/80 opacity-70 group-hover:opacity-90 transition" />
-                  <div className="relative rounded-2xl bg-white shadow-[0_10px_25px_rgba(23,10,44,0.18)] border border-[#f0e2ff] overflow-hidden">
-                    {/* Top bar of each page */}
-                    <div className="flex items-center justify-between px-3 py-2 border-b border-[#f5e9ff] bg-[#f8f1ff]">
-                      <div className="flex items-center gap-1.5">
-                        <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-[#e9d4ff] text-[10px] font-semibold text-[#2b143f]">
-                          {chapter.order ?? idx + 1}
-                        </span>
-                        <span className="text-[11px] font-semibold text-[#2b143f] truncate max-w-[9rem]">
-                          {chapter.title || `Chapter ${idx + 1}`}
-                        </span>
-                      </div>
-                      <span className="text-[10px] text-[#9a7bc0]">
-                        {(chapter.wordCount || 0).toLocaleString()}w
-                      </span>
-                    </div>
-
-                    {/* Body: your existing ChapterCard content */}
-                    <div className="p-3">
-                      <ChapterCard
-                        chapter={chapter}
-                        index={idx}
-                        moveCard={onMoveChapter}
-                        active={chapter.id === selectedId}
-                        onOpen={handleOpen(chapter.id, idx)}
-                        onDelete={onDeleteChapter}
-                        // pass selection info down if your card uses it
-                        selected={selectedIds?.has?.(chapter.id)}
-                        selectMode={!!selectMode}
-                        onToggleSelect={onToggleSelect}
-                      />
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="py-10 text-center text-[#2b143f]/80">
-              <div className="w-16 h-16 mx-auto mb-4 rounded-2xl border border-dashed border-[#d2b8ff] bg-[#f8f1ff] flex items-center justify-center">
-                <BookOpen className="w-8 h-8 text-[#D4AF37]" />
-              </div>
-              <p className="text-sm font-semibold mb-1">
-                No chapters yet
-              </p>
-              <p className="text-xs text-[#7d5a9e] mb-4">
-                Create your first page to begin building your outline.
-              </p>
-              <button
-                onClick={onAddChapter}
-                className="inline-flex items-center gap-1.5 rounded-full bg-[#f5e4ff] px-3 py-1.5 text-xs font-medium text-[#2b143f] hover:bg-[#fff0ff] border border-[#D4AF37]/60"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>Create first chapter</span>
-              </button>
-            </div>
-          )}
+      {/* Small stats / tip row */}
+      <div className="flex items-center justify-between text-[11px]">
+        <div>
+          <p className="font-semibold tracking-wide text-[#5c3f7a]">
+            {chapterCountLabel}
+          </p>
+          <p className="text-[#4a305f] mt-0.5">{totalWordsLabel}</p>
         </div>
+        {safeChapters.length > 0 && (
+          <p className="text-[#4a305f]">
+            Tip: Drag to reorder pages. Use Shift to select a range.
+          </p>
+        )}
       </div>
+
+      {/* 👉 No more big lilac “sheet” — just the cards floating on the page */}
+      {safeChapters.length > 0 ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4 gap-4">
+          {safeChapters.map((chapter, idx) => (
+            <ChapterCard
+              key={chapter.id}
+              chapter={chapter}
+              index={idx}
+              moveCard={onMoveChapter}
+              active={chapter.id === selectedId}
+              onOpen={handleOpen(chapter.id, idx)}
+              onDelete={onDeleteChapter}
+              selected={selectedIds?.has?.(chapter.id)}
+              selectMode={!!selectMode}
+              onToggleSelect={onToggleSelect}
+            />
+          ))}
+        </div>
+      ) : (
+        <div className="py-10 flex justify-center">
+          <div className="w-full max-w-xs rounded-3xl bg-white shadow-[0_18px_45px_rgba(0,0,0,0.18)] border border-[#f1ddff] p-5 text-center">
+            <div className="w-16 h-16 mx-auto mb-4 rounded-2xl border border-dashed border-[#e2c9ff] bg-[#fbf4ff] flex items-center justify-center">
+              <BookOpen className="w-8 h-8 text-[#7b4aa8]" />
+            </div>
+            <p className="text-sm font-medium text-[#3b1e55] mb-1">
+              No chapters yet
+            </p>
+            <p className="text-xs text-[#5a3b73] mb-4">
+              Use the button above to create your first chapter and begin your
+              outline.
+            </p>
+            <button
+              onClick={onAddChapter}
+              className="inline-flex items-center gap-1.5 rounded-full bg-[#7b4aa8] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#5d2f8a] border border-[#D4AF37]/40"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>Create first chapter</span>
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
