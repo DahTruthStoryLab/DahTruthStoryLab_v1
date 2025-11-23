@@ -471,6 +471,32 @@ export default function Publishing(): JSX.Element {
     authorLast: "YourLastName",
   });
 
+  useEffect(() => {
+  try {
+    const saved = localStorage.getItem("dahtruth_project_meta");
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      // Light validation
+      if (parsed && typeof parsed === "object") {
+        setMeta((prev) => ({
+          ...prev,
+          ...parsed,
+        }));
+      }
+    }
+  } catch {
+    // ignore bad JSON
+  }
+}, []);
+
+  useEffect(() => {
+  try {
+    localStorage.setItem("dahtruth_project_meta", JSON.stringify(meta));
+  } catch {
+    // ignore storage errors
+  }
+}, [meta]);
+
   const [chapters, setChapters] = useState<Chapter[]>([]);
 
   const [provider, setProvider] = useState<"openai" | "anthropic">("openai");
@@ -1209,7 +1235,7 @@ export default function Publishing(): JSX.Element {
         {/* HEADER STRIP */}
         <div
           style={{
-            background: "linear-gradient(135deg, #3b3355, #a47bb8)",
+            background: "linear-gradient(135deg, #b897d6, #e3c8ff)",
             backdropFilter: "blur(12px)",
             color: theme.white,
             padding: "14px 24px",
@@ -1225,21 +1251,22 @@ export default function Publishing(): JSX.Element {
               gap: 16,
             }}
           >
-            <button
+           <button
               onClick={() => navigate("/dashboard")}
               style={{
                 ...styles.btn,
                 border: "none",
-                background: "rgba(0,0,0,0.35)",
-                color: theme.white,
+                background: theme.gold,
+                color: "#1f2933",
                 padding: "8px 14px",
                 fontSize: 13,
                 fontWeight: 600,
+                boxShadow: "0 4px 10px rgba(0,0,0,0.15)",
               }}
             >
               ← Back to Dashboard
             </button>
-
+            
             <div
               style={{
                 display: "flex",
