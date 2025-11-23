@@ -180,9 +180,8 @@ const PLATFORM_PRESETS: Record<
     headers: true,
     footers: true,
     pageNumbers: true,
-    showTOCInEbook: false,
-  },
-
+    showTOCInEebook: false as any, // just to keep shape, not used
+  } as any,
   KDP_Paperback_5_25x8: {
     label: "KDP Paperback – 5.25 x 8 in",
     trim: { widthInch: 5.25, heightInch: 8 },
@@ -196,9 +195,8 @@ const PLATFORM_PRESETS: Record<
     headers: true,
     footers: true,
     pageNumbers: true,
-    showTOCInEbook: false,
-  },
-
+    showTOCInEebook: false as any,
+  } as any,
   KDP_Paperback_5_5x8_5: {
     label: "KDP Paperback – 5.5 x 8.5 in",
     trim: { widthInch: 5.5, heightInch: 8.5 },
@@ -212,9 +210,8 @@ const PLATFORM_PRESETS: Record<
     headers: true,
     footers: true,
     pageNumbers: true,
-    showTOCInEbook: false,
-  },
-
+    showTOCInEebook: false as any,
+  } as any,
   KDP_Paperback_6x9: {
     label: "KDP Paperback – 6 x 9 in",
     trim: { widthInch: 6, heightInch: 9 },
@@ -230,7 +227,6 @@ const PLATFORM_PRESETS: Record<
     pageNumbers: true,
     showTOCInEbook: false,
   },
-
   KDP_Paperback_7x10: {
     label: "KDP Paperback – 7 x 10 in",
     trim: { widthInch: 7, heightInch: 10 },
@@ -246,7 +242,6 @@ const PLATFORM_PRESETS: Record<
     pageNumbers: true,
     showTOCInEbook: false,
   },
-
   KDP_Paperback_8x10: {
     label: "KDP Paperback – 8 x 10 in",
     trim: { widthInch: 8, heightInch: 10 },
@@ -262,7 +257,6 @@ const PLATFORM_PRESETS: Record<
     pageNumbers: true,
     showTOCInEbook: false,
   },
-
   KDP_Ebook: {
     label: "KDP Kindle eBook (reflowable)",
     trim: null,
@@ -277,7 +271,6 @@ const PLATFORM_PRESETS: Record<
     pageNumbers: false,
     showTOCInEbook: true,
   },
-
   Generic_Manuscript_Submission: {
     label: "Generic Manuscript Submission (DOCX)",
     trim: null,
@@ -288,7 +281,6 @@ const PLATFORM_PRESETS: Record<
     showTOCInEbook: false,
   },
 };
-
 
 /* ---------- Styles ---------- */
 const styles = {
@@ -463,6 +455,8 @@ function AIActionButton({
 const htmlEscape = (s: string) =>
   s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 
+const inchToPx = (inch: number) => inch * 96; // CSS assumes 96 DPI
+
 /* ======================== Component ======================== */
 
 export default function Publishing(): JSX.Element {
@@ -513,10 +507,8 @@ export default function Publishing(): JSX.Element {
   const includeHeadersFooters = pf.headers || pf.footers;
 
   // Rough visual preview of page size based on platform trim/margins
-  const inchToPx = (inch: number) => inch * 96; // CSS assumes 96 DPI
-
   const pageWidthPx = pf.trim?.widthInch
-    ? inchToPx(pf.trim.widthInch)
+    ? inchToPx(pf.trim.widthInch) * 0.9
     : 840;
 
   const leftPaddingPx = pf.margins.left
@@ -983,7 +975,7 @@ export default function Publishing(): JSX.Element {
         alert("Sorry—import failed. The file may be malformed or not a valid .docx.");
       }
     },
-    [activeIdx, setChapters, setActiveChapterId]
+    [activeIdx]
   );
 
   const importHTML = useCallback(
@@ -1029,7 +1021,7 @@ export default function Publishing(): JSX.Element {
         alert("Sorry—import failed. The file may be malformed or unreadable.");
       }
     },
-    [activeIdx, setChapters, setActiveChapterId]
+    [activeIdx]
   );
 
   /* ---------- Compile (Preview/Export) ---------- */
@@ -1039,7 +1031,10 @@ export default function Publishing(): JSX.Element {
     chapters.forEach((c) => {
       if (!c.included) return;
       const html = c.textHTML || `<p>${htmlEscape(c.text)}</p>`;
-      const dom = new DOMParser().parseFromString(`<div>${html}</div>`, "text/html");
+      const dom = new DOMParser().parseFromString(
+        `<div>${html}</div>`,
+        "text/html"
+      );
       const hs = Array.from(dom.querySelectorAll("h1, h2, h3"));
       if (hs.length === 0) {
         items.push(c.title);
@@ -1091,58 +1086,54 @@ export default function Publishing(): JSX.Element {
     [compiledPlain]
   );
 
-useEffect(() => {
-  try {
-    if (compiledPlain) {
-      localStorage.setItem(
-        "dahtruth_publishing_manuscript",
-        compiledPlain
+  useEffect(() => {
+    try {
+      if (compiledPlain) {
+        localStorage.setItem(
+          "dahtruth_publishing_manuscript",
+          compiledPlain
+        );
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [compiledPlain]);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("dahtruth_chapters");
+      if (!saved) return;
+
+      const parsed = JSON.parse(saved) as any[];
+      if (!Array.isArray(parsed) || parsed.length === 0) return;
+
+      // Normalize into our Chapter shape
+      const normalized: Chapter[] = parsed.map((c, idx) => ({
+        id: c.id || `c_${idx + 1}`,
+        title: c.title || `Chapter ${idx + 1}`,
+        included: typeof c.included === "boolean" ? c.included : true,
+        text: c.text || "",
+        textHTML: c.textHTML,
+      }));
+
+      setChapters(normalized);
+      setActiveChapterId(normalized[0].id);
+    } catch (err) {
+      console.error(
+        "Failed to load dahtruth_chapters for Publishing:",
+        err
       );
     }
-  } catch {
-    /* ignore */
-  }
-}, [compiledPlain]);
+  }, []);
 
-useEffect(() => {
-  try {
-    const saved = localStorage.getItem("dahtruth_chapters");
-    if (!saved) return;
-
-    const parsed = JSON.parse(saved) as any[];
-    if (!Array.isArray(parsed) || parsed.length === 0) return;
-
-    // Normalize into our Chapter shape
-    const normalized: Chapter[] = parsed.map((c, idx) => ({
-      id: c.id || `c_${idx + 1}`,
-      title: c.title || `Chapter ${idx + 1}`,
-      included:
-        typeof c.included === "boolean" ? c.included : true,
-      text: c.text || "",
-      textHTML: c.textHTML,
-    }));
-
-    setChapters(normalized);
-    setActiveChapterId(normalized[0].id);
-  } catch (err) {
-    console.error(
-      "Failed to load dahtruth_chapters for Publishing:",
-      err
-    );
-  }
-}, []);
-
-useEffect(() => {
-  try {
-    if (!chapters.length) return;
-    localStorage.setItem(
-      "dahtruth_chapters",
-      JSON.stringify(chapters)
-    );
-  } catch (err) {
-    console.error("Failed to persist chapters from Publishing:", err);
-  }
-}, [chapters]);
+  useEffect(() => {
+    try {
+      if (!chapters.length) return;
+      localStorage.setItem("dahtruth_chapters", JSON.stringify(chapters));
+    } catch (err) {
+      console.error("Failed to persist chapters from Publishing:", err);
+    }
+  }, [chapters]);
 
   // Story materials state
   const [materialKey, setMaterialKey] =
@@ -1150,59 +1141,57 @@ useEffect(() => {
   const [materialOutput, setMaterialOutput] = useState<string>("");
   const [materialBusy, setMaterialBusy] = useState<boolean>(false);
 
- const handleGenerateMaterial = async (key: MaterialKey) => {
-  if (!compiledPlain) {
-    alert(
-      "Your publishing manuscript is empty. Add chapters and front matter first."
-    );
-    return;
-  }
-  if (materialBusy) return;
-
-  setMaterialBusy(true);
-  setMaterialKey(key);
-
-  try {
-    const res: any = await runAssistant(
-      compiledPlain,
-      key,
-      "",
-      provider
-    );
-
-    const text =
-      res?.result || res?.text || res?.output || compiledPlain;
-
-    if (!text) {
-      throw new Error("AI returned an empty response.");
+  const handleGenerateMaterial = async (key: MaterialKey) => {
+    if (!compiledPlain) {
+      alert(
+        "Your publishing manuscript is empty. Add chapters and front matter first."
+      );
+      return;
     }
+    if (materialBusy) return;
 
-    // keep local in case you ever want to show it in-panel
-    setMaterialOutput(text);
+    setMaterialBusy(true);
+    setMaterialKey(key);
 
-    // 🚀 go to Publishing Prep with the generated material
-    navigate("/publishing-prep", {
-      state: {
-        from: "story-materials",
-        materialType: key,          // 'synopsis-short', 'logline', etc.
-        manuscriptMeta: meta,       // title, author, year
-        manuscriptText: compiledPlain,
-        generated: text,            // the AI output to show/edit
-      },
-    });
-  } catch (e: any) {
-    console.error("[Story Material Error]:", e);
-    alert(
-      e?.message ||
-        "Could not generate story material. Please try again."
-    );
-  } finally {
-    setMaterialBusy(false);
-  }
-};
+    try {
+      const res: any = await runAssistant(
+        compiledPlain,
+        key,
+        "",
+        provider
+      );
+
+      const text =
+        res?.result || res?.text || res?.output || compiledPlain;
+
+      if (!text) {
+        throw new Error("AI returned an empty response.");
+      }
+
+      setMaterialOutput(text);
+
+      navigate("/publishing-prep", {
+        state: {
+          from: "story-materials",
+          materialType: key,
+          manuscriptMeta: meta,
+          manuscriptText: compiledPlain,
+          generated: text,
+        },
+      });
+    } catch (e: any) {
+      console.error("[Story Material Error]:", e);
+      alert(
+        e?.message ||
+          "Could not generate story material. Please try again."
+      );
+    } finally {
+      setMaterialBusy(false);
+    }
+  };
 
   /* ---------- UI ---------- */
-   return (
+  return (
     <PageShell
       style={{
         background: theme.bg,
@@ -2077,29 +2066,36 @@ useEffect(() => {
                 }}
               >
                 <div
-                ref={editorRef}
-                contentEditable
-                suppressContentEditableWarning
-                style={{
-                  margin: "0 auto",
-                  width: "100%",
-                  maxWidth: pageWidthPx, // 🔁 was 840
-                  minHeight: 1040,
-                  background: "#ffffff",
-                  color: "#111",
-                  border: "1px solid #e5e7eb",
-                  boxShadow: "0 8px 30px rgba(2,20,40,0.10)",
-                  borderRadius: 6,
-                  padding: `48px ${rightPaddingPx}px 48px ${leftPaddingPx}px`, // 🔁 was "48px 48px"
-                  lineHeight: ms.lineHeight,
-                  fontFamily: ms.fontFamily,
-                  fontSize: ms.fontSizePt * (96 / 72),
-                  outline: "none",
-                  direction: "ltr",
-                  unicodeBidi: "plaintext",
-                  whiteSpace: "pre-wrap",
-                }}
-              ></div>
+                  ref={editorRef}
+                  contentEditable
+                  suppressContentEditableWarning
+                  style={{
+                    margin: "0 auto",
+                    width: "100%",
+                    maxWidth: pageWidthPx,
+                    minHeight: 1040,
+                    background: "#ffffff",
+                    color: "#111",
+                    border: "1px solid #e5e7eb",
+                    boxShadow: "0 8px 30px rgba(2,20,40,0.10)",
+                    borderRadius: 6,
+                    padding: `48px ${Math.max(
+                      32,
+                      Math.min(leftPaddingPx, 80)
+                    )}px 48px ${Math.max(
+                      32,
+                      Math.min(rightPaddingPx, 80)
+                    )}px`,
+                    lineHeight: ms.lineHeight,
+                    fontFamily: ms.fontFamily,
+                    fontSize: ms.fontSizePt * (96 / 72),
+                    outline: "none",
+                    direction: "ltr",
+                    unicodeBidi: "plaintext",
+                    whiteSpace: "pre-wrap",
+                  }}
+                ></div>
+              </div>
 
               <div
                 style={{
@@ -2116,7 +2112,7 @@ useEffect(() => {
           </div>
         </div>
       </div>
-     </PageShell>
+    </PageShell>
   );
 }
 
