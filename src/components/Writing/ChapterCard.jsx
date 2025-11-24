@@ -1,16 +1,16 @@
 // src/components/Writing/ChapterCard.jsx
-// Individual chapter card with drag-and-drop, writerly design
+// Individual chapter card styled as a sheet of paper with drag-and-drop
 import React, { useRef } from "react";
 import { useDrag, useDrop } from "react-dnd";
-import { Trash2, PenSquare } from "lucide-react";
+import { Trash2, GripVertical } from "lucide-react";
 
 const DND_TYPE = "CHAPTER_CARD";
 
-// Extract first N words from HTML
+// Extract first N words from HTML content
 const getFirstWords = (html = "", wordCount = 20) => {
   // Strip HTML tags
   const text = html.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
-  if (!text) return "—";
+  if (!text) return "";
   const words = text.split(/\s+/);
   if (words.length <= wordCount) return text;
   return words.slice(0, wordCount).join(" ") + "...";
@@ -23,6 +23,9 @@ export default function ChapterCard({
   onOpen,
   active,
   onDelete,
+  selected,
+  selectMode,
+  onToggleSelect,
 }) {
   const ref = useRef(null);
 
@@ -54,68 +57,80 @@ export default function ChapterCard({
     }
   };
 
-  const previewText =
-    chapter.summary && chapter.summary.trim().length > 0
-      ? chapter.summary.trim()
-      : getFirstWords(chapter.content, 24);
+  // Get preview text - first 20 words from content
+  const previewText = getFirstWords(chapter.content, 20);
 
   return (
-    <button
+    <div
       ref={ref}
-      type="button"
       onClick={onOpen}
       className={[
-        "group relative w-full text-left rounded-xl border border-transparent",
-        "bg-transparent px-1 py-1.5",
-        "transition-all duration-150",
-        active ? "bg-[#f8f1ff] border-[#e1cffe]" : "hover:bg-[#faf3ff]",
-        isDragging ? "opacity-50" : "",
+        "group relative cursor-pointer",
+        "w-full aspect-[8.5/11]", // Standard paper ratio
+        "rounded-sm shadow-md hover:shadow-xl",
+        "transition-all duration-200",
+        "bg-white",
+        active ? "ring-2 ring-[#D4AF37] shadow-xl" : "",
+        selected ? "ring-2 ring-blue-400" : "",
+        isDragging ? "opacity-50 scale-95" : "hover:scale-[1.02]",
       ].join(" ")}
     >
+      {/* Paper texture overlay */}
+      <div className="absolute inset-0 rounded-sm bg-gradient-to-br from-white via-[#fffef8] to-[#faf9f0] opacity-60 pointer-events-none" />
+      
+      {/* Drag handle - top center */}
+      <div className="absolute top-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
+        <GripVertical className="w-4 h-4 text-gray-400" />
+      </div>
+
       {/* Delete Button - Top Right */}
       <button
         onClick={handleDelete}
-        className="absolute top-1.5 right-1.5 p-1 rounded-full bg-white/90 hover:bg-red-50 text-[#9a7bc0] hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity z-10 shadow-sm"
+        className="absolute top-2 right-2 p-1.5 rounded-full bg-white/90 hover:bg-red-50 text-gray-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity z-10 shadow-sm"
         title="Delete chapter"
         type="button"
       >
-        <Trash2 size={12} />
+        <Trash2 size={14} />
       </button>
 
-      {/* Progress bar / accent line */}
-      <div className="h-1.5 rounded-full bg-gradient-to-r from-[#f5e4ff] via-[#D4AF37]/70 to-[#f5e4ff] mb-2 opacity-80" />
-
-      {/* Main content */}
-      <div className="flex items-start gap-2">
-        {/* Icon bubble */}
-        <div className="mt-0.5 flex-shrink-0">
-          <div className="w-7 h-7 rounded-full bg-[#f5e4ff] flex items-center justify-center shadow-sm">
-            <PenSquare className="w-3.5 h-3.5 text-[#2b143f]" />
-          </div>
-        </div>
-
-        {/* Text content */}
-        <div className="flex-1 min-w-0">
-          {/* Status pill */}
-          <div className="mb-1 flex items-center gap-2">
-            <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-[#f8f1ff] text-[10px] font-medium text-[#5a3d7a] border border-[#e6d3ff]">
-              {chapter.status || "draft"}
-            </span>
-          </div>
-
-          {/* Preview text */}
-          <p className="text-[12px] leading-snug text-[#2b143f] line-clamp-3">
-            {previewText || "No outline or text yet. Start writing this chapter."}
-          </p>
-
-          {/* Meta row */}
-          <div className="mt-2 flex items-center justify-between text-[11px] text-[#5a4070]">
-            <span>{(chapter.wordCount || 0).toLocaleString()} words</span>
-            <span>{chapter.lastEdited || "Last edited —"}</span>
-          </div>
+      {/* Chapter number badge */}
+      <div className="absolute top-3 left-3">
+        <div className="px-2 py-1 rounded bg-[#f5e4ff] text-[10px] font-semibold text-[#5a3d7a] shadow-sm">
+          Ch. {index + 1}
         </div>
       </div>
-    </button>
+
+      {/* Main content area */}
+      <div className="relative h-full p-6 pt-12 flex flex-col">
+        {/* Chapter title */}
+        <h3 className="text-sm font-bold text-[#2b143f] mb-3 line-clamp-2 font-serif">
+          {chapter.title || `Chapter ${index + 1}`}
+        </h3>
+
+        {/* Decorative line */}
+        <div className="h-px bg-gradient-to-r from-[#D4AF37]/50 via-[#D4AF37] to-[#D4AF37]/50 mb-3" />
+
+        {/* Preview text - first 20 words */}
+        <div className="flex-1 overflow-hidden">
+          <p className="text-[11px] leading-relaxed text-gray-700 font-serif line-clamp-6">
+            {previewText || "This chapter is empty. Click to start writing."}
+          </p>
+        </div>
+
+        {/* Footer info */}
+        <div className="mt-auto pt-3 border-t border-gray-100 flex items-center justify-between text-[10px] text-gray-500">
+          <span className="font-medium">
+            {(chapter.wordCount || 0).toLocaleString()} words
+          </span>
+          <span className="px-1.5 py-0.5 rounded text-[9px] bg-gray-50 text-gray-600">
+            {chapter.status || "draft"}
+          </span>
+        </div>
+      </div>
+
+      {/* Paper edge shadow effect */}
+      <div className="absolute inset-0 rounded-sm shadow-inner pointer-events-none opacity-20" />
+    </div>
   );
 }
 
