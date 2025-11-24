@@ -3,7 +3,6 @@ import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import {
-  Play,
   Plus,
   Settings,
   PencilLine,
@@ -18,8 +17,6 @@ import {
   ChevronRight,
   Menu,
   X,
-  Bell,
-  Search,
   FileText,
 } from "lucide-react";
 
@@ -37,18 +34,36 @@ const writingActivity = [
 const recentChapters = [];
 
 // --------- Small UI helpers ---------
-const Card = ({ children, className = "", onClick }) => (
-  <div className={`rounded-2xl glass-panel ${className}`} onClick={onClick}>
+const Card = ({ children, className = "", onClick, style = {} }) => (
+  <div
+    className={`rounded-2xl glass-panel border border-slate-200/60 shadow-sm ${className}`}
+    onClick={onClick}
+    style={style}
+  >
     {children}
   </div>
 );
-const CardBody = ({ children, className = "" }) => <div className={`p-5 ${className}`}>{children}</div>;
-const StatLabel = ({ children }) => <p className="text-xs uppercase tracking-wide text-muted">{children}</p>;
-const StatValue = ({ children }) => <p className="text-3xl font-semibold text-ink mt-1">{children}</p>;
+
+const CardBody = ({ children, className = "", style = {} }) => (
+  <div className={`p-5 ${className}`} style={style}>
+    {children}
+  </div>
+);
+
+const StatLabel = ({ children }) => (
+  <p className="text-[11px] uppercase tracking-[0.14em] text-slate-500">
+    {children}
+  </p>
+);
+
+const StatValue = ({ children }) => (
+  <p className="text-3xl font-semibold text-slate-900 mt-1">{children}</p>
+);
+
 const Progress = ({ value }) => (
-  <div className="h-2 w-full rounded-full bg-primary/20">
+  <div className="h-1.5 w-full rounded-full bg-slate-200">
     <div
-      className="h-2 rounded-full bg-gradient-to-r from-accent to-primary transition-all duration-300"
+      className="h-1.5 rounded-full bg-gradient-to-r from-amber-400 to-violet-500 transition-all duration-300"
       style={{ width: `${value}%` }}
     />
   </div>
@@ -70,7 +85,6 @@ function readAuthorProfile() {
         avatarUrl = obj.avatarUrl;
       }
 
-      // Check for author field first (from project meta)
       if (obj.author) {
         name = obj.author;
         break;
@@ -100,60 +114,84 @@ function readAuthorProfile() {
   return { name, avatarUrl };
 }
 
+// --------- Menu items ---------
+const menuItems = [
+  { icon: Home,       label: "Dashboard",         path: "/dashboard" },
+  { icon: PencilLine, label: "Write",             path: "/writer" },
+  { icon: BookOpen,   label: "Table of Contents", path: "/toc" },
+  { icon: Layers,     label: "Story Lab",         path: "/story-lab" },
+  { icon: Calendar,   label: "Calendar",          path: "/calendar" },
+  { icon: UploadCloud,label: "Publishing",        path: "/publishing" },
+  { icon: Layers,     label: "Project",           path: "/project" },
+  { icon: User,       label: "Profile",           path: "/profile" },
+  { icon: Info,       label: "About",             path: "/about" },
+  { icon: Store,      label: "Store",             path: "/store" },
+];
+
 // --------- Sidebar ---------
 const Sidebar = ({ isOpen, onClose, authorName, authorAvatar, navigate, userNovels = [] }) => {
   const { pathname } = useLocation();
 
-  const menuItems = [
-    { icon: Home,       label: "Dashboard",         path: "/dashboard" },
-    { icon: PencilLine, label: "Write",             path: "/writer" },
-    { icon: BookOpen,   label: "Table of Contents", path: "/toc" },
-    { icon: Layers,     label: "Story Lab",         path: "/story-lab" },
-    { icon: Calendar,   label: "Calendar",          path: "/calendar" },
-    { icon: UploadCloud,label: "Publishing",        path: "/publishing" },
-    { icon: User,       label: "Profile",           path: "/profile" },
-    { icon: Info,       label: "About",             path: "/about" },
-    { icon: Store,      label: "Store",             path: "/store" },
-  ];
-
   return (
     <>
       {/* Mobile overlay */}
-      {isOpen && <div className="fixed inset-0 bg-black/30 z-40 lg:hidden" onClick={onClose} />}
+      {isOpen && (
+        <div
+          className="fixed inset-0 bg-slate-900/50 z-40 lg:hidden"
+          onClick={onClose}
+        />
+      )}
 
-      {/* Narrower glassmorphic sidebar - starts from very top */}
+      {/* Dark glassmorphic sidebar */}
       <div
         className={`
           fixed top-0 left-0 h-screen w-64
-          bg-[#d4c5e8] backdrop-blur-xl border-r border-[#c4afd9] z-40
+          backdrop-blur-2xl z-40
           transform transition-transform duration-300 ease-in-out
           ${isOpen ? "translate-x-0" : "-translate-x-full"}
           lg:translate-x-0
           flex flex-col overflow-hidden
         `}
+        style={{
+          background:
+            "linear-gradient(160deg, rgba(15,23,42,0.96), rgba(30,64,175,0.92))",
+          borderRight: "1px solid rgba(148,163,184,0.5)",
+        }}
       >
-        {/* Header with DahTruth logo */}
-        <div className="px-4 py-3 border-b border-black/10 flex-shrink-0">
+        {/* Header with DahTruth Story Lab logo */}
+        <div className="px-4 py-4 border-b border-slate-700/60 flex-shrink-0">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
+              {/* Save your coin logo into public/assets and update the path below */}
               <img
-                src="/DahTruthLogo.png"
-                alt="DahTruth Logo"
-                className="w-10 h-10 rounded-full shadow-lg border-2 border-white/20"
+                src="/assets/dahtruth-storylab-coin.png"
+                alt="DahTruth Story Lab"
+                className="w-11 h-11 rounded-full shadow-lg border border-amber-300/40"
+                style={{ objectFit: "cover" }}
               />
-              <div className="leading-tight">
-                <span
-                  className="block font-bold text-base text-black"
-                  style={{ fontFamily: "Georgia, serif" }}
+              <div>
+                <h1
+                  className="text-sm font-semibold tracking-wide"
+                  style={{
+                    fontFamily: "'EB Garamond', Georgia, serif",
+                    letterSpacing: "0.12em",
+                    textTransform: "uppercase",
+                    color: "#E5E7EB",
+                  }}
                 >
-                  DahTruth
-                </span>
-                <span className="block text-xs text-black/70 -mt-0.5">StoryLab</span>
+                  DAHTRUTH
+                </h1>
+                <p
+                  className="text-[11px] text-slate-300/80"
+                  style={{ fontFamily: "'Inter', system-ui, -apple-system, sans-serif" }}
+                >
+                  Story Lab Dashboard
+                </p>
               </div>
             </div>
             <button
               onClick={onClose}
-              className="lg:hidden text-black/70 hover:text-black p-1 rounded-lg hover:bg-white/70 transition-colors"
+              className="lg:hidden text-slate-200/80 hover:text-white p-1.5 rounded-lg hover:bg-slate-700/70 transition-colors"
               aria-label="Close sidebar"
             >
               <X size={18} />
@@ -173,21 +211,23 @@ const Sidebar = ({ isOpen, onClose, authorName, authorAvatar, navigate, userNove
                 aria-current={isActive ? "page" : undefined}
                 onClick={() => navigate(item.path)}
                 className={`
-                  group relative w-full h-10 rounded-xl border
+                  group relative w-full h-10 rounded-xl
                   flex items-center gap-2.5 px-3
-                  transition-colors duration-150
-                  ${
-                    isActive
-                      ? "bg-[#9b7bc9] border-[#D4AF37] text-white"
-                      : "bg-white/40 border-[#c4afd9]/50 text-black hover:bg-white/60"
-                  }
+                  transition-all duration-150
+                  ${isActive ? "bg-slate-800/80" : "hover:bg-slate-800/60"}
                 `}
               >
                 <item.icon
-                  size={16}
-                  className={`relative z-10 ${isActive ? "text-white" : "text-black/80"}`}
+                  size={17}
+                  className={isActive ? "text-amber-300" : "text-slate-300/80"}
                 />
-                <span className={`relative z-10 font-medium text-sm ${isActive ? "text-white" : "text-black/90"}`}>
+                <span
+                  className="font-medium text-xs"
+                  style={{
+                    fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+                    color: isActive ? "#F9FAFB" : "#E5E7EB",
+                  }}
+                >
                   {item.label}
                 </span>
               </button>
@@ -195,15 +235,21 @@ const Sidebar = ({ isOpen, onClose, authorName, authorAvatar, navigate, userNove
           })}
         </nav>
 
-        {/* Your Projects Section */}
-        <div className="p-3 border-t border-black/10 flex-shrink-0">
+        {/* Your Projects */}
+        <div className="p-3 border-t border-slate-700/60 flex-shrink-0">
           <div className="flex items-center justify-between mb-2">
-            <h3 className="text-xs font-semibold text-black/80 uppercase tracking-wide">
+            <h3
+              className="text-[11px] font-semibold uppercase tracking-[0.16em]"
+              style={{
+                color: "rgba(209,213,219,0.9)",
+                fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+              }}
+            >
               Your Projects ({userNovels.length})
             </h3>
             <button
               onClick={() => navigate("/project")}
-              className="text-black hover:opacity-80 p-1 rounded-lg hover:bg-white/70 transition-colors"
+              className="text-slate-100 hover:text-white p-1 rounded-lg hover:bg-slate-700/80 transition-colors"
               aria-label="Create project"
             >
               <Plus size={14} />
@@ -212,9 +258,9 @@ const Sidebar = ({ isOpen, onClose, authorName, authorAvatar, navigate, userNove
 
           <div className="space-y-1.5 max-h-32 overflow-y-auto">
             {userNovels.length === 0 ? (
-              <div className="p-2 rounded-lg bg-white/60 text-center">
-                <p className="text-xs text-black/70">No projects yet</p>
-                <p className="text-xs text-black/60 mt-0.5">
+              <div className="p-2 rounded-lg bg-slate-800/80 text-center">
+                <p className="text-[11px] text-slate-200">No projects yet</p>
+                <p className="text-[11px] mt-0.5 text-slate-400">
                   Click + to create your first story
                 </p>
               </div>
@@ -246,13 +292,22 @@ const Sidebar = ({ isOpen, onClose, authorName, authorAvatar, navigate, userNove
                   <button
                     key={project.id || i}
                     onClick={handleOpen}
-                    className="w-full text-left p-2 rounded-lg bg-white/60 hover:bg-white/80 transition-colors"
+                    className="w-full text-left p-2 rounded-lg bg-slate-800/80 hover:bg-slate-700/80 transition-colors"
                   >
-                    <h4 className="text-xs font-medium text-black truncate">{title}</h4>
-                    <p className="text-[10px] text-black/70 mt-0.5">
+                    <h4 className="text-xs font-medium text-slate-50 truncate">
+                      {title}
+                    </h4>
+                    <p className="text-[10px] mt-0.5 text-slate-300">
                       {words.toLocaleString()} words
                       {status && (
-                        <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded-full bg-white/70 border border-white/60 text-[9px] uppercase tracking-wide text-black/70">
+                        <span
+                          className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] uppercase tracking-wide"
+                          style={{
+                            background: "rgba(15,23,42,0.9)",
+                            border: "1px solid rgba(148,163,184,0.7)",
+                            color: "rgba(226,232,240,0.95)",
+                          }}
+                        >
                           {status}
                         </span>
                       )}
@@ -264,38 +319,48 @@ const Sidebar = ({ isOpen, onClose, authorName, authorAvatar, navigate, userNove
           </div>
         </div>
 
-        {/* Author info - integrated into sidebar */}
-        <div className="p-3 border-t border-black/10 flex-shrink-0">
+        {/* Author info */}
+        <div className="p-3 border-t border-slate-700/60 flex-shrink-0">
           <div
-            className="p-3 bg-white/60 rounded-xl hover:bg-white/80 transition-colors cursor-pointer"
+            className="p-3 rounded-xl bg-slate-800/80 hover:bg-slate-700/90 transition-colors cursor-pointer"
             onClick={() => navigate("/profile")}
             role="button"
             aria-label="Open profile"
           >
             <div className="flex items-center gap-2 mb-2">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#D4AF37] via-[#9b7bc9] to-[#D4AF37] shadow-md overflow-hidden grid place-items-center">
+              <div
+                className="w-8 h-8 rounded-full shadow-md overflow-hidden grid place-items-center"
+                style={{
+                  background:
+                    "radial-gradient(circle at 30% 0%, #FDE68A, #4C1D95)",
+                }}
+              >
                 {authorAvatar ? (
-                  <img
-                    src={authorAvatar}
-                    alt={authorName || "Author avatar"}
-                    className="w-full h-full object-cover"
-                  />
+                 <img
+                  src="/assets/Story%20Lab_Transparent.jpeg"
+                  alt="DahTruth Story Lab"
+                  className="w-11 h-11 rounded-full shadow-lg border border-amber-300/40"
+                  style={{ objectFit: "cover" }}
+                />
+
                 ) : (
-                  <span className="text-white font-bold text-xs">
+                  <span className="text-xs font-semibold text-slate-50">
                     {authorName?.charAt(0)?.toUpperCase?.() || "A"}
                   </span>
                 )}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-medium text-black truncate">{authorName || "Author"}</p>
-                <p className="text-[10px] text-black/70">Author</p>
+                <p className="text-xs font-medium text-slate-50 truncate">
+                  {authorName || "Author"}
+                </p>
+                <p className="text-[10px] text-slate-400">Author</p>
               </div>
               <button
                 onClick={(e) => {
                   e.stopPropagation();
                   navigate("/profile");
                 }}
-                className="text-black/70 hover:text-black p-1 rounded-lg hover:bg-white/70 transition-colors"
+                className="p-1 rounded-lg hover:bg-slate-600/80 transition-colors text-slate-200"
                 aria-label="Open profile settings"
               >
                 <Settings size={14} />
@@ -307,7 +372,7 @@ const Sidebar = ({ isOpen, onClose, authorName, authorAvatar, navigate, userNove
                   e.stopPropagation();
                   navigate("/profile");
                 }}
-                className="w-full text-left px-2 py-1.5 text-[10px] text-black/70 hover:text-black hover:bg-white/70 rounded-lg transition-colors"
+                className="w-full text-left px-2 py-1.5 text-[11px] text-slate-200 hover:bg-slate-700/80 rounded-lg transition-colors"
               >
                 Account Settings
               </button>
@@ -316,7 +381,7 @@ const Sidebar = ({ isOpen, onClose, authorName, authorAvatar, navigate, userNove
                   e.stopPropagation();
                   navigate("/");
                 }}
-                className="w-full text-left px-2 py-1.5 text-[10px] text-black/70 hover:text-black hover:bg-white/70 rounded-lg transition-colors"
+                className="w-full text-left px-2 py-1.5 text-[11px] text-slate-200 hover:bg-slate-700/80 rounded-lg transition-colors"
               >
                 Sign Out
               </button>
@@ -404,8 +469,14 @@ export default function Dashboard() {
   const todayPercent = Math.min(100, Math.round((todayWritten / todayTarget) * 100));
 
   return (
-    <div className="min-h-screen bg-base bg-radial-fade text-ink">
-      {/* Narrower sidebar */}
+    <div
+      className="min-h-screen text-slate-900"
+      style={{
+        background:
+          "radial-gradient(circle at top left, #EEF2FF 0, #F9FAFB 45%, #F3F4F6 100%)",
+      }}
+    >
+      {/* Sidebar */}
       <Sidebar
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
@@ -415,110 +486,106 @@ export default function Dashboard() {
         navigate={navigate}
       />
 
-      {/* Main content — adjusted for narrower sidebar (16rem = 256px = w-64) */}
+      {/* Main content */}
       <div className="flex min-h-screen">
         <div className="flex-1 flex flex-col lg:ml-64">
-          {/* Header */}
-          <div className="sticky top-0 z-30 bg-white/70 backdrop-blur-xl border-b border-white/60 shadow">
-            <div className="px-6 py-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <button
-                    onClick={() => setSidebarOpen(true)}
-                    className="lg:hidden text-muted hover:text-ink p-2 rounded-lg hover:bg-white/70 transition-colors"
-                    aria-label="Open sidebar"
-                  >
-                    <Menu size={24} />
-                  </button>
-                  <div>
-                    <h1 className="text-2xl md:text-3xl font-extrabold text-ink">
-                      <span className="mr-2">📝</span>
-                      {greeting} — Ready to Write?
-                    </h1>
-                    <div className="mt-1 flex items-center gap-4">
-                      <p className="font-medium text-sm text-ink/80">Start your writing journey today</p>
-                      <span className="text-muted">•</span>
-                      <p className="text-sm text-muted">Transform your ideas into compelling stories</p>
-                    </div>
-                    <p className="text-xs text-muted mt-1">
-                      Create your first novel and begin tracking your progress
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex flex-col items-end gap-2">
-                  <div className="flex gap-3">
-                    <button
-                      onClick={() => navigate("/writer")}
-                      className="inline-flex items-center gap-2 rounded-2xl bg-accent hover:opacity-90 px-4 py-2 text-sm font-semibold shadow"
-                    >
-                      <Plus size={16} /> Create Novel
-                    </button>
-                    <button
-                      onClick={() => navigate("/writer")}
-                      className="inline-flex items-center gap-2 rounded-2xl glass-soft border border-white/40 px-4 py-2 text-sm font-semibold"
-                    >
-                      <Play size={16} /> Quick Start
-                    </button>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      className="p-2 rounded-lg glass-soft hover:bg-white/80 transition-colors"
-                      title="Search"
-                    >
-                      <Search size={16} />
-                    </button>
-                    <button
-                      className="p-2 rounded-lg glass-soft hover:bg-white/80 transition-colors relative"
-                      title="Notifications"
-                    >
-                      <Bell size={16} />
-                      <span className="absolute -top-1 -right-1 w-3 h-3 bg-gold rounded-full" />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
+          {/* Mobile menu button */}
+          <div className="lg:hidden p-4">
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="p-2 rounded-lg bg-white/90 shadow-sm border border-slate-200 text-slate-700 hover:bg-slate-50 transition-colors"
+              aria-label="Open sidebar"
+            >
+              <Menu size={22} />
+            </button>
           </div>
 
           {/* Content */}
           <div className="flex-1 p-6 space-y-6 overflow-auto">
-            {/* Welcome */}
-            <Card>
-              <CardBody>
-                <div className="text-center py-6">
-                  <div className="flex items-center justify-center gap-3 mb-4">
-                    <img
-                      src="/DahTruthLogo.png"
-                      alt="DahTruth Logo"
-                      className="w-16 h-16 rounded-full shadow-lg border-2 border-white/20"
-                      onError={(e) => {
-                        e.currentTarget.style.display = "none";
-                      }}
-                    />
-                  </div>
-                  <h2
-                    className="text-xl font-bold text-ink mb-3 flex items-center justify-center gap-2"
-                    style={{ fontFamily: "Georgia, serif" }}
-                  >
-                    <span className="text-xl">📝</span>
-                    Welcome to DahTruth StoryLab!
-                  </h2>
-                  <p className="text-ink/80 mb-5 max-w-xl mx-auto text-sm">
-                    Ready to bring your stories to life? Start by creating your first novel and set your writing goals.
-                    Track your progress, stay motivated, and turn your ideas into compelling narratives.
+            {/* Main Greeting Banner */}
+            <Card
+              className="relative overflow-hidden"
+              style={{
+                background:
+                  "linear-gradient(120deg, #0F172A, #312E81, #7C3AED)",
+                border: "none",
+              }}
+            >
+              <CardBody className="flex items-center justify-between gap-6">
+                <div>
+                  <p className="text-sm text-slate-200/80 mb-1 tracking-[0.16em] uppercase">
+                    Welcome back
                   </p>
-                  <div className="flex gap-3 justify-center">
+                  <h1
+                    className="text-3xl md:text-4xl font-semibold text-white"
+                    style={{ fontFamily: "'EB Garamond', Georgia, serif" }}
+                  >
+                    {greeting}
+                  </h1>
+                  <p className="mt-3 text-slate-200/80 text-sm md:text-base max-w-xl">
+                    Pick up where you left off, or open a new manuscript and let
+                    DahTruth Story Lab carry the structure while you tell the story.
+                  </p>
+                  <div className="mt-5 flex flex-wrap gap-3">
                     <button
                       onClick={() => navigate("/writer")}
-                      className="inline-flex items-center gap-2 rounded-2xl bg-accent hover:opacity-90 px-5 py-2.5 text-sm font-semibold shadow"
+                      className="inline-flex items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-medium shadow-md shadow-indigo-900/40 hover:shadow-lg transition-all"
+                      style={{
+                        background:
+                          "linear-gradient(135deg, #FBBF24, #F97316)",
+                        color: "#111827",
+                      }}
                     >
-                      <Plus size={16} /> Create Your First Novel
+                      <Plus size={18} />
+                      Start Writing
                     </button>
-                    <button className="inline-flex items-center gap-2 rounded-2xl glass-soft border border-white/40 px-5 py-2.5 text-sm font-semibold">
-                      <BookOpen size={16} /> Learn More
+                    <button
+                      onClick={() => navigate("/project")}
+                      className="inline-flex items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-medium border border-indigo-200/70 text-indigo-100 hover:bg-white/10 transition-colors"
+                    >
+                      <Layers size={16} />
+                      View Projects
                     </button>
                   </div>
+                </div>
+
+                {/* Logo watermark on larger screens */}
+                <div className="hidden md:flex items-center justify-center flex-shrink-0">
+                  <div className="w-32 h-32 md:w-36 md:h-36 rounded-full border border-amber-200/30 bg-slate-900/40 backdrop-blur-xl shadow-[0_0_80px_rgba(15,23,42,0.7)] grid place-items-center">
+                    <img
+                      src="/assets/Story%20Lab_Transparent.jpeg"
+                      alt="DahTruth Story Lab"
+                      className="w-[82%] h-[82%] object-contain"
+                    />
+                    
+                  </div>
+                </div>
+              </CardBody>
+            </Card>
+
+            {/* Secondary actions */}
+            <Card>
+              <CardBody className="flex flex-col md:flex-row items-center justify-between gap-4">
+                <p
+                  className="text-sm md:text-base text-slate-700"
+                  style={{ fontFamily: "'EB Garamond', Georgia, serif" }}
+                >
+                  Outline your next chapter, refine a scene, or prep your manuscript
+                  for publishing – all from one workspace.
+                </p>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => navigate("/toc")}
+                    className="px-4 py-2 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-800 hover:bg-slate-50 transition-colors"
+                  >
+                    Open Table of Contents
+                  </button>
+                  <button
+                    onClick={() => navigate("/publishing")}
+                    className="px-4 py-2 rounded-lg bg-slate-900 text-sm font-medium text-slate-50 hover:bg-slate-800 transition-colors"
+                  >
+                    Publishing Suite
+                  </button>
                 </div>
               </CardBody>
             </Card>
@@ -528,13 +595,13 @@ export default function Dashboard() {
               <Card>
                 <CardBody>
                   <div className="flex items-center gap-2 mb-2">
-                    <PencilLine size={16} className="text-primary" />
+                    <PencilLine size={18} className="text-violet-500" />
                     <StatLabel>Overall Progress</StatLabel>
                   </div>
                   <StatValue>{goalPercent}%</StatValue>
                   <div className="mt-4 space-y-2">
                     <Progress value={goalPercent} />
-                    <div className="flex justify-between text-xs text-muted">
+                    <div className="flex justify-between text-[11px] text-slate-500">
                       <span>Current: {current.toLocaleString()}</span>
                       <span>Goal: {goal.toLocaleString()}</span>
                     </div>
@@ -545,27 +612,26 @@ export default function Dashboard() {
               <Card>
                 <CardBody>
                   <div className="flex items-center gap-2 mb-2">
-                    <span className="text-lg">✍️</span>
+                    <BookOpen size={18} className="text-emerald-500" />
                     <StatLabel>Writing Streak</StatLabel>
                   </div>
-                  <div className="flex items-center gap-2 mt-1">
-                    <StatValue>0</StatValue>
-                    <span className="text-2xl">🗓️</span>
-                  </div>
-                  <p className="text-muted text-sm mt-2">Start your streak today!</p>
+                  <StatValue>0 days</StatValue>
+                  <p className="text-slate-500 text-sm mt-3">
+                    Begin a daily rhythm and your streak will appear here.
+                  </p>
                 </CardBody>
               </Card>
 
               <Card>
                 <CardBody>
                   <div className="flex items-center gap-2 mb-2">
-                    <span className="text-lg">🎯</span>
-                    <StatLabel>Today's Goal</StatLabel>
+                    <Calendar size={18} className="text-sky-500" />
+                    <StatLabel>Today&apos;s Goal</StatLabel>
                   </div>
                   <StatValue>{todayPercent}%</StatValue>
                   <div className="mt-4 space-y-2">
                     <Progress value={todayPercent} />
-                    <div className="flex justify-between text-xs text-muted">
+                    <div className="flex justify-between text-[11px] text-slate-500">
                       <span>Written: {todayWritten}</span>
                       <span>Target: {todayTarget}</span>
                     </div>
@@ -576,15 +642,25 @@ export default function Dashboard() {
               <Card>
                 <CardBody className="flex items-center justify-center">
                   <div className="text-center">
-                    <div className="flex items-center justify-center gap-2 mb-2">
-                      <Calendar size={16} className="text-primary" />
-                      <span className="text-xs text-muted uppercase tracking-wide">Today</span>
+                    <div className="text-xs text-slate-500 uppercase tracking-[0.18em] mb-1">
+                      Today
                     </div>
-                    <div className="text-5xl font-bold bg-gradient-to-r from-accent via-primary to-gold bg-clip-text text-transparent">
+                    <div
+                      className="text-5xl font-semibold"
+                      style={{
+                        background:
+                          "linear-gradient(90deg, #FBBF24, #F97316, #6366F1)",
+                        WebkitBackgroundClip: "text",
+                        WebkitTextFillColor: "transparent",
+                      }}
+                    >
                       {new Date().getDate()}
                     </div>
-                    <div className="text-muted text-sm uppercase tracking-wide">
-                      {new Date().toLocaleDateString("en-US", { month: "short", weekday: "short" })}
+                    <div className="text-xs text-slate-500 uppercase tracking-[0.16em] mt-1">
+                      {new Date().toLocaleDateString("en-US", {
+                        month: "short",
+                        weekday: "short",
+                      })}
                     </div>
                   </div>
                 </CardBody>
@@ -593,35 +669,75 @@ export default function Dashboard() {
 
             {/* Quick Access */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <Card className="cursor-pointer hover:border-white/60" onClick={() => navigate("/toc")}>
+              <Card
+                className="cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all"
+                onClick={() => navigate("/toc")}
+              >
                 <CardBody className="text-center">
-                  <BookOpen size={24} className="mx-auto mb-2 text-ink" />
-                  <p className="font-semibold">Table of Contents</p>
-                  <p className="text-xs text-muted mt-1">Organize chapters</p>
+                  <BookOpen
+                    size={22}
+                    className="mx-auto mb-2 text-emerald-500"
+                  />
+                  <p className="font-semibold text-sm text-slate-900">
+                    Table of Contents
+                  </p>
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    Organize your chapters
+                  </p>
                 </CardBody>
               </Card>
 
-              <Card className="cursor-pointer hover:border-white/60" onClick={() => navigate("/writer")}>
+              <Card
+                className="cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all"
+                onClick={() => navigate("/writer")}
+              >
                 <CardBody className="text-center">
-                  <PencilLine size={24} className="mx-auto mb-2 text-ink" />
-                  <p className="font-semibold">Writer</p>
-                  <p className="text-xs text-muted mt-1">Start writing</p>
+                  <PencilLine
+                    size={22}
+                    className="mx-auto mb-2 text-violet-500"
+                  />
+                  <p className="font-semibold text-sm text-slate-900">
+                    Writer
+                  </p>
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    Draft your pages
+                  </p>
                 </CardBody>
               </Card>
 
-              <Card className="cursor-pointer hover:border-white/60" onClick={() => navigate("/project")}>
+              <Card
+                className="cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all"
+                onClick={() => navigate("/project")}
+              >
                 <CardBody className="text-center">
-                  <Layers size={24} className="mx-auto mb-2 text-ink" />
-                  <p className="font-semibold">Projects</p>
-                  <p className="text-xs text-muted mt-1">Manage all projects</p>
+                  <Layers
+                    size={22}
+                    className="mx-auto mb-2 text-indigo-500"
+                  />
+                  <p className="font-semibold text-sm text-slate-900">
+                    Projects
+                  </p>
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    Manage every manuscript
+                  </p>
                 </CardBody>
               </Card>
 
-              <Card className="cursor-pointer hover:border-white/60" onClick={() => navigate("/calendar")}>
+              <Card
+                className="cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all"
+                onClick={() => navigate("/calendar")}
+              >
                 <CardBody className="text-center">
-                  <Calendar size={24} className="mx-auto mb-2 text-ink" />
-                  <p className="font-semibold">Calendar</p>
-                  <p className="text-xs text-muted mt-1">Track progress</p>
+                  <Calendar
+                    size={22}
+                    className="mx-auto mb-2 text-rose-500"
+                  />
+                  <p className="font-semibold text-sm text-slate-900">
+                    Calendar
+                  </p>
+                  <p className="text-[11px] text-slate-500 mt-1">
+                    Map your writing time
+                  </p>
                 </CardBody>
               </Card>
             </div>
@@ -631,13 +747,17 @@ export default function Dashboard() {
               <Card className="xl:col-span-2">
                 <CardBody>
                   <div className="flex justify-between items-center mb-6">
-                    <h2 className="text-xl font-bold text-ink">Writing Activity</h2>
-                    <div className="flex gap-2">
-                      <button className="px-3 py-1 rounded-lg bg-primary text-ink text-sm">7 days</button>
-                      <button className="px-3 py-1 rounded-lg text-ink/70 hover:bg-white/70 text-sm transition-colors">
+                    <h2 className="text-lg font-semibold text-slate-900">
+                      Writing Activity
+                    </h2>
+                    <div className="flex gap-2 text-[11px]">
+                      <button className="px-3 py-1 rounded-lg bg-slate-900 text-slate-50">
+                        7 days
+                      </button>
+                      <button className="px-3 py-1 rounded-lg text-slate-600 hover:bg-slate-100 transition-colors">
                         30 days
                       </button>
-                      <button className="px-3 py-1 rounded-lg text-ink/70 hover:bg-white/70 text-sm transition-colors">
+                      <button className="px-3 py-1 rounded-lg text-slate-600 hover:bg-slate-100 transition-colors">
                         All time
                       </button>
                     </div>
@@ -646,40 +766,65 @@ export default function Dashboard() {
                   <div className="h-64">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={writingActivity}>
-                        <XAxis dataKey="day" axisLine={false} tickLine={false} className="text-ink/70" />
-                        <YAxis axisLine={false} tickLine={false} className="text-ink/70" />
+                        <XAxis
+                          dataKey="day"
+                          axisLine={false}
+                          tickLine={false}
+                          className="text-slate-500"
+                        />
+                        <YAxis
+                          axisLine={false}
+                          tickLine={false}
+                          className="text-slate-500"
+                        />
                         <Tooltip
                           contentStyle={{
-                            backgroundColor: "rgba(255,255,255,0.95)",
-                            border: "1px solid rgba(0,0,0,0.05)",
+                            backgroundColor: "rgba(255,255,255,0.98)",
+                            border: "1px solid rgba(148,163,184,0.4)",
                             borderRadius: "12px",
-                            boxShadow: "0 10px 25px rgba(0,0,0,0.08)",
+                            boxShadow: "0 10px 25px rgba(15,23,42,0.10)",
                             color: "#0F172A",
                           }}
                         />
                         <defs>
-                          <linearGradient id="brandGradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                            <stop offset="0%" stopColor="#CAB1D6" />
-                            <stop offset="100%" stopColor="#EAF2FF" />
+                          <linearGradient
+                            id="brandGradient"
+                            x1="0%"
+                            y1="0%"
+                            x2="0%"
+                            y2="100%"
+                          >
+                            <stop offset="0%" stopColor="#6366F1" />
+                            <stop offset="100%" stopColor="#A855F7" />
                           </linearGradient>
                         </defs>
-                        <Bar dataKey="words" fill="url(#brandGradient)" radius={[4, 4, 0, 0]} />
+                        <Bar
+                          dataKey="words"
+                          fill="url(#brandGradient)"
+                          radius={[4, 4, 0, 0]}
+                        />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
 
-                  <div className="flex justify-between text-center mt-6 pt-4 border-t border-white/60">
+                  <div className="flex justify-between text-center mt-6 pt-4 border-t border-slate-200">
                     <div>
-                      <p className="text-2xl font-bold text-ink">0</p>
-                      <p className="text-xs text-muted uppercase">This Week</p>
+                      <p className="text-2xl font-semibold text-slate-900">0</p>
+                      <p className="text-[11px] text-slate-500 uppercase tracking-[0.14em]">
+                        This Week
+                      </p>
                     </div>
                     <div>
-                      <p className="text-2xl font-bold text-ink">0</p>
-                      <p className="text-xs text-muted uppercase">Last Week</p>
+                      <p className="text-2xl font-semibold text-slate-900">0</p>
+                      <p className="text-[11px] text-slate-500 uppercase tracking-[0.14em]">
+                        Last Week
+                      </p>
                     </div>
                     <div>
-                      <p className="text-2xl font-bold text-ink">0</p>
-                      <p className="text-xs text-muted uppercase">Average</p>
+                      <p className="text-2xl font-semibold text-slate-900">0</p>
+                      <p className="text-[11px] text-slate-500 uppercase tracking-[0.14em]">
+                        Average
+                      </p>
                     </div>
                   </div>
                 </CardBody>
@@ -688,34 +833,40 @@ export default function Dashboard() {
               <Card>
                 <CardBody>
                   <div className="flex items-center justify-between mb-6">
-                    <h2 className="text-xl font-bold text-ink">Recent Activity</h2>
+                    <h2 className="text-lg font-semibold text-slate-900">
+                      Recent Activity
+                    </h2>
                     <ChevronRight
                       size={20}
-                      className="text-ink/60 hover:text-ink transition-colors cursor-pointer"
+                      className="text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
                     />
                   </div>
 
                   <div className="space-y-4">
                     {recentChapters.length === 0 ? (
                       <div className="text-center py-8">
-                        <div className="w-12 h-12 glass-soft rounded-full flex items-center justify-center mx-auto mb-3">
-                          <FileText size={20} className="text-ink/70" />
+                        <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-3">
+                          <FileText size={20} className="text-slate-500" />
                         </div>
-                        <p className="text-sm text-muted mb-2">No activity yet</p>
-                        <p className="text-xs text-ink/60">Start writing to see your progress here</p>
+                        <p className="text-sm text-slate-500 mb-1">
+                          No activity yet
+                        </p>
+                        <p className="text-[11px] text-slate-400">
+                          As you write, your recent chapters will appear here.
+                        </p>
                       </div>
                     ) : (
                       recentChapters.map((chapter) => (
                         <div
                           key={chapter.id}
-                          className="flex items-start gap-3 p-3 rounded-lg hover:bg-white/70 transition-colors cursor-pointer group"
+                          className="flex items-start gap-3 p-3 rounded-lg hover:bg-slate-50 transition-colors cursor-pointer group"
                         >
-                          <div className="w-2 h-2 rounded-full bg-gold mt-2 flex-shrink-0" />
+                          <div className="w-2 h-2 rounded-full bg-amber-400 mt-2 flex-shrink-0" />
                           <div className="flex-1 min-w-0">
-                            <h3 className="font-medium text-ink text-sm truncate group-hover:opacity-80 transition-colors">
+                            <h3 className="font-medium text-sm text-slate-900 truncate group-hover:opacity-80 transition-colors">
                               {chapter.title}
                             </h3>
-                            <p className="text-xs text-muted mt-1">
+                            <p className="text-[11px] text-slate-500 mt-1">
                               {chapter.words} words • {chapter.time}
                             </p>
                           </div>
