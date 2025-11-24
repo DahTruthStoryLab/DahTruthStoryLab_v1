@@ -60,7 +60,7 @@ function readAuthorProfile() {
   let avatarUrl = "";
 
   try {
-    const keys = ["dt_profile", "userProfile", "profile", "currentUser"];
+    const keys = ["dahtruth_project_meta", "dt_profile", "userProfile", "profile", "currentUser"];
     for (const key of keys) {
       const raw = localStorage.getItem(key);
       if (!raw) continue;
@@ -68,6 +68,12 @@ function readAuthorProfile() {
 
       if (obj.avatarUrl && !avatarUrl) {
         avatarUrl = obj.avatarUrl;
+      }
+
+      // Check for author field first (from project meta)
+      if (obj.author) {
+        name = obj.author;
+        break;
       }
 
       if (obj.displayName) {
@@ -102,13 +108,12 @@ const Sidebar = ({ isOpen, onClose, authorName, authorAvatar, navigate, userNove
     { icon: Home,       label: "Dashboard",         path: "/dashboard" },
     { icon: PencilLine, label: "Write",             path: "/writer" },
     { icon: BookOpen,   label: "Table of Contents", path: "/toc" },
-    { icon: Layers,     label: "Project",           path: "/project" },
-    { icon: Calendar,   label: "Calendar",          path: "/calendar" },
     { icon: Layers,     label: "Story Lab",         path: "/story-lab" },
+    { icon: Calendar,   label: "Calendar",          path: "/calendar" },
     { icon: UploadCloud,label: "Publishing",        path: "/publishing" },
-    { icon: Layers,     label: "Projects",          path: "/project" },
+    { icon: User,       label: "Profile",           path: "/profile" },
     { icon: Info,       label: "About",             path: "/about" },
-    { icon: Store,      label: "Store",             path: "/store" }, // 👈 Store last
+    { icon: Store,      label: "Store",             path: "/store" },
   ];
 
   return (
@@ -116,50 +121,48 @@ const Sidebar = ({ isOpen, onClose, authorName, authorAvatar, navigate, userNove
       {/* Mobile overlay */}
       {isOpen && <div className="fixed inset-0 bg-black/30 z-40 lg:hidden" onClick={onClose} />}
 
-      {/* Floating glassmorphic sidebar */}
+      {/* Narrower glassmorphic sidebar - starts from very top */}
       <div
         className={`
-          fixed top-0 left-0 h-screen w-80 glass-panel bg-white/70 backdrop-blur-xl border-r border-white/60 z-40
+          fixed top-0 left-0 h-screen w-64
+          bg-[#d4c5e8] backdrop-blur-xl border-r border-[#c4afd9] z-40
           transform transition-transform duration-300 ease-in-out
           ${isOpen ? "translate-x-0" : "-translate-x-full"}
-          lg:top-4 lg:left-4 lg:bottom-4 lg:h-auto lg:w-80
-          lg:rounded-3xl lg:shadow-glass lg:border lg:border-white/60
-          lg:translate-x-0 lg:z-40
+          lg:translate-x-0
           flex flex-col overflow-hidden
         `}
       >
         {/* Header with DahTruth logo */}
-        <div className="px-5 py-3 border-b border-white/60 flex-shrink-0">
+        <div className="px-4 py-3 border-b border-black/10 flex-shrink-0">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
               <img
                 src="/DahTruthLogo.png"
                 alt="DahTruth Logo"
-                className="w-12 h-12 rounded-full shadow-lg border-2 border-white/20"
+                className="w-10 h-10 rounded-full shadow-lg border-2 border-white/20"
               />
               <div className="leading-tight">
                 <span
-                  className="block font-bold text-lg text-ink"
+                  className="block font-bold text-base text-black"
                   style={{ fontFamily: "Georgia, serif" }}
                 >
                   DahTruth
                 </span>
-                <span className="block text-xs text-muted -mt-0.5">StoryLab</span>
+                <span className="block text-xs text-black/70 -mt-0.5">StoryLab</span>
               </div>
             </div>
             <button
               onClick={onClose}
-              className="lg:hidden text-muted hover:text-ink p-1 rounded-lg hover:bg-white/70 transition-colors"
+              className="lg:hidden text-black/70 hover:text-black p-1 rounded-lg hover:bg-white/70 transition-colors"
               aria-label="Close sidebar"
             >
-              <X size={20} />
+              <X size={18} />
             </button>
           </div>
-          <p className="text-xs text-muted mt-1">Where your story comes to life</p>
         </div>
 
         {/* Menu */}
-        <nav className="p-3 space-y-1.5 flex-1 overflow-y-auto">
+        <nav className="p-3 space-y-1 flex-1 overflow-y-auto">
           {menuItems.map((item) => {
             const isActive = pathname === item.path;
             return (
@@ -170,31 +173,21 @@ const Sidebar = ({ isOpen, onClose, authorName, authorAvatar, navigate, userNove
                 aria-current={isActive ? "page" : undefined}
                 onClick={() => navigate(item.path)}
                 className={`
-                  group relative w-full h-11 rounded-xl border
-                  flex items-center gap-3 px-4
+                  group relative w-full h-10 rounded-xl border
+                  flex items-center gap-2.5 px-3
                   transition-colors duration-150
                   ${
                     isActive
-                      ? "bg-white/80 border-white/60"
-                      : "bg-transparent border-transparent hover:bg-accent/15 hover:border-white/60"
+                      ? "bg-[#9b7bc9] border-[#D4AF37] text-white"
+                      : "bg-white/40 border-[#c4afd9]/50 text-black hover:bg-white/60"
                   }
                 `}
               >
-                {/* left accent rail */}
-                <span
-                  className={`
-                    absolute left-0 top-1.5 bottom-1.5 w-1 rounded-full transition-all
-                    ${isActive ? "bg-primary" : "bg-transparent group-hover:bg-primary/60"}
-                  `}
-                />
-                {/* translucent hover veil */}
-                <span className="absolute inset-0 rounded-xl bg-white/40 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
-                {/* content */}
                 <item.icon
-                  size={18}
-                  className={`relative z-10 ${isActive ? "text-ink" : "text-ink/80"}`}
+                  size={16}
+                  className={`relative z-10 ${isActive ? "text-white" : "text-black/80"}`}
                 />
-                <span className={`relative z-10 font-medium ${isActive ? "text-ink" : "text-ink/90"}`}>
+                <span className={`relative z-10 font-medium text-sm ${isActive ? "text-white" : "text-black/90"}`}>
                   {item.label}
                 </span>
               </button>
@@ -202,27 +195,27 @@ const Sidebar = ({ isOpen, onClose, authorName, authorAvatar, navigate, userNove
           })}
         </nav>
 
-             {/* Your Projects / Novels */}
-        <div className="p-4 border-t border-white/60 flex-shrink-0">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-sm font-semibold text-muted uppercase tracking-wide">
+        {/* Your Projects Section */}
+        <div className="p-3 border-t border-black/10 flex-shrink-0">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-xs font-semibold text-black/80 uppercase tracking-wide">
               Your Projects ({userNovels.length})
             </h3>
             <button
               onClick={() => navigate("/project")}
-              className="text-ink hover:opacity-80 p-1 rounded-lg hover:bg-white/70 transition-colors"
+              className="text-black hover:opacity-80 p-1 rounded-lg hover:bg-white/70 transition-colors"
               aria-label="Create project"
             >
-              <Plus size={16} />
+              <Plus size={14} />
             </button>
           </div>
 
-          <div className="space-y-2 max-h-40 overflow-y-auto">
+          <div className="space-y-1.5 max-h-32 overflow-y-auto">
             {userNovels.length === 0 ? (
-              <div className="p-3 rounded-lg glass-soft text-center">
-                <p className="text-xs text-muted">No projects yet</p>
-                <p className="text-xs text-muted mt-1">
-                  Click + to create your first story project
+              <div className="p-2 rounded-lg bg-white/60 text-center">
+                <p className="text-xs text-black/70">No projects yet</p>
+                <p className="text-xs text-black/60 mt-0.5">
+                  Click + to create your first story
                 </p>
               </div>
             ) : (
@@ -234,7 +227,6 @@ const Sidebar = ({ isOpen, onClose, authorName, authorAvatar, navigate, userNove
 
                 const handleOpen = () => {
                   try {
-                    // Set the active story so Writer / Compose knows what to open
                     const snapshot = {
                       id: project.id || i,
                       title,
@@ -254,19 +246,14 @@ const Sidebar = ({ isOpen, onClose, authorName, authorAvatar, navigate, userNove
                   <button
                     key={project.id || i}
                     onClick={handleOpen}
-                    className="w-full text-left p-3 rounded-lg glass-soft hover:bg-white/80 transition-colors"
+                    className="w-full text-left p-2 rounded-lg bg-white/60 hover:bg-white/80 transition-colors"
                   >
-                    <h4 className="text-sm font-medium text-ink truncate">{title}</h4>
-                    <p className="text-xs text-muted mt-0.5">
+                    <h4 className="text-xs font-medium text-black truncate">{title}</h4>
+                    <p className="text-[10px] text-black/70 mt-0.5">
                       {words.toLocaleString()} words
                       {status && (
-                        <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded-full bg-white/70 border border-white/60 text-[10px] uppercase tracking-wide text-muted">
+                        <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded-full bg-white/70 border border-white/60 text-[9px] uppercase tracking-wide text-black/70">
                           {status}
-                        </span>
-                      )}
-                      {lastModified && (
-                        <span className="ml-2 opacity-75">
-                          • {new Date(lastModified).toLocaleDateString()}
                         </span>
                       )}
                     </p>
@@ -277,16 +264,16 @@ const Sidebar = ({ isOpen, onClose, authorName, authorAvatar, navigate, userNove
           </div>
         </div>
 
-        {/* Author info */}
-        <div className="p-4 border-t border-white/60 flex-shrink-0">
+        {/* Author info - integrated into sidebar */}
+        <div className="p-3 border-t border-black/10 flex-shrink-0">
           <div
-            className="p-4 glass-soft rounded-xl hover:bg-white/80 transition-colors cursor-pointer"
+            className="p-3 bg-white/60 rounded-xl hover:bg-white/80 transition-colors cursor-pointer"
             onClick={() => navigate("/profile")}
             role="button"
             aria-label="Open profile"
           >
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-accent via-primary to-gold shadow-md overflow-hidden grid place-items-center">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#D4AF37] via-[#9b7bc9] to-[#D4AF37] shadow-md overflow-hidden grid place-items-center">
                 {authorAvatar ? (
                   <img
                     src={authorAvatar}
@@ -294,33 +281,33 @@ const Sidebar = ({ isOpen, onClose, authorName, authorAvatar, navigate, userNove
                     className="w-full h-full object-cover"
                   />
                 ) : (
-                  <span className="text-ink font-bold text-xs">
+                  <span className="text-white font-bold text-xs">
                     {authorName?.charAt(0)?.toUpperCase?.() || "A"}
                   </span>
                 )}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-ink truncate">{authorName || "Author"}</p>
-                <p className="text-xs text-muted">Author</p>
+                <p className="text-xs font-medium text-black truncate">{authorName || "Author"}</p>
+                <p className="text-[10px] text-black/70">Author</p>
               </div>
               <button
                 onClick={(e) => {
                   e.stopPropagation();
                   navigate("/profile");
                 }}
-                className="text-muted hover:text-ink p-1 rounded-lg hover:bg-white/70 transition-colors"
+                className="text-black/70 hover:text-black p-1 rounded-lg hover:bg-white/70 transition-colors"
                 aria-label="Open profile settings"
               >
-                <Settings size={16} />
+                <Settings size={14} />
               </button>
             </div>
-            <div className="space-y-2">
+            <div className="space-y-1">
               <button
                 onClick={(e) => {
                   e.stopPropagation();
                   navigate("/profile");
                 }}
-                className="w-full text-left px-3 py-2 text-xs text-muted hover:text-ink hover:bg-white/70 rounded-lg transition-colors"
+                className="w-full text-left px-2 py-1.5 text-[10px] text-black/70 hover:text-black hover:bg-white/70 rounded-lg transition-colors"
               >
                 Account Settings
               </button>
@@ -329,7 +316,7 @@ const Sidebar = ({ isOpen, onClose, authorName, authorAvatar, navigate, userNove
                   e.stopPropagation();
                   navigate("/");
                 }}
-                className="w-full text-left px-3 py-2 text-xs text-muted hover:text-ink hover:bg-white/70 rounded-lg transition-colors"
+                className="w-full text-left px-2 py-1.5 text-[10px] text-black/70 hover:text-black hover:bg-white/70 rounded-lg transition-colors"
               >
                 Sign Out
               </button>
@@ -387,6 +374,7 @@ export default function Dashboard() {
       }
     };
 
+    refresh();
     window.addEventListener("storage", refresh);
     window.addEventListener("profile:updated", refresh);
     window.addEventListener("project:change", refresh);
@@ -398,31 +386,14 @@ export default function Dashboard() {
     };
   }, []);
 
-
-  // live refresh profile on storage changes
-  useEffect(() => {
-    const refresh = () => {
-      const profile = readAuthorProfile();
-      setAuthorName(profile.name);
-      setAuthorAvatar(profile.avatarUrl);
-    };
-    window.addEventListener("storage", refresh);
-    window.addEventListener("profile:updated", refresh);
-    window.addEventListener("project:change", refresh);
-    return () => {
-      window.removeEventListener("storage", refresh);
-      window.removeEventListener("profile:updated", refresh);
-      window.removeEventListener("project:change", refresh);
-    };
-  }, []);
-
-  // greeting
+  // greeting with first name only
   useEffect(() => {
     const h = new Date().getHours();
-    if (h < 12) setGreeting("Good Morning");
-    else if (h < 17) setGreeting("Good Afternoon");
-    else setGreeting("Good Evening");
-  }, []);
+    const firstName = authorName.split(" ")[0];
+    if (h < 12) setGreeting(`Good Morning, ${firstName}`);
+    else if (h < 17) setGreeting(`Good Afternoon, ${firstName}`);
+    else setGreeting(`Good Evening, ${firstName}`);
+  }, [authorName]);
 
   // simple stats
   const goal = 25000,
@@ -434,7 +405,7 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-base bg-radial-fade text-ink">
-      {/* Floating sidebar */}
+      {/* Narrower sidebar */}
       <Sidebar
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
@@ -444,9 +415,9 @@ export default function Dashboard() {
         navigate={navigate}
       />
 
-      {/* Main content — give room for sidebar on large screens */}
+      {/* Main content — adjusted for narrower sidebar (16rem = 256px = w-64) */}
       <div className="flex min-h-screen">
-        <div className="flex-1 flex flex-col lg:ml-[21rem]">
+        <div className="flex-1 flex flex-col lg:ml-64">
           {/* Header */}
           <div className="sticky top-0 z-30 bg-white/70 backdrop-blur-xl border-b border-white/60 shadow">
             <div className="px-6 py-4">
@@ -462,8 +433,7 @@ export default function Dashboard() {
                   <div>
                     <h1 className="text-2xl md:text-3xl font-extrabold text-ink">
                       <span className="mr-2">📝</span>
-                      {greeting}
-                      {authorName ? `, ${authorName}` : ""} — Ready to Write?
+                      {greeting} — Ready to Write?
                     </h1>
                     <div className="mt-1 flex items-center gap-4">
                       <p className="font-medium text-sm text-ink/80">Start your writing journey today</p>
@@ -511,7 +481,7 @@ export default function Dashboard() {
             </div>
           </div>
 
-            {/* Content */}
+          {/* Content */}
           <div className="flex-1 p-6 space-y-6 overflow-auto">
             {/* Welcome */}
             <Card>
@@ -639,7 +609,7 @@ export default function Dashboard() {
                 </CardBody>
               </Card>
 
-             <Card className="cursor-pointer hover:border-white/60" onClick={() => navigate("/project")}>
+              <Card className="cursor-pointer hover:border-white/60" onClick={() => navigate("/project")}>
                 <CardBody className="text-center">
                   <Layers size={24} className="mx-auto mb-2 text-ink" />
                   <p className="font-semibold">Projects</p>
