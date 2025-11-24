@@ -137,12 +137,12 @@ const Sidebar = ({ isOpen, onClose, authorName, authorAvatar, navigate, userNove
       {/* Mobile overlay */}
       {isOpen && (
         <div
-          className="fixed inset-0 bg-slate-900/50 z-40 lg:hidden"
+          className="fixed inset-0 bg-slate-900/40 z-40 lg:hidden"
           onClick={onClose}
         />
       )}
 
-      {/* Dark glassmorphic sidebar */}
+      {/* Light mauve glassmorphic sidebar */}
       <div
         className={`
           fixed top-0 left-0 h-screen w-64
@@ -154,35 +154,34 @@ const Sidebar = ({ isOpen, onClose, authorName, authorAvatar, navigate, userNove
         `}
         style={{
           background:
-            "linear-gradient(160deg, rgba(15,23,42,0.96), rgba(30,64,175,0.92))",
-          borderRight: "1px solid rgba(148,163,184,0.5)",
+            "linear-gradient(160deg, rgba(249,245,255,0.96), rgba(234,224,252,0.98))",
+          borderRight: "1px solid rgba(209,213,219,0.9)",
         }}
       >
         {/* Header with DahTruth Story Lab logo */}
-        <div className="px-4 py-4 border-b border-slate-700/60 flex-shrink-0">
+        <div className="px-4 py-4 border-b border-slate-200 flex-shrink-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              {/* Save your coin logo into public/assets and update the path below */}
-              <img
-                src="/assets/dahtruth-storylab-coin.png"
-                alt="DahTruth Story Lab"
-                className="w-11 h-11 rounded-full shadow-lg border border-amber-300/40"
-                style={{ objectFit: "cover" }}
-              />
+              <div className="w-11 h-11 rounded-full overflow-hidden bg-white shadow-md border border-amber-300/60">
+                <img
+                  src="/assets/Story%20Lab_Transparent.jpeg"
+                  alt="DahTruth Story Lab"
+                  className="w-full h-full object-cover"
+                />
+              </div>
               <div>
                 <h1
-                  className="text-sm font-semibold tracking-wide"
+                  className="text-sm font-semibold tracking-wide text-slate-900"
                   style={{
                     fontFamily: "'EB Garamond', Georgia, serif",
                     letterSpacing: "0.12em",
                     textTransform: "uppercase",
-                    color: "#E5E7EB",
                   }}
                 >
                   DAHTRUTH
                 </h1>
                 <p
-                  className="text-[11px] text-slate-300/80"
+                  className="text-[11px] text-slate-500"
                   style={{ fontFamily: "'Inter', system-ui, -apple-system, sans-serif" }}
                 >
                   Story Lab Dashboard
@@ -191,7 +190,7 @@ const Sidebar = ({ isOpen, onClose, authorName, authorAvatar, navigate, userNove
             </div>
             <button
               onClick={onClose}
-              className="lg:hidden text-slate-200/80 hover:text-white p-1.5 rounded-lg hover:bg-slate-700/70 transition-colors"
+              className="lg:hidden text-slate-600 hover:text-slate-900 p-1.5 rounded-lg hover:bg-white/80 transition-colors"
               aria-label="Close sidebar"
             >
               <X size={18} />
@@ -214,18 +213,18 @@ const Sidebar = ({ isOpen, onClose, authorName, authorAvatar, navigate, userNove
                   group relative w-full h-10 rounded-xl
                   flex items-center gap-2.5 px-3
                   transition-all duration-150
-                  ${isActive ? "bg-slate-800/80" : "hover:bg-slate-800/60"}
+                  ${isActive ? "bg-white/90 shadow-sm" : "hover:bg-white/70"}
                 `}
               >
                 <item.icon
                   size={17}
-                  className={isActive ? "text-amber-300" : "text-slate-300/80"}
+                  className={isActive ? "text-violet-500" : "text-slate-500"}
                 />
                 <span
                   className="font-medium text-xs"
                   style={{
                     fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
-                    color: isActive ? "#F9FAFB" : "#E5E7EB",
+                    color: isActive ? "#111827" : "#374151",
                   }}
                 >
                   {item.label}
@@ -236,12 +235,12 @@ const Sidebar = ({ isOpen, onClose, authorName, authorAvatar, navigate, userNove
         </nav>
 
         {/* Your Projects */}
-        <div className="p-3 border-t border-slate-700/60 flex-shrink-0">
+        <div className="p-3 border-t border-slate-200 flex-shrink-0">
           <div className="flex items-center justify-between mb-2">
             <h3
               className="text-[11px] font-semibold uppercase tracking-[0.16em]"
               style={{
-                color: "rgba(209,213,219,0.9)",
+                color: "#4B5563",
                 fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
               }}
             >
@@ -249,7 +248,7 @@ const Sidebar = ({ isOpen, onClose, authorName, authorAvatar, navigate, userNove
             </h3>
             <button
               onClick={() => navigate("/project")}
-              className="text-slate-100 hover:text-white p-1 rounded-lg hover:bg-slate-700/80 transition-colors"
+              className="text-slate-700 hover:text-slate-900 p-1 rounded-lg hover:bg-white/80 transition-colors"
               aria-label="Create project"
             >
               <Plus size={14} />
@@ -258,9 +257,9 @@ const Sidebar = ({ isOpen, onClose, authorName, authorAvatar, navigate, userNove
 
           <div className="space-y-1.5 max-h-32 overflow-y-auto">
             {userNovels.length === 0 ? (
-              <div className="p-2 rounded-lg bg-slate-800/80 text-center">
-                <p className="text-[11px] text-slate-200">No projects yet</p>
-                <p className="text-[11px] mt-0.5 text-slate-400">
+              <div className="p-2 rounded-lg bg-white/90 text-center border border-slate-200/80">
+                <p className="text-[11px] text-slate-700">No projects yet</p>
+                <p className="text-[11px] mt-0.5 text-slate-500">
                   Click + to create your first story
                 </p>
               </div>
@@ -292,20 +291,20 @@ const Sidebar = ({ isOpen, onClose, authorName, authorAvatar, navigate, userNove
                   <button
                     key={project.id || i}
                     onClick={handleOpen}
-                    className="w-full text-left p-2 rounded-lg bg-slate-800/80 hover:bg-slate-700/80 transition-colors"
+                    className="w-full text-left p-2 rounded-lg bg-white/90 hover:bg-white transition-colors border border-slate-200/70"
                   >
-                    <h4 className="text-xs font-medium text-slate-50 truncate">
+                    <h4 className="text-xs font-medium text-slate-900 truncate">
                       {title}
                     </h4>
-                    <p className="text-[10px] mt-0.5 text-slate-300">
+                    <p className="text-[10px] mt-0.5 text-slate-600">
                       {words.toLocaleString()} words
                       {status && (
                         <span
                           className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] uppercase tracking-wide"
                           style={{
-                            background: "rgba(15,23,42,0.9)",
-                            border: "1px solid rgba(148,163,184,0.7)",
-                            color: "rgba(226,232,240,0.95)",
+                            background: "rgba(249,250,251,0.95)",
+                            border: "1px solid rgba(209,213,219,0.9)",
+                            color: "rgba(55,65,81,1)",
                           }}
                         >
                           {status}
@@ -320,47 +319,41 @@ const Sidebar = ({ isOpen, onClose, authorName, authorAvatar, navigate, userNove
         </div>
 
         {/* Author info */}
-        <div className="p-3 border-t border-slate-700/60 flex-shrink-0">
+        <div className="p-3 border-t border-slate-200 flex-shrink-0">
           <div
-            className="p-3 rounded-xl bg-slate-800/80 hover:bg-slate-700/90 transition-colors cursor-pointer"
+            className="p-3 rounded-xl bg-white/90 hover:bg-white transition-colors cursor-pointer border border-slate-200/80"
             onClick={() => navigate("/profile")}
             role="button"
             aria-label="Open profile"
           >
             <div className="flex items-center gap-2 mb-2">
               <div
-                className="w-8 h-8 rounded-full shadow-md overflow-hidden grid place-items-center"
-                style={{
-                  background:
-                    "radial-gradient(circle at 30% 0%, #FDE68A, #4C1D95)",
-                }}
+                className="w-8 h-8 rounded-full shadow-sm overflow-hidden grid place-items-center border border-violet-300/70 bg-gradient-to-br from-amber-100 to-violet-200"
               >
                 {authorAvatar ? (
-                 <img
-                  src="/assets/Story%20Lab_Transparent.jpeg"
-                  alt="DahTruth Story Lab"
-                  className="w-11 h-11 rounded-full shadow-lg border border-amber-300/40"
-                  style={{ objectFit: "cover" }}
-                />
-
+                  <img
+                    src={authorAvatar}
+                    alt={authorName || "Author avatar"}
+                    className="w-full h-full object-cover"
+                  />
                 ) : (
-                  <span className="text-xs font-semibold text-slate-50">
+                  <span className="text-xs font-semibold text-slate-800">
                     {authorName?.charAt(0)?.toUpperCase?.() || "A"}
                   </span>
                 )}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-xs font-medium text-slate-50 truncate">
+                <p className="text-xs font-medium text-slate-900 truncate">
                   {authorName || "Author"}
                 </p>
-                <p className="text-[10px] text-slate-400">Author</p>
+                <p className="text-[10px] text-slate-500">Author</p>
               </div>
               <button
                 onClick={(e) => {
                   e.stopPropagation();
                   navigate("/profile");
                 }}
-                className="p-1 rounded-lg hover:bg-slate-600/80 transition-colors text-slate-200"
+                className="p-1 rounded-lg hover:bg-slate-100 transition-colors text-slate-600"
                 aria-label="Open profile settings"
               >
                 <Settings size={14} />
@@ -372,7 +365,7 @@ const Sidebar = ({ isOpen, onClose, authorName, authorAvatar, navigate, userNove
                   e.stopPropagation();
                   navigate("/profile");
                 }}
-                className="w-full text-left px-2 py-1.5 text-[11px] text-slate-200 hover:bg-slate-700/80 rounded-lg transition-colors"
+                className="w-full text-left px-2 py-1.5 text-[11px] text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
               >
                 Account Settings
               </button>
@@ -381,7 +374,7 @@ const Sidebar = ({ isOpen, onClose, authorName, authorAvatar, navigate, userNove
                   e.stopPropagation();
                   navigate("/");
                 }}
-                className="w-full text-left px-2 py-1.5 text-[11px] text-slate-200 hover:bg-slate-700/80 rounded-lg transition-colors"
+                className="w-full text-left px-2 py-1.5 text-[11px] text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
               >
                 Sign Out
               </button>
@@ -408,6 +401,21 @@ export default function Dashboard() {
       const profile = readAuthorProfile();
       setAuthorName(profile.name);
       setAuthorAvatar(profile.avatarUrl);
+
+      // Greeting logic here so we don't get "Good Morning, New"
+      const name = profile.name && profile.name !== "New Author" ? profile.name : "";
+      const hour = new Date().getHours();
+      let g;
+
+      if (!name) {
+        g = "Welcome to DahTruth Story Lab";
+      } else {
+        const firstName = name.split(" ")[0];
+        if (hour < 12) g = `Good Morning, ${firstName}`;
+        else if (hour < 17) g = `Good Afternoon, ${firstName}`;
+        else g = `Good Evening, ${firstName}`;
+      }
+      setGreeting(g);
 
       try {
         const projectData = localStorage.getItem("userProjects");
@@ -451,15 +459,6 @@ export default function Dashboard() {
     };
   }, []);
 
-  // greeting with first name only
-  useEffect(() => {
-    const h = new Date().getHours();
-    const firstName = authorName.split(" ")[0];
-    if (h < 12) setGreeting(`Good Morning, ${firstName}`);
-    else if (h < 17) setGreeting(`Good Afternoon, ${firstName}`);
-    else setGreeting(`Good Evening, ${firstName}`);
-  }, [authorName]);
-
   // simple stats
   const goal = 25000,
     current = 0;
@@ -473,7 +472,7 @@ export default function Dashboard() {
       className="min-h-screen text-slate-900"
       style={{
         background:
-          "radial-gradient(circle at top left, #EEF2FF 0, #F9FAFB 45%, #F3F4F6 100%)",
+          "radial-gradient(circle at top left, #F9FAFB 0, #F3F4F6 40%, #EDE9FE 100%)",
       }}
     >
       {/* Sidebar */}
@@ -507,29 +506,31 @@ export default function Dashboard() {
               className="relative overflow-hidden"
               style={{
                 background:
-                  "linear-gradient(120deg, #0F172A, #312E81, #7C3AED)",
+                  "linear-gradient(120deg, #4C1D95, #7C3AED, #A855F7)",
                 border: "none",
               }}
             >
               <CardBody className="flex items-center justify-between gap-6">
                 <div>
-                  <p className="text-sm text-slate-200/80 mb-1 tracking-[0.16em] uppercase">
-                    Welcome back
+                  <p className="text-sm text-violet-100/80 mb-1 tracking-[0.16em] uppercase">
+                    {authorName && authorName !== "New Author"
+                      ? "Author workspace"
+                      : "Welcome"}
                   </p>
                   <h1
                     className="text-3xl md:text-4xl font-semibold text-white"
                     style={{ fontFamily: "'EB Garamond', Georgia, serif" }}
                   >
-                    {greeting}
+                    {greeting || "Welcome to DahTruth Story Lab"}
                   </h1>
-                  <p className="mt-3 text-slate-200/80 text-sm md:text-base max-w-xl">
+                  <p className="mt-3 text-violet-100/90 text-sm md:text-base max-w-xl">
                     Pick up where you left off, or open a new manuscript and let
                     DahTruth Story Lab carry the structure while you tell the story.
                   </p>
                   <div className="mt-5 flex flex-wrap gap-3">
                     <button
                       onClick={() => navigate("/writer")}
-                      className="inline-flex items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-medium shadow-md shadow-indigo-900/40 hover:shadow-lg transition-all"
+                      className="inline-flex items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-medium shadow-md shadow-violet-900/40 hover:shadow-lg transition-all"
                       style={{
                         background:
                           "linear-gradient(135deg, #FBBF24, #F97316)",
@@ -541,7 +542,7 @@ export default function Dashboard() {
                     </button>
                     <button
                       onClick={() => navigate("/project")}
-                      className="inline-flex items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-medium border border-indigo-200/70 text-indigo-100 hover:bg-white/10 transition-colors"
+                      className="inline-flex items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-medium border border-violet-200/80 text-violet-50 hover:bg-white/10 transition-colors"
                     >
                       <Layers size={16} />
                       View Projects
@@ -551,13 +552,12 @@ export default function Dashboard() {
 
                 {/* Logo watermark on larger screens */}
                 <div className="hidden md:flex items-center justify-center flex-shrink-0">
-                  <div className="w-32 h-32 md:w-36 md:h-36 rounded-full border border-amber-200/30 bg-slate-900/40 backdrop-blur-xl shadow-[0_0_80px_rgba(15,23,42,0.7)] grid place-items-center">
+                  <div className="w-32 h-32 md:w-36 md:h-36 rounded-full overflow-hidden border border-amber-200/50 bg-violet-900/40 backdrop-blur-xl shadow-[0_0_80px_rgba(76,29,149,0.8)] grid place-items-center">
                     <img
                       src="/assets/Story%20Lab_Transparent.jpeg"
                       alt="DahTruth Story Lab"
-                      className="w-[82%] h-[82%] object-contain"
+                      className="w-full h-full object-contain"
                     />
-                    
                   </div>
                 </div>
               </CardBody>
