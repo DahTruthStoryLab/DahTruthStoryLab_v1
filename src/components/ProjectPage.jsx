@@ -1,63 +1,27 @@
-// src/components/ProfilePage.jsx
+// src/components/ProjectPage.jsx
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
-  ArrowLeft,
-  Camera,
-  Loader2,
-  Globe,
-  Instagram,
-  Twitter,
-  Facebook,
-  LogOut,
-  Save,
-  X,
   BookOpen,
-  PenSquare,
-  Link2,
-  Settings,
+  Plus,
+  Upload,
+  Trash2,
+  PencilLine,
+  ArrowLeft,
+  Loader2,
+  Image as ImageIcon,
+  Grid,
+  List,
+  Users,
+  FileText,
+  Calendar,
+  Trophy,
+  Edit3,
 } from "lucide-react";
 import heic2any from "heic2any";
 
-// -------------------- Storage Keys --------------------
-const PROFILE_KEY = "profile";
+// -------------------- Storage helpers --------------------
 const PROJECTS_KEY = "userProjects";
-
-// -------------------- Load/Save Helpers --------------------
-function getDefaultProfile() {
-  return {
-    displayName: "New Author",
-    tagline: "",
-    bio: "",
-    avatarUrl: "",
-    genres: [],
-    website: "",
-    instagram: "",
-    twitter: "",
-    facebook: "",
-    email: "",
-    memberSince: new Date().toISOString(),
-  };
-}
-
-function loadProfile() {
-  try {
-    const raw = localStorage.getItem(PROFILE_KEY);
-    if (!raw) return getDefaultProfile();
-    return { ...getDefaultProfile(), ...JSON.parse(raw) };
-  } catch {
-    return getDefaultProfile();
-  }
-}
-
-function saveProfile(profile) {
-  try {
-    localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
-    window.dispatchEvent(new Event("profile:updated"));
-  } catch (err) {
-    console.error("Failed to save profile:", err);
-  }
-}
 
 function loadProjects() {
   try {
@@ -70,7 +34,67 @@ function loadProjects() {
   }
 }
 
-// -------------------- Image Helpers (HEIC/iPhone support) --------------------
+function saveProjects(projects) {
+  try {
+    localStorage.setItem(PROJECTS_KEY, JSON.stringify(projects));
+    window.dispatchEvent(new Event("project:change"));
+  } catch (err) {
+    console.error("Failed to save projects:", err);
+  }
+}
+
+// -------------------- Profile helper --------------------
+function readAuthorProfile() {
+  let name = "New Author";
+  let avatarUrl = "";
+
+  try {
+    const keys = [
+      "dahtruth_project_meta",
+      "dt_profile",
+      "userProfile",
+      "profile",
+      "currentUser",
+    ];
+    for (const key of keys) {
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      const obj = JSON.parse(raw);
+
+      if (obj.avatarUrl && !avatarUrl) {
+        avatarUrl = obj.avatarUrl;
+      }
+
+      if (obj.author) {
+        name = obj.author;
+        break;
+      }
+
+      if (obj.displayName) {
+        name = obj.displayName;
+        break;
+      }
+
+      const fn = obj.firstName || obj.given_name;
+      const ln = obj.lastName || obj.family_name;
+      if (fn || ln) {
+        name = [fn, ln].filter(Boolean).join(" ");
+        break;
+      }
+
+      if (obj.username) {
+        name = obj.username;
+        break;
+      }
+    }
+  } catch {
+    // ignore and fall back to defaults
+  }
+
+  return { name, avatarUrl };
+}
+
+// -------------------- Image helpers --------------------
 async function heicArrayBufferToJpegDataUrl(arrayBuffer, quality = 0.9) {
   const blob = new Blob([arrayBuffer], { type: "image/heic" });
   const jpegBlob = await heic2any({ blob, toType: "image/jpeg", quality });
@@ -83,7 +107,7 @@ async function heicArrayBufferToJpegDataUrl(arrayBuffer, quality = 0.9) {
   return dataUrl;
 }
 
-async function downscaleDataUrl(dataUrl, maxDim = 800, quality = 0.9) {
+async function downscaleDataUrl(dataUrl, maxDim = 2000, quality = 0.9) {
   const img = await new Promise((resolve, reject) => {
     const x = new Image();
     x.onload = () => resolve(x);
@@ -103,47 +127,83 @@ async function downscaleDataUrl(dataUrl, maxDim = 800, quality = 0.9) {
   return canvas.toDataURL("image/jpeg", quality);
 }
 
-// -------------------- Genre Options --------------------
-const GENRE_OPTIONS = [
-  "Urban Fiction",
-  "Romance",
-  "Mystery",
-  "Drama",
-  "Thriller",
-  "Sci-Fi",
-  "Fantasy",
-  "Historical",
-  "YA",
-  "Literary",
-  "Horror",
-  "Comedy",
-  "Adventure",
-  "Memoir",
-];
+// -------------------- Misc helpers --------------------
+const getReadingTime = (wordCount) => Math.ceil((wordCount || 0) / 200);
+const progressPct = (cur, tgt) =>
+  Math.min((cur / Math.max(tgt || 1, 1)) * 100, 100);
+
+const statusColors = {
+  Idea: {
+    bg: "linear-gradient(135deg, rgba(202,177,214,0.25), rgba(202,177,214,0.1))",
+    text: "#6B4F7A",
+    border: "rgba(202,177,214,0.4)",
+  },
+  Outline: {
+    bg: "linear-gradient(135deg, rgba(147,197,253,0.25), rgba(147,197,253,0.1))",
+    text: "#1e40af",
+    border: "rgba(147,197,253,0.4)",
+  },
+  Draft: {
+    bg: "linear-gradient(135deg, rgba(251,191,36,0.25), rgba(251,191,36,0.1))",
+    text: "#92400e",
+    border: "rgba(251,191,36,0.4)",
+  },
+  Revision: {
+    bg: "linear-gradient(135deg, rgba(251,146,60,0.25), rgba(251,146,60,0.1))",
+    text: "#9a3412",
+    border: "rgba(251,146,60,0.4)",
+  },
+  Editing: {
+    bg: "linear-gradient(135deg, rgba(52,211,153,0.25), rgba(52,211,153,0.1))",
+    text: "#065f46",
+    border: "rgba(52,211,153,0.4)",
+  },
+  Published: {
+    bg: "linear-gradient(135deg, rgba(212,175,55,0.25), rgba(212,175,55,0.1))",
+    text: "#78350f",
+    border: "rgba(212,175,55,0.4)",
+  },
+};
+
+const getStatusStyle = (status) => {
+  const colors = statusColors[status] || statusColors.Draft;
+  return {
+    background: colors.bg,
+    color: colors.text,
+    border: `1px solid ${colors.border}`,
+  };
+};
 
 // -------------------- Main Component --------------------
-export default function ProfilePage() {
+export default function ProjectPage() {
   const navigate = useNavigate();
-  const [profile, setProfile] = useState(getDefaultProfile());
-  const [isUploading, setIsUploading] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [showSaved, setShowSaved] = useState(false);
+  const [projects, setProjects] = useState([]);
+  const [coverUploadId, setCoverUploadId] = useState(null);
+  const [viewMode, setViewMode] = useState("grid"); // "grid" or "list"
+  const [authorName, setAuthorName] = useState("New Author");
+  const [authorAvatar, setAuthorAvatar] = useState("");
 
-  // Load profile on mount
   useEffect(() => {
-    const loadedProfile = loadProfile();
-    setProfile(loadedProfile);
+    setProjects(loadProjects());
+    const profile = readAuthorProfile();
+    setAuthorName(profile.name);
+    setAuthorAvatar(profile.avatarUrl);
   }, []);
 
-  // Listen for external profile changes
+  // Keep in sync if other tabs / parts of app modify projects or profile
   useEffect(() => {
     const sync = () => {
-      setProfile(loadProfile());
+      setProjects(loadProjects());
+      const profile = readAuthorProfile();
+      setAuthorName(profile.name);
+      setAuthorAvatar(profile.avatarUrl);
     };
     window.addEventListener("storage", sync);
+    window.addEventListener("project:change", sync);
     window.addEventListener("profile:updated", sync);
     return () => {
       window.removeEventListener("storage", sync);
+      window.removeEventListener("project:change", sync);
       window.removeEventListener("profile:updated", sync);
     };
   }, []);
@@ -156,28 +216,110 @@ export default function ProfilePage() {
     }
   };
 
-  const updateProfile = (field, value) => {
-    setProfile((prev) => ({ ...prev, [field]: value }));
+  // -------- Author name: source of truth here --------
+  const handleAuthorNameSave = (newName) => {
+    const trimmed = (newName || "").trim() || "New Author";
+
+    setAuthorName(trimmed);
+
+    // 1) Update all projects' author field
+    setProjects((prev) => {
+      const updated = prev.map((p) => ({
+        ...p,
+        author: trimmed,
+      }));
+      saveProjects(updated);
+      return updated;
+    });
+
+    // 2) Save to a profile object so Dashboard can read it
+    try {
+      const existingProfileRaw = localStorage.getItem("profile");
+      const existingProfile = existingProfileRaw
+        ? JSON.parse(existingProfileRaw)
+        : {};
+      const profileToSave = {
+        ...existingProfile,
+        displayName: trimmed,
+        avatarUrl: authorAvatar || existingProfile.avatarUrl || "",
+      };
+      localStorage.setItem("profile", JSON.stringify(profileToSave));
+      window.dispatchEvent(new Event("profile:updated"));
+    } catch (err) {
+      console.error("Failed to save profile from ProjectPage:", err);
+    }
   };
 
-  const toggleGenre = (genre) => {
-    setProfile((prev) => {
-      const genres = prev.genres || [];
-      if (genres.includes(genre)) {
-        return { ...prev, genres: genres.filter((g) => g !== genre) };
-      } else {
-        return { ...prev, genres: [...genres, genre] };
-      }
+  const addProject = () => {
+    const now = new Date().toISOString();
+    setProjects((prev) => {
+      const newProject = {
+        id: Date.now().toString(),
+        title: "Untitled Project",
+        author: authorName,
+        logline: "",
+        synopsis: "",
+        genre: [],
+        status: "Draft",
+        targetWords: 50000,
+        wordCount: 0,
+        chapterCount: 0,
+        characterCount: 0,
+        cover: "",
+        createdAt: now,
+        lastModified: now,
+      };
+      const updated = [newProject, ...prev];
+      saveProjects(updated);
+      return updated;
     });
   };
 
-  const handleAvatarChange = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const updateProject = (id, patch) => {
+    setProjects((prev) => {
+      const now = new Date().toISOString();
+      const updated = prev.map((p) =>
+        p.id === id ? { ...p, ...patch, lastModified: now } : p
+      );
+      saveProjects(updated);
+      return updated;
+    });
+  };
 
-    setIsUploading(true);
+  const deleteProject = (id) => {
+    if (!window.confirm("Delete this project? This cannot be undone.")) return;
+    setProjects((prev) => {
+      const updated = prev.filter((p) => p.id !== id);
+      saveProjects(updated);
+      return updated;
+    });
+  };
+
+  const openInWriter = (project) => {
+    const snapshot = {
+      id: project.id,
+      title: project.title,
+      wordCount: project.wordCount || 0,
+      lastModified: project.lastModified || new Date().toISOString(),
+      status: project.status || "Draft",
+      targetWords: project.targetWords || 50000,
+    };
     try {
-      const maxSize = 10 * 1024 * 1024; // 10MB
+      localStorage.setItem("currentStory", JSON.stringify(snapshot));
+      window.dispatchEvent(new Event("project:change"));
+    } catch (err) {
+      console.error("Failed to set currentStory:", err);
+    }
+    navigate("/writer");
+  };
+
+  // Handle cover upload
+  const handleCoverChange = async (projectId, fileInputEvent) => {
+    const file = fileInputEvent.target.files?.[0];
+    if (!file) return;
+    setCoverUploadId(projectId);
+    try {
+      const maxSize = 10 * 1024 * 1024;
       if (file.size > maxSize) {
         alert("Image is too large. Please choose an image under 10MB.");
         return;
@@ -193,7 +335,7 @@ export default function ProfilePage() {
       if (isHEIC) {
         const ab = await file.arrayBuffer();
         const jpegDataUrl = await heicArrayBufferToJpegDataUrl(ab, 0.9);
-        dataUrl = await downscaleDataUrl(jpegDataUrl, 800, 0.9);
+        dataUrl = await downscaleDataUrl(jpegDataUrl, 2000, 0.9);
       } else {
         dataUrl = await new Promise((resolve, reject) => {
           const fr = new FileReader();
@@ -201,76 +343,106 @@ export default function ProfilePage() {
           fr.onerror = reject;
           fr.readAsDataURL(file);
         });
-        dataUrl = await downscaleDataUrl(String(dataUrl), 800, 0.9);
+        dataUrl = await downscaleDataUrl(String(dataUrl), 2000, 0.9);
       }
 
-      updateProfile("avatarUrl", dataUrl);
+      updateProject(projectId, { cover: dataUrl });
     } catch (err) {
-      console.error("Error uploading avatar:", err);
+      console.error("Error uploading cover:", err);
       alert("Failed to upload image. Please try again or use a different image.");
     } finally {
-      setIsUploading(false);
-      e.target.value = "";
+      setCoverUploadId(null);
+      fileInputEvent.target.value = "";
     }
   };
 
-  const handleSave = async () => {
-    setIsSaving(true);
-    try {
-      saveProfile(profile);
+  // Handle import - redirects to writer after import
+  const handleImport = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-      // Also update author name in all projects
-      const projects = loadProjects();
-      if (projects.length > 0) {
-        const updatedProjects = projects.map((p) => ({
-          ...p,
-          author: profile.displayName,
-        }));
-        localStorage.setItem(PROJECTS_KEY, JSON.stringify(updatedProjects));
-        window.dispatchEvent(new Event("project:change"));
-      }
+    const now = new Date().toISOString();
+    const newProject = {
+      id: Date.now().toString(),
+      title: file.name.replace(/\.[^/.]+$/, ""),
+      author: authorName,
+      logline: "",
+      synopsis: "",
+      genre: [],
+      status: "Draft",
+      targetWords: 50000,
+      wordCount: 0,
+      chapterCount: 0,
+      characterCount: 0,
+      cover: "",
+      createdAt: now,
+      lastModified: now,
+      imported: true,
+    };
 
-      setShowSaved(true);
-      setTimeout(() => setShowSaved(false), 3000);
-    } catch (err) {
-      console.error("Failed to save:", err);
-      alert("Failed to save profile. Please try again.");
-    } finally {
-      setIsSaving(false);
-    }
+    const updated = [newProject, ...projects];
+    saveProjects(updated);
+    setProjects(updated);
+
+    localStorage.setItem(
+      "currentStory",
+      JSON.stringify({
+        id: newProject.id,
+        title: newProject.title,
+        wordCount: 0,
+        lastModified: now,
+        status: "Draft",
+        targetWords: 50000,
+      })
+    );
+    window.dispatchEvent(new Event("project:change"));
+    navigate("/writer");
+
+    e.target.value = "";
   };
 
-  const handleSignOut = () => {
-    if (window.confirm("Are you sure you want to sign out?")) {
-      navigate("/");
-    }
-  };
+  // Calculate totals
+  const totalWords = projects.reduce(
+    (sum, p) => sum + (p.wordCount || 0),
+    0
+  );
+  const inProgress = projects.filter(
+    (p) => !["Published", "Idea"].includes(p.status)
+  ).length;
+  const published = projects.filter((p) => p.status === "Published").length;
 
-  const getInitials = () => {
-    const name = profile.displayName || "A";
-    return name.charAt(0).toUpperCase();
-  };
+  const formatDate = (dateStr) => {
+    if (!dateStr) return "—";
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diff = now - date;
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
 
-  const formatMemberSince = () => {
-    if (!profile.memberSince) return "—";
-    const date = new Date(profile.memberSince);
-    return date.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+    if (days === 0) return "Today";
+    if (days === 1) return "Yesterday";
+    if (days < 7) return `${days} days ago`;
+    return date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+    });
   };
 
   return (
     <div
       className="min-h-screen text-gray-800"
       style={{
-        background: "linear-gradient(135deg, #fef5ff 0%, #f8e8ff 50%, #fff5f7 100%)",
+        background:
+          "linear-gradient(135deg, #fef5ff 0%, #f8e8ff 50%, #fff5f7 100%)",
       }}
     >
-      <div className="mx-auto max-w-3xl px-6 py-8">
+      <div className="mx-auto max-w-7xl px-6 py-8">
+  
         {/* Dashboard Button */}
         <button
           onClick={handleGoBack}
           className="mb-6 inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all hover:scale-105"
           style={{
-            background: "linear-gradient(135deg, #D4AF37, #f5e6b3)",
+            background: "linear-gradient(135deg, #D4AF37, #f5e6b3)", // gold gradient
             color: "#1f2937",
             border: "1px solid rgba(180,142,38,0.9)",
             boxShadow: "0 6px 18px rgba(180,142,38,0.35)",
@@ -279,10 +451,11 @@ export default function ProfilePage() {
           <ArrowLeft size={16} />
           Dashboard
         </button>
+        >
 
-        {/* Profile Header Card */}
+        {/* Page Header */}
         <div
-          className="rounded-3xl overflow-hidden mb-6"
+          className="rounded-3xl p-8 mb-8"
           style={{
             background: "rgba(255,255,255,0.9)",
             backdropFilter: "blur(20px)",
@@ -290,404 +463,673 @@ export default function ProfilePage() {
             boxShadow: "0 14px 45px rgba(15,23,42,0.08)",
           }}
         >
-          {/* Header gradient banner */}
-          <div
-            className="h-28"
-            style={{
-              background: "linear-gradient(135deg, #b897d6, #e3c8ff, #f5e6ff)",
-            }}
-          />
-
-          <div className="px-8 pb-8 -mt-16 text-center">
-            {/* Avatar */}
-            <div className="relative inline-block mb-6">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+            <div className="flex items-center gap-5">
               <div
-                className="w-36 h-36 rounded-full p-1.5"
+                className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl"
                 style={{
-                  background: "linear-gradient(135deg, #D4AF37, #9b7bc9)",
-                  boxShadow: "0 12px 40px rgba(155,123,201,0.4)",
+                  background:
+                    "linear-gradient(135deg, #b897d6, #e3c8ff)",
+                  boxShadow: "0 10px 30px rgba(155,123,201,0.35)",
                 }}
               >
-                <div
-                  className="w-full h-full rounded-full flex items-center justify-center overflow-hidden"
+                📚
+              </div>
+              <div>
+                <h1
+                  className="text-4xl font-semibold mb-1"
                   style={{
-                    background: "linear-gradient(135deg, #e8dff5, #f5e6ff)",
+                    fontFamily: "'EB Garamond', Georgia, serif",
+                    color: "#111827",
                   }}
                 >
-                  {isUploading ? (
-                    <Loader2 size={32} className="animate-spin text-purple-400" />
-                  ) : profile.avatarUrl ? (
-                    <img
-                      src={profile.avatarUrl}
-                      alt="Profile"
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <span
-                      className="text-5xl font-semibold"
-                      style={{
-                        fontFamily: "'EB Garamond', Georgia, serif",
-                        color: "#6b4f7a",
-                      }}
-                    >
-                      {getInitials()}
-                    </span>
-                  )}
-                </div>
+                  Projects
+                </h1>
+
+                <p className="text-sm text-gray-500">
+                  Author{" "}
+                  <span className="font-medium text-gray-800">
+                    {authorName}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const current =
+                        authorName === "New Author" ? "" : authorName;
+                      const next = window.prompt(
+                        "Update author / pen name:",
+                        current
+                      );
+                      if (next !== null) {
+                        handleAuthorNameSave(next);
+                      }
+                    }}
+                    className="inline-flex items-center gap-1 ml-2 text-xs text-purple-600 hover:text-purple-800"
+                  >
+                    <PencilLine size={14} />
+                    Edit
+                  </button>
+                </p>
+
+                <p className="text-xs text-gray-500 mt-1">
+                  {projects.length} projects •{" "}
+                  {totalWords.toLocaleString()} total words
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 flex-wrap">
+              {/* View Toggle */}
+              <div
+                className="flex rounded-xl p-1"
+                style={{
+                  background: "rgba(248,250,252,0.95)",
+                  border: "1px solid rgba(148,163,184,0.4)",
+                }}
+              >
+                <button
+                  onClick={() => setViewMode("grid")}
+                  className={`p-2 rounded-lg transition-all ${
+                    viewMode === "grid"
+                      ? "bg-white shadow-md text-purple-700"
+                      : "text-gray-400 hover:text-gray-600"
+                  }`}
+                  title="Grid View"
+                >
+                  <Grid size={18} />
+                </button>
+                <button
+                  onClick={() => setViewMode("list")}
+                  className={`p-2 rounded-lg transition-all ${
+                    viewMode === "list"
+                      ? "bg-white shadow-md text-purple-700"
+                      : "text-gray-400 hover:text-gray-600"
+                  }`}
+                  title="List View"
+                >
+                  <List size={18} />
+                </button>
               </div>
 
-              {/* Upload button */}
+              {/* Import Button */}
               <label
-                className="absolute bottom-2 right-2 w-11 h-11 rounded-full flex items-center justify-center cursor-pointer transition-all hover:scale-110"
+                className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl text-sm font-semibold cursor-pointer transition-all hover:scale-105"
                 style={{
-                  background: "white",
-                  border: "3px solid #f8e8ff",
-                  boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+                  background: "rgba(255,255,255,0.9)",
+                  border: "1px solid rgba(148,163,184,0.4)",
                 }}
-                title="Upload photo (supports iPhone photos)"
               >
-                <Camera size={18} className="text-purple-600" />
+                <Upload size={16} />
+                Import Project
                 <input
                   type="file"
-                  accept="image/*,.heic,.heif"
+                  accept=".doc,.docx,.txt,.rtf"
                   className="hidden"
-                  onChange={handleAvatarChange}
+                  onChange={handleImport}
                 />
               </label>
+
+              {/* New Project Button */}
+              <button
+                onClick={addProject}
+                className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl text-sm font-semibold text-white transition-all hover:scale-105"
+                style={{
+                  background:
+                    "linear-gradient(135deg, #9b7bc9, #b897d6)",
+                  boxShadow: "0 8px 24px rgba(155,123,201,0.5)",
+                }}
+              >
+                <Plus size={16} />
+                New Project
+              </button>
             </div>
-
-            {/* Name input */}
-            <input
-              type="text"
-              value={profile.displayName || ""}
-              onChange={(e) => updateProfile("displayName", e.target.value)}
-              placeholder="Your name or pen name..."
-              className="w-full max-w-md mx-auto text-center text-3xl font-semibold bg-transparent outline-none border-b-2 border-transparent hover:border-purple-200 focus:border-purple-400 transition-colors pb-1"
-              style={{
-                fontFamily: "'EB Garamond', Georgia, serif",
-                color: "#2b143f",
-              }}
-            />
-
-            {/* Tagline input */}
-            <input
-              type="text"
-              value={profile.tagline || ""}
-              onChange={(e) => updateProfile("tagline", e.target.value)}
-              placeholder="Add a tagline... (e.g., 'Urban fiction author & storyteller')"
-              className="mt-3 w-full max-w-lg mx-auto text-center text-base bg-transparent outline-none italic"
-              style={{ color: "rgba(31,41,55,0.6)" }}
-            />
           </div>
         </div>
 
-        {/* About Me Section */}
-        <div
-          className="rounded-3xl p-8 mb-6"
-          style={{
-            background: "rgba(255,255,255,0.9)",
-            backdropFilter: "blur(20px)",
-            border: "1px solid rgba(148,163,184,0.3)",
-            boxShadow: "0 8px 32px rgba(15,23,42,0.06)",
-          }}
-        >
-          <div className="flex items-center gap-3 mb-6">
+        {/* Stats Row */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
+          {[
+            {
+              icon: <BookOpen size={18} />,
+              value: projects.length,
+              label: "Projects",
+            },
+            {
+              icon: <FileText size={18} />,
+              value: totalWords.toLocaleString(),
+              label: "Words Written",
+            },
+            {
+              icon: <Edit3 size={18} />,
+              value: inProgress,
+              label: "In Progress",
+            },
+            {
+              icon: <Trophy size={18} />,
+              value: published,
+              label: "Published",
+            },
+          ].map((stat, i) => (
             <div
-              className="w-11 h-11 rounded-xl flex items-center justify-center"
-              style={{ background: "rgba(155,123,201,0.08)" }}
-            >
-              <PenSquare size={18} className="text-purple-700" />
-            </div>
-            <h2
-              className="text-xl font-semibold"
+              key={i}
+              className="rounded-2xl p-5 flex items-center gap-4 transition-all hover:-translate-y-1"
               style={{
-                fontFamily: "'EB Garamond', Georgia, serif",
-                color: "#2b143f",
+                background: "rgba(255,255,255,0.95)",
+                border: "1px solid rgba(148,163,184,0.35)",
               }}
             >
-              About Me
-            </h2>
-          </div>
-
-          <textarea
-            value={profile.bio || ""}
-            onChange={(e) => {
-              if (e.target.value.length <= 500) {
-                updateProfile("bio", e.target.value);
-              }
-            }}
-            placeholder="Tell readers about yourself... What inspires your writing? What genres do you love? Share your story."
-            className="w-full min-h-32 p-4 rounded-2xl text-base leading-relaxed outline-none resize-y transition-all"
-            style={{
-              background: "rgba(248,250,252,0.8)",
-              border: "1px solid rgba(148,163,184,0.3)",
-              color: "#1f2937",
-            }}
-          />
-          <div className="text-right text-xs text-gray-400 mt-2">
-            {(profile.bio || "").length} / 500 characters
-          </div>
-        </div>
-
-        {/* Writing Genres Section */}
-        <div
-          className="rounded-3xl p-8 mb-6"
-          style={{
-            background: "rgba(255,255,255,0.9)",
-            backdropFilter: "blur(20px)",
-            border: "1px solid rgba(148,163,184,0.3)",
-            boxShadow: "0 8px 32px rgba(15,23,42,0.06)",
-          }}
-        >
-          <div className="flex items-center gap-3 mb-6">
-            <div
-              className="w-11 h-11 rounded-xl flex items-center justify-center"
-              style={{ background: "rgba(251,191,36,0.08)" }}
-            >
-              <BookOpen size={18} className="text-amber-600" />
-            </div>
-            <h2
-              className="text-xl font-semibold"
-              style={{
-                fontFamily: "'EB Garamond', Georgia, serif",
-                color: "#2b143f",
-              }}
-            >
-              Writing Genres
-            </h2>
-          </div>
-
-          <p className="text-sm text-gray-500 mb-4">
-            Select the genres you focus on in your writing:
-          </p>
-
-          <div className="flex flex-wrap gap-2.5">
-            {GENRE_OPTIONS.map((genre) => {
-              const isActive = (profile.genres || []).includes(genre);
-              return (
-                <button
-                  key={genre}
-                  onClick={() => toggleGenre(genre)}
-                  className="px-4 py-2 rounded-full text-sm font-medium transition-all hover:scale-105"
+              <div
+                className="w-10 h-10 rounded-xl flex items-center justify-center"
+                style={{ background: "rgba(155,123,201,0.12)" }}
+              >
+                <span className="text-purple-700">{stat.icon}</span>
+              </div>
+              <div>
+                <div
+                  className="text-2xl font-semibold"
                   style={{
-                    background: isActive
-                      ? "linear-gradient(135deg, #9b7bc9, #b897d6)"
-                      : "rgba(155,123,201,0.06)",
-                    color: isActive ? "white" : "#6b4f7a",
-                    border: isActive
-                      ? "1px solid transparent"
-                      : "1px solid rgba(155,123,201,0.2)",
+                    fontFamily: "'EB Garamond', Georgia, serif",
+                    color: "#111827",
                   }}
                 >
-                  {genre}
-                </button>
+                  {stat.value}
+                </div>
+                <div className="text-xs text-gray-500 uppercase tracking-wide">
+                  {stat.label}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Empty State */}
+        {projects.length === 0 ? (
+          <div
+            className="rounded-3xl p-16 text-center"
+            style={{
+              background: "rgba(255,255,255,0.95)",
+              backdropFilter: "blur(20px)",
+              border: "1px solid rgba(148,163,184,0.35)",
+            }}
+          >
+            <div
+              className="w-16 h-16 rounded-full flex items-center justify-center text-3xl mx-auto mb-4"
+              style={{ background: "rgba(155,123,201,0.12)" }}
+            >
+              📚
+            </div>
+            <h2
+              className="text-3xl font-semibold mb-3"
+              style={{
+                fontFamily: "'EB Garamond', Georgia, serif",
+                color: "#111827",
+              }}
+            >
+              No Projects Yet
+            </h2>
+            <p className="text-gray-500 max-w-md mx-auto mb-8 leading-relaxed">
+              Create your first project to start tracking your novels, covers,
+              word counts, and story details in one place.
+            </p>
+            <button
+              onClick={addProject}
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl text-base font-semibold text-white transition-all hover:scale-105"
+              style={{
+                background:
+                  "linear-gradient(135deg, #9b7bc9, #b897d6)",
+                boxShadow: "0 8px 24px rgba(155,123,201,0.5)",
+              }}
+            >
+              <Plus size={18} />
+              Create Your First Project
+            </button>
+          </div>
+        ) : viewMode === "grid" ? (
+          /* Grid View */
+          <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-2">
+            {projects.map((project) => {
+              const wordCount = project.wordCount || 0;
+              const targetWords = project.targetWords || 50000;
+              const pct = progressPct(wordCount, targetWords);
+              const readTime = getReadingTime(wordCount);
+
+              return (
+                <div
+                  key={project.id}
+                  className="rounded-3xl overflow-hidden transition-all hover:-translate-y-2"
+                  style={{
+                    background: "rgba(255,255,255,0.96)",
+                    backdropFilter: "blur(20px)",
+                    border: "1px solid rgba(148,163,184,0.35)",
+                    boxShadow: "0 8px 24px rgba(15,23,42,0.06)",
+                  }}
+                >
+                  <div className="flex">
+                    {/* Cover */}
+                    <div
+                      className="w-40 flex-shrink-0 relative"
+                      style={{
+                        background:
+                          "linear-gradient(135deg, #e8dff5, #f5e6ff)",
+                      }}
+                    >
+                      {coverUploadId === project.id ? (
+                        <div className="w-full h-full min-h-[280px] flex flex-col items-center justify-center">
+                          <Loader2
+                            size={24}
+                            className="animate-spin text-purple-400 mb-2"
+                          />
+                          <span className="text-xs text-gray-500">
+                            Processing...
+                          </span>
+                        </div>
+                      ) : project.cover ? (
+                        <img
+                          src={project.cover}
+                          alt={`${project.title} cover`}
+                          className="w-full h-full min-h-[280px] object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full min-h-[280px] flex flex-col items-center justify-center p-4">
+                          <ImageIcon
+                            size={40}
+                            className="text-purple-300 mb-3"
+                          />
+                          <span className="text-xs text-gray-400 text-center">
+                            Add book cover
+                          </span>
+                        </div>
+                      )}
+
+                      <label
+                        className="absolute bottom-3 left-1/2 -translate-x-1/2 inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold cursor-pointer transition-all hover:scale-105"
+                        style={{
+                          background: "rgba(255,255,255,0.98)",
+                          backdropFilter: "blur(10px)",
+                          border: "1px solid rgba(148,163,184,0.5)",
+                        }}
+                      >
+                        <Upload size={12} />
+                        {project.cover ? "Change" : "Upload"}
+                        <input
+                          type="file"
+                          accept="image/*,.heic,.heif"
+                          className="hidden"
+                          onChange={(e) =>
+                            handleCoverChange(project.id, e)
+                          }
+                        />
+                      </label>
+                    </div>
+
+                    {/* Details */}
+                    <div className="flex-1 p-6 flex flex-col">
+                      {/* Header */}
+                      <div className="flex justify-between items-start mb-1">
+                        <div className="flex-1 min-w-0">
+                          <input
+                            value={project.title || ""}
+                            onChange={(e) =>
+                              updateProject(project.id, {
+                                title: e.target.value,
+                              })
+                            }
+                            placeholder="Project title..."
+                            className="w-full bg-transparent text-xl font-semibold outline-none border-b-2 border-transparent hover:border-purple-200 focus:border-purple-400 transition-colors pb-1"
+                            style={{
+                              fontFamily:
+                                "'EB Garamond', Georgia, serif",
+                              color: "#111827",
+                            }}
+                          />
+                          <div className="flex items-center gap-2 mt-2 text-sm text-gray-500">
+                            <div
+                              className="w-5 h-5 rounded-full flex items-center justify-center text-xs text-white font-semibold"
+                              style={{
+                                background:
+                                  "linear-gradient(135deg, #D4AF37, #9b7bc9)",
+                              }}
+                            >
+                              {(project.author || authorName)
+                                ?.charAt(0)
+                                ?.toUpperCase() || "A"}
+                            </div>
+                            <span>
+                              by {project.author || authorName}
+                            </span>
+                          </div>
+                        </div>
+                        <select
+                          value={project.status || "Draft"}
+                          onChange={(e) =>
+                            updateProject(project.id, {
+                              status: e.target.value,
+                            })
+                          }
+                          className="ml-3 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide rounded-full cursor-pointer outline-none"
+                          style={getStatusStyle(
+                            project.status || "Draft"
+                          )}
+                        >
+                          {[
+                            "Idea",
+                            "Outline",
+                            "Draft",
+                            "Revision",
+                            "Editing",
+                            "Published",
+                          ].map((s) => (
+                            <option key={s} value={s}>
+                              {s}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Logline */}
+                      <input
+                        value={project.logline || ""}
+                        onChange={(e) =>
+                          updateProject(project.id, {
+                            logline: e.target.value,
+                          })
+                        }
+                        placeholder="One-sentence logline describing your story..."
+                        className="mt-3 w-full bg-transparent text-sm text-gray-600 italic outline-none"
+                      />
+
+                      {/* Progress */}
+                      <div
+                        className="mt-4 p-4 rounded-2xl"
+                        style={{
+                          background: "rgba(248,250,252,0.9)",
+                        }}
+                      >
+                        <div className="flex justify-between items-center mb-2">
+                          <span className="text-xs text-gray-500 font-medium">
+                            Word Count Progress
+                          </span>
+                          <span className="text-sm font-bold text-purple-900">
+                            {wordCount.toLocaleString()} /{" "}
+                            {targetWords.toLocaleString()}
+                          </span>
+                        </div>
+                        <div
+                          className="h-2 rounded-full overflow-hidden"
+                          style={{
+                            background: "rgba(148,163,184,0.25)",
+                          }}
+                        >
+                          <div
+                            className="h-full rounded-full transition-all duration-500"
+                            style={{
+                              width: `${pct}%`,
+                              background:
+                                "linear-gradient(90deg, #9b7bc9, #D4AF37)",
+                            }}
+                          />
+                        </div>
+                        <div className="flex justify-between mt-2 text-xs text-gray-400">
+                          <span>{Math.round(pct)}% complete</span>
+                          <span>~{readTime} min read</span>
+                        </div>
+                      </div>
+
+                      {/* Mini Stats */}
+                      <div className="grid grid-cols-3 gap-3 mt-4">
+                        {[
+                          {
+                            icon: <FileText size={16} />,
+                            value: project.chapterCount || 0,
+                            label: "Chapters",
+                          },
+                          {
+                            icon: <Users size={16} />,
+                            value: project.characterCount || 0,
+                            label: "Characters",
+                          },
+                          {
+                            icon: <Calendar size={16} />,
+                            value: formatDate(project.lastModified),
+                            label: "Last Edit",
+                          },
+                        ].map((stat, i) => (
+                          <div
+                            key={i}
+                            className="text-center p-3 rounded-xl"
+                            style={{
+                              background:
+                                "rgba(248,250,252,0.9)",
+                            }}
+                          >
+                            <div className="text-purple-400 flex justify-center mb-1">
+                              {stat.icon}
+                            </div>
+                            <div
+                              className="text-base font-bold text-purple-900"
+                              style={{
+                                fontFamily:
+                                  "'EB Garamond', Georgia, serif",
+                              }}
+                            >
+                              {stat.value}
+                            </div>
+                            <div className="text-[10px] text-gray-400 uppercase">
+                              {stat.label}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex gap-3 mt-auto pt-4 border-t border-gray-100">
+                        <button
+                          onClick={() => openInWriter(project)}
+                          className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold text-white transition-all hover:scale-105"
+                          style={{
+                            background:
+                              "linear-gradient(135deg, #9b7bc9, #b897d6)",
+                          }}
+                        >
+                          <Edit3 size={16} /> Write
+                        </button>
+                        <button
+                          onClick={() => deleteProject(project.id)}
+                          className="px-4 py-3 rounded-xl text-sm transition-all hover:scale-105"
+                          style={{
+                            background: "rgba(239,68,68,0.06)",
+                            color: "#dc2626",
+                            border:
+                              "1px solid rgba(239,68,68,0.35)",
+                          }}
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* New Project Card */}
+            <div
+              onClick={addProject}
+              className="rounded-3xl p-10 text-center cursor-pointer transition-all hover:-translate-y-2 flex flex-col items-center justify-center min-h-[320px]"
+              style={{
+                background:
+                  "linear-gradient(135deg, rgba(155,123,201,0.06), rgba(212,175,55,0.04))",
+                border: "1px dashed rgba(155,123,201,0.35)",
+              }}
+            >
+              <div
+                className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl text-white mb-4"
+                style={{
+                  background:
+                    "linear-gradient(135deg, #9b7bc9, #D4AF37)",
+                }}
+              >
+                +
+              </div>
+              <div
+                className="text-xl font-semibold"
+                style={{
+                  fontFamily: "'EB Garamond', Georgia, serif",
+                  color: "#4b3b61",
+                }}
+              >
+                Create New Project
+              </div>
+              <div className="text-sm text-gray-400 mt-2">
+                Start your next story
+              </div>
+            </div>
+          </div>
+        ) : (
+          /* List View */
+          <div
+            className="rounded-3xl overflow-hidden"
+            style={{
+              background: "rgba(255,255,255,0.96)",
+              backdropFilter: "blur(20px)",
+              border: "1px solid rgba(148,163,184,0.35)",
+            }}
+          >
+            {/* List Header */}
+            <div
+              className="grid gap-4 px-6 py-4 text-xs font-semibold uppercase tracking-wide text-gray-500"
+              style={{
+                gridTemplateColumns:
+                  "60px 2fr 1fr 100px 80px 100px 120px 100px",
+                background: "rgba(148,163,184,0.12)",
+                borderBottom: "1px solid rgba(15,23,42,0.06)",
+              }}
+            >
+              <span>Cover</span>
+              <span>Title / Author</span>
+              <span>Genre</span>
+              <span>Words</span>
+              <span>Chapters</span>
+              <span>Last Edit</span>
+              <span>Progress</span>
+              <span>Actions</span>
+            </div>
+
+            {/* List Rows */}
+            {projects.map((project) => {
+              const wordCount = project.wordCount || 0;
+              const targetWords = project.targetWords || 50000;
+              const pct = progressPct(wordCount, targetWords);
+
+              return (
+                <div
+                  key={project.id}
+                  className="grid gap-4 px-6 py-4 items-center transition-colors hover:bg-white/60"
+                  style={{
+                    gridTemplateColumns:
+                      "60px 2fr 1fr 100px 80px 100px 120px 100px",
+                    borderBottom:
+                      "1px solid rgba(15,23,42,0.04)",
+                  }}
+                >
+                  {/* Cover */}
+                  <div
+                    className="w-12 h-16 rounded-lg flex items-center justify-center text-xl overflow-hidden"
+                    style={{
+                      background:
+                        "linear-gradient(135deg, #e8dff5, #f5e6ff)",
+                    }}
+                  >
+                    {project.cover ? (
+                      <img
+                        src={project.cover}
+                        alt=""
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      "📕"
+                    )}
+                  </div>
+
+                  {/* Title / Author */}
+                  <div>
+                    <div
+                      className="font-semibold"
+                      style={{
+                        fontFamily:
+                          "'EB Garamond', Georgia, serif",
+                        color: "#111827",
+                      }}
+                    >
+                      {project.title || "Untitled"}
+                    </div>
+                    <div className="text-xs text-gray-500 mt-0.5">
+                      by {project.author || authorName}
+                    </div>
+                  </div>
+
+                  {/* Genre */}
+                  <div className="text-sm text-gray-600">
+                    {project.genre?.join(", ") || "—"}
+                  </div>
+
+                  {/* Words */}
+                  <div className="font-semibold text-purple-900">
+                    {wordCount.toLocaleString()}
+                  </div>
+
+                  {/* Chapters */}
+                  <div className="text-gray-600">
+                    {project.chapterCount || 0}
+                  </div>
+
+                  {/* Last Edit */}
+                  <div className="text-sm text-gray-500">
+                    {formatDate(project.lastModified)}
+                  </div>
+
+                  {/* Progress */}
+                  <div>
+                    <div
+                      className="h-1.5 rounded-full overflow-hidden mb-1"
+                      style={{
+                        background: "rgba(148,163,184,0.25)",
+                      }}
+                    >
+                      <div
+                        className="h-full rounded-full"
+                        style={{
+                          width: `${pct}%`,
+                          background:
+                            "linear-gradient(90deg, #9b7bc9, #D4AF37)",
+                        }}
+                      />
+                    </div>
+                    <div className="text-[10px] text-gray-400">
+                      {Math.round(pct)}% •{" "}
+                      {project.status || "Draft"}
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div>
+                    <button
+                      onClick={() => openInWriter(project)}
+                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold text-white transition-all hover:scale-105"
+                      style={{
+                        background:
+                          "linear-gradient(135deg, #9b7bc9, #b897d6)",
+                      }}
+                    >
+                      <Edit3 size={12} /> Write
+                    </button>
+                  </div>
+                </div>
               );
             })}
           </div>
-        </div>
-
-        {/* Social Links Section */}
-        <div
-          className="rounded-3xl p-8 mb-6"
-          style={{
-            background: "rgba(255,255,255,0.9)",
-            backdropFilter: "blur(20px)",
-            border: "1px solid rgba(148,163,184,0.3)",
-            boxShadow: "0 8px 32px rgba(15,23,42,0.06)",
-          }}
-        >
-          <div className="flex items-center gap-3 mb-6">
-            <div
-              className="w-11 h-11 rounded-xl flex items-center justify-center"
-              style={{ background: "rgba(59,130,246,0.08)" }}
-            >
-              <Link2 size={18} className="text-blue-600" />
-            </div>
-            <h2
-              className="text-xl font-semibold"
-              style={{
-                fontFamily: "'EB Garamond', Georgia, serif",
-                color: "#2b143f",
-              }}
-            >
-              Social & Website
-            </h2>
-          </div>
-
-          <p className="text-sm text-gray-500 mb-5">
-            Optional: share where readers can follow your work.
-          </p>
-
-          <div className="space-y-4">
-            {[
-              {
-                icon: <Globe size={18} />,
-                field: "website",
-                placeholder: "Your website (e.g., dahtruth.com)",
-                bg: "rgba(59,130,246,0.1)",
-              },
-              {
-                icon: <Instagram size={18} />,
-                field: "instagram",
-                placeholder: "Instagram username",
-                bg: "rgba(236,72,153,0.1)",
-              },
-              {
-                icon: <Twitter size={18} />,
-                field: "twitter",
-                placeholder: "X (Twitter) username",
-                bg: "rgba(14,165,233,0.1)",
-              },
-              {
-                icon: <Facebook size={18} />,
-                field: "facebook",
-                placeholder: "Facebook page URL",
-                bg: "rgba(59,89,152,0.1)",
-              },
-            ].map((item) => (
-              <div key={item.field} className="flex items-center gap-3">
-                <div
-                  className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
-                  style={{ background: item.bg }}
-                >
-                  <span className="text-gray-600">{item.icon}</span>
-                </div>
-                <input
-                  type="text"
-                  value={profile[item.field] || ""}
-                  onChange={(e) => updateProfile(item.field, e.target.value)}
-                  placeholder={item.placeholder}
-                  className="flex-1 px-4 py-3 rounded-xl text-sm outline-none transition-colors"
-                  style={{
-                    background: "rgba(248,250,252,0.8)",
-                    border: "1px solid rgba(148,163,184,0.3)",
-                    color: "#1f2937",
-                  }}
-                />
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Account Section */}
-        <div
-          className="rounded-3xl p-8 mb-6"
-          style={{
-            background: "rgba(255,255,255,0.9)",
-            backdropFilter: "blur(20px)",
-            border: "1px solid rgba(148,163,184,0.3)",
-            boxShadow: "0 8px 32px rgba(15,23,42,0.06)",
-          }}
-        >
-          <div className="flex items-center gap-3 mb-6">
-            <div
-              className="w-11 h-11 rounded-xl flex items-center justify-center"
-              style={{ background: "rgba(107,114,128,0.08)" }}
-            >
-              <Settings size={18} className="text-slate-600" />
-            </div>
-         
-
-            <h2
-              className="text-xl font-semibold"
-              style={{
-                fontFamily: "'EB Garamond', Georgia, serif",
-                color: "#2b143f",
-              }}
-            >
-              Account
-            </h2>
-          </div>
-
-          <div className="space-y-3">
-            {[
-              { label: "Email", value: profile.email || "—" },
-              { label: "Member Since", value: formatMemberSince() },
-              {
-                label: "Plan",
-                value: "Premium Author",
-                highlight: true,
-              },
-            ].map((item, i) => (
-              <div
-                key={i}
-                className="flex justify-between items-center p-4 rounded-xl"
-                style={{ background: "rgba(248,250,252,0.8)" }}
-              >
-                <span className="text-sm text-gray-500">{item.label}</span>
-                <span
-                  className="text-sm font-medium"
-                  style={{
-                    color: item.highlight ? "#D4AF37" : "#1f2937",
-                    fontWeight: item.highlight ? 600 : 500,
-                  }}
-                >
-                  {item.value}
-                </span>
-              </div>
-            ))}
-          </div>
-
-          <button
-            onClick={handleSignOut}
-            className="mt-6 inline-flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-semibold transition-all hover:scale-105"
-            style={{
-              background: "rgba(239,68,68,0.1)",
-              color: "#dc2626",
-              border: "1px solid rgba(239,68,68,0.2)",
-            }}
-          >
-            <LogOut size={16} />
-            Sign Out
-          </button>
-        </div>
-
-        {/* Save Actions */}
-        <div className="flex gap-4 justify-center pb-8">
-          <button
-            onClick={handleGoBack}
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold transition-all hover:scale-105"
-            style={{
-              background: "rgba(255,255,255,0.9)",
-              color: "#1f2937",
-              border: "1px solid rgba(148,163,184,0.3)",
-            }}
-          >
-            <X size={16} />
-            Cancel
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={isSaving}
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold text-white transition-all hover:scale-105 disabled:opacity-70"
-            style={{
-              background: "linear-gradient(135deg, #9b7bc9, #b897d6)",
-              boxShadow: "0 4px 16px rgba(155,123,201,0.4)",
-            }}
-          >
-            {isSaving ? (
-              <Loader2 size={16} className="animate-spin" />
-            ) : (
-              <Save size={16} />
-            )}
-            {isSaving ? "Saving..." : "Save Profile"}
-          </button>
-        </div>
+        )}
       </div>
-
-      {/* Success Toast */}
-      {showSaved && (
-        <div
-          className="fixed bottom-8 right-8 flex items-center gap-3 px-6 py-4 rounded-2xl text-white font-semibold"
-          style={{
-            background: "linear-gradient(135deg, #10b981, #34d399)",
-            boxShadow: "0 8px 24px rgba(16,185,129,0.4)",
-          }}
-        >
-          <span>✓</span>
-          Profile saved!
-        </div>
-      )}
     </div>
   );
 }
