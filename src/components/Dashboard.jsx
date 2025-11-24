@@ -532,11 +532,11 @@ export default function Dashboard() {
                       onClick={() => navigate("/writer")}
                       className="inline-flex items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-medium shadow-md shadow-violet-900/40 hover:shadow-lg transition-all"
                       style={{
-                        background:
-                          "linear-gradient(135deg, #FBBF24, #F97316)",
-                        color: "#111827",
-                      }}
-                    >
+                          // solid DahTruth gold
+                          background: "#D4AF37",
+                          color: "#111827",
+                        }}
+                      >
                       <Plus size={18} />
                       Start Writing
                     </button>
@@ -563,34 +563,7 @@ export default function Dashboard() {
               </CardBody>
             </Card>
 
-            {/* Secondary actions */}
-            <Card>
-              <CardBody className="flex flex-col md:flex-row items-center justify-between gap-4">
-                <p
-                  className="text-sm md:text-base text-slate-700"
-                  style={{ fontFamily: "'EB Garamond', Georgia, serif" }}
-                >
-                  Outline your next chapter, refine a scene, or prep your manuscript
-                  for publishing – all from one workspace.
-                </p>
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => navigate("/toc")}
-                    className="px-4 py-2 rounded-lg border border-slate-200 bg-white text-sm font-medium text-slate-800 hover:bg-slate-50 transition-colors"
-                  >
-                    Open Table of Contents
-                  </button>
-                  <button
-                    onClick={() => navigate("/publishing")}
-                    className="px-4 py-2 rounded-lg bg-slate-900 text-sm font-medium text-slate-50 hover:bg-slate-800 transition-colors"
-                  >
-                    Publishing Suite
-                  </button>
-                </div>
-              </CardBody>
-            </Card>
-
-            {/* Stats */}
+               {/* Stats */}
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
               <Card>
                 <CardBody>
