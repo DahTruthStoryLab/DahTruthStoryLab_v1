@@ -1,9 +1,10 @@
 // src/components/Writing/ChapterGrid.jsx
 // 4-column grid view of all chapters with drag-drop reordering
-
-import React from "react";
-import { List } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { List, Plus } from "lucide-react";
 import ChapterCard from "./ChapterCard";
+
+const META_KEY = "dahtruth_project_meta";
 
 export default function ChapterGrid({
   chapters,
@@ -11,7 +12,7 @@ export default function ChapterGrid({
   onSelectChapter,
   onMoveChapter,
   onDeleteChapter,
-
+  onAddChapter, // 👈 NEW: needed for Add Chapter button
   // multi-select props (may be undefined if not used)
   selectMode,
   selectedIds,
@@ -19,6 +20,26 @@ export default function ChapterGrid({
   onRangeSelect,
   lastClickedIndexRef,
 }) {
+  // Load project meta to get novel name and author
+  const [meta, setMeta] = useState({
+    title: "Working Title",
+    author: "Your Name",
+  });
+
+  useEffect(() => {
+    try {
+      const savedMeta = localStorage.getItem(META_KEY);
+      if (savedMeta) {
+        const parsed = JSON.parse(savedMeta);
+        if (parsed && typeof parsed === "object") {
+          setMeta((prev) => ({ ...prev, ...parsed }));
+        }
+      }
+    } catch (err) {
+      console.warn("Failed to load project meta", err);
+    }
+  }, []);
+
   // Extra safety: filter out bad entries so `.id` is never read on undefined
   const safeChapters = Array.isArray(chapters)
     ? chapters.filter((ch) => ch && ch.id != null)
@@ -26,17 +47,14 @@ export default function ChapterGrid({
 
   const handleOpen = (chapterId, index) => (event) => {
     if (!chapterId) return;
-
     // When not in select mode: normal open -> editor
     if (!selectMode) {
       onSelectChapter && onSelectChapter(chapterId);
       return;
     }
-
     // In select mode: support Ctrl/Cmd + Shift
     const isShift = event.shiftKey;
     const isCtrlOrCmd = event.ctrlKey || event.metaKey;
-
     if (isShift && typeof onRangeSelect === "function") {
       onRangeSelect(index);
     } else if (typeof onToggleSelect === "function") {
@@ -52,29 +70,40 @@ export default function ChapterGrid({
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-6 space-y-4">
-      {/* Header: Story Outline + TOC pill */}
+      {/* Header: Story Outline | Table of Contents | Novel Name */}
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-full bg-white/70 shadow-sm flex items-center justify-center">
-            {/* Table of contents icon */}
             <List className="w-4 h-4 text-[#7e55c4]" />
           </div>
           <div>
             <p className="text-xs font-semibold tracking-wide text-[#4b2a63] uppercase">
-              Story Outline
+              Story Outline | Table of Contents | {meta.title || "Working Title"}
             </p>
             <p className="text-[11px] text-[#7c5c9b]">
-              See your chapters at a glance. Click any card to open and keep
-              writing.
+              {meta.author && `by ${meta.author} • `}
+              See your chapters at a glance. Click any card to open and keep writing.
             </p>
           </div>
         </div>
+        
+        <div className="flex items-center gap-3">
+          {/* Add Chapter Button */}
+          <button
+            onClick={onAddChapter}
+            className="inline-flex items-center gap-1.5 rounded-md bg-[#9b7bc9] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#8668b3] border border-[#D4AF37] shadow-sm transition"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>Add Chapter</span>
+          </button>
 
-        <div className="hidden sm:flex flex-col items-end text-[11px] text-[#7c5c9b]">
-          <span>{chapterCountLabel}</span>
-          {safeChapters.length > 0 && (
-            <span>Tip: Drag cards to reorder. Shift+Click to select a range.</span>
-          )}
+          {/* Chapter count and tips */}
+          <div className="hidden sm:flex flex-col items-end text-[11px] text-[#7c5c9b]">
+            <span>{chapterCountLabel}</span>
+            {safeChapters.length > 0 && (
+              <span>Tip: Drag cards to reorder.</span>
+            )}
+          </div>
         </div>
       </div>
 
@@ -97,13 +126,21 @@ export default function ChapterGrid({
           ))}
         </div>
       ) : (
-        // Simple, quiet empty state – no "create first chapter" CTA
-        <div className="rounded-2xl border border-[#f0e4ff] bg-white/70 px-4 py-6 text-center text-[12px] text-[#7c5c9b]">
-          No chapters in your outline yet.  
-          <br />
-          Create chapters from the Writing view and they will appear here.
+        // Empty state with Add Chapter CTA
+        <div className="rounded-2xl border border-[#f0e4ff] bg-white/70 px-4 py-8 text-center">
+          <p className="text-[12px] text-[#7c5c9b] mb-4">
+            No chapters in your outline yet.
+          </p>
+          <button
+            onClick={onAddChapter}
+            className="inline-flex items-center gap-1.5 rounded-md bg-[#9b7bc9] px-4 py-2 text-sm font-medium text-white hover:bg-[#8668b3] border border-[#D4AF37] shadow-sm transition mx-auto"
+          >
+            <Plus className="w-4 h-4" />
+            <span>Create First Chapter</span>
+          </button>
         </div>
       )}
     </div>
   );
 }
+
