@@ -10,8 +10,8 @@ import {
 } from "lucide-react";
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
-import ChapterGrid from "./ChapterGrid";
-import ChapterSidebar from "./ChapterSidebar";
+import ChapterGrid from "./Writing/ChapterGrid";
+import ChapterSidebar from "./Writing/ChapterSidebar";
 
 import {
   computeWordsFromChapters,
