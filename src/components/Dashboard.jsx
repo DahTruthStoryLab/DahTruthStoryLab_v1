@@ -116,13 +116,16 @@ function readAuthorProfile() {
 
 // --------- Menu items ---------
 const menuItems = [
+  // Core navigation / workflow
   { icon: Home,       label: "Dashboard",         path: "/dashboard" },
-  { icon: PencilLine, label: "Write",             path: "/writer" },
+  { icon: Layers,     label: "Projects",          path: "/project" },
   { icon: BookOpen,   label: "Table of Contents", path: "/toc" },
+  { icon: PencilLine, label: "Writer",            path: "/writer" },
   { icon: Layers,     label: "Story Lab",         path: "/story-lab" },
+  { icon: UploadCloud,label: "Publishing Suite",  path: "/publishing" },
   { icon: Calendar,   label: "Calendar",          path: "/calendar" },
-  { icon: UploadCloud,label: "Publishing",        path: "/publishing" },
-  { icon: Layers,     label: "Project",           path: "/project" },
+
+  // Supporting / meta
   { icon: User,       label: "Profile",           path: "/profile" },
   { icon: Info,       label: "About",             path: "/about" },
   { icon: Store,      label: "Store",             path: "/store" },
