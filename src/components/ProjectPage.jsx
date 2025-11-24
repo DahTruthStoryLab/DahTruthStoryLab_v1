@@ -7,12 +7,16 @@ import {
   Upload,
   Trash2,
   PencilLine,
-  BarChart3,
-  Clock,
-  Layers,
   ArrowLeft,
   Loader2,
   Image as ImageIcon,
+  Grid,
+  List,
+  Users,
+  FileText,
+  Calendar,
+  Trophy,
+  Edit3,
 } from "lucide-react";
 import heic2any from "heic2any";
 
@@ -37,6 +41,57 @@ function saveProjects(projects) {
   } catch (err) {
     console.error("Failed to save projects:", err);
   }
+}
+
+// -------------------- Profile helper --------------------
+function readAuthorProfile() {
+  let name = "New Author";
+  let avatarUrl = "";
+
+  try {
+    const keys = [
+      "dahtruth_project_meta",
+      "dt_profile",
+      "userProfile",
+      "profile",
+      "currentUser",
+    ];
+    for (const key of keys) {
+      const raw = localStorage.getItem(key);
+      if (!raw) continue;
+      const obj = JSON.parse(raw);
+
+      if (obj.avatarUrl && !avatarUrl) {
+        avatarUrl = obj.avatarUrl;
+      }
+
+      if (obj.author) {
+        name = obj.author;
+        break;
+      }
+
+      if (obj.displayName) {
+        name = obj.displayName;
+        break;
+      }
+
+      const fn = obj.firstName || obj.given_name;
+      const ln = obj.lastName || obj.family_name;
+      if (fn || ln) {
+        name = [fn, ln].filter(Boolean).join(" ");
+        break;
+      }
+
+      if (obj.username) {
+        name = obj.username;
+        break;
+      }
+    }
+  } catch {
+    // ignore and fall back to defaults
+  }
+
+  return { name, avatarUrl };
 }
 
 // -------------------- Image helpers --------------------
@@ -73,47 +128,50 @@ async function downscaleDataUrl(dataUrl, maxDim = 2000, quality = 0.9) {
 }
 
 // -------------------- Misc helpers --------------------
-const countWords = (s = "") => s.trim().split(/\s+/).filter(Boolean).length;
-const getReadingTime = (wordCount) => Math.ceil(wordCount / 200);
+const getReadingTime = (wordCount) => Math.ceil((wordCount || 0) / 200);
 const progressPct = (cur, tgt) =>
   Math.min((cur / Math.max(tgt || 1, 1)) * 100, 100);
 
-const getStatusColor = (status) => {
-  const pill = (bg, text, border) =>
-    `bg-[${bg}] text-[${text}] border ${border} rounded-full`;
-  const colors = {
-    Idea: pill(
-      "color:rgba(202,177,214,0.20)",
-      "color:#6B4F7A",
-      "border-[hsl(var(--border))]"
-    ),
-    Outline: pill(
-      "color:rgba(234,242,255,0.60)",
-      "color:#0F172A",
-      "border-[hsl(var(--border))]"
-    ),
-    Draft: pill(
-      "color:rgba(255,213,0,0.15)",
-      "color:#7A5E00",
-      "border-[hsl(var(--border))]"
-    ),
-    Revision: pill(
-      "color:rgba(255,173,51,0.18)",
-      "color:#7A3E00",
-      "border-[hsl(var(--border))]"
-    ),
-    Editing: pill(
-      "color:rgba(46,204,113,0.18)",
-      "color:#1E6B43",
-      "border-[hsl(var(--border))]"
-    ),
-    Published: pill(
-      "color:rgba(212,175,55,0.18)",
-      "color:#6B5A1E",
-      "border-[hsl(var(--border))]"
-    ),
+const statusColors = {
+  Idea: {
+    bg: "linear-gradient(135deg, rgba(202,177,214,0.25), rgba(202,177,214,0.1))",
+    text: "#6B4F7A",
+    border: "rgba(202,177,214,0.4)",
+  },
+  Outline: {
+    bg: "linear-gradient(135deg, rgba(147,197,253,0.25), rgba(147,197,253,0.1))",
+    text: "#1e40af",
+    border: "rgba(147,197,253,0.4)",
+  },
+  Draft: {
+    bg: "linear-gradient(135deg, rgba(251,191,36,0.25), rgba(251,191,36,0.1))",
+    text: "#92400e",
+    border: "rgba(251,191,36,0.4)",
+  },
+  Revision: {
+    bg: "linear-gradient(135deg, rgba(251,146,60,0.25), rgba(251,146,60,0.1))",
+    text: "#9a3412",
+    border: "rgba(251,146,60,0.4)",
+  },
+  Editing: {
+    bg: "linear-gradient(135deg, rgba(52,211,153,0.25), rgba(52,211,153,0.1))",
+    text: "#065f46",
+    border: "rgba(52,211,153,0.4)",
+  },
+  Published: {
+    bg: "linear-gradient(135deg, rgba(212,175,55,0.25), rgba(212,175,55,0.1))",
+    text: "#78350f",
+    border: "rgba(212,175,55,0.4)",
+  },
+};
+
+const getStatusStyle = (status) => {
+  const colors = statusColors[status] || statusColors.Draft;
+  return {
+    background: colors.bg,
+    color: colors.text,
+    border: `1px solid ${colors.border}`,
   };
-  return colors[status] || colors.Draft;
 };
 
 // -------------------- Main Component --------------------
@@ -121,19 +179,32 @@ export default function ProjectPage() {
   const navigate = useNavigate();
   const [projects, setProjects] = useState([]);
   const [coverUploadId, setCoverUploadId] = useState(null);
+  const [viewMode, setViewMode] = useState("grid"); // "grid" or "list"
+  const [authorName, setAuthorName] = useState("New Author");
+  const [authorAvatar, setAuthorAvatar] = useState("");
 
   useEffect(() => {
     setProjects(loadProjects());
+    const profile = readAuthorProfile();
+    setAuthorName(profile.name);
+    setAuthorAvatar(profile.avatarUrl);
   }, []);
 
-  // Keep in sync if other tabs / parts of app modify projects
+  // Keep in sync if other tabs / parts of app modify projects or profile
   useEffect(() => {
-    const sync = () => setProjects(loadProjects());
+    const sync = () => {
+      setProjects(loadProjects());
+      const profile = readAuthorProfile();
+      setAuthorName(profile.name);
+      setAuthorAvatar(profile.avatarUrl);
+    };
     window.addEventListener("storage", sync);
     window.addEventListener("project:change", sync);
+    window.addEventListener("profile:updated", sync);
     return () => {
       window.removeEventListener("storage", sync);
       window.removeEventListener("project:change", sync);
+      window.removeEventListener("profile:updated", sync);
     };
   }, []);
 
@@ -145,17 +216,55 @@ export default function ProjectPage() {
     }
   };
 
+  // -------- Author name: source of truth here --------
+  const handleAuthorNameSave = (newName) => {
+    const trimmed = (newName || "").trim() || "New Author";
+
+    setAuthorName(trimmed);
+
+    // 1) Update all projects' author field
+    setProjects((prev) => {
+      const updated = prev.map((p) => ({
+        ...p,
+        author: trimmed,
+      }));
+      saveProjects(updated);
+      return updated;
+    });
+
+    // 2) Save to a profile object so Dashboard can read it
+    try {
+      const existingProfileRaw = localStorage.getItem("profile");
+      const existingProfile = existingProfileRaw
+        ? JSON.parse(existingProfileRaw)
+        : {};
+      const profileToSave = {
+        ...existingProfile,
+        displayName: trimmed,
+        avatarUrl: authorAvatar || existingProfile.avatarUrl || "",
+      };
+      localStorage.setItem("profile", JSON.stringify(profileToSave));
+      window.dispatchEvent(new Event("profile:updated"));
+    } catch (err) {
+      console.error("Failed to save profile from ProjectPage:", err);
+    }
+  };
+
   const addProject = () => {
     const now = new Date().toISOString();
     setProjects((prev) => {
       const newProject = {
         id: Date.now().toString(),
         title: "Untitled Project",
+        author: authorName,
         logline: "",
         synopsis: "",
+        genre: [],
         status: "Draft",
-        targetWords: 25000,
+        targetWords: 50000,
         wordCount: 0,
+        chapterCount: 0,
+        characterCount: 0,
         cover: "",
         createdAt: now,
         lastModified: now,
@@ -187,14 +296,13 @@ export default function ProjectPage() {
   };
 
   const openInWriter = (project) => {
-    // Lightweight "current story" handoff for Writer page
     const snapshot = {
       id: project.id,
       title: project.title,
       wordCount: project.wordCount || 0,
       lastModified: project.lastModified || new Date().toISOString(),
       status: project.status || "Draft",
-      targetWords: project.targetWords || 25000,
+      targetWords: project.targetWords || 50000,
     };
     try {
       localStorage.setItem("currentStory", JSON.stringify(snapshot));
@@ -205,7 +313,7 @@ export default function ProjectPage() {
     navigate("/writer");
   };
 
-  // Handle cover upload per project (JPG/PNG/HEIC, including iPhone photos)
+  // Handle cover upload
   const handleCoverChange = async (projectId, fileInputEvent) => {
     const file = fileInputEvent.target.files?.[0];
     if (!file) return;
@@ -248,279 +356,88 @@ export default function ProjectPage() {
     }
   };
 
+  // Handle import - redirects to writer after import
+  const handleImport = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const now = new Date().toISOString();
+    const newProject = {
+      id: Date.now().toString(),
+      title: file.name.replace(/\.[^/.]+$/, ""),
+      author: authorName,
+      logline: "",
+      synopsis: "",
+      genre: [],
+      status: "Draft",
+      targetWords: 50000,
+      wordCount: 0,
+      chapterCount: 0,
+      characterCount: 0,
+      cover: "",
+      createdAt: now,
+      lastModified: now,
+      imported: true,
+    };
+
+    const updated = [newProject, ...projects];
+    saveProjects(updated);
+    setProjects(updated);
+
+    localStorage.setItem(
+      "currentStory",
+      JSON.stringify({
+        id: newProject.id,
+        title: newProject.title,
+        wordCount: 0,
+        lastModified: now,
+        status: "Draft",
+        targetWords: 50000,
+      })
+    );
+    window.dispatchEvent(new Event("project:change"));
+    navigate("/writer");
+
+    e.target.value = "";
+  };
+
+  // Calculate totals
+  const totalWords = projects.reduce(
+    (sum, p) => sum + (p.wordCount || 0),
+    0
+  );
+  const inProgress = projects.filter(
+    (p) => !["Published", "Idea"].includes(p.status)
+  ).length;
+  const published = projects.filter((p) => p.status === "Published").length;
+
+  const formatDate = (dateStr) => {
+    if (!dateStr) return "—";
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diff = now - date;
+    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+
+    if (days === 0) return "Today";
+    if (days === 1) return "Yesterday";
+    if (days < 7) return `${days} days ago`;
+    return date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+    });
+  };
+
   return (
-    <div className="min-h-screen text-[color:var(--color-ink)] bg-[color:var(--color-base)] bg-radial-fade py-8">
-      <div className="mx-auto max-w-6xl px-4">
+    <div
+      className="min-h-screen text-gray-800"
+      style={{
+        background:
+          "linear-gradient(135deg, #fef5ff 0%, #f8e8ff 50%, #fff5f7 100%)",
+      }}
+    >
+      <div className="mx-auto max-w-7xl px-6 py-8">
         {/* Back Button */}
         <button
           onClick={handleGoBack}
-          className="mb-4 inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-white border border-[hsl(var(--border))] hover:bg-gray-50 transition-colors text-sm"
-        >
-          <ArrowLeft size={16} />
-          Back
-        </button>
-
-        {/* Header */}
-        <div className="glass-panel">
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between px-6 py-5">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-[color:var(--color-primary)] grid place-items-center">
-                <Layers size={20} className="text-[color:var(--color-ink)]/80" />
-              </div>
-              <div>
-                <h1 className="text-3xl heading-serif flex items-center gap-2">
-                  <Layers size={20} className="text-[color:var(--color-ink)]/80" />
-                  Projects
-                </h1>
-                <div className="text-sm text-muted mt-1">
-                  Manage all of your novels and writing projects in one place.
-                </div>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 flex-wrap">
-              <button
-                onClick={addProject}
-                className="btn-primary inline-flex items-center gap-2"
-              >
-                <Plus size={16} /> New Project
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Content */}
-        <div className="mt-6">
-          {projects.length === 0 ? (
-            <div className="glass-panel p-8 text-center">
-              <div className="w-14 h-14 rounded-full bg-[color:var(--color-primary)]/60 flex items-center justify-center mx-auto mb-4">
-                <BookOpen size={24} className="text-[color:var(--color-ink)]/80" />
-              </div>
-              <h2 className="text-xl font-semibold mb-2 heading-serif">
-                No projects yet
-              </h2>
-              <p className="text-sm text-muted mb-4 max-w-md mx-auto">
-                Create your first project to start tracking your novels, covers,
-                word counts, and story details.
-              </p>
-              <button
-                onClick={addProject}
-                className="btn-primary inline-flex items-center gap-2"
-              >
-                <Plus size={16} /> Create Your First Project
-              </button>
-            </div>
-          ) : (
-            <div className="grid gap-5 md:grid-cols-2">
-              {projects.map((project) => {
-                const wordCount = project.wordCount || 0;
-                const targetWords = project.targetWords || 0;
-                const pct = progressPct(wordCount, targetWords || 25000);
-                const readTime = getReadingTime(wordCount);
-                const lastUpdated = project.lastModified
-                  ? new Date(project.lastModified).toLocaleDateString()
-                  : "—";
-
-                return (
-                  <div key={project.id} className="glass-panel p-5 rounded-2xl flex flex-col gap-4">
-                    {/* Top row: cover + main details */}
-                    <div className="flex gap-4">
-                      {/* Cover */}
-                      <div className="w-28 md:w-32 flex-shrink-0">
-                        <div className="rounded-xl overflow-hidden border border-[hsl(var(--border))] bg-[color:var(--color-primary)]/40 aspect-[3/4] flex items-center justify-center relative">
-                          {coverUploadId === project.id ? (
-                            <div className="text-center">
-                              <Loader2
-                                size={24}
-                                className="mx-auto mb-1 animate-spin text-[color:var(--color-ink)]/70"
-                              />
-                              <div className="text-[10px] text-muted">
-                                Processing...
-                              </div>
-                            </div>
-                          ) : project.cover ? (
-                            <img
-                              src={project.cover}
-                              alt={`${project.title} cover`}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <div className="text-center text-muted px-2">
-                              <ImageIcon
-                                size={20}
-                                className="mx-auto mb-1 opacity-70"
-                              />
-                              <div className="text-[11px]">
-                                Add a cover image
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                        <label className="mt-2 block">
-                          <span className="inline-flex items-center justify-center gap-1 w-full px-2 py-1.5 rounded-lg bg-white border border-[hsl(var(--border))] text-[11px] text-ink cursor-pointer hover:bg-gray-50 transition-colors">
-                            <Upload size={12} />
-                            {project.cover ? "Change Cover" : "Upload Cover"}
-                          </span>
-                          <input
-                            type="file"
-                            accept="image/*,.heic,.heif"
-                            className="hidden"
-                            onChange={(e) => handleCoverChange(project.id, e)}
-                          />
-                        </label>
-                      </div>
-
-                      {/* Main info */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="flex-1 min-w-0">
-                            <input
-                              value={project.title || ""}
-                              onChange={(e) =>
-                                updateProject(project.id, {
-                                  title: e.target.value,
-                                })
-                              }
-                              placeholder="Project title..."
-                              className="w-full bg-transparent border border-transparent hover:border-[hsl(var(--border))] rounded-lg px-2 py-1 text-base font-semibold outline-none focus:border-[hsl(var(--border))]"
-                              style={{
-                                fontFamily:
-                                  "Playfair Display, ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif",
-                              }}
-                            />
-                            <input
-                              value={project.logline || ""}
-                              onChange={(e) =>
-                                updateProject(project.id, {
-                                  logline: e.target.value,
-                                })
-                              }
-                              placeholder="One-sentence logline..."
-                              className="mt-1 w-full bg-transparent border border-transparent hover:border-[hsl(var(--border))] rounded-lg px-2 py-1 text-xs text-muted outline-none focus:border-[hsl(var(--border))]"
-                            />
-                          </div>
-
-                          <select
-                            value={project.status || "Draft"}
-                            onChange={(e) =>
-                              updateProject(project.id, {
-                                status: e.target.value,
-                              })
-                            }
-                            className={`ml-2 px-3 py-1 text-xs font-medium ${getStatusColor(
-                              project.status || "Draft"
-                            )}`}
-                          >
-                            {[
-                              "Idea",
-                              "Outline",
-                              "Draft",
-                              "Revision",
-                              "Editing",
-                              "Published",
-                            ].map((s) => (
-                              <option key={s} value={s}>
-                                {s}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-
-                        <textarea
-                          value={project.synopsis || ""}
-                          onChange={(e) =>
-                            updateProject(project.id, {
-                              synopsis: e.target.value,
-                            })
-                          }
-                          placeholder="Short synopsis of this project..."
-                          className="mt-2 w-full bg-transparent border border-[hsl(var(--border))] rounded-lg px-2 py-2 text-xs text-ink/80 outline-none min-h-[72px] resize-vertical"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Stats row */}
-                    <div className="grid grid-cols-2 gap-3 text-xs text-muted">
-                      <div>
-                        <div className="flex items-center gap-1 mb-1">
-                          <BarChart3
-                            size={14}
-                            className="text-[color:var(--color-ink)]/70"
-                          />
-                          <span>Word Count</span>
-                        </div>
-                        <div className="text-sm font-semibold text-ink">
-                          {wordCount.toLocaleString()}{" "}
-                          {targetWords
-                            ? ` / ${targetWords.toLocaleString()}`
-                            : ""}
-                        </div>
-                        {targetWords > 0 && (
-                          <div className="mt-1 w-full bg-[color:var(--color-primary)]/40 rounded-full h-1.5">
-                            <div
-                              className="bg-[color:var(--color-accent)] h-1.5 rounded-full transition-all duration-500"
-                              style={{ width: `${pct}%` }}
-                            />
-                          </div>
-                        )}
-                      </div>
-
-                      <div>
-                        <div className="flex items-center gap-1 mb-1">
-                          <Clock
-                            size={14}
-                            className="text-[color:var(--color-ink)]/70"
-                          />
-                          <span>Est. Read Time</span>
-                        </div>
-                        <div className="text-sm font-semibold text-ink">
-                          {readTime} min
-                        </div>
-                        <div className="mt-1 text-[11px] text-muted">
-                          Last updated: {lastUpdated}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Target words + actions */}
-                    <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 pt-3 border-t border-[hsl(var(--border))]">
-                      <div className="flex items-center gap-2 text-xs">
-                        <span className="text-muted">Target words:</span>
-                        <input
-                          type="number"
-                          min="0"
-                          step="500"
-                          value={targetWords}
-                          onChange={(e) =>
-                            updateProject(project.id, {
-                              targetWords: Number(e.target.value) || 0,
-                            })
-                          }
-                          className="w-24 rounded-lg bg-white border border-[hsl(var(--border))] px-2 py-1 text-xs outline-none"
-                        />
-                      </div>
-
-                      <div className="flex items-center gap-2 justify-end">
-                        <button
-                          onClick={() => openInWriter(project)}
-                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-[color:var(--color-accent)] text-xs font-semibold hover:opacity-90"
-                        >
-                          <PencilLine size={14} /> Open in Writer
-                        </button>
-                        <button
-                          onClick={() => deleteProject(project.id)}
-                          className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white border border-[hsl(var(--border))] text-xs text-red-600 hover:bg-red-50"
-                        >
-                          <Trash2 size={14} /> Delete
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
+          className="mb-6 inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all hover:scale-105"
+          style={{
