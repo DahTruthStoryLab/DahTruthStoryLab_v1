@@ -436,19 +436,20 @@ export default function ProjectPage() {
       }}
     >
       <div className="mx-auto max-w-7xl px-6 py-8">
-        {/* Back Button */}
-        <button
-          onClick={handleGoBack}
-          className="mb-6 inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all hover:scale-105"
-          style={{
-            background: "rgba(255,255,255,0.8)",
-            backdropFilter: "blur(10px)",
-            border: "1px solid rgba(148,163,184,0.35)",
-          }}
-        >
-          <ArrowLeft size={16} />
-          Back
-        </button>
+       {/* Dashboard Button */}
+          <button
+            onClick={handleGoBack}
+            className="mb-6 inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all hover:scale-105"
+            style={{
+              background: "linear-gradient(135deg, #D4AF37, #f5e6b3)", // gold gradient
+              color: "#1f2937",
+              border: "1px solid rgba(180,142,38,0.9)",
+              boxShadow: "0 6px 18px rgba(180,142,38,0.35)",
+            }}
+          >
+            <ArrowLeft size={16} />
+            Dashboard
+          </button>
 
         {/* Page Header */}
         <div
