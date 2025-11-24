@@ -66,7 +66,7 @@ export default function ChapterCard({
       onClick={onOpen}
       className={[
         "group relative cursor-pointer",
-        "w-full aspect-[8.5/11]", // Standard paper ratio
+        "w-full aspect-[8.5/7]", // Shorter paper ratio for preview cards
         "rounded-sm shadow-md hover:shadow-xl",
         "transition-all duration-200",
         "bg-white",
@@ -101,24 +101,24 @@ export default function ChapterCard({
       </div>
 
       {/* Main content area */}
-      <div className="relative h-full p-6 pt-12 flex flex-col">
+      <div className="relative h-full p-4 pt-10 flex flex-col">
         {/* Chapter title */}
-        <h3 className="text-sm font-bold text-[#2b143f] mb-3 line-clamp-2 font-serif">
+        <h3 className="text-sm font-bold text-[#2b143f] mb-2 line-clamp-1 font-serif">
           {chapter.title || `Chapter ${index + 1}`}
         </h3>
 
         {/* Decorative line */}
-        <div className="h-px bg-gradient-to-r from-[#D4AF37]/50 via-[#D4AF37] to-[#D4AF37]/50 mb-3" />
+        <div className="h-px bg-gradient-to-r from-[#D4AF37]/50 via-[#D4AF37] to-[#D4AF37]/50 mb-2" />
 
         {/* Preview text - first 20 words */}
         <div className="flex-1 overflow-hidden">
-          <p className="text-[11px] leading-relaxed text-gray-700 font-serif line-clamp-6">
+          <p className="text-[11px] leading-relaxed text-gray-700 font-serif line-clamp-3">
             {previewText || "This chapter is empty. Click to start writing."}
           </p>
         </div>
 
         {/* Footer info */}
-        <div className="mt-auto pt-3 border-t border-gray-100 flex items-center justify-between text-[10px] text-gray-500">
+        <div className="mt-auto pt-2 border-t border-gray-100 flex items-center justify-between text-[10px] text-gray-500">
           <span className="font-medium">
             {(chapter.wordCount || 0).toLocaleString()} words
           </span>
