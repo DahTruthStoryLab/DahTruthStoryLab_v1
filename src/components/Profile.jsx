@@ -1,655 +1,693 @@
-// src/components/Profile.jsx
-import React, { useEffect, useState, useRef } from "react";
-import { useNavigate, useLocation } from "react-router-dom";
+// src/components/ProfilePage.jsx
+import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
-  User,
-  Save,
-  BookOpen,
-  LogOut,
-  Mail,
-  Image,
   ArrowLeft,
-  Home,
-  PencilLine,
-  BookOpen as BookIcon,
-  Calendar as CalIcon,
-  Layers,
-  Store,
-  Info,
+  Camera,
   Loader2,
+  Globe,
+  Instagram,
+  Twitter,
+  Facebook,
+  LogOut,
+  Save,
+  X,
+  BookOpen,
+  PenSquare,
+  Link2,
+  Settings,
 } from "lucide-react";
 import heic2any from "heic2any";
 
-// ✅ Use your real store hook
-import { useUser } from "../lib/userStore.jsx";
+// -------------------- Storage Keys --------------------
+const PROFILE_KEY = "profile";
+const PROJECTS_KEY = "userProjects";
 
-/* =========================================================
-   Minimal, self-contained image helpers (no external helpers)
-   ========================================================= */
-const isHeicLike = (f) => {
-  const n = f.name?.toLowerCase() || "";
-  const t = f.type?.toLowerCase() || "";
-  return n.endsWith(".heic") || n.endsWith(".heif") || t === "image/heic" || t === "image/heif";
-};
-
-async function ensureJpegFile(file, quality = 0.9) {
-  if (isHeicLike(file)) {
-    const jpegBlob = await heic2any({ blob: file, toType: "image/jpeg", quality });
-    const name = file.name.replace(/\.(heic|heif)$/i, ".jpg");
-    return new File([jpegBlob], name, { type: "image/jpeg" });
-  }
-  return file;
+// -------------------- Load/Save Helpers --------------------
+function getDefaultProfile() {
+  return {
+    displayName: "New Author",
+    tagline: "",
+    bio: "",
+    avatarUrl: "",
+    genres: [],
+    website: "",
+    instagram: "",
+    twitter: "",
+    facebook: "",
+    email: "",
+    memberSince: new Date().toISOString(),
+  };
 }
 
-async function resizeImageBlob(file, maxW = 2000, maxH = 2000, quality = 0.9) {
-  // turn File -> dataURL
+function loadProfile() {
+  try {
+    const raw = localStorage.getItem(PROFILE_KEY);
+    if (!raw) return getDefaultProfile();
+    return { ...getDefaultProfile(), ...JSON.parse(raw) };
+  } catch {
+    return getDefaultProfile();
+  }
+}
+
+function saveProfile(profile) {
+  try {
+    localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
+    window.dispatchEvent(new Event("profile:updated"));
+  } catch (err) {
+    console.error("Failed to save profile:", err);
+  }
+}
+
+function loadProjects() {
+  try {
+    const raw = localStorage.getItem(PROJECTS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+// -------------------- Image Helpers (HEIC/iPhone support) --------------------
+async function heicArrayBufferToJpegDataUrl(arrayBuffer, quality = 0.9) {
+  const blob = new Blob([arrayBuffer], { type: "image/heic" });
+  const jpegBlob = await heic2any({ blob, toType: "image/jpeg", quality });
   const dataUrl = await new Promise((resolve, reject) => {
     const fr = new FileReader();
     fr.onload = () => resolve(String(fr.result || ""));
     fr.onerror = reject;
-    fr.readAsDataURL(file);
+    fr.readAsDataURL(jpegBlob);
   });
+  return dataUrl;
+}
 
-  // load into <img>
-  const img = await new Promise((res, rej) => {
-    const i = new Image();
-    i.onload = () => res(i);
-    i.onerror = rej;
-    i.src = dataUrl;
+async function downscaleDataUrl(dataUrl, maxDim = 800, quality = 0.9) {
+  const img = await new Promise((resolve, reject) => {
+    const x = new Image();
+    x.onload = () => resolve(x);
+    x.onerror = reject;
+    x.src = dataUrl;
   });
-
-  const scale = Math.min(1, maxW / img.width, maxH / img.height);
-  if (scale >= 1) return file; // no resize needed
-
+  let { width, height } = img;
+  if (Math.max(width, height) <= maxDim) return dataUrl;
+  const scale = maxDim / Math.max(width, height);
+  width = Math.round(width * scale);
+  height = Math.round(height * scale);
   const canvas = document.createElement("canvas");
-  canvas.width = Math.round(img.width * scale);
-  canvas.height = Math.round(img.height * scale);
+  canvas.width = width;
+  canvas.height = height;
   const ctx = canvas.getContext("2d");
-  ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-  // export as JPEG for consistency
-  const outDataUrl = canvas.toDataURL("image/jpeg", quality);
-  const outBlob = await (await fetch(outDataUrl)).blob();
-  const name = file.name.replace(/\.(png|webp)$/i, ".jpg");
-  return new File([outBlob], name.endsWith(".jpg") ? name : `${name}.jpg`, {
-    type: "image/jpeg",
-  });
+  ctx.drawImage(img, 0, 0, width, height);
+  return canvas.toDataURL("image/jpeg", quality);
 }
 
-/* ---------- Local persistence ---------- */
-const STORAGE_KEY = "dt_profile";
+// -------------------- Genre Options --------------------
+const GENRE_OPTIONS = [
+  "Urban Fiction",
+  "Romance",
+  "Mystery",
+  "Drama",
+  "Thriller",
+  "Sci-Fi",
+  "Fantasy",
+  "Historical",
+  "YA",
+  "Literary",
+  "Horror",
+  "Comedy",
+  "Adventure",
+  "Memoir",
+];
 
-function readProfile() {
-  try {
-    const raw =
-      localStorage.getItem(STORAGE_KEY) ||
-      localStorage.getItem("userProfile") ||
-      localStorage.getItem("profile") ||
-      localStorage.getItem("currentUser");
-    return raw
-      ? JSON.parse(raw)
-      : { displayName: "", email: "", bio: "", avatar: "" };
-  } catch {
-    return { displayName: "", email: "", bio: "", avatar: "" };
-  }
-}
-
-function writeProfile(p) {
-  try {
-    const payload = JSON.stringify(p);
-    localStorage.setItem("dt_profile", payload);
-    localStorage.setItem("userProfile", payload);
-    localStorage.setItem("profile", payload);
-    localStorage.setItem("currentUser", payload);
-    window.dispatchEvent(new Event("profile:updated"));
-  } catch {}
-}
-
-/* ---------- Inline Sidebar (optional) ---------- */
-function ProfileSidebar({ onNavigate }) {
-  const { pathname } = useLocation();
-  const items = [
-    { label: "Dashboard", icon: Home, path: "/dashboard" },
-    { label: "Writer", icon: PencilLine, path: "/writer" },
-    { label: "Table of Contents", icon: BookIcon, path: "/toc" },
-    { label: "Project", icon: Layers, path: "/project" },
-    { label: "Calendar", icon: CalIcon, path: "/calendar" },
-    { label: "Store", icon: Store, path: "/store" },
-    { label: "About", icon: Info, path: "/about" },
-  ];
-
-  return (
-    <aside className="hidden lg:block w-72 flex-shrink-0">
-      <div className="glass-panel p-4 sticky top-4">
-        <div className="flex items-center gap-3 mb-4">
-          <img
-            src="/DahTruthLogo.png"
-            alt="DahTruth"
-            className="w-10 h-10 rounded-full border border-white/40"
-            onError={(e) => {
-              e.currentTarget.style.display = "none";
-            }}
-          />
-          <div>
-            <div className="heading-serif text-xl">DahTruth</div>
-            <div className="text-xs text-muted -mt-0.5">StoryLab</div>
-          </div>
-        </div>
-        <nav className="space-y-1.5">
-          {items.map((it) => {
-            const active = pathname === it.path;
-            return (
-              <button
-                key={it.path}
-                onClick={() => onNavigate(it.path)}
-                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg border transition
-                  ${
-                    active
-                      ? "bg-[color:var(--color-primary)] border-[hsl(var(--border))] font-medium"
-                      : "bg-transparent border-transparent hover:bg-[color:var(--color-primary)]/60 hover:border-[hsl(var(--border))]"
-                  }`}
-              >
-                <it.icon size={18} className="text-[color:var(--color-ink)]/80" />
-                <span>{it.label}</span>
-              </button>
-            );
-          })}
-        </nav>
-      </div>
-    </aside>
-  );
-}
-
-/* ---------- Main Component ---------- */
-export default function Profile() {
+// -------------------- Main Component --------------------
+export default function ProfilePage() {
   const navigate = useNavigate();
-  const fileInputRef = useRef(null);
+  const [profile, setProfile] = useState(getDefaultProfile());
+  const [isUploading, setIsUploading] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [showSaved, setShowSaved] = useState(false);
 
-  // ✅ Always call your real store hook (Provider is mounted in App)
-  const store = useUser();
-
-  // Initial state from store or localStorage
-  const initial = store?.user ?? readProfile();
-
-  const [displayName, setDisplayName] = useState(initial.displayName || "");
-  const [email, setEmail] = useState(initial.email || "");
-  const [bio, setBio] = useState(initial.bio || "");
-  const [avatar, setAvatar] = useState(initial.avatar || ""); // data URL preview
-  const [lastSaved, setLastSaved] = useState(Date.now());
-  const [uploadingAvatar, setUploadingAvatar] = useState(false);
-
-const [openaiKey, setOpenaiKey] = useState("");
-const [claudeKey, setClaudeKey] = useState("");
-const [aiProvider, setAiProvider] = useState("claude");
-const [showApiHelp, setShowApiHelp] = useState(false);
-
-// Load API keys from localStorage on mount
-useEffect(() => {
-  const savedOpenAI = localStorage.getItem('openai_api_key') || '';
-  const savedClaude = localStorage.getItem('claude_api_key') || '';
-  const savedProvider = localStorage.getItem('ai_provider') || 'claude';
-  setOpenaiKey(savedOpenAI);
-  setClaudeKey(savedClaude);
-  setAiProvider(savedProvider);
-}, []);
-
-// Save API keys to localStorage
-const saveApiKeys = () => {
-  localStorage.setItem('openai_api_key', openaiKey);
-  localStorage.setItem('claude_api_key', claudeKey);
-  localStorage.setItem('ai_provider', aiProvider);
-  alert('✅ API keys saved successfully!');
-};
-  
+  // Load profile on mount
   useEffect(() => {
-    if (store?.user) {
-      setDisplayName(store.user.displayName || "");
-      setEmail(store.user.email || "");
-      setBio(store.user.bio || "");
-      setAvatar(store.user.avatar || "");
+    const loadedProfile = loadProfile();
+    setProfile(loadedProfile);
+  }, []);
+
+  // Listen for external profile changes
+  useEffect(() => {
+    const sync = () => {
+      setProfile(loadProfile());
+    };
+    window.addEventListener("storage", sync);
+    window.addEventListener("profile:updated", sync);
+    return () => {
+      window.removeEventListener("storage", sync);
+      window.removeEventListener("profile:updated", sync);
+    };
+  }, []);
+
+  const handleGoBack = () => {
+    if (window.history.length > 1) {
+      navigate(-1);
+    } else {
+      navigate("/dashboard");
     }
-  }, [
-    store?.user?.displayName,
-    store?.user?.email,
-    store?.user?.bio,
-    store?.user?.avatar,
-  ]);
+  };
 
-  // Convert File -> DataURL (for preview)
-  function fileToDataUrl(file) {
-    return new Promise((resolve, reject) => {
-      const fr = new FileReader();
-      fr.onload = () => resolve(String(fr.result || ""));
-      fr.onerror = reject;
-      fr.readAsDataURL(file);
+  const updateProfile = (field, value) => {
+    setProfile((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const toggleGenre = (genre) => {
+    setProfile((prev) => {
+      const genres = prev.genres || [];
+      if (genres.includes(genre)) {
+        return { ...prev, genres: genres.filter((g) => g !== genre) };
+      } else {
+        return { ...prev, genres: [...genres, genre] };
+      }
     });
-  }
+  };
 
-  const onPickAvatar = async (file) => {
+  const handleAvatarChange = async (e) => {
+    const file = e.target.files?.[0];
     if (!file) return;
-    setUploadingAvatar(true);
+
+    setIsUploading(true);
     try {
-      const maxSize = 10 * 1024 * 1024; // 10MB guardrail
+      const maxSize = 10 * 1024 * 1024; // 10MB
       if (file.size > maxSize) {
         alert("Image is too large. Please choose an image under 10MB.");
-        setUploadingAvatar(false);
         return;
       }
 
-      // 1) Ensure JPEG if user selected HEIC/HEIF (iPhone)
-      let safeFile = await ensureJpegFile(file, 0.9);
+      const isHEIC =
+        file.name.toLowerCase().endsWith(".heic") ||
+        file.name.toLowerCase().endsWith(".heif") ||
+        file.type === "image/heic" ||
+        file.type === "image/heif";
 
-      // 2) Optional downscale big images (keeps uploads snappy)
-      if (safeFile.size > 5 * 1024 * 1024) {
-        safeFile = await resizeImageBlob(safeFile, 2000, 2000, 0.88);
+      let dataUrl = "";
+      if (isHEIC) {
+        const ab = await file.arrayBuffer();
+        const jpegDataUrl = await heicArrayBufferToJpegDataUrl(ab, 0.9);
+        dataUrl = await downscaleDataUrl(jpegDataUrl, 800, 0.9);
+      } else {
+        dataUrl = await new Promise((resolve, reject) => {
+          const fr = new FileReader();
+          fr.onload = () => resolve(String(fr.result || ""));
+          fr.onerror = reject;
+          fr.readAsDataURL(file);
+        });
+        dataUrl = await downscaleDataUrl(String(dataUrl), 800, 0.9);
       }
 
-      // 3) Preview as Data URL
-      const previewUrl = await fileToDataUrl(safeFile);
-      setAvatar(previewUrl);
-
-      // TODO: upload `safeFile` to your backend / Amplify Storage if needed
-      // await Storage.put(`avatars/${userId}.jpg`, safeFile, { contentType: safeFile.type });
+      updateProfile("avatarUrl", dataUrl);
     } catch (err) {
       console.error("Error uploading avatar:", err);
-      alert("Failed to process image. Please try a different photo.");
+      alert("Failed to upload image. Please try again or use a different image.");
     } finally {
-      setUploadingAvatar(false);
-      if (fileInputRef.current) fileInputRef.current.value = "";
+      setIsUploading(false);
+      e.target.value = "";
     }
   };
 
-  const handleUploadClick = () => {
-    if (!uploadingAvatar) fileInputRef.current?.click();
+  const handleSave = async () => {
+    setIsSaving(true);
+    try {
+      saveProfile(profile);
+
+      // Also update author name in all projects
+      const projects = loadProjects();
+      if (projects.length > 0) {
+        const updatedProjects = projects.map((p) => ({
+          ...p,
+          author: profile.displayName,
+        }));
+        localStorage.setItem(PROJECTS_KEY, JSON.stringify(updatedProjects));
+        window.dispatchEvent(new Event("project:change"));
+      }
+
+      setShowSaved(true);
+      setTimeout(() => setShowSaved(false), 3000);
+    } catch (err) {
+      console.error("Failed to save:", err);
+      alert("Failed to save profile. Please try again.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const removeAvatar = () => setAvatar("");
-
-  const save = () => {
-    const next = {
-      ...(store?.user || {}),
-      displayName: displayName.trim(),
-      email: email.trim(),
-      bio,
-      avatar,
-    };
-    if (store?.setUser) store.setUser(next);
-    writeProfile(next);
-    setLastSaved(Date.now());
+  const handleSignOut = () => {
+    if (window.confirm("Are you sure you want to sign out?")) {
+      navigate("/");
+    }
   };
 
-  const authorInitial = (displayName || "A").charAt(0).toUpperCase();
+  const getInitials = () => {
+    const name = profile.displayName || "A";
+    return name.charAt(0).toUpperCase();
+  };
+
+  const formatMemberSince = () => {
+    if (!profile.memberSince) return "—";
+    const date = new Date(profile.memberSince);
+    return date.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  };
 
   return (
-    <div className="min-h-screen text-[color:var(--color-ink)] bg-[color:var(--color-base)] bg-radial-fade">
-      <div className="mx-auto max-w-7xl px-4 py-6">
-        {/* Top header with Back button */}
-        <div className="glass-panel">
-          <div className="flex items-center justify-between px-6 py-4">
-            <div className="flex items-center gap-3">
-              <button
-                onClick={() => navigate("/dashboard")}
-                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg bg-white border border-[hsl(var(--border))] hover:opacity-90"
-                title="Back to Dashboard"
+    <div
+      className="min-h-screen text-gray-800"
+      style={{
+        background: "linear-gradient(135deg, #fef5ff 0%, #f8e8ff 50%, #fff5f7 100%)",
+      }}
+    >
+      <div className="mx-auto max-w-3xl px-6 py-8">
+        {/* Dashboard Button */}
+        <button
+          onClick={handleGoBack}
+          className="mb-6 inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all hover:scale-105"
+          style={{
+            background: "linear-gradient(135deg, #D4AF37, #f5e6b3)",
+            color: "#1f2937",
+            border: "1px solid rgba(180,142,38,0.9)",
+            boxShadow: "0 6px 18px rgba(180,142,38,0.35)",
+          }}
+        >
+          <ArrowLeft size={16} />
+          Dashboard
+        </button>
+
+        {/* Profile Header Card */}
+        <div
+          className="rounded-3xl overflow-hidden mb-6"
+          style={{
+            background: "rgba(255,255,255,0.9)",
+            backdropFilter: "blur(20px)",
+            border: "1px solid rgba(148,163,184,0.3)",
+            boxShadow: "0 14px 45px rgba(15,23,42,0.08)",
+          }}
+        >
+          {/* Header gradient banner */}
+          <div
+            className="h-28"
+            style={{
+              background: "linear-gradient(135deg, #b897d6, #e3c8ff, #f5e6ff)",
+            }}
+          />
+
+          <div className="px-8 pb-8 -mt-16 text-center">
+            {/* Avatar */}
+            <div className="relative inline-block mb-6">
+              <div
+                className="w-36 h-36 rounded-full p-1.5"
+                style={{
+                  background: "linear-gradient(135deg, #D4AF37, #9b7bc9)",
+                  boxShadow: "0 12px 40px rgba(155,123,201,0.4)",
+                }}
               >
-                <ArrowLeft size={16} /> Back
-              </button>
-              <div className="w-10 h-10 rounded-lg grid place-items-center bg-[color:var(--color-primary)]">
-                <User size={18} className="text-[color:var(--color-ink)]/80" />
-              </div>
-              <div>
-                <h1 className="heading-serif text-2xl">Profile</h1>
-                <div className="text-sm text-muted">
-                  {displayName ? `Signed in as ${displayName}` : "Set your author details"}
+                <div
+                  className="w-full h-full rounded-full flex items-center justify-center overflow-hidden"
+                  style={{
+                    background: "linear-gradient(135deg, #e8dff5, #f5e6ff)",
+                  }}
+                >
+                  {isUploading ? (
+                    <Loader2 size={32} className="animate-spin text-purple-400" />
+                  ) : profile.avatarUrl ? (
+                    <img
+                      src={profile.avatarUrl}
+                      alt="Profile"
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <span
+                      className="text-5xl font-semibold"
+                      style={{
+                        fontFamily: "'EB Garamond', Georgia, serif",
+                        color: "#6b4f7a",
+                      }}
+                    >
+                      {getInitials()}
+                    </span>
+                  )}
                 </div>
               </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <button onClick={save} className="btn-gold inline-flex items-center gap-2">
-                <Save size={16} /> Save
-              </button>
-              <button
-                onClick={() => navigate("/toc")}
-                className="btn-primary inline-flex items-center gap-2"
+
+              {/* Upload button */}
+              <label
+                className="absolute bottom-2 right-2 w-11 h-11 rounded-full flex items-center justify-center cursor-pointer transition-all hover:scale-110"
+                style={{
+                  background: "white",
+                  border: "3px solid #f8e8ff",
+                  boxShadow: "0 4px 12px rgba(0,0,0,0.15)",
+                }}
+                title="Upload photo (supports iPhone photos)"
               >
-                <BookOpen size={16} /> Go to TOC
-              </button>
-              <span className="text-xs text-muted hidden sm:inline">
-                Last saved {Math.round((Date.now() - lastSaved) / 60000) || 0}m ago
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* Main layout with optional sidebar */}
-        <div className="mt-6 flex gap-6">
-          {/* Sidebar (shown on lg+) */}
-          <ProfileSidebar onNavigate={navigate} />
-
-          {/* Content */}
-          <div className="flex-1 space-y-6">
-            {/* Avatar Card */}
-            <div className="glass-panel p-6">
-              <div className="text-lg font-semibold mb-4 heading-serif">Profile Photo</div>
-
-              <div className="rounded-2xl overflow-hidden border border-[hsl(var(--border))] bg-[color:var(--color-primary)]/40 aspect-square max-w-sm flex items-center justify-center mb-4 relative">
-                {uploadingAvatar ? (
-                  <div className="text-center">
-                    <Loader2 size={32} className="mx-auto mb-2 animate-spin text-[color:var(--color-ink)]/60" />
-                    <div className="text-sm text-muted">Processing image...</div>
-                  </div>
-                ) : avatar ? (
-                  <img src={avatar} alt="Avatar" className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full grid place-items-center">
-                    <div className="w-24 h-24 rounded-full bg-[color:var(--color-accent)] grid place-items-center shadow">
-                      <span className="text-[color:var(--color-ink)] font-black text-3xl">{authorInitial}</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="flex gap-2">
-                <button
-                  onClick={handleUploadClick}
-                  disabled={uploadingAvatar}
-                  className="flex-1 inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-[color:var(--color-primary)] border border-[hsl(var(--border))] hover:opacity-90 text-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {uploadingAvatar ? (
-                    <>
-                      <Loader2 size={16} className="animate-spin" /> Processing
-                    </>
-                  ) : (
-                    <>
-                      <Image size={16} /> Upload
-                    </>
-                  )}
-                </button>
+                <Camera size={18} className="text-purple-600" />
                 <input
-                  ref={fileInputRef}
                   type="file"
                   accept="image/*,.heic,.heif"
                   className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) onPickAvatar(file);
-                  }}
+                  onChange={handleAvatarChange}
                 />
-                {avatar && !uploadingAvatar && (
-                  <button
-                    onClick={removeAvatar}
-                    className="px-3 py-2 rounded-lg bg-white border border-[hsl(var(--border))] hover:opacity-90 text-sm"
-                  >
-                    Remove
-                  </button>
-                )}
-              </div>
-              <div className="text-xs text-muted mt-2 text-center">
-                Supports JPG, PNG, or iPhone HEIC photos
-              </div>
+              </label>
             </div>
 
-            {/* Author Details */}
-            <div className="glass-panel p-6">
-              <div className="text-lg font-semibold mb-4 heading-serif">Author Details</div>
+            {/* Name input */}
+            <input
+              type="text"
+              value={profile.displayName || ""}
+              onChange={(e) => updateProfile("displayName", e.target.value)}
+              placeholder="Your name or pen name..."
+              className="w-full max-w-md mx-auto text-center text-3xl font-semibold bg-transparent outline-none border-b-2 border-transparent hover:border-purple-200 focus:border-purple-400 transition-colors pb-1"
+              style={{
+                fontFamily: "'EB Garamond', Georgia, serif",
+                color: "#2b143f",
+              }}
+            />
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="md:col-span-2">
-                  <label className="text-xs text-muted mb-1 block">Display Name</label>
-                  <input
-                    value={displayName}
-                    onChange={(e) => setDisplayName(e.target.value)}
-                    placeholder="e.g., Jacqueline Session Ausby"
-                    className="w-full rounded-lg bg-white border border-[hsl(var(--border))] px-4 py-3 text-lg font-semibold outline-none"
-                    style={{
-                      fontFamily:
-                        "Playfair Display, ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif",
-                    }}
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs text-muted mb-1 block">Email</label>
-                  <div className="relative">
-                    <Mail
-                      className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--color-muted)]"
-                      size={16}
-                    />
-                    <input
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      placeholder="you@example.com"
-                      className="w-full rounded-lg bg-white border border-[hsl(var(--border))] pl-9 pr-4 py-3 text-sm outline-none"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-xs text-muted mb-1 block">Website (optional)</label>
-                  <input
-                    placeholder="https://DahTruth.com"
-                    className="w-full rounded-lg bg-white border border-[hsl(var(--border))] px-4 py-3 text-sm outline-none"
-                  />
-                </div> 
-                
-{/* AI API Keys */}
-            <div className="glass-panel p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="text-lg font-semibold heading-serif">🤖 AI API Keys</div>
-                <button
-                  onClick={() => setShowApiHelp(!showApiHelp)}
-                  className="px-3 py-1.5 text-xs rounded-lg bg-white border border-[hsl(var(--border))] hover:opacity-90"
-                >
-                  {showApiHelp ? "Hide Help" : "Show Help"}
-                </button>
-              </div>
-
-              {showApiHelp && (
-                <div className="mb-6 rounded-lg bg-blue-50 border border-blue-200 p-4 text-sm">
-                  <div className="font-semibold mb-3 text-blue-900">📚 How to get your API keys:</div>
-                  
-                  <div className="mb-4">
-                    <div className="font-semibold text-blue-900 mb-2">OpenAI (ChatGPT):</div>
-                    <ol className="list-decimal list-inside space-y-1 text-blue-800 ml-2">
-                      <li>Go to{" "}
-                        <a 
-                          href="https://platform.openai.com/api-keys" 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="underline text-blue-600 hover:text-blue-800"
-                        >
-                          platform.openai.com/api-keys
-                        </a>
-                      </li>
-                      <li>Sign in or create an account</li>
-                      <li>Click "Create new secret key"</li>
-                      <li>Copy the key (starts with "sk-")</li>
-                      <li>Paste it below</li>
-                    </ol>
-                  </div>
-
-                  <div className="mb-4">
-                    <div className="font-semibold text-blue-900 mb-2">Anthropic Claude:</div>
-                    <ol className="list-decimal list-inside space-y-1 text-blue-800 ml-2">
-                      <li>Go to{" "}
-                        <a 
-                          href="https://console.anthropic.com/settings/keys" 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          className="underline text-blue-600 hover:text-blue-800"
-                        >
-                          console.anthropic.com/settings/keys
-                        </a>
-                      </li>
-                      <li>Sign in or create an account</li>
-                      <li>Click "Create Key"</li>
-                      <li>Copy the key (starts with "sk-ant-")</li>
-                      <li>Paste it below</li>
-                    </ol>
-                  </div>
-
-                  <div className="rounded-lg bg-yellow-50 border border-yellow-200 p-3 mb-3">
-                    <div className="font-semibold text-yellow-900 mb-1">💡 Pro Tip:</div>
-                    <div className="text-yellow-800 text-xs">
-                      Your API keys are stored locally on your device only. They're never sent to our servers - only directly to OpenAI or Anthropic when you use AI features.
-                    </div>
-                  </div>
-
-                  <div className="text-xs text-blue-700">
-                    <strong>💰 Cost:</strong> Both services charge based on usage. OpenAI typically costs ~$0.002 per page, Claude ~$0.008 per page. Check their pricing pages for current rates.
-                  </div>
-                </div>
-              )}
-
-              {/* OpenAI Key */}
-              <div className="mb-4">
-                <label className="text-xs text-muted mb-1 block font-semibold">
-                  OpenAI API Key (ChatGPT)
-                </label>
-                <input
-                  type="password"
-                  value={openaiKey}
-                  onChange={(e) => setOpenaiKey(e.target.value)}
-                  placeholder="sk-..."
-                  className="w-full rounded-lg bg-white border border-[hsl(var(--border))] px-4 py-3 text-sm outline-none font-mono"
-                />
-                {openaiKey && (
-                  <div className="text-xs text-green-600 mt-1 flex items-center gap-1">
-                    <span>✓</span>
-                    <span>Key saved (ends with: ...{openaiKey.slice(-4)})</span>
-                  </div>
-                )}
-              </div>
-
-              {/* Claude Key */}
-              <div className="mb-4">
-                <label className="text-xs text-muted mb-1 block font-semibold">
-                  Anthropic Claude API Key
-                </label>
-                <input
-                  type="password"
-                  value={claudeKey}
-                  onChange={(e) => setClaudeKey(e.target.value)}
-                  placeholder="sk-ant-..."
-                  className="w-full rounded-lg bg-white border border-[hsl(var(--border))] px-4 py-3 text-sm outline-none font-mono"
-                />
-                {claudeKey && (
-                  <div className="text-xs text-green-600 mt-1 flex items-center gap-1">
-                    <span>✓</span>
-                    <span>Key saved (ends with: ...{claudeKey.slice(-4)})</span>
-                  </div>
-                )}
-              </div>
-
-              {/* AI Provider Selection */}
-              <div className="mb-6">
-                <label className="text-xs text-muted mb-1 block font-semibold">
-                  Preferred AI Provider
-                </label>
-                <select
-                  value={aiProvider}
-                  onChange={(e) => setAiProvider(e.target.value)}
-                  className="w-full rounded-lg bg-white border border-[hsl(var(--border))] px-4 py-3 text-sm outline-none"
-                >
-                  <option value="claude">Claude (Better for creative writing)</option>
-                  <option value="openai">OpenAI ChatGPT (Faster responses)</option>
-                </select>
-                <div className="text-xs text-muted mt-1">
-                  This will be used for all AI features across the app
-                </div>
-              </div>
-
-              {/* Save Button */}
-              <button 
-                onClick={saveApiKeys}
-                className="btn-gold inline-flex items-center gap-2"
-              >
-                <Save size={16} /> Save API Keys
-              </button>
-            </div>
-                
-                <div className="md:col-span-2">
-                  <label className="text-xs text-muted mb-1 block">Bio</label>
-                  <textarea
-                    value={bio}
-                    onChange={(e) => setBio(e.target.value)}
-                    placeholder="A brief author bio for your profile and manuscripts…"
-                    className="w-full min-h-[140px] rounded-lg bg-white border border-[hsl(var(--border))] px-4 py-3 text-sm outline-none resize-vertical"
-                  />
-                </div>
-              </div>
-
-              <div className="mt-6 flex items-center gap-2">
-                <button onClick={save} className="btn-gold inline-flex items-center gap-2">
-                  <Save size={16} /> Save Profile
-                </button>
-                <button
-                  onClick={() => navigate("/dashboard")}
-                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-white border border-[hsl(var(--border))] hover:opacity-90 font-semibold"
-                >
-                  <Home size={16} /> Back to Dashboard
-                </button>
-              </div>
-            </div>
-
-              {/* Quick Actions */}
-            <div className="glass-panel p-6">
-              <div className="text-lg font-semibold mb-4 heading-serif">Quick Actions</div>
-              <div className="flex flex-wrap gap-2">
-                <button onClick={save} className="btn-primary">Save changes</button>
-                <button
-                  onClick={() => navigate("/")}
-                  className="px-4 py-2 rounded-lg bg-white border border-[hsl(var(--border))] hover:opacity-90 inline-flex items-center gap-2"
-                >
-                  <LogOut size={14} /> Sign out
-                </button>
-              </div>
-              <div className="text-xs text-muted mt-3">
-                Last saved {Math.round((Date.now() - lastSaved) / 60000) || 0}m ago
-              </div>
-            </div>
-
-            {/* Preview */}
-            <div className="glass-panel p-6">
-              <div className="text-lg font-semibold mb-4 heading-serif">Preview</div>
-              <div className="flex items-center gap-4">
-                {avatar ? (
-                  <img
-                    src={avatar}
-                    alt={displayName || "Profile"}
-                    className="w-12 h-12 rounded-full object-cover shadow border-2 border-[hsl(var(--border))]"
-                  />
-                ) : (
-                  <div className="w-12 h-12 rounded-full bg-[color:var(--color-accent)] grid place-items-center shadow">
-                    <span className="text-[color:var(--color-ink)] font-black">
-                      {authorInitial}
-                    </span>
-                  </div>
-                )}
-                <div className="min-w-0">
-                  <div
-                    className="font-bold text-lg truncate"
-                    style={{
-                      fontFamily:
-                        "Playfair Display, ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif",
-                    }}
-                  >
-                    {displayName || "Your Name"}
-                  </div>
-                  <div className="text-sm text-muted truncate">
-                    {email || "you@example.com"}
-                  </div>
-                </div>
-              </div>
-              {bio?.trim() && (
-                <p className="mt-4 text-[color:var(--color-ink)]/80 leading-relaxed">
-                  {bio}
-                </p>
-              )}
-            </div>
+            {/* Tagline input */}
+            <input
+              type="text"
+              value={profile.tagline || ""}
+              onChange={(e) => updateProfile("tagline", e.target.value)}
+              placeholder="Add a tagline... (e.g., 'Urban fiction author & storyteller')"
+              className="mt-3 w-full max-w-lg mx-auto text-center text-base bg-transparent outline-none italic"
+              style={{ color: "rgba(31,41,55,0.6)" }}
+            />
           </div>
         </div>
+
+        {/* About Me Section */}
+        <div
+          className="rounded-3xl p-8 mb-6"
+          style={{
+            background: "rgba(255,255,255,0.9)",
+            backdropFilter: "blur(20px)",
+            border: "1px solid rgba(148,163,184,0.3)",
+            boxShadow: "0 8px 32px rgba(15,23,42,0.06)",
+          }}
+        >
+          <div className="flex items-center gap-3 mb-6">
+            <div
+              className="w-11 h-11 rounded-xl flex items-center justify-center"
+              style={{ background: "rgba(155,123,201,0.08)" }}
+            >
+              <PenSquare size={18} className="text-purple-700" />
+            </div>
+            <h2
+              className="text-xl font-semibold"
+              style={{
+                fontFamily: "'EB Garamond', Georgia, serif",
+                color: "#2b143f",
+              }}
+            >
+              About Me
+            </h2>
+          </div>
+
+          <textarea
+            value={profile.bio || ""}
+            onChange={(e) => {
+              if (e.target.value.length <= 500) {
+                updateProfile("bio", e.target.value);
+              }
+            }}
+            placeholder="Tell readers about yourself... What inspires your writing? What genres do you love? Share your story."
+            className="w-full min-h-32 p-4 rounded-2xl text-base leading-relaxed outline-none resize-y transition-all"
+            style={{
+              background: "rgba(248,250,252,0.8)",
+              border: "1px solid rgba(148,163,184,0.3)",
+              color: "#1f2937",
+            }}
+          />
+          <div className="text-right text-xs text-gray-400 mt-2">
+            {(profile.bio || "").length} / 500 characters
+          </div>
+        </div>
+
+        {/* Writing Genres Section */}
+        <div
+          className="rounded-3xl p-8 mb-6"
+          style={{
+            background: "rgba(255,255,255,0.9)",
+            backdropFilter: "blur(20px)",
+            border: "1px solid rgba(148,163,184,0.3)",
+            boxShadow: "0 8px 32px rgba(15,23,42,0.06)",
+          }}
+        >
+          <div className="flex items-center gap-3 mb-6">
+            <div
+              className="w-11 h-11 rounded-xl flex items-center justify-center"
+              style={{ background: "rgba(251,191,36,0.08)" }}
+            >
+              <BookOpen size={18} className="text-amber-600" />
+            </div>
+            <h2
+              className="text-xl font-semibold"
+              style={{
+                fontFamily: "'EB Garamond', Georgia, serif",
+                color: "#2b143f",
+              }}
+            >
+              Writing Genres
+            </h2>
+          </div>
+
+          <p className="text-sm text-gray-500 mb-4">
+            Select the genres you focus on in your writing:
+          </p>
+
+          <div className="flex flex-wrap gap-2.5">
+            {GENRE_OPTIONS.map((genre) => {
+              const isActive = (profile.genres || []).includes(genre);
+              return (
+                <button
+                  key={genre}
+                  onClick={() => toggleGenre(genre)}
+                  className="px-4 py-2 rounded-full text-sm font-medium transition-all hover:scale-105"
+                  style={{
+                    background: isActive
+                      ? "linear-gradient(135deg, #9b7bc9, #b897d6)"
+                      : "rgba(155,123,201,0.06)",
+                    color: isActive ? "white" : "#6b4f7a",
+                    border: isActive
+                      ? "1px solid transparent"
+                      : "1px solid rgba(155,123,201,0.2)",
+                  }}
+                >
+                  {genre}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Social Links Section */}
+        <div
+          className="rounded-3xl p-8 mb-6"
+          style={{
+            background: "rgba(255,255,255,0.9)",
+            backdropFilter: "blur(20px)",
+            border: "1px solid rgba(148,163,184,0.3)",
+            boxShadow: "0 8px 32px rgba(15,23,42,0.06)",
+          }}
+        >
+          <div className="flex items-center gap-3 mb-6">
+            <div
+              className="w-11 h-11 rounded-xl flex items-center justify-center"
+              style={{ background: "rgba(59,130,246,0.08)" }}
+            >
+              <Link2 size={18} className="text-blue-600" />
+            </div>
+            <h2
+              className="text-xl font-semibold"
+              style={{
+                fontFamily: "'EB Garamond', Georgia, serif",
+                color: "#2b143f",
+              }}
+            >
+              Social & Website
+            </h2>
+          </div>
+
+          <p className="text-sm text-gray-500 mb-5">
+            Optional: share where readers can follow your work.
+          </p>
+
+          <div className="space-y-4">
+            {[
+              {
+                icon: <Globe size={18} />,
+                field: "website",
+                placeholder: "Your website (e.g., dahtruth.com)",
+                bg: "rgba(59,130,246,0.1)",
+              },
+              {
+                icon: <Instagram size={18} />,
+                field: "instagram",
+                placeholder: "Instagram username",
+                bg: "rgba(236,72,153,0.1)",
+              },
+              {
+                icon: <Twitter size={18} />,
+                field: "twitter",
+                placeholder: "X (Twitter) username",
+                bg: "rgba(14,165,233,0.1)",
+              },
+              {
+                icon: <Facebook size={18} />,
+                field: "facebook",
+                placeholder: "Facebook page URL",
+                bg: "rgba(59,89,152,0.1)",
+              },
+            ].map((item) => (
+              <div key={item.field} className="flex items-center gap-3">
+                <div
+                  className="w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0"
+                  style={{ background: item.bg }}
+                >
+                  <span className="text-gray-600">{item.icon}</span>
+                </div>
+                <input
+                  type="text"
+                  value={profile[item.field] || ""}
+                  onChange={(e) => updateProfile(item.field, e.target.value)}
+                  placeholder={item.placeholder}
+                  className="flex-1 px-4 py-3 rounded-xl text-sm outline-none transition-colors"
+                  style={{
+                    background: "rgba(248,250,252,0.8)",
+                    border: "1px solid rgba(148,163,184,0.3)",
+                    color: "#1f2937",
+                  }}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Account Section */}
+        <div
+          className="rounded-3xl p-8 mb-6"
+          style={{
+            background: "rgba(255,255,255,0.9)",
+            backdropFilter: "blur(20px)",
+            border: "1px solid rgba(148,163,184,0.3)",
+            boxShadow: "0 8px 32px rgba(15,23,42,0.06)",
+          }}
+        >
+          <div className="flex items-center gap-3 mb-6">
+            <div
+              className="w-11 h-11 rounded-xl flex items-center justify-center"
+              style={{ background: "rgba(107,114,128,0.08)" }}
+            >
+              <Settings size={18} className="text-slate-600" />
+            </div>
+         
+
+            <h2
+              className="text-xl font-semibold"
+              style={{
+                fontFamily: "'EB Garamond', Georgia, serif",
+                color: "#2b143f",
+              }}
+            >
+              Account
+            </h2>
+          </div>
+
+          <div className="space-y-3">
+            {[
+              { label: "Email", value: profile.email || "—" },
+              { label: "Member Since", value: formatMemberSince() },
+              {
+                label: "Plan",
+                value: "Premium Author",
+                highlight: true,
+              },
+            ].map((item, i) => (
+              <div
+                key={i}
+                className="flex justify-between items-center p-4 rounded-xl"
+                style={{ background: "rgba(248,250,252,0.8)" }}
+              >
+                <span className="text-sm text-gray-500">{item.label}</span>
+                <span
+                  className="text-sm font-medium"
+                  style={{
+                    color: item.highlight ? "#D4AF37" : "#1f2937",
+                    fontWeight: item.highlight ? 600 : 500,
+                  }}
+                >
+                  {item.value}
+                </span>
+              </div>
+            ))}
+          </div>
+
+          <button
+            onClick={handleSignOut}
+            className="mt-6 inline-flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-semibold transition-all hover:scale-105"
+            style={{
+              background: "rgba(239,68,68,0.1)",
+              color: "#dc2626",
+              border: "1px solid rgba(239,68,68,0.2)",
+            }}
+          >
+            <LogOut size={16} />
+            Sign Out
+          </button>
+        </div>
+
+        {/* Save Actions */}
+        <div className="flex gap-4 justify-center pb-8">
+          <button
+            onClick={handleGoBack}
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold transition-all hover:scale-105"
+            style={{
+              background: "rgba(255,255,255,0.9)",
+              color: "#1f2937",
+              border: "1px solid rgba(148,163,184,0.3)",
+            }}
+          >
+            <X size={16} />
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={isSaving}
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold text-white transition-all hover:scale-105 disabled:opacity-70"
+            style={{
+              background: "linear-gradient(135deg, #9b7bc9, #b897d6)",
+              boxShadow: "0 4px 16px rgba(155,123,201,0.4)",
+            }}
+          >
+            {isSaving ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : (
+              <Save size={16} />
+            )}
+            {isSaving ? "Saving..." : "Save Profile"}
+          </button>
+        </div>
       </div>
+
+      {/* Success Toast */}
+      {showSaved && (
+        <div
+          className="fixed bottom-8 right-8 flex items-center gap-3 px-6 py-4 rounded-2xl text-white font-semibold"
+          style={{
+            background: "linear-gradient(135deg, #10b981, #34d399)",
+            boxShadow: "0 8px 24px rgba(16,185,129,0.4)",
+          }}
+        >
+          <span>✓</span>
+          Profile saved!
+        </div>
+      )}
     </div>
   );
 }
