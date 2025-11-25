@@ -512,6 +512,30 @@ export default function Publishing(): JSX.Element {
 
   const [chapters, setChapters] = useState<Chapter[]>([]);
 
+// Load chapters that Writing saved into localStorage
+useEffect(() => {
+  try {
+    const saved = localStorage.getItem("dahtruth_chapters");
+    if (!saved) return;
+
+    const parsed = JSON.parse(saved) as any[];
+    if (!Array.isArray(parsed) || parsed.length === 0) return;
+
+    const normalized: Chapter[] = parsed.map((c, idx) => ({
+      id: c.id || `c_${idx + 1}`,
+      title: c.title || `Chapter ${idx + 1}`,
+      included: typeof c.included === "boolean" ? c.included : true,
+      text: c.text || "",
+      textHTML: c.textHTML,
+    }));
+
+    setChapters(normalized);
+    setActiveChapterId(normalized[0].id);
+  } catch (err) {
+    console.error("Failed to load dahtruth_chapters for Publishing:", err);
+  }
+}, []);
+  
   const [provider, setProvider] = useState<"openai" | "anthropic">("openai");
 
   const [matter, setMatter] = useState<Matter>({
@@ -602,6 +626,15 @@ export default function Publishing(): JSX.Element {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeChapterId]);
+
+  useEffect(() => {
+  try {
+    if (!chapters.length) return;
+    localStorage.setItem("dahtruth_chapters", JSON.stringify(chapters));
+  } catch (err) {
+    console.error("Failed to persist chapters from Publishing:", err);
+  }
+}, [chapters]);
 
   const exec = (command: string, value?: string) => {
     editorRef.current?.focus();
