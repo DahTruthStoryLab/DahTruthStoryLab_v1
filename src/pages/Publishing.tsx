@@ -90,6 +90,68 @@ type NumFmt =
 type ChapterGroup = { title: string; content: string[] };
 
 /* ---------- Presets ---------- */
+const MANUSCRIPT_PRESETS: Record<
+  ManuscriptPresetKey,
+  {
+    label: string;
+    fontFamily: string;
+    fontSizePt: number;
+    lineHeight: number;
+    firstLineIndentInches: number;
+    paragraphSpacingPt: number;
+    align: "left" | "justify";
+    chapterTitleCase: "UPPER" | "Capitalize" | "AsIs";
+    chapterStartsOnNewPage: boolean;
+  }
+> = {
+  Agents_Standard_12pt_TNR_Double: {
+    label: "Agents: Standard (TNR 12, Double)",
+    fontFamily: "Times New Roman",
+    fontSizePt: 12,
+    lineHeight: 2.0,
+    firstLineIndentInches: 0.5,
+    paragraphSpacingPt: 0,
+    align: "left",
+    chapterTitleCase: "UPPER",
+    chapterStartsOnNewPage: true,
+  },
+  Nonfiction_Chicago_12pt_TNR_1p5: {
+    label: "Nonfiction (Chicago-ish)",
+    fontFamily: "Times New Roman",
+    fontSizePt: 12,
+    lineHeight: 1.5,
+    firstLineIndentInches: 0.5,
+    paragraphSpacingPt: 6,
+    align: "left",
+    chapterTitleCase: "Capitalize",
+    chapterStartsOnNewPage: true,
+  },
+  Screenplay_Basic_Courier_12pt: {
+    label: "Screenplay (Courier 12)",
+    fontFamily: "Courier New",
+    fontSizePt: 12,
+    lineHeight: 1.0,
+    firstLineIndentInches: 0,
+    paragraphSpacingPt: 0,
+    align: "left",
+    chapterTitleCase: "AsIs",
+    chapterStartsOnNewPage: true,
+  },
+  Poetry_Minimal_12pt_Serif: {
+    label: "Poetry (Minimal Serif)",
+    fontFamily: "Georgia, 'Times New Roman', serif",
+    fontSizePt: 12,
+    lineHeight: 1.5,
+    firstLineIndentInches: 0,
+    paragraphSpacingPt: 0,
+    align: "left",
+    chapterTitleCase: "AsIs",
+    chapterStartsOnNewPage: true,
+  },
+};
+
+
+/* ---------- Presets ---------- */
 const PLATFORM_PRESETS: Record<
   PlatformPresetKey,
   {
