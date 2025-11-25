@@ -16,8 +16,8 @@ import {
   runReadability,
   runPublishingPrep,
   runAssistant,
+  generateSynopsis,   // ⬅️ pull this from the same api module
 } from "../lib/api";
-import { generateSynopsis } from "../lib/api.ts";
 
 /* ---------- Theme via CSS variables (from your brand.css) ---------- */
 const theme = {
