@@ -267,6 +267,59 @@ export const rewrite = (
   provider: "anthropic" | "openai" = "openai"
 ) => runAssistant(text, "rewrite", instructions, provider);
 
+/* ------------------------- Publishing tools (REST) ------------------------ */
+
+export type SynopsisRequest = {
+  manuscriptText: string;
+  title?: string;
+  genre?: string;
+  tone?: string;
+  maxWords?: number;
+};
+
+export type SynopsisResponse = {
+  synopsis: string;
+  // allow extra metadata from Lambda
+  [key: string]: any;
+};
+
+export async function generateSynopsis(
+  input: SynopsisRequest,
+  signal?: AbortSignal
+): Promise<SynopsisResponse> {
+  const res = await fetchWithTimeout(
+    `${API_BASE}/publishing/synopsis`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        operation: "synopsis",
+        ...input,
+      }),
+      signal,
+    },
+    60000 // 60s timeout – synopses can be chunky
+  );
+
+  const text = await res.text().catch(() => null);
+  const norm = normalizeResponse(res, text);
+
+  if (!norm.ok) {
+    throw new Error(norm.error || `HTTP ${norm.status}`);
+  }
+
+  // Expecting Lambda to return { synopsis: "..." , ... }
+  if (norm.json && (norm.json as any).synopsis) {
+    return norm.json as SynopsisResponse;
+  }
+
+  // Fallback if Lambda puts text in `result` instead
+  return {
+    synopsis: (norm.result as string) || "",
+    ...(norm.json || {}),
+  };
+}
+
 /* --------------------------- File helper routes --------------------------- */
 // These use the /files endpoint with different operations
 
