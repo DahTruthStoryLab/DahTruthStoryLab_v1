@@ -17,6 +17,7 @@ import {
   runPublishingPrep,
   runAssistant,
 } from "../lib/api";
+import { generateSynopsis } from "../lib/api.ts";
 
 /* ---------- Theme via CSS variables (from your brand.css) ---------- */
 const theme = {
@@ -1161,25 +1162,46 @@ export default function Publishing(): JSX.Element {
     }
   }, [chapters]);
 
-  // Story materials state
-  const [materialKey, setMaterialKey] =
-    useState<MaterialKey>("synopsis-short");
-  const [materialOutput, setMaterialOutput] = useState<string>("");
-  const [materialBusy, setMaterialBusy] = useState<boolean>(false);
+// Story materials state
+const [materialKey, setMaterialKey] =
+  useState<MaterialKey>("synopsis-short");
+const [materialOutput, setMaterialOutput] = useState<string>("");
+const [materialBusy, setMaterialBusy] = useState<boolean>(false);
 
-  const handleGenerateMaterial = async (key: MaterialKey) => {
-    if (!compiledPlain) {
-      alert(
-        "Your publishing manuscript is empty. Add chapters and front matter first."
-      );
-      return;
-    }
-    if (materialBusy) return;
+const handleGenerateMaterial = async (key: MaterialKey) => {
+  if (!compiledPlain) {
+    alert(
+      "Your publishing manuscript is empty. Add chapters and front matter first."
+    );
+    return;
+  }
+  if (materialBusy) return;
 
-    setMaterialBusy(true);
-    setMaterialKey(key);
+  setMaterialBusy(true);
+  setMaterialKey(key);
 
-    try {
+  try {
+    let generatedText = "";
+
+    // 🔸 Use the new /publishing/synopsis endpoint for synopsis requests
+    if (key === "synopsis-short" || key === "synopsis-long") {
+      const synopsisRes = await generateSynopsis({
+        manuscriptText: compiledPlain,
+        title:
+          (meta as any)?.title ||
+          (meta as any)?.workingTitle ||
+          "Untitled Manuscript",
+        genre: (meta as any)?.genre || "",
+        tone:
+          key === "synopsis-short"
+            ? "brief agent-ready synopsis"
+            : "expanded reader-facing synopsis",
+        maxWords: key === "synopsis-short" ? 300 : 800,
+      });
+
+      generatedText = synopsisRes.synopsis || "";
+    } else {
+      // 🔸 Everything else still uses the unified AI assistant
       const res: any = await runAssistant(
         compiledPlain,
         key,
@@ -1187,34 +1209,35 @@ export default function Publishing(): JSX.Element {
         provider
       );
 
-      const text =
+      generatedText =
         res?.result || res?.text || res?.output || compiledPlain;
-
-      if (!text) {
-        throw new Error("AI returned an empty response.");
-      }
-
-      setMaterialOutput(text);
-
-      navigate("/publishing-prep", {
-        state: {
-          from: "story-materials",
-          materialType: key,
-          manuscriptMeta: meta,
-          manuscriptText: compiledPlain,
-          generated: text,
-        },
-      });
-    } catch (e: any) {
-      console.error("[Story Material Error]:", e);
-      alert(
-        e?.message ||
-          "Could not generate story material. Please try again."
-      );
-    } finally {
-      setMaterialBusy(false);
     }
-  };
+
+    if (!generatedText) {
+      throw new Error("AI returned an empty response.");
+    }
+
+    setMaterialOutput(generatedText);
+
+    navigate("/publishing-prep", {
+      state: {
+        from: "story-materials",
+        materialType: key,
+        manuscriptMeta: meta,
+        manuscriptText: compiledPlain,
+        generated: generatedText,
+      },
+    });
+  } catch (e: any) {
+    console.error("[Story Material Error]:", e);
+    alert(
+      e?.message ||
+        "Could not generate story material. Please try again."
+    );
+  } finally {
+    setMaterialBusy(false);
+  }
+};
 
   /* ---------- UI ---------- */
   return (
