@@ -90,66 +90,6 @@ type NumFmt =
 type ChapterGroup = { title: string; content: string[] };
 
 /* ---------- Presets ---------- */
-const MANUSCRIPT_PRESETS: Record<
-  ManuscriptPresetKey,
-  {
-    label: string;
-    fontFamily: string;
-    fontSizePt: number;
-    lineHeight: number;
-    firstLineIndentInches: number;
-    paragraphSpacingPt: number;
-    align: "left" | "justify";
-    chapterTitleCase: "UPPER" | "Capitalize" | "AsIs";
-    chapterStartsOnNewPage: boolean;
-  }
-> = {
-  Agents_Standard_12pt_TNR_Double: {
-    label: "Agents: Standard (TNR 12, Double)",
-    fontFamily: "Times New Roman",
-    fontSizePt: 12,
-    lineHeight: 2.0,
-    firstLineIndentInches: 0.5,
-    paragraphSpacingPt: 0,
-    align: "left",
-    chapterTitleCase: "UPPER",
-    chapterStartsOnNewPage: true,
-  },
-  Nonfiction_Chicago_12pt_TNR_1p5: {
-    label: "Nonfiction (Chicago-ish)",
-    fontFamily: "Times New Roman",
-    fontSizePt: 12,
-    lineHeight: 1.5,
-    firstLineIndentInches: 0.5,
-    paragraphSpacingPt: 6,
-    align: "left",
-    chapterTitleCase: "Capitalize",
-    chapterStartsOnNewPage: true,
-  },
-  Screenplay_Basic_Courier_12pt: {
-    label: "Screenplay (Courier 12)",
-    fontFamily: "Courier New",
-    fontSizePt: 12,
-    lineHeight: 1.0,
-    firstLineIndentInches: 0,
-    paragraphSpacingPt: 0,
-    align: "left",
-    chapterTitleCase: "AsIs",
-    chapterStartsOnNewPage: true,
-  },
-  Poetry_Minimal_12pt_Serif: {
-    label: "Poetry (Minimal Serif)",
-    fontFamily: "Georgia, 'Times New Roman', serif",
-    fontSizePt: 12,
-    lineHeight: 1.5,
-    firstLineIndentInches: 0,
-    paragraphSpacingPt: 0,
-    align: "left",
-    chapterTitleCase: "AsIs",
-    chapterStartsOnNewPage: true,
-  },
-};
-
 const PLATFORM_PRESETS: Record<
   PlatformPresetKey,
   {
@@ -181,8 +121,8 @@ const PLATFORM_PRESETS: Record<
     headers: true,
     footers: true,
     pageNumbers: true,
-    showTOCInEebook: false as any, // just to keep shape, not used
-  } as any,
+    showTOCInEbook: false,
+  },
   KDP_Paperback_5_25x8: {
     label: "KDP Paperback – 5.25 x 8 in",
     trim: { widthInch: 5.25, heightInch: 8 },
@@ -196,8 +136,8 @@ const PLATFORM_PRESETS: Record<
     headers: true,
     footers: true,
     pageNumbers: true,
-    showTOCInEebook: false as any,
-  } as any,
+    showTOCInEbook: false,
+  },
   KDP_Paperback_5_5x8_5: {
     label: "KDP Paperback – 5.5 x 8.5 in",
     trim: { widthInch: 5.5, heightInch: 8.5 },
@@ -211,8 +151,8 @@ const PLATFORM_PRESETS: Record<
     headers: true,
     footers: true,
     pageNumbers: true,
-    showTOCInEebook: false as any,
-  } as any,
+    showTOCInEbook: false,
+  },
   KDP_Paperback_6x9: {
     label: "KDP Paperback – 6 x 9 in",
     trim: { widthInch: 6, heightInch: 9 },
@@ -258,6 +198,20 @@ const PLATFORM_PRESETS: Record<
     pageNumbers: true,
     showTOCInEbook: false,
   },
+  KDP_Eebook: {
+    label: "KDP Kindle eBook (reflowable)",
+    trim: null,
+    margins: {
+      top: 0.2,
+      bottom: 0.2,
+      left: 0.2,
+      right: 0.2,
+    },
+    headers: false,
+    footers: false,
+    pageNumbers: false,
+    showTOCInEbook: true,
+  } as any, // if you want to keep key KDP_Ebook exactly, keep your original; otherwise rename the key to KDP_Ebook if that is what you use
   KDP_Ebook: {
     label: "KDP Kindle eBook (reflowable)",
     trim: null,
@@ -282,6 +236,7 @@ const PLATFORM_PRESETS: Record<
     showTOCInEbook: false,
   },
 };
+
 
 /* ---------- Styles ---------- */
 const styles = {
@@ -472,31 +427,26 @@ export default function Publishing(): JSX.Element {
     authorLast: "YourLastName",
   });
 
-  useEffect(() => {
-  try {
-    const saved = localStorage.getItem("dahtruth_project_meta");
-    if (saved) {
+   useEffect(() => {
+    try {
+      const saved = localStorage.getItem("dahtruth_project_meta");
+      if (!saved) return;
       const parsed = JSON.parse(saved);
-      // Light validation
       if (parsed && typeof parsed === "object") {
-        setMeta((prev) => ({
-          ...prev,
-          ...parsed,
-        }));
+        setMeta((prev) => ({ ...prev, ...parsed }));
       }
+    } catch {
+      // ignore bad JSON
     }
-  } catch {
-    // ignore bad JSON
-  }
-}, []);
+  }, []);
 
   useEffect(() => {
-  try {
-    localStorage.setItem("dahtruth_project_meta", JSON.stringify(meta));
-  } catch {
-    // ignore storage errors
-  }
-}, [meta]);
+    try {
+      localStorage.setItem("dahtruth_project_meta", JSON.stringify(meta));
+    } catch {
+      // ignore storage errors
+    }
+  }, [meta]);
 
   const [chapters, setChapters] = useState<Chapter[]>([]);
 
@@ -1162,82 +1112,82 @@ export default function Publishing(): JSX.Element {
     }
   }, [chapters]);
 
-// Story materials state
-const [materialKey, setMaterialKey] =
-  useState<MaterialKey>("synopsis-short");
-const [materialOutput, setMaterialOutput] = useState<string>("");
-const [materialBusy, setMaterialBusy] = useState<boolean>(false);
+  // Story materials state
+  const [materialKey, setMaterialKey] =
+    useState<MaterialKey>("synopsis-short");
+  const [materialOutput, setMaterialOutput] = useState<string>("");
+  const [materialBusy, setMaterialBusy] = useState<boolean>(false);
 
-const handleGenerateMaterial = async (key: MaterialKey) => {
-  if (!compiledPlain) {
-    alert(
-      "Your publishing manuscript is empty. Add chapters and front matter first."
-    );
-    return;
-  }
-  if (materialBusy) return;
-
-  setMaterialBusy(true);
-  setMaterialKey(key);
-
-  try {
-    let generatedText = "";
-
-    // 🔸 Use the new /publishing/synopsis endpoint for synopsis requests
-    if (key === "synopsis-short" || key === "synopsis-long") {
-      const synopsisRes = await generateSynopsis({
-        manuscriptText: compiledPlain,
-        title:
-          (meta as any)?.title ||
-          (meta as any)?.workingTitle ||
-          "Untitled Manuscript",
-        genre: (meta as any)?.genre || "",
-        tone:
-          key === "synopsis-short"
-            ? "brief agent-ready synopsis"
-            : "expanded reader-facing synopsis",
-        maxWords: key === "synopsis-short" ? 300 : 800,
-      });
-
-      generatedText = synopsisRes.synopsis || "";
-    } else {
-      // 🔸 Everything else still uses the unified AI assistant
-      const res: any = await runAssistant(
-        compiledPlain,
-        key,
-        "",
-        provider
+  const handleGenerateMaterial = async (key: MaterialKey) => {
+    if (!compiledPlain) {
+      alert(
+        "Your publishing manuscript is empty. Add chapters and front matter first."
       );
-
-      generatedText =
-        res?.result || res?.text || res?.output || compiledPlain;
+      return;
     }
+    if (materialBusy) return;
 
-    if (!generatedText) {
-      throw new Error("AI returned an empty response.");
+    setMaterialBusy(true);
+    setMaterialKey(key);
+
+    try {
+      let generatedText = "";
+
+      // 🔸 Use the dedicated synopsis endpoint for synopsis requests
+      if (key === "synopsis-short" || key === "synopsis-long") {
+        const synopsisRes = await generateSynopsis({
+          manuscriptText: compiledPlain,
+          title:
+            (meta as any)?.title ||
+            (meta as any)?.workingTitle ||
+            "Untitled Manuscript",
+          genre: (meta as any)?.genre || "",
+          tone:
+            key === "synopsis-short"
+              ? "brief agent-ready synopsis"
+              : "expanded reader-facing synopsis",
+          maxWords: key === "synopsis-short" ? 300 : 800,
+        });
+
+        generatedText = synopsisRes.synopsis || "";
+      } else {
+        // 🔸 Everything else still uses the unified AI assistant
+        const res: any = await runAssistant(
+          compiledPlain,
+          key,
+          "",
+          provider
+        );
+
+        generatedText =
+          res?.result || res?.text || res?.output || compiledPlain;
+      }
+
+      if (!generatedText) {
+        throw new Error("AI returned an empty response.");
+      }
+
+      setMaterialOutput(generatedText);
+
+      navigate("/publishing-prep", {
+        state: {
+          from: "story-materials",
+          materialType: key,
+          manuscriptMeta: meta,
+          manuscriptText: compiledPlain,
+          generated: generatedText,
+        },
+      });
+    } catch (e: any) {
+      console.error("[Story Material Error]:", e);
+      alert(
+        e?.message ||
+          "Could not generate story material. Please try again."
+      );
+    } finally {
+      setMaterialBusy(false);
     }
-
-    setMaterialOutput(generatedText);
-
-    navigate("/publishing-prep", {
-      state: {
-        from: "story-materials",
-        materialType: key,
-        manuscriptMeta: meta,
-        manuscriptText: compiledPlain,
-        generated: generatedText,
-      },
-    });
-  } catch (e: any) {
-    console.error("[Story Material Error]:", e);
-    alert(
-      e?.message ||
-        "Could not generate story material. Please try again."
-    );
-  } finally {
-    setMaterialBusy(false);
-  }
-};
+  };
 
   /* ---------- UI ---------- */
   return (
