@@ -1,6 +1,6 @@
 // src/pages/PublishingPrep.tsx
 import React, { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import PageShell from "../components/layout/PageShell.tsx";
 import {
   ArrowLeft,
@@ -146,22 +146,45 @@ const getWordCount = (str: string = "") =>
 /* ---------- Component ---------- */
 export default function PublishingPrep(): JSX.Element {
   const navigate = useNavigate();
+  const location = useLocation();
 
+  // State passed from StoryMaterials → PublishingPrep
+  const locationState = (location.state || {}) as {
+    from?: string;
+    materialType?: string;
+    manuscriptMeta?: any;
+    manuscriptText?: string;
+    generated?: string;
+  };
+
+  const initialMaterialType = locationState.materialType || null;
+  const initialGenerated = locationState.generated || "";
+
+  const cameFromStoryMaterials = locationState.from === "story-materials";
+  const isSynopsisMaterial =
+    !!initialMaterialType &&
+    initialMaterialType.toString().startsWith("synopsis");
+
+  // Core app state
   const [profile, setProfile] = useState<any | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [currentStory, setCurrentStory] = useState<any | null>(null);
 
-  const [activeTab, setActiveTab] = useState<"synopsis" | "query" | "checklist" | "marketing">(
-    "synopsis"
+  const [activeTab, setActiveTab] = useState<
+    "synopsis" | "query" | "checklist" | "marketing"
+  >("synopsis");
+
+  // Use routed-in generated synopsis if we came from Story Materials
+  const [synopsis, setSynopsis] = useState<string>(
+    isSynopsisMaterial && initialGenerated ? initialGenerated : ""
   );
+  const [queryLetter, setQueryLetter] = useState<string>("");
+  const [backCover, setBackCover] = useState<string>("");
 
-  const [synopsis, setSynopsis] = useState("");
-  const [queryLetter, setQueryLetter] = useState("");
-  const [backCover, setBackCover] = useState("");
-
-  const [checklistState, setChecklistState] = useState<PublishingChecklist>({});
-  const [marketingNotes, setMarketingNotes] = useState("");
-  const [launchPlan, setLaunchPlan] = useState("");
+  const [checklistState, setChecklistState] =
+    useState<PublishingChecklist>({});
+  const [marketingNotes, setMarketingNotes] = useState<string>("");
+  const [launchPlan, setLaunchPlan] = useState<string>("");
 
   const [isSaving, setIsSaving] = useState(false);
   const [showSaved, setShowSaved] = useState(false);
@@ -211,7 +234,13 @@ export default function PublishingPrep(): JSX.Element {
       return;
     }
 
-    setSynopsis(activeProject.synopsis || "");
+    // If we arrived with a freshly generated synopsis, prefer that once
+    if (cameFromStoryMaterials && isSynopsisMaterial && initialGenerated) {
+      setSynopsis(initialGenerated);
+    } else {
+      setSynopsis(activeProject.synopsis || "");
+    }
+
     setQueryLetter(activeProject.queryLetter || "");
     setBackCover(activeProject.backCover || "");
 
@@ -219,7 +248,8 @@ export default function PublishingPrep(): JSX.Element {
     const baseState: PublishingChecklist = {};
     DEFAULT_CHECKLIST.forEach((item) => {
       baseState[item.id] =
-        storedChecklist[item.id] === true || storedChecklist[item.id] === false
+        storedChecklist[item.id] === true ||
+        storedChecklist[item.id] === false
           ? storedChecklist[item.id]
           : false;
     });
@@ -227,7 +257,12 @@ export default function PublishingPrep(): JSX.Element {
 
     setMarketingNotes(activeProject.marketingNotes || "");
     setLaunchPlan(activeProject.launchPlan || "");
-  }, [activeProject]);
+  }, [
+    activeProject,
+    cameFromStoryMaterials,
+    isSynopsisMaterial,
+    initialGenerated,
+  ]);
 
   const authorName =
     activeProject?.author || profile?.displayName || "New Author";
@@ -273,88 +308,10 @@ export default function PublishingPrep(): JSX.Element {
     }
   };
 
-  /* ---------- If no project selected ---------- */
-  if (!activeProject) {
-    return (
-      <PageShell
-        style={{
-          background: theme.bg,
-          minHeight: "100vh",
-        }}
-      >
-        <div
-          style={{
-            maxWidth: 560,
-            margin: "80px auto",
-            padding: 32,
-            borderRadius: 24,
-            background: theme.surface,
-            border: `1px solid ${theme.borderStrong}`,
-            boxShadow: "0 18px 50px rgba(2,20,40,.12)",
-            textAlign: "center",
-          }}
-        >
-          <div
-            style={{
-              width: 56,
-              height: 56,
-              borderRadius: 18,
-              margin: "0 auto 16px",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              background:
-                "linear-gradient(135deg, rgba(236,72,153,0.75), rgba(249,168,212,0.75))",
-              color: "#fff",
-            }}
-          >
-            <BookOpen size={28} />
-          </div>
-          <h2
-            style={{
-              margin: "0 0 8px 0",
-              fontSize: 22,
-              fontWeight: 600,
-              color: theme.text,
-            }}
-          >
-            No Project Selected
-          </h2>
-          <p
-            style={{
-              margin: "0 0 24px 0",
-              fontSize: 14,
-              lineHeight: 1.6,
-              color: theme.subtext,
-            }}
-          >
-            To use Publishing Prep, first create a project and open it in the
-            Writer. Then come back here to build your synopsis, query letter,
-            checklist, and marketing plan.
-          </p>
-          <button
-            onClick={() => navigate("/project")}
-            style={{
-              border: "none",
-              padding: "10px 20px",
-              borderRadius: 999,
-              fontSize: 14,
-              fontWeight: 600,
-              cursor: "pointer",
-              color: "#fff",
-              background:
-                "linear-gradient(135deg, #9b7bc9, #b897d6)",
-              boxShadow: "0 4px 16px rgba(155,123,201,0.45)",
-            }}
-          >
-            Go to Projects
-          </button>
-        </div>
-      </PageShell>
-    );
-  }
+  const synopsisWords = getWordCount(synopsis);
+  const queryWords = getWordCount(queryLetter);
 
-  /* ---------- Main UI ---------- */
+  /* ---------- Render ---------- */
   return (
     <PageShell
       style={{
@@ -367,7 +324,7 @@ export default function PublishingPrep(): JSX.Element {
         <div
           style={{
             background:
-              "linear-gradient(135deg, rgba(236,72,153,0.65), rgba(249,168,212,0.65))",
+              "linear-gradient(135deg, rgba(236, 72, 153, 0.65), rgba(249, 168, 212, 0.65))",
             backdropFilter: "blur(12px)",
             color: theme.white,
             padding: "20px 24px",
@@ -378,469 +335,428 @@ export default function PublishingPrep(): JSX.Element {
               maxWidth: 1120,
               margin: "0 auto",
               display: "flex",
-              justifyContent: "space-between",
               alignItems: "center",
+              justifyContent: "space-between",
               gap: 16,
             }}
           >
-            {/* Back button – gold for consistency */}
             <button
               onClick={handleBackToPublishing}
               style={{
                 border: "none",
-                background:
-                  "linear-gradient(135deg, #D4AF37, #f5e6b3)",
-                color: "#1f2937",
+                background: "rgba(255,255,255,0.2)",
+                color: theme.white,
                 padding: "10px 18px",
-                fontSize: 14,
-                fontWeight: 600,
-                borderRadius: 999,
+                fontSize: 15,
+                borderRadius: 12,
                 cursor: "pointer",
-                boxShadow: "0 6px 18px rgba(180,142,38,0.35)",
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
               }}
             >
-              <ArrowLeft size={16} />
-              Publishing Suite
+              ← Back to Publishing
             </button>
 
-            {/* Title + Project info */}
             <div
               style={{
                 display: "flex",
-                flexDirection: "column",
                 alignItems: "center",
-                gap: 4,
+                gap: 10,
                 textAlign: "center",
               }}
             >
-              <div
-                style={{
-                  display: "flex",
-                  gap: 10,
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <div
-                  style={{
-                    width: 32,
-                    height: 32,
-                    borderRadius: 12,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    background:
-                      "radial-gradient(circle at 0% 0%, #fef3c7, #b897d6)",
-                    color: "#fff",
-                  }}
-                >
-                  <Feather size={18} />
-                </div>
+              <BookOpen size={22} />
+              <div>
                 <h1
                   style={{
                     margin: 0,
-                    fontSize: 22,
+                    fontSize: 20,
                     fontWeight: 600,
                   }}
                 >
                   Publishing Preparation
                 </h1>
-              </div>
-              <p
-                style={{
-                  margin: 0,
-                  fontSize: 13,
-                  opacity: 0.9,
-                }}
-              >
-                {activeProject.title || "Untitled Project"}{" "}
-                <span style={{ opacity: 0.8 }}>by</span>{" "}
-                <strong>{authorName}</strong>
-              </p>
-              <p
-                style={{
-                  margin: 0,
-                  fontSize: 11,
-                  opacity: 0.8,
-                }}
-              >
-                Last updated: {formatDate(activeProject.lastModified)}
-              </p>
-            </div>
-
-            {/* Manuscript stats */}
-            <div style={{ width: 160, textAlign: "right" }}>
-              <div
-                style={{
-                  fontSize: 11,
-                  textTransform: "uppercase",
-                  letterSpacing: 0.08,
-                  opacity: 0.8,
-                }}
-              >
-                Manuscript
-              </div>
-              <div style={{ fontSize: 14, fontWeight: 600 }}>
-                {(activeProject.wordCount || 0).toLocaleString()} words
-              </div>
-              <div
-                style={{
-                  fontSize: 11,
-                  opacity: 0.8,
-                  marginTop: 2,
-                }}
-              >
-                Target:{" "}
-                {(activeProject.targetWords || 50000).toLocaleString()} words
-              </div>
-            </div>
-          </div>
-
-          {/* Tabs */}
-          <div
-            style={{
-              maxWidth: 1120,
-              margin: "16px auto 0",
-              display: "flex",
-              flexWrap: "wrap",
-              gap: 8,
-              justifyContent: "center",
-            }}
-          >
-            {[
-              { id: "synopsis", label: "Synopsis" },
-              { id: "query", label: "Query Letter" },
-              { id: "checklist", label: "Checklist" },
-              { id: "marketing", label: "Marketing Kit" },
-            ].map((tab) => {
-              const isActive = activeTab === tab.id;
-              return (
-                <button
-                  key={tab.id}
-                  type="button"
-                  onClick={() =>
-                    setActiveTab(tab.id as typeof activeTab)
-                  }
+                <div
                   style={{
-                    borderRadius: 999,
-                    padding: "8px 16px",
-                    fontSize: 11,
-                    fontWeight: 600,
-                    textTransform: "uppercase",
-                    letterSpacing: 0.12,
-                    cursor: "pointer",
-                    border: isActive
-                      ? "1px solid transparent"
-                      : "1px solid rgba(255,255,255,0.7)",
-                    background: isActive
-                      ? "rgba(15,23,42,0.18)"
-                      : "rgba(255,255,255,0.16)",
-                    color: "#fff",
-                    boxShadow: isActive
-                      ? "0 4px 14px rgba(15,23,42,0.35)"
-                      : "none",
+                    fontSize: 13,
+                    opacity: 0.9,
                   }}
                 >
-                  {tab.label}
-                </button>
-              );
-            })}
+                  {activeProject ? (
+                    <>
+                      <span style={{ fontWeight: 500 }}>
+                        {activeProject.title || "Untitled Project"}
+                      </span>{" "}
+                      by {authorName}
+                    </>
+                  ) : (
+                    "No active project selected"
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div style={{ width: 150, textAlign: "right", fontSize: 12 }}>
+              {activeProject?.lastModified && (
+                <span>
+                  Last updated: {formatDate(activeProject.lastModified)}
+                </span>
+              )}
+            </div>
           </div>
         </div>
 
         {/* Content */}
         <div style={{ ...styles.inner, ...styles.sectionShell }}>
+          {/* Tabs */}
+          <div
+            style={{
+              display: "flex",
+              gap: 8,
+              marginBottom: 16,
+              flexWrap: "wrap",
+            }}
+          >
+            {[
+              {
+                id: "synopsis" as const,
+                icon: <Feather size={16} />,
+                label: "Synopsis",
+              },
+              {
+                id: "query" as const,
+                icon: <FileText size={16} />,
+                label: "Query Letter",
+              },
+              {
+                id: "checklist" as const,
+                icon: <ClipboardList size={16} />,
+                label: "Checklist",
+              },
+              {
+                id: "marketing" as const,
+                icon: <Megaphone size={16} />,
+                label: "Marketing & Launch",
+              },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "8px 14px",
+                  borderRadius: 999,
+                  border:
+                    activeTab === tab.id
+                      ? "1px solid rgba(255,255,255,0.0)"
+                      : `1px solid ${theme.border}`,
+                  background:
+                    activeTab === tab.id
+                      ? "linear-gradient(135deg, #9b7bc9, #b897d6)"
+                      : theme.white,
+                  color: activeTab === tab.id ? "#fff" : theme.text,
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: "pointer",
+                  boxShadow:
+                    activeTab === tab.id
+                      ? "0 6px 18px rgba(155,123,201,0.35)"
+                      : "none",
+                }}
+              >
+                {tab.icon}
+                {tab.label}
+              </button>
+            ))}
+
+            <div style={{ marginLeft: "auto" }}>
+              <button
+                onClick={handleSave}
+                disabled={isSaving || !activeProject}
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 8,
+                  padding: "9px 16px",
+                  borderRadius: 999,
+                  border: "none",
+                  background:
+                    "linear-gradient(135deg, #D4AF37, #f5e6b3)",
+                  color: "#1f2937",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: isSaving ? "default" : "pointer",
+                  opacity: isSaving ? 0.8 : 1,
+                  boxShadow:
+                    "0 6px 18px rgba(180,142,38,0.35)",
+                }}
+              >
+                {isSaving ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <Save size={16} />
+                )}
+                {isSaving ? "Saving..." : "Save All"}
+              </button>
+            </div>
+          </div>
+
+          {/* Main two-column layout */}
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "minmax(0, 2fr) minmax(0, 1fr)",
+              gridTemplateColumns: "minmax(0, 2fr) minmax(0, 1.4fr)",
               gap: 20,
+              alignItems: "flex-start",
             }}
           >
-            {/* Main Column */}
-            <div
-              style={{
-                ...styles.glassCard,
-                padding: 24,
-              }}
-            >
-              {/* Synopsis Tab */}
+            {/* Left column: text content */}
+            <div style={styles.glassCard}>
               {activeTab === "synopsis" && (
                 <>
-                  <div
+                  <h3
                     style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "flex-start",
-                      marginBottom: 12,
-                      gap: 8,
+                      margin: "0 0 8px 0",
+                      fontSize: 18,
+                      color: theme.text,
                     }}
                   >
-                    <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                      <div
-                        style={{
-                          width: 34,
-                          height: 34,
-                          borderRadius: 12,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          background: "rgba(155,123,201,0.08)",
-                        }}
-                      >
-                        <FileText size={18} color="#7c3aed" />
-                      </div>
-                      <div>
-                        <h3
-                          style={{
-                            margin: 0,
-                            fontSize: 18,
-                            fontWeight: 600,
-                            color: theme.text,
-                          }}
-                        >
-                          Synopsis
-                        </h3>
-                        <p
-                          style={{
-                            margin: "4px 0 0 0",
-                            fontSize: 12,
-                            color: theme.subtext,
-                          }}
-                        >
-                          1–3 paragraphs that cover the beginning, middle, and ending of your story.
-                        </p>
-                      </div>
-                    </div>
-                    <div style={{ textAlign: "right" }}>
-                      <div
-                        style={{
-                          fontSize: 11,
-                          textTransform: "uppercase",
-                          letterSpacing: 0.12,
-                          color: theme.subtext,
-                        }}
-                      >
-                        Word Count
-                      </div>
-                      <div
-                        style={{
-                          fontSize: 13,
-                          fontWeight: 600,
-                          color: theme.text,
-                        }}
-                      >
-                        {getWordCount(synopsis).toLocaleString()}
-                      </div>
-                    </div>
-                  </div>
-
+                    Synopsis
+                  </h3>
+                  <p
+                    style={{
+                      margin: "0 0 12px 0",
+                      fontSize: 13,
+                      color: theme.subtext,
+                    }}
+                  >
+                    Draft a clear, compelling summary of your story. Aim for
+                    1–3 paragraphs that cover the main arc and stakes.
+                  </p>
                   <textarea
                     value={synopsis}
                     onChange={(e) => setSynopsis(e.target.value)}
-                    placeholder="Summarize your story from beginning to end, including the ending. Focus on your main character, core conflict, and resolution."
+                    placeholder="Paste or refine your synopsis here..."
                     style={{
                       width: "100%",
-                      minHeight: 260,
-                      borderRadius: 14,
-                      padding: 12,
-                      fontSize: 14,
-                      lineHeight: 1.6,
+                      minHeight: 220,
+                      borderRadius: 12,
                       border: `1px solid ${theme.border}`,
-                      background: "rgba(248,250,252,0.9)",
-                      color: theme.text,
+                      padding: "10px 12px",
+                      fontSize: 14,
                       resize: "vertical",
-                      outline: "none",
+                      fontFamily: "inherit",
                     }}
                   />
+                  <div
+                    style={{
+                      marginTop: 6,
+                      fontSize: 12,
+                      color: theme.subtext,
+                      display: "flex",
+                      justifyContent: "space-between",
+                    }}
+                  >
+                    <span>{synopsisWords} words</span>
+                    {cameFromStoryMaterials && isSynopsisMaterial && (
+                      <span>Imported from Story Materials</span>
+                    )}
+                  </div>
                 </>
               )}
 
-              {/* Query Letter Tab */}
               {activeTab === "query" && (
                 <>
-                  <div
+                  <h3
                     style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "flex-start",
-                      marginBottom: 12,
-                      gap: 8,
+                      margin: "0 0 8px 0",
+                      fontSize: 18,
+                      color: theme.text,
                     }}
                   >
-                    <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                      <div
-                        style={{
-                          width: 34,
-                          height: 34,
-                          borderRadius: 12,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          background: "rgba(155,123,201,0.08)",
-                        }}
-                      >
-                        <Feather size={18} color="#7c3aed" />
-                      </div>
-                      <div>
-                        <h3
-                          style={{
-                            margin: 0,
-                            fontSize: 18,
-                            fontWeight: 600,
-                            color: theme.text,
-                          }}
-                        >
-                          Query Letter
-                        </h3>
-                        <p
-                          style={{
-                            margin: "4px 0 0 0",
-                            fontSize: 12,
-                            color: theme.subtext,
-                          }}
-                        >
-                          Hook, short story pitch, book details, and a brief author bio for agents or publishers.
-                        </p>
-                      </div>
-                    </div>
-                    <div style={{ textAlign: "right" }}>
-                      <div
-                        style={{
-                          fontSize: 11,
-                          textTransform: "uppercase",
-                          letterSpacing: 0.12,
-                          color: theme.subtext,
-                        }}
-                      >
-                        Word Count
-                      </div>
-                      <div
-                        style={{
-                          fontSize: 13,
-                          fontWeight: 600,
-                          color: theme.text,
-                        }}
-                      >
-                        {getWordCount(queryLetter).toLocaleString()}
-                      </div>
-                    </div>
-                  </div>
-
+                    Query Letter
+                  </h3>
+                  <p
+                    style={{
+                      margin: "0 0 12px 0",
+                      fontSize: 13,
+                      color: theme.subtext,
+                    }}
+                  >
+                    Draft your query letter here. Include a strong hook, brief
+                    synopsis, and your author bio.
+                  </p>
                   <textarea
                     value={queryLetter}
                     onChange={(e) => setQueryLetter(e.target.value)}
-                    placeholder="Draft your query letter here. Lead with a strong hook, follow with a brief pitch and details (title, genre, word count), and close with a concise author bio."
+                    placeholder="Dear Agent..."
                     style={{
                       width: "100%",
                       minHeight: 260,
-                      borderRadius: 14,
-                      padding: 12,
-                      fontSize: 14,
-                      lineHeight: 1.6,
+                      borderRadius: 12,
                       border: `1px solid ${theme.border}`,
-                      background: "rgba(248,250,252,0.9)",
-                      color: theme.text,
+                      padding: "10px 12px",
+                      fontSize: 14,
                       resize: "vertical",
-                      outline: "none",
+                      fontFamily: "inherit",
+                    }}
+                  />
+                  <div
+                    style={{
+                      marginTop: 6,
+                      fontSize: 12,
+                      color: theme.subtext,
+                      textAlign: "right",
+                    }}
+                  >
+                    {queryWords} words
+                  </div>
+                </>
+              )}
+
+              {activeTab === "marketing" && (
+                <>
+                  <h3
+                    style={{
+                      margin: "0 0 8px 0",
+                      fontSize: 18,
+                      color: theme.text,
+                    }}
+                  >
+                    Marketing & Launch Plan
+                  </h3>
+                  <p
+                    style={{
+                      margin: "0 0 12px 0",
+                      fontSize: 13,
+                      color: theme.subtext,
+                    }}
+                  >
+                    Sketch out your marketing notes and launch plan. Think about
+                    audience, channels, timing, and partnerships.
+                  </p>
+                  <label
+                    style={{
+                      display: "block",
+                      fontSize: 13,
+                      fontWeight: 600,
+                      marginBottom: 6,
+                      color: theme.text,
+                    }}
+                  >
+                    Notes / Talking Points
+                  </label>
+                  <textarea
+                    value={marketingNotes}
+                    onChange={(e) => setMarketingNotes(e.target.value)}
+                    placeholder="Who is your reader? Where will you reach them?"
+                    style={{
+                      width: "100%",
+                      minHeight: 140,
+                      borderRadius: 12,
+                      border: `1px solid ${theme.border}`,
+                      padding: "10px 12px",
+                      fontSize: 14,
+                      resize: "vertical",
+                      fontFamily: "inherit",
+                      marginBottom: 16,
+                    }}
+                  />
+
+                  <label
+                    style={{
+                      display: "block",
+                      fontSize: 13,
+                      fontWeight: 600,
+                      marginBottom: 6,
+                      color: theme.text,
+                    }}
+                  >
+                    Launch Plan
+                  </label>
+                  <textarea
+                    value={launchPlan}
+                    onChange={(e) => setLaunchPlan(e.target.value)}
+                    placeholder="Outline your pre-launch, launch week, and post-launch steps..."
+                    style={{
+                      width: "100%",
+                      minHeight: 160,
+                      borderRadius: 12,
+                      border: `1px solid ${theme.border}`,
+                      padding: "10px 12px",
+                      fontSize: 14,
+                      resize: "vertical",
+                      fontFamily: "inherit",
                     }}
                   />
                 </>
               )}
 
-              {/* Checklist Tab */}
               {activeTab === "checklist" && (
                 <>
-                  <div
+                  <h3
                     style={{
-                      display: "flex",
-                      gap: 10,
-                      alignItems: "center",
-                      marginBottom: 12,
+                      margin: "0 0 8px 0",
+                      fontSize: 18,
+                      color: theme.text,
                     }}
                   >
-                    <div
-                      style={{
-                        width: 34,
-                        height: 34,
-                        borderRadius: 12,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        background: "rgba(251,191,36,0.1)",
-                      }}
-                    >
-                      <ClipboardList size={18} color="#b45309" />
-                    </div>
-                    <div>
-                      <h3
-                        style={{
-                          margin: 0,
-                          fontSize: 18,
-                          fontWeight: 600,
-                          color: theme.text,
-                        }}
-                      >
-                        Publishing Checklist
-                      </h3>
-                      <p
-                        style={{
-                          margin: "4px 0 0 0",
-                          fontSize: 12,
-                          color: theme.subtext,
-                        }}
-                      >
-                        Track your progress from finished draft to query-ready manuscript.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    Pre-Publishing Checklist
+                  </h3>
+                  <p
+                    style={{
+                      margin: "0 0 12px 0",
+                      fontSize: 13,
+                      color: theme.subtext,
+                    }}
+                  >
+                    Track your pre-launch tasks. Mark items complete as you
+                    go.
+                  </p>
+                  <ul
+                    style={{
+                      listStyle: "none",
+                      margin: 0,
+                      padding: 0,
+                    }}
+                  >
                     {DEFAULT_CHECKLIST.map((item) => {
-                      const checked = checklistState[item.id] || false;
+                      const checked = !!checklistState[item.id];
                       return (
-                        <label
+                        <li
                           key={item.id}
                           style={{
                             display: "flex",
-                            alignItems: "flex-start",
+                            alignItems: "center",
                             gap: 10,
-                            padding: 10,
-                            borderRadius: 12,
-                            border: `1px solid ${theme.border}`,
-                            cursor: "pointer",
-                            background: checked
-                              ? "rgba(155,123,201,0.04)"
-                              : "rgba(248,250,252,0.8)",
+                            padding: "8px 0",
+                            borderBottom: `1px solid rgba(148,163,184,0.25)`,
                           }}
                         >
                           <button
                             type="button"
-                            onClick={() => handleToggleChecklist(item.id)}
+                            onClick={() =>
+                              handleToggleChecklist(item.id)
+                            }
                             style={{
-                              marginTop: 2,
-                              width: 20,
-                              height: 20,
-                              borderRadius: 6,
+                              width: 22,
+                              height: 22,
+                              borderRadius: "999px",
                               border: checked
-                                ? "1px solid transparent"
-                                : `1px solid ${theme.borderStrong}`,
-                              background: checked
-                                ? "linear-gradient(135deg, #9b7bc9, #b897d6)"
-                                : "#fff",
-                              display: "flex",
+                                ? "none"
+                                : `1px solid ${theme.border}`,
+                              display: "inline-flex",
                               alignItems: "center",
                               justifyContent: "center",
-                              boxShadow: checked
-                                ? "0 2px 8px rgba(155,123,201,0.45)"
-                                : "none",
+                              background: checked
+                                ? "linear-gradient(135deg, #22c55e, #4ade80)"
+                                : theme.white,
                               cursor: "pointer",
                             }}
                           >
-                            {checked && <Check size={14} color="#fff" />}
+                            {checked && (
+                              <Check size={14} color="#fff" />
+                            )}
                           </button>
                           <span
                             style={{
@@ -850,360 +766,149 @@ export default function PublishingPrep(): JSX.Element {
                           >
                             {item.label}
                           </span>
-                        </label>
+                        </li>
                       );
                     })}
-                  </div>
+                  </ul>
                 </>
               )}
-
-              {/* Marketing Tab */}
-              {activeTab === "marketing" && (
-                <>
-                  <div
-                    style={{
-                      display: "flex",
-                      gap: 10,
-                      alignItems: "center",
-                      marginBottom: 12,
-                    }}
-                  >
-                    <div
-                      style={{
-                        width: 34,
-                        height: 34,
-                        borderRadius: 12,
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        background: "rgba(56,189,248,0.1)",
-                      }}
-                    >
-                      <Megaphone size={18} color="#0284c7" />
-                    </div>
-                    <div>
-                      <h3
-                        style={{
-                          margin: 0,
-                          fontSize: 18,
-                          fontWeight: 600,
-                          color: theme.text,
-                        }}
-                      >
-                        Marketing Kit
-                      </h3>
-                      <p
-                        style={{
-                          margin: "4px 0 0 0",
-                          fontSize: 12,
-                          color: theme.subtext,
-                        }}
-                      >
-                        Capture key talking points and a simple launch plan for your book.
-                      </p>
-                    </div>
-                  </div>
-
-                  <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-                    <div>
-                      <label
-                        style={{
-                          display: "block",
-                          marginBottom: 4,
-                          fontSize: 11,
-                          fontWeight: 600,
-                          textTransform: "uppercase",
-                          letterSpacing: 0.12,
-                          color: theme.subtext,
-                        }}
-                      >
-                        Talking Points / Positioning
-                      </label>
-                      <textarea
-                        value={marketingNotes}
-                        onChange={(e) => setMarketingNotes(e.target.value)}
-                        placeholder="What is this book about? Who is it for? What makes it different? Capture the main beats you want to emphasize when you talk about your story."
-                        style={{
-                          width: "100%",
-                          minHeight: 140,
-                          borderRadius: 14,
-                          padding: 12,
-                          fontSize: 14,
-                          lineHeight: 1.6,
-                          border: `1px solid ${theme.border}`,
-                          background: "rgba(248,250,252,0.9)",
-                          color: theme.text,
-                          resize: "vertical",
-                          outline: "none",
-                        }}
-                      />
-                    </div>
-
-                    <div>
-                      <label
-                        style={{
-                          display: "block",
-                          marginBottom: 4,
-                          fontSize: 11,
-                          fontWeight: 600,
-                          textTransform: "uppercase",
-                          letterSpacing: 0.12,
-                          color: theme.subtext,
-                        }}
-                      >
-                        Launch Plan
-                      </label>
-                      <textarea
-                        value={launchPlan}
-                        onChange={(e) => setLaunchPlan(e.target.value)}
-                        placeholder="Outline a simple launch plan: preorders (if any), social posts, email newsletter, book clubs, events, and any partnerships or early reviewers."
-                        style={{
-                          width: "100%",
-                          minHeight: 140,
-                          borderRadius: 14,
-                          padding: 12,
-                          fontSize: 14,
-                          lineHeight: 1.6,
-                          border: `1px solid ${theme.border}`,
-                          background: "rgba(248,250,252,0.9)",
-                          color: theme.text,
-                          resize: "vertical",
-                          outline: "none",
-                        }}
-                      />
-                    </div>
-                  </div>
-                </>
-              )}
-
-              {/* Save actions */}
-              <div
-                style={{
-                  marginTop: 16,
-                  display: "flex",
-                  justifyContent: "flex-end",
-                  gap: 10,
-                }}
-              >
-                <button
-                  type="button"
-                  onClick={handleBackToPublishing}
-                  style={{
-                    borderRadius: 12,
-                    padding: "8px 14px",
-                    fontSize: 13,
-                    fontWeight: 500,
-                    border: `1px solid ${theme.border}`,
-                    background: "rgba(255,255,255,0.9)",
-                    color: theme.text,
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                  }}
-                >
-                  <ArrowLeft size={14} />
-                  Back
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSave}
-                  disabled={isSaving}
-                  style={{
-                    borderRadius: 12,
-                    padding: "8px 16px",
-                    fontSize: 13,
-                    fontWeight: 600,
-                    border: "none",
-                    background:
-                      "linear-gradient(135deg, #9b7bc9, #b897d6)",
-                    color: "#fff",
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                    opacity: isSaving ? 0.75 : 1,
-                  }}
-                >
-                  {isSaving ? (
-                    <Loader2 size={14} className="animate-spin" />
-                  ) : (
-                    <Save size={14} />
-                  )}
-                  {isSaving ? "Saving..." : "Save All"}
-                </button>
-              </div>
             </div>
 
-            {/* Side Column */}
-            <div
-              style={{
-                ...styles.glassCard,
-                padding: 20,
-                display: "flex",
-                flexDirection: "column",
-                gap: 16,
-              }}
-            >
-              {/* Project Snapshot */}
-              <div>
+            {/* Right column: summary / context */}
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              {/* Project Summary Card */}
+              <div style={styles.glassCard}>
                 <h4
                   style={{
-                    margin: "0 0 8px 0",
+                    margin: "0 0 10px 0",
                     fontSize: 15,
-                    fontWeight: 600,
                     color: theme.text,
-                  }}
-                >
-                  Project Snapshot
-                </h4>
-                <div
-                  style={{
-                    fontSize: 13,
-                    color: theme.subtext,
                     display: "flex",
-                    flexDirection: "column",
-                    gap: 4,
+                    alignItems: "center",
+                    gap: 8,
                   }}
                 >
+                  <FileText size={16} />
+                  Project Summary
+                </h4>
+                {activeProject ? (
                   <div
                     style={{
-                      display: "flex",
-                      justifyContent: "space-between",
+                      fontSize: 13,
+                      color: theme.subtext,
+                      lineHeight: 1.6,
                     }}
                   >
-                    <span>Title</span>
-                    <span style={{ fontWeight: 500, maxWidth: "60%", textAlign: "right" }}>
+                    <div>
+                      <strong>Title:</strong>{" "}
                       {activeProject.title || "Untitled Project"}
-                    </span>
-                  </div>
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                    }}
-                  >
-                    <span>Author</span>
-                    <span style={{ fontWeight: 500 }}>{authorName}</span>
-                  </div>
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                    }}
-                  >
-                    <span>Status</span>
-                    <span style={{ fontWeight: 500 }}>
+                    </div>
+                    <div>
+                      <strong>Author:</strong> {authorName}
+                    </div>
+                    <div>
+                      <strong>Status:</strong>{" "}
                       {activeProject.status || "Draft"}
-                    </span>
+                    </div>
+                    {typeof activeProject.wordCount === "number" && (
+                      <div>
+                        <strong>Words:</strong>{" "}
+                        {activeProject.wordCount.toLocaleString()}
+                      </div>
+                    )}
+                    {activeProject.targetWords && (
+                      <div>
+                        <strong>Target:</strong>{" "}
+                        {activeProject.targetWords.toLocaleString()}
+                      </div>
+                    )}
+                    {activeProject.lastModified && (
+                      <div>
+                        <strong>Last edit:</strong>{" "}
+                        {formatDate(activeProject.lastModified)}
+                      </div>
+                    )}
                   </div>
-                  <div
+                ) : (
+                  <p
                     style={{
-                      display: "flex",
-                      justifyContent: "space-between",
+                      fontSize: 13,
+                      color: theme.subtext,
                     }}
                   >
-                    <span>Words</span>
-                    <span style={{ fontWeight: 500 }}>
-                      {(activeProject.wordCount || 0).toLocaleString()}
-                    </span>
-                  </div>
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                    }}
-                  >
-                    <span>Last Edit</span>
-                    <span style={{ fontWeight: 500 }}>
-                      {formatDate(activeProject.lastModified)}
-                    </span>
-                  </div>
-                </div>
+                    No active project found. Go back to the Projects page and
+                    select a manuscript.
+                  </p>
+                )}
               </div>
 
-              {/* Workflow Notes */}
-              <div>
+              {/* Pro Tips */}
+              <div style={{ ...styles.glassCard, background: theme.highlight }}>
                 <h4
                   style={{
-                    margin: "0 0 6px 0",
+                    margin: "0 0 10px 0",
                     fontSize: 15,
-                    fontWeight: 600,
                     color: theme.text,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
                   }}
                 >
-                  Workflow Notes
+                  <Feather size={16} />
+                  Pro Tips
                 </h4>
-                <p
+                <ul
                   style={{
                     margin: 0,
-                    fontSize: 12,
-                    color: theme.subtext,
-                    lineHeight: 1.6,
-                  }}
-                >
-                  Start with your synopsis, then refine your query letter. Use the
-                  checklist to decide when the manuscript is ready, and keep a
-                  simple marketing kit so you never scramble at launch time.
-                </p>
-              </div>
-
-              {/* Book Cover placeholder */}
-              <div
-                style={{
-                  borderRadius: 12,
-                  padding: 12,
-                  background: theme.highlight,
-                  border: `1px dashed ${theme.border}`,
-                }}
-              >
-                <h4
-                  style={{
-                    margin: "0 0 4px 0",
-                    fontSize: 14,
-                    fontWeight: 600,
+                    paddingLeft: 18,
+                    fontSize: 13,
                     color: theme.text,
+                    lineHeight: 1.7,
                   }}
                 >
-                  Book Cover (Coming Soon)
-                </h4>
-                <p
-                  style={{
-                    margin: 0,
-                    fontSize: 12,
-                    color: theme.subtext,
-                    lineHeight: 1.6,
-                  }}
-                >
-                  This is where your cover builder will live: upload a design or
-                  generate concepts that match your story and audience.
-                </p>
+                  <li>
+                    Keep your synopsis clear and focused; avoid subplots
+                    unless essential.
+                  </li>
+                  <li>
+                    Tailor query letters to each agent or publisher whenever
+                    possible.
+                  </li>
+                  <li>
+                    Make sure your checklist is fully complete before
+                    hitting publish.
+                  </li>
+                  <li>
+                    Start building buzz for your book several weeks before
+                    launch.
+                  </li>
+                </ul>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Saved toast */}
+      {/* Save toast */}
       {showSaved && (
         <div
+          className="fixed bottom-8 right-8"
           style={{
-            position: "fixed",
-            bottom: 24,
-            right: 24,
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
             padding: "10px 16px",
             borderRadius: 999,
-            background: "linear-gradient(135deg, #10b981, #34d399)",
+            background:
+              "linear-gradient(135deg, #22c55e, #4ade80)",
             color: "#fff",
             fontSize: 13,
             fontWeight: 600,
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            boxShadow: "0 8px 24px rgba(16,185,129,0.4)",
+            boxShadow: "0 8px 24px rgba(22,163,74,0.4)",
           }}
         >
-          <span>✓</span> Publishing prep saved
+          <Check size={16} />
+          Publishing prep saved
         </div>
       )}
     </PageShell>
