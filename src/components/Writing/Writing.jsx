@@ -18,6 +18,7 @@ import {
   syncProjectForCurrentStory,
 } from "../lib/projectsSync";
 import { uploadImage } from "../lib/uploads";
+import { runAssistant } from "../lib/api"; // 🔹 AI helper
 
 const STORAGE_KEY = "dahtruth_chapters";
 const META_KEY = "dahtruth_project_meta";
@@ -30,6 +31,12 @@ const Writing = () => {
 
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const imageInputRef = useRef(null);
+
+  // 🔹 AI assistant sidebar state
+  const [aiOpen, setAiOpen] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [aiResult, setAiResult] = useState("");
+  const [aiBusy, setAiBusy] = useState(false);
 
   // 🔹 Shared project meta (synced with Publishing page)
   const [meta, setMeta] = useState({
@@ -185,7 +192,7 @@ const Writing = () => {
     });
   };
 
-  // 🔍 Lookup selected chapter for outline editor
+  // 🔍 Lookup selected chapter for outline editor + AI
   const selectedChapter = useMemo(
     () => chapters.find((ch) => ch.id === selectedChapterId) || null,
     [chapters, selectedChapterId]
@@ -199,6 +206,68 @@ const Writing = () => {
   const handleTitleChangeFromEditor = (newTitle) => {
     if (!selectedChapter) return;
     handleRenameChapter(selectedChapter.id, newTitle);
+  };
+
+  // 🧠 AI assistant handlers
+  const handleAskAI = async () => {
+    if (!selectedChapter) {
+      alert("Select a chapter first.");
+      return;
+    }
+
+    const baseText = selectedChapter.content || "";
+    if (!baseText.trim()) {
+      alert("This chapter is empty. Add some text first.");
+      return;
+    }
+
+    const instruction =
+      aiPrompt.trim() ||
+      "Please improve clarity and concision while keeping my voice and meaning.";
+
+    setAiBusy(true);
+    setAiResult("");
+
+    try {
+      // 🔹 Adjust payload if your runAssistant signature differs
+      const res = await runAssistant({
+        message: instruction,
+        text: baseText,
+      });
+
+      const suggestion =
+        (res && res.text) ||
+        (res && res.content) ||
+        (typeof res === "string" ? res : "");
+
+      if (!suggestion) {
+        alert("AI returned an empty response.");
+        return;
+      }
+
+      setAiResult(suggestion);
+    } catch (err) {
+      console.error("AI assistant failed", err);
+      alert("AI assistant request failed. Please try again.");
+    } finally {
+      setAiBusy(false);
+    }
+  };
+
+  const handleApplyAIToChapter = () => {
+    if (!selectedChapter || !aiResult) return;
+
+    const ok = window.confirm(
+      "Replace this chapter's content with the AI suggestion?"
+    );
+    if (!ok) return;
+
+    handleUpdateChapter(selectedChapter.id, {
+      content: aiResult,
+    });
+
+    // optional: keep AI panel open or close it
+    // setAiOpen(false);
   };
 
   // 🖼 Image upload handlers
@@ -311,7 +380,21 @@ const Writing = () => {
                 className="inline-flex items-center gap-1.5 rounded-md border border-white/15 bg-white/5 px-3 py-1.5 text-xs text-white/80 hover:bg-white/10 hover:border-[#D4AF37]/40 transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <ImageIcon className="w-3.5 h-3.5" />
-                <span>{isUploadingImage ? "Uploading..." : "Insert image"}</span>
+                <span>
+                  {isUploadingImage ? "Uploading..." : "Insert image"}
+                </span>
+              </button>
+
+              {/* 🔹 AI Assist toggle */}
+              <button
+                onClick={() => setAiOpen((open) => !open)}
+                disabled={!selectedChapterId}
+                className="inline-flex items-center gap-1.5 rounded-md border border-white/15 bg-white/5 px-3 py-1.5 text-xs text-white/80 hover:bg-white/10 hover:border-[#D4AF37]/40 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <span className="w-3.5 h-3.5 rounded-full border border-[#D4AF37]/60 flex items-center justify-center text-[10px]">
+                  ✨
+                </span>
+                <span>{aiOpen ? "Hide AI" : "AI Assist"}</span>
               </button>
 
               <input
@@ -337,13 +420,16 @@ const Writing = () => {
         {/* Chapters / Manuscript note */}
         <div className="max-w-7xl mx-auto px-4 pt-3 pb-1">
           <div className="bg-amber-50/5 border border-amber-200/40 rounded-xl px-3 py-2 text-[11px] text-amber-50">
-            <p className="font-semibold text-amber-100">Chapters & manuscripts</p>
+            <p className="font-semibold text-amber-100">
+              Chapters & manuscripts
+            </p>
             <p className="mt-0.5">
               Headings inside your text, like "Chapter 1," do not automatically
-              create new chapters in StoryLab. To stay organized, upload your full
-              manuscript on the <span className="font-semibold">Manuscripts</span>{" "}
-              page, then create one card per chapter here and paste each section
-              into its own chapter.
+              create new chapters in StoryLab. To stay organized, upload your
+              full manuscript on the{" "}
+              <span className="font-semibold">Manuscripts</span> page, then
+              create one card per chapter here and paste each section into its
+              own chapter.
             </p>
           </div>
         </div>
@@ -358,14 +444,14 @@ const Writing = () => {
               onSelectChapter={handleSelectChapter}
               onAddChapter={handleAddChapter}
               onRenameChapter={handleRenameChapter}
-              onMoveChapter={handleMoveChapter}   {/* 👈 drag-reorder in sidebar */}
+              onMoveChapter={handleMoveChapter} /* 👈 drag-reorder in sidebar */
             />
           )}
 
           {/* Main Content */}
           <div className="flex-1 overflow-auto">
             {viewMode === "grid" ? (
-              // Grid view + small outline editor
+              // Grid view + small outline editor + AI
               <div className="h-full grid grid-rows-[minmax(0,1.5fr),minmax(0,1fr)] lg:grid-rows-none lg:grid-cols-[minmax(0,2fr),minmax(0,1.3fr)]">
                 {/* Left: Chapters grid */}
                 <div className="p-4 lg:p-6 overflow-auto">
@@ -376,11 +462,11 @@ const Writing = () => {
                     onAddChapter={handleAddChapter}
                     onUpdateChapter={handleUpdateChapter}
                     onDeleteChapter={handleDeleteChapter}
-                    onMoveChapter={handleMoveChapter}  {/* 👈 drag-reorder in grid */}
+                    onMoveChapter={handleMoveChapter} /* 👈 drag-reorder in grid */
                   />
                 </div>
 
-                {/* Right: Small Chapter Outline editor */}
+                {/* Right: Outline + AI Assistant */}
                 <div className="border-t border-white/10 lg:border-t-0 lg:border-l border-white/10 bg-white/5/40 backdrop-blur-xl px-4 py-4 lg:px-6 lg:py-6 flex flex-col">
                   {selectedChapter ? (
                     <>
@@ -409,24 +495,81 @@ const Writing = () => {
                         Small Chapter Outline
                       </label>
                       <textarea
-                        className="flex-1 w-full rounded-lg border border-white/15 bg-[#050819]/60 px-3 py-2 text-sm text-white outline-none resize-none min-h-[140px] placeholder:text-white/40"
+                        className="w-full rounded-lg border border-white/15 bg-[#050819]/60 px-3 py-2 text-sm text-white outline-none resize-none min-h-[100px] placeholder:text-white/40"
                         placeholder="Briefly describe what happens in this chapter..."
                         value={selectedChapter.summary || ""}
                         onChange={(e) => handleOutlineChange(e.target.value)}
                       />
                       <p className="mt-2 text-[11px] text-white/50">
-                        This short outline is shared with your Table of Contents,
-                        so you can see each chapter's purpose at a glance.
+                        This short outline is shared with your Table of
+                        Contents, so you can see each chapter's purpose at a
+                        glance.
                       </p>
+
+                      {/* 🔹 AI Helper section */}
+                      <hr className="my-4 border-white/10" />
+
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-[11px] font-semibold text-white/70">
+                          AI Writing Assistant
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => setAiOpen((open) => !open)}
+                          className="text-[11px] text-[#D4AF37] hover:text-[#ffd54f]"
+                        >
+                          {aiOpen ? "Hide" : "Open"}
+                        </button>
+                      </div>
+
+                      {aiOpen && (
+                        <div className="flex flex-col gap-2">
+                          <textarea
+                            className="w-full rounded-lg border border-white/15 bg-[#050819]/60 px-3 py-2 text-xs text-white outline-none resize-none min-h-[70px] placeholder:text-white/40"
+                            placeholder='e.g. "Make this chapter more concise but keep my voice."'
+                            value={aiPrompt}
+                            onChange={(e) => setAiPrompt(e.target.value)}
+                          />
+
+                          <button
+                            type="button"
+                            onClick={handleAskAI}
+                            disabled={aiBusy}
+                            className="inline-flex items-center justify-center gap-1.5 rounded-md bg-[#1a237e] px-3 py-1.5 text-[11px] font-medium text-white hover:bg-[#0d47a1] border border-[#D4AF37]/40 disabled:opacity-60 disabled:cursor-not-allowed"
+                          >
+                            {aiBusy ? "Asking AI..." : "Ask AI to revise chapter"}
+                          </button>
+
+                          {aiResult && (
+                            <div className="mt-2 border border-white/15 rounded-lg bg-[#050819]/70 p-2 max-h-56 overflow-auto">
+                              <p className="text-[11px] font-semibold text-white/70 mb-1">
+                                AI suggestion
+                              </p>
+                              <pre className="text-[11px] text-white/80 whitespace-pre-wrap">
+                                {aiResult}
+                              </pre>
+                              <button
+                                type="button"
+                                onClick={handleApplyAIToChapter}
+                                className="mt-2 inline-flex items-center justify-center gap-1.5 rounded-md bg-[#2e7d32] px-3 py-1.5 text-[11px] font-medium text-white hover:bg-[#1b5e20]"
+                              >
+                                Apply to chapter
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </>
                   ) : (
                     <div className="flex-1 flex flex-col items-center justify-center text-center text-white/70">
                       <Edit3 className="w-8 h-8 mb-3 opacity-70" />
                       <p className="text-sm mb-1">
-                        Select a chapter to add a small outline.
+                        Select a chapter to add a small outline and use the AI
+                        assistant.
                       </p>
                       <p className="text-xs text-white/60">
-                        Your outline stays synced with the Table of Contents view.
+                        Your outline stays synced with the Table of Contents
+                        view.
                       </p>
                     </div>
                   )}
