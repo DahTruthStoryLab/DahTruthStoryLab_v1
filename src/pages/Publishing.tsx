@@ -597,9 +597,6 @@ const [matter, setMatter] = useState<Matter>({
     ? inchToPx(pf.margins.right) * 0.6
     : 48;
 
-  const [activeChapterId, setActiveChapterId] = useState(
-    chapters[0]?.id || ""
-  );
   const activeIdx = Math.max(
     0,
     chapters.findIndex((c) => c.id === activeChapterId)
