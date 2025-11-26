@@ -33,6 +33,7 @@ const theme = {
   white: "var(--brand-white)",
   gold: "var(--brand-gold)",
 } as const;
+const STORAGE_KEY = "dahtruth_chapters";
 
 const GOOGLE_PALETTE = {
   primary: "#1a73e8",
@@ -482,6 +483,7 @@ export default function Publishing(): JSX.Element {
   const [working, setWorking] = useState<AIKey | null>(null);
   const navigate = useNavigate();
 
+   // ---------- Meta (shared with Writing) ----------
   const [meta, setMeta] = useState<Meta>({
     title: "Working Title",
     author: "Your Name",
@@ -489,7 +491,8 @@ export default function Publishing(): JSX.Element {
     authorLast: "YourLastName",
   });
 
-   useEffect(() => {
+  // Load meta from localStorage (same key Writing uses)
+  useEffect(() => {
     try {
       const saved = localStorage.getItem("dahtruth_project_meta");
       if (!saved) return;
@@ -502,6 +505,7 @@ export default function Publishing(): JSX.Element {
     }
   }, []);
 
+  // Persist meta when it changes
   useEffect(() => {
     try {
       localStorage.setItem("dahtruth_project_meta", JSON.stringify(meta));
@@ -510,60 +514,72 @@ export default function Publishing(): JSX.Element {
     }
   }, [meta]);
 
-  // state for chapters + active chapter
-const [chapters, setChapters] = useState<Chapter[]>([]);
-const [activeChapterId, setActiveChapterId] = useState<string>("");
+  // ---------- Chapters + active chapter ----------
+  const [chapters, setChapters] = useState<Chapter[]>([]);
+  const [activeChapterId, setActiveChapterId] = useState<string>("");
 
-// 1️⃣ Load chapters that Writing saved into localStorage
-useEffect(() => {
-  try {
-    const saved = localStorage.getItem("dahtruth_chapters");
-    console.log("[Publishing] raw dahtruth_chapters:", saved);
+  // 1️⃣ Load chapters that Writing saved into localStorage
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("dahtruth_chapters");
+      if (!saved) return;
 
-    if (!saved) {
-      console.log("[Publishing] No saved chapters found.");
-      return;
+      const parsed = JSON.parse(saved) as any[];
+      if (!Array.isArray(parsed) || parsed.length === 0) return;
+
+      const normalized: Chapter[] = parsed.map((c, idx) => {
+        // Prefer `text` if present, otherwise fall back to Writing's `content` field
+        const baseText =
+          typeof c.text === "string" && c.text.trim().length > 0
+            ? c.text
+            : typeof c.content === "string"
+            ? c.content
+            : "";
+
+        return {
+          id: c.id || `c_${idx + 1}`,
+          title: c.title || `Chapter ${idx + 1}`,
+          included: typeof c.included === "boolean" ? c.included : true,
+          text: baseText,
+          textHTML: c.textHTML,
+        };
+      });
+
+      setChapters(normalized);
+
+      // Set the initial active chapter
+      if (normalized.length > 0) {
+        setActiveChapterId(normalized[0].id);
+      }
+    } catch (err) {
+      console.error("Failed to load dahtruth_chapters for Publishing:", err);
     }
+  }, []);
 
-    const parsed = JSON.parse(saved) as any[];
-    console.log("[Publishing] parsed chapters:", parsed);
-
-    if (!Array.isArray(parsed) || parsed.length === 0) {
-      console.log("[Publishing] Parsed chapters is not an array or is empty.");
-      return;
+  // Keep chapters in localStorage when edited in Publishing
+  useEffect(() => {
+    try {
+      if (!chapters.length) return;
+      localStorage.setItem("dahtruth_chapters", JSON.stringify(chapters));
+    } catch (err) {
+      console.error("Failed to persist chapters from Publishing:", err);
     }
+  }, [chapters]);
 
-    const normalized: Chapter[] = parsed.map((c, idx) => ({
-      id: c.id || `c_${idx + 1}`,
-      title: c.title || `Chapter ${idx + 1}`,
-      included: typeof c.included === "boolean" ? c.included : true,
-      text: c.text || "",
-      textHTML: c.textHTML,
-    }));
+  // ---------- AI + layout state ----------
+  const [provider, setProvider] = useState<"openai" | "anthropic">("openai");
 
-    console.log("[Publishing] normalized chapters:", normalized);
-
-    setChapters(normalized);
-    setActiveChapterId(normalized[0].id);
-  } catch (err) {
-    console.error("Failed to load dahtruth_chapters for Publishing:", err);
-  }
-}, []);
-
-// then your other state:
-const [provider, setProvider] = useState<"openai" | "anthropic">("openai");
-
-const [matter, setMatter] = useState<Matter>({
-  titlePage: "{title}\nby {author}",
-  copyright: "© {year} {author}. All rights reserved.",
-  dedication: "For those who kept the light on.",
-  epigraph: '"We live by stories."',
-  toc: true,
-  acknowledgments: "Thank you to every early reader.",
-  aboutAuthor: "{author} writes stories about family, faith, and becoming.",
-  notes: "",
-  tocFromHeadings: true,
-});
+  const [matter, setMatter] = useState<Matter>({
+    titlePage: "{title}\nby {author}",
+    copyright: "© {year} {author}. All rights reserved.",
+    dedication: "For those who kept the light on.",
+    epigraph: '"We live by stories."',
+    toc: true,
+    acknowledgments: "Thank you to every early reader.",
+    aboutAuthor: "{author} writes stories about family, faith, and becoming.",
+    notes: "",
+    tocFromHeadings: true,
+  });
 
   const [manuscriptPreset, setManuscriptPreset] =
     useState<ManuscriptPresetKey>("Agents_Standard_12pt_TNR_Double");
@@ -608,6 +624,7 @@ const [matter, setMatter] = useState<Matter>({
   const [isWide, setIsWide] = useState<boolean>(
     typeof window !== "undefined" ? window.innerWidth >= 1100 : true
   );
+
   useEffect(() => {
     const onResize = () =>
       setIsWide(typeof window !== "undefined" && window.innerWidth >= 1100);
@@ -639,15 +656,7 @@ const [matter, setMatter] = useState<Matter>({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeChapterId]);
 
-  useEffect(() => {
-  try {
-    if (!chapters.length) return;
-    localStorage.setItem("dahtruth_chapters", JSON.stringify(chapters));
-  } catch (err) {
-    console.error("Failed to persist chapters from Publishing:", err);
-  }
-}, [chapters]);
-
+  // ---------- Editor commands ----------
   const exec = (command: string, value?: string) => {
     editorRef.current?.focus();
     document.execCommand(command, false, value);
@@ -655,6 +664,7 @@ const [matter, setMatter] = useState<Matter>({
 
   const setBlock = (tag: "P" | "H1" | "H2" | "H3") => exec("formatBlock", tag);
   const setFont = (family: string) => exec("fontName", family);
+
   const setFontSizePt = (sizePx: number) => {
     editorRef.current?.focus();
     const selection = window.getSelection();
@@ -714,7 +724,6 @@ const [matter, setMatter] = useState<Matter>({
       return [...prev, ch];
     });
   };
-
   /* ----- Import: DOCX (.docx) and HTML (.html) ----- */
   const importDocx = useCallback(
     async (file: File, asNewChapter: boolean = true) => {
