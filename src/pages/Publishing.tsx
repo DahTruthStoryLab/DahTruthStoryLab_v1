@@ -510,16 +510,28 @@ export default function Publishing(): JSX.Element {
     }
   }, [meta]);
 
-  const [chapters, setChapters] = useState<Chapter[]>([]);
+  // state for chapters + active chapter
+const [chapters, setChapters] = useState<Chapter[]>([]);
+const [activeChapterId, setActiveChapterId] = useState<string>("");
 
-// Load chapters that Writing saved into localStorage
+// 1️⃣ Load chapters that Writing saved into localStorage
 useEffect(() => {
   try {
     const saved = localStorage.getItem("dahtruth_chapters");
-    if (!saved) return;
+    console.log("[Publishing] raw dahtruth_chapters:", saved);
+
+    if (!saved) {
+      console.log("[Publishing] No saved chapters found.");
+      return;
+    }
 
     const parsed = JSON.parse(saved) as any[];
-    if (!Array.isArray(parsed) || parsed.length === 0) return;
+    console.log("[Publishing] parsed chapters:", parsed);
+
+    if (!Array.isArray(parsed) || parsed.length === 0) {
+      console.log("[Publishing] Parsed chapters is not an array or is empty.");
+      return;
+    }
 
     const normalized: Chapter[] = parsed.map((c, idx) => ({
       id: c.id || `c_${idx + 1}`,
@@ -529,26 +541,29 @@ useEffect(() => {
       textHTML: c.textHTML,
     }));
 
+    console.log("[Publishing] normalized chapters:", normalized);
+
     setChapters(normalized);
     setActiveChapterId(normalized[0].id);
   } catch (err) {
     console.error("Failed to load dahtruth_chapters for Publishing:", err);
   }
 }, []);
-  
-  const [provider, setProvider] = useState<"openai" | "anthropic">("openai");
 
-  const [matter, setMatter] = useState<Matter>({
-    titlePage: "{title}\nby {author}",
-    copyright: "© {year} {author}. All rights reserved.",
-    dedication: "For those who kept the light on.",
-    epigraph: '"We live by stories."',
-    toc: true,
-    acknowledgments: "Thank you to every early reader.",
-    aboutAuthor: "{author} writes stories about family, faith, and becoming.",
-    notes: "",
-    tocFromHeadings: true,
-  });
+// then your other state:
+const [provider, setProvider] = useState<"openai" | "anthropic">("openai");
+
+const [matter, setMatter] = useState<Matter>({
+  titlePage: "{title}\nby {author}",
+  copyright: "© {year} {author}. All rights reserved.",
+  dedication: "For those who kept the light on.",
+  epigraph: '"We live by stories."',
+  toc: true,
+  acknowledgments: "Thank you to every early reader.",
+  aboutAuthor: "{author} writes stories about family, faith, and becoming.",
+  notes: "",
+  tocFromHeadings: true,
+});
 
   const [manuscriptPreset, setManuscriptPreset] =
     useState<ManuscriptPresetKey>("Agents_Standard_12pt_TNR_Double");
