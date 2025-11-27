@@ -16,7 +16,12 @@ import { rateLimiter } from "../utils/rateLimiter";
 
 import { runAssistant } from "../lib/api";
 import { Sparkles } from "lucide-react"; 
-import { computeWordsFromChapters } from "../lib/projectsSync";
+
+import {
+  computeWordsFromChapters,
+  syncProjectForCurrentStory,
+} from "../lib/projectsSync";
+
 
 const CURRENT_STORY_KEY = "currentStory";
 const USER_PROJECTS_KEY = "userProjects";
@@ -128,6 +133,7 @@ export default function ComposePage() {
   // Guard + normalize chapters (just require an id)
   const chapters = useMemo(
     () =>
+
       Array.isArray(rawChapters)
         ? rawChapters.filter((c) => c && c.id != null)
         : [],
@@ -272,60 +278,67 @@ export default function ComposePage() {
   }, [selectedId, selectedChapter]);
 
   // Save with visual feedback
-// Save with visual feedback
-const handleSave = async () => {
-  if (!hasChapter) return;
-  if (saveStatus === "saving") return;
+  const handleSave = async () => {
+    if (!hasChapter) return;
+    if (saveStatus === "saving") return;
 
-  setSaveStatus("saving");
+    setSaveStatus("saving");
 
-  try {
-    // Update the selected chapter content
-    updateChapter(selectedId, {
-      title: title || selectedChapter?.title || "",
-      content: html,
-    });
+    try {
+      // Update the selected chapter content
+      updateChapter(selectedId, {
+        title: title || selectedChapter?.title || "",
+        content: html,
+      });
 
-    // Compute aggregate stats across all chapters
-    const totalWords = computeWordsFromChapters(chapters || []);
-    const chapterCount = Array.isArray(chapters) ? chapters.length : 0;
+      // Compute aggregate stats across all chapters
+      const totalWords = computeWordsFromChapters(chapters || []);
+      const chapterCount = Array.isArray(chapters) ? chapters.length : 0;
 
-    // Persist book meta + stats via the chapter manager
-    await Promise.resolve(
-      saveProject({
-        book: { ...book, title: bookTitle },
-        stats: {
-          wordCount: totalWords,
-          chapterCount,
-        },
-      })
-    );
+      // Persist book meta + stats via the chapter manager
+      await Promise.resolve(
+        saveProject({
+          book: { ...book, title: bookTitle },
+          stats: {
+            wordCount: totalWords,
+            chapterCount,
+          },
+        })
+      );
 
-    const safeTitle =
-      (bookTitle && bookTitle.trim()) ||
-      (book?.title && book.title.trim()) ||
-      "Untitled Book";
+      const safeTitle =
+        (bookTitle && bookTitle.trim()) ||
+        (book?.title && book.title.trim()) ||
+        "Untitled Book";
 
-    // Snapshot for Dashboard & cross-page sync
-    saveCurrentStorySnapshot({ title: safeTitle });
+      // Snapshot for Dashboard & cross-page sync
+      saveCurrentStorySnapshot({ title: safeTitle });
 
-    // Update the projects list entry so ProjectPage shows correct stats
-    upsertUserProject({
-      title: safeTitle,
-      wordCount: totalWords,
-      chapterCount,
-      // characterCount: 0, // we can wire this later when you have a Characters module
-    });
+      // Update the projects list entry so ProjectPage shows correct stats
+      upsertUserProject({
+        title: safeTitle,
+        wordCount: totalWords,
+        chapterCount,
+        // characterCount: 0, // we can wire this later when you have a Characters module
+      });
 
-    setSaveStatus("saved");
-    setTimeout(() => {
+      // 🔄 Central sync: currentStory + userProjects
+      syncProjectForCurrentStory({
+        wordCount: totalWords,
+        targetWords: 50000, // adjust if you expose this per book
+        chapters,
+        bookTitle: safeTitle,
+      });
+
+      setSaveStatus("saved");
+      setTimeout(() => {
+        setSaveStatus("idle");
+      }, 2000);
+    } catch (error) {
+      console.error("Save failed:", error);
       setSaveStatus("idle");
-    }, 2000);
-  } catch (error) {
-    console.error("Save failed:", error);
-    setSaveStatus("idle");
-  }
-};
+    }
+  };
 
   // Rename a chapter (used by sidebar rename ✏️)
   const handleRenameChapter = (chapterId, newTitle) => {
