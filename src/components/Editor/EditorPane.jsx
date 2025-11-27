@@ -98,6 +98,15 @@ export default function EditorPane({
     <div className="relative flex flex-col gap-3">
       {/* Title row + stats */}
       <div className="flex items-center justify-between gap-3">
+        {/* 👇 Move word/page info to the LEFT */}
+        <div className="flex items-center gap-3 text-xs text-slate-600">
+          <span>{wordCount.toLocaleString()} words</span>
+          <span className="inline-flex items-center rounded-full border border-slate-200 bg-white/80 px-3 py-1 shadow-sm">
+            Pg ~{pageCount}
+          </span>
+        </div>
+
+        {/* Title takes remaining space on the right */}
         <input
           type="text"
           value={title}
@@ -106,14 +115,6 @@ export default function EditorPane({
           placeholder="Untitled chapter"
           className="flex-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
         />
-
-        {/* 👇 Move page/word info over to the right so it doesn't sit under the trash can */}
-        <div className="flex items-center gap-3 text-xs text-slate-600">
-          <span>{wordCount.toLocaleString()} words</span>
-          <span className="inline-flex items-center rounded-full border border-slate-200 bg-white/80 px-3 py-1 shadow-sm">
-            Pg ~{pageCount}
-          </span>
-        </div>
       </div>
 
       {/* Editor "page" */}
@@ -125,7 +126,6 @@ export default function EditorPane({
             minHeight: "80vh",
           }}
         >
-          {/* Quill toolbar sits on top of the page */}
           <ReactQuill
             theme="snow"
             value={html}
@@ -135,7 +135,6 @@ export default function EditorPane({
             className="h-full"
           />
 
-          {/* Optional footer inside the page (no page number here anymore) */}
           {aiBusy && (
             <div className="absolute bottom-3 left-1/2 -translate-x-1/2 text-[11px] text-slate-500 bg-white/80 px-2 py-1 rounded border border-slate-200 shadow-sm">
               AI working…
