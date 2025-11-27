@@ -1263,9 +1263,65 @@ function mapToWritingChapters(rawChapters: any[]): any[] {
   });
 }
 
+const STORAGE_KEY = "dahtruth_chapters";
+const META_KEY = "dahtruth_project_meta";
+
+function mapToWritingChapters(rawChapters: any[]): any[] {
+  const now = new Date().toISOString();
+
+  return rawChapters.map((c, idx) => {
+    const baseText =
+      typeof c.content === "string" && c.content.trim().length > 0
+        ? c.content
+        : typeof c.text === "string"
+        ? c.text
+        : "";
+
+    return {
+      id: c.id || `chapter-${Date.now()}-${idx + 1}`,
+      order: idx + 1,
+      title: c.title || `Chapter ${idx + 1}`,
+      summary: c.summary || "",
+      content: baseText,
+      wordCount: baseText
+        .split(/\s+/)
+        .filter(Boolean).length,
+      status: "draft",
+      createdAt: now,
+      updatedAt: now,
+    };
+  });
+}
+
 async function handleImportManuscript(file: File) {
   const parsed = await parseDocxToChapters(file);
   // parsed: { title?: string, author?: string, chapters: [...] }
+
+  const chapters = mapToWritingChapters(parsed.chapters || []);
+
+  // Optional: warn if we’re going to overwrite existing chapters
+  const existing = localStorage.getItem(STORAGE_KEY);
+  if (existing && chapters.length > 0) {
+    const ok = window.confirm(
+      "Replace existing chapters with this imported manuscript?"
+    );
+    if (!ok) return;
+  }
+
+  // 1️⃣ Save chapters so Writing *and* Publishing can see them
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(chapters));
+
+  // 2️⃣ Save project meta (title/author/year)
+  const meta = {
+    title: parsed.title || "Working Title",
+    author: parsed.author || "Your Name",
+    year: new Date().getFullYear().toString(),
+  };
+  localStorage.setItem(META_KEY, JSON.stringify(meta));
+
+  // 3️⃣ Optionally route user straight to Writing
+  navigate("/writing"); // or however you navigate
+}
 
   const chapters = mapToWritingChapters(parsed.chapters || []);
 
