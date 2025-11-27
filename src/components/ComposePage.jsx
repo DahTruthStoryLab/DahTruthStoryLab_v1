@@ -11,11 +11,9 @@ import TrashDock from "./Writing/TrashDock";
 import { useChapterManager } from "../hooks/useChapterManager";
 import { GoldButton, WritingCrumb } from "./UI/UIComponents";
 
-// NEW: Import the document parser and rate limiter
 import { documentParser } from "../utils/documentParser";
 import { rateLimiter } from "../utils/rateLimiter";
 
-// ✅ Use runAssistant so we can send instructions/questions
 import { runAssistant } from "../lib/api";
 import { Sparkles } from "lucide-react";
 
@@ -78,7 +76,7 @@ function upsertUserProject({ title }) {
 
 const DEBUG_IMPORT = false;
 
-// Helper: normalize to "double spaced" paragraphs on import
+// Helper: normalize to "double spaced" paragraphs on import / AI
 const applyDoubleSpacing = (text = "") => {
   if (!text) return "";
 
@@ -115,7 +113,13 @@ export default function ComposePage() {
   // 🔹 LOCAL AI STATE
   const [aiBusy, setAiBusy] = useState(false);
   const [provider, setProvider] = useState("openai");
-  const [instructions, setInstructions] = useState(""); // what you tell the assistant
+  const [instructions, setInstructions] = useState(""); // optional extra guidance
+
+  // 🔹 Right-hand AI assistant chat state
+  const [showAssistant, setShowAssistant] = useState(false);
+  const [chatMessages, setChatMessages] = useState([]); // {role: 'user'|'assistant', content: string}
+  const [chatInput, setChatInput] = useState("");
+  const [chatBusy, setChatBusy] = useState(false);
 
   // Guard + normalize chapters (just require an id)
   const chapters = useMemo(
@@ -157,6 +161,14 @@ export default function ComposePage() {
   const [activeAiTab, setActiveAiTab] = useState("proofread");
 
   const hasChapter = !!selectedId && !!selectedChapter;
+
+  // Plain text version of current chapter for AI context (chat)
+  const chapterPlainText = useMemo(() => {
+    if (!html) return "";
+    const tmp = document.createElement("div");
+    tmp.innerHTML = html;
+    return tmp.textContent || tmp.innerText || "";
+  }, [html]);
 
   // Monitor rate limiter queue (for AI)
   useEffect(() => {
@@ -350,7 +362,7 @@ export default function ComposePage() {
       }
     }
 
-    // 1) Try to grab selected HTML from the editor (Quill uses .ql-editor)
+    // 1) Try to grab selected HTML from the editor
     if (!targetHtmlOverride && typeof window !== "undefined") {
       try {
         const selection = window.getSelection();
@@ -393,39 +405,40 @@ export default function ComposePage() {
       );
 
       const resultTextRaw =
-  (result && (result.result || result.text || result.output || result.data)) ||
-  result ||
-  "";
+        (result &&
+          (result.result || result.text || result.output || result.data)) ||
+        result ||
+        "";
 
-if (!resultTextRaw) {
-  alert(
-    "The AI did not return any text. Please try again with a smaller section or a different mode."
-  );
-  return;
-}
+      if (!resultTextRaw) {
+        alert(
+          "The AI did not return any text. Please try again with a smaller section or a different mode."
+        );
+        return;
+      }
 
-// 🔹 NEW: reapply double-spacing to whatever the AI gave us
-const resultText = applyDoubleSpacing(resultTextRaw);
+      // 🔹 Reapply double-spacing to whatever the AI gave us
+      const resultText = applyDoubleSpacing(resultTextRaw);
 
-let combinedHtml = fullHtml;
+      let combinedHtml = fullHtml;
 
-if (useSelection) {
-  const idx = fullHtml.indexOf(target);
+      if (useSelection) {
+        const idx = fullHtml.indexOf(target);
 
-  if (idx !== -1) {
-    combinedHtml =
-      fullHtml.slice(0, idx) +
-      resultText +
-      fullHtml.slice(idx + target.length);
-  } else {
-    const replacedOnce = fullHtml.replace(target, resultText);
-    combinedHtml =
-      replacedOnce === fullHtml ? resultText + fullHtml : replacedOnce;
-  }
-} else {
-  const remainder = fullHtml.slice(target.length);
-  combinedHtml = resultText + remainder;
-}
+        if (idx !== -1) {
+          combinedHtml =
+            fullHtml.slice(0, idx) +
+            resultText +
+            fullHtml.slice(idx + target.length);
+        } else {
+          const replacedOnce = fullHtml.replace(target, resultText);
+          combinedHtml =
+            replacedOnce === fullHtml ? resultText + fullHtml : replacedOnce;
+        }
+      } else {
+        const remainder = fullHtml.slice(target.length);
+        combinedHtml = resultText + remainder;
+      }
 
       setHtml(combinedHtml);
       updateChapter(selectedId, {
@@ -433,6 +446,7 @@ if (useSelection) {
         content: combinedHtml,
       });
 
+      // Restore scroll
       if (typeof window !== "undefined") {
         setTimeout(() => {
           try {
@@ -457,6 +471,73 @@ if (useSelection) {
       );
     } finally {
       setAiBusy(false);
+    }
+  };
+
+  // 🔹 Chat: send a message to the AI assistant
+  const handleAssistantSend = async () => {
+    const text = chatInput.trim();
+    if (!text) return;
+
+    // Push user message into UI
+    const userMessage = {
+      role: "user",
+      content: text,
+      id: Date.now(),
+    };
+    setChatMessages((prev) => [...prev, userMessage]);
+    setChatInput("");
+    setChatBusy(true);
+
+    try {
+      const snippet = chapterPlainText.slice(0, 1500) || "";
+
+      const instructionsText = [
+        `You are the DahTruth StoryLab writing assistant.`,
+        `The user is working on a chapter titled "${title || "Untitled Chapter"}".`,
+        `When you suggest edits, please quote or clearly separate your suggested text so it can be copy-pasted into the manuscript.`,
+        snippet
+          ? `Here is an excerpt of the chapter for context:\n\n${snippet}`
+          : `There is no chapter text yet; answer based on the question only.`,
+      ].join("\n\n");
+
+      const res = await rateLimiter.addToQueue(() =>
+        runAssistant(text, "clarify", instructionsText, provider)
+      );
+
+      const replyText =
+        (res && (res.result || res.text || res.output || res.data)) || "";
+
+      const assistantMessage = {
+        role: "assistant",
+        content:
+          replyText ||
+          "I couldn't generate a response. Please try asking your question in a different way.",
+        id: Date.now() + 1,
+      };
+
+      setChatMessages((prev) => [...prev, assistantMessage]);
+    } catch (err) {
+      console.error("Assistant chat error:", err);
+      setChatMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content:
+            "Sorry, there was an error reaching the assistant. Please try again in a moment.",
+          id: Date.now() + 2,
+        },
+      ]);
+    } finally {
+      setChatBusy(false);
+    }
+  };
+
+  // Allow Enter to send (Shift+Enter = newline) in chat box
+  const handleAssistantKeyDown = (e) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleAssistantSend();
     }
   };
 
@@ -597,7 +678,9 @@ if (useSelection) {
   // Bulk delete
   const handleDeleteMultiple = (ids) => {
     if (!ids?.length) return;
-    if (!window.confirm(`Delete ${ids.length} chapter(s)? This cannot be undone.`))
+    if (
+      !window.confirm(`Delete ${ids.length} chapter(s)? This cannot be undone.`)
+    )
       return;
 
     ids.forEach((id) => deleteChapter(id));
@@ -644,7 +727,9 @@ if (useSelection) {
             <button
               onClick={() => setView("editor")}
               className={`inline-flex items-center gap-2 rounded-md border px-2.5 py-1 text-[13px] ${
-                view === "editor" ? "bg-slate-100" : "bg-white hover:bg-slate-50"
+                view === "editor"
+                  ? "bg-slate-100"
+                  : "bg-white hover:bg-slate-50"
               }`}
               title="Open Editor"
             >
@@ -666,7 +751,7 @@ if (useSelection) {
             {selectMode ? "✓ Select" : "Select"}
           </button>
 
-          {/* AI Assistant quick button */}
+          {/* Quick AI run button (uses current active tab) */}
           <button
             onClick={() => handleAI(activeAiTab || "proofread")}
             disabled={!hasChapter || aiBusy || isImporting}
@@ -677,7 +762,7 @@ if (useSelection) {
             title="Run AI on the current chapter or selected text"
           >
             <Sparkles className="w-4 h-4 text-amber-500" />
-            <span>AI Assistant</span>
+            <span>Run AI</span>
           </button>
 
           {/* Provider selector */}
@@ -712,50 +797,24 @@ if (useSelection) {
 
           <div className="w-full sm:flex-1" />
 
-          {/* Toolbar */}
+          {/* Toolbar with AI mode buttons + Assistant toggle */}
           <EditorToolbar
             onAI={handleAI}
             onSave={handleSave}
             onImport={handleImport}
             onExport={handleExport}
             onDelete={handleDeleteCurrent}
-            aiBusy={aiBusy || isImporting}
+            aiBusy={aiBusy || isImporting || chatBusy}
             saveStatus={saveStatus}
             activeAiTab={activeAiTab}
             setActiveAiTab={setActiveAiTab}
+            onToggleAssistant={() => setShowAssistant((prev) => !prev)}
+            assistantOpen={showAssistant}
           />
         </div>
       </div>
 
       {/* GRID VIEW */}
-      {view === "grid" && (
-        <>
-          <ChapterGrid
-            chapters={chapters}
-            selectedId={selectedId}
-            onSelectChapter={(id) => {
-              if (!id) return;
-              if (selectMode) {
-                toggleSelect(id);
-              } else {
-                setSelectedId(id);
-                setView("editor");
-              }
-            }}
-            onAddChapter={addChapter}
-            onMoveChapter={moveChapter}
-            onDeleteChapter={deleteChapter}
-            selectMode={selectMode}
-            selectedIds={selectedIds}
-            onToggleSelect={toggleSelect}
-            onRangeSelect={(idx) => rangeSelect(idx)}
-            lastClickedIndexRef={lastClickedIndexRef}
-          />
-          <TrashDock onDelete={handleDeleteMultiple} />
-        </>
-      )}
-
-        {/* GRID VIEW */}
       {view === "grid" && (
         <>
           <ChapterGrid
@@ -788,7 +847,12 @@ if (useSelection) {
       {view === "editor" && (
         <div
           className="max-w-7xl mx-auto px-4 py-6 grid gap-6"
-          style={{ gridTemplateColumns: "280px minmax(0, 1fr)", minWidth: 1024 }}
+          style={{
+            gridTemplateColumns: showAssistant
+              ? "280px minmax(0, 1fr) 320px"
+              : "280px minmax(0, 1fr)",
+            minWidth: showAssistant ? 1280 : 1024,
+          }}
         >
           {/* Left Sidebar */}
           <aside className="sticky top-16 space-y-3" style={{ zIndex: 10 }}>
@@ -844,81 +908,94 @@ if (useSelection) {
             setHtml={setHtml}
             onSave={handleSave}
             onAI={handleAI}
-            aiBusy={aiBusy}
+            aiBusy={aiBusy || chatBusy}
             pageWidth={1000}
             onHeadingsChange={setHeadings}
           />
-          {/* ❌ No TrashDock here anymore */}
-        </div>
-      )}
 
-            {/* 🔹 AI Assistant Panel */}
-            <section className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-amber-500" />
-                  <span className="text-xs font-semibold text-slate-800">
-                    AI Writing Assistant
-                  </span>
+          {/* 🔹 Right-hand AI Assistant chat panel */}
+          {showAssistant && (
+            <section className="flex flex-col bg-white border border-slate-200 rounded-xl shadow-sm h-[calc(100vh-8rem)]">
+              {/* Header */}
+              <div className="px-3 py-2 border-b border-slate-200 flex items-center justify-between">
+                <div>
+                  <div className="text-xs font-semibold text-slate-800">
+                    AI Assistant
+                  </div>
+                  <div className="text-[11px] text-slate-500">
+                    Ask questions about your chapter. Copy any suggestions you
+                    like into the editor.
+                  </div>
                 </div>
-                {aiBusy && (
-                  <span className="text-[11px] text-amber-700">
-                    Thinking…
-                  </span>
+                <button
+                  type="button"
+                  onClick={() => setShowAssistant(false)}
+                  className="text-[11px] px-2 py-1 rounded border border-slate-200 hover:bg-slate-50"
+                >
+                  Close
+                </button>
+              </div>
+
+              {/* Messages */}
+              <div className="flex-1 overflow-y-auto px-3 py-2 space-y-2 text-sm">
+                {chatMessages.length === 0 && (
+                  <p className="text-[12px] text-slate-500 mt-2">
+                    Example questions:
+                    <br />
+                    • “Help me tighten this opening paragraph.”
+                    <br />
+                    • “Is this dialogue too on the nose?”
+                    <br />
+                    • “Suggest a stronger closing sentence.”
+                  </p>
                 )}
+
+                {chatMessages.map((m) => (
+                  <div
+                    key={m.id}
+                    className={
+                      m.role === "user"
+                        ? "ml-auto max-w-[90%] rounded-lg bg-indigo-50 px-3 py-2 text-[13px] text-slate-800"
+                        : "mr-auto max-w-[90%] rounded-lg bg-slate-100 px-3 py-2 text-[13px] text-slate-800"
+                    }
+                  >
+                    {m.content}
+                  </div>
+                ))}
               </div>
 
-              <textarea
-                className="w-full border border-slate-300 rounded-md px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 resize-y min-h-[60px]"
-                placeholder="Tell the assistant how to help (for example: 'Tighten this paragraph but keep my voice' or 'Improve clarity without changing meaning')."
-                value={instructions}
-                onChange={(e) => setInstructions(e.target.value)}
-              />
-
-              <div className="mt-2 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  disabled={!hasChapter || aiBusy}
-                  onClick={() => handleAI("proofread")}
-                  className="text-xs px-2 py-1 rounded border border-slate-300 bg-slate-50 hover:bg-slate-100 disabled:opacity-60"
-                >
-                  Proofread
-                </button>
-                <button
-                  type="button"
-                  disabled={!hasChapter || aiBusy}
-                  onClick={() => handleAI("clarify")}
-                  className="text-xs px-2 py-1 rounded border border-slate-300 bg-slate-50 hover:bg-slate-100 disabled:opacity-60"
-                >
-                  Clarify
-                </button>
-                <button
-                  type="button"
-                  disabled={!hasChapter || aiBusy}
-                  onClick={() => handleAI("rewrite")}
-                  className="text-xs px-2 py-1 rounded border border-slate-300 bg-slate-50 hover:bg-slate-100 disabled:opacity-60"
-                >
-                  Rewrite
-                </button>
-                <button
-                  type="button"
-                  disabled={!hasChapter || aiBusy}
-                  onClick={() => handleAI("readability")}
-                  className="text-xs px-2 py-1 rounded border border-slate-300 bg-slate-50 hover:bg-slate-100 disabled:opacity-60"
-                >
-                  Readability
-                </button>
-              </div>
-
-              <p className="mt-1 text-[11px] text-slate-500">
-                Tip: select a section in the editor first, then choose a mode.
-                The assistant will focus on just that selection and apply your
-                instructions.
-              </p>
+              {/* Input */}
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  handleAssistantSend();
+                }}
+                className="border-t border-slate-200 p-2 space-y-2"
+              >
+                <textarea
+                  rows={3}
+                  className="w-full resize-none rounded-md border border-slate-300 px-2 py-1 text-[13px] focus:outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
+                  placeholder="Ask the assistant a question about your scene, character, or sentence..."
+                  value={chatInput}
+                  onChange={(e) => setChatInput(e.target.value)}
+                  onKeyDown={handleAssistantKeyDown}
+                  disabled={chatBusy}
+                />
+                <div className="flex items-center justify-between">
+                  <div className="text-[11px] text-slate-500">
+                    Press Enter to send, Shift+Enter for a new line.
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={!chatInput.trim() || chatBusy}
+                    className="text-[13px] px-3 py-1.5 rounded-md bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {chatBusy ? "Thinking…" : "Send"}
+                  </button>
+                </div>
+              </form>
             </section>
-          </div>
-
-          <TrashDock onDelete={handleDeleteMultiple} />
+          )}
         </div>
       )}
     </div>
