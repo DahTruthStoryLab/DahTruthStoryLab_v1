@@ -15,12 +15,12 @@ import { documentParser } from "../utils/documentParser";
 import { rateLimiter } from "../utils/rateLimiter";
 
 import { runAssistant } from "../lib/api";
-import { Sparkles } from "lucide-react";
+import { Sparkles } from "lucide-react"; 
+import { computeWordsFromChapters } from "../lib/projectsSync";
 
 const CURRENT_STORY_KEY = "currentStory";
 const USER_PROJECTS_KEY = "userProjects";
 const PUBLISHING_DRAFT_KEY = "publishingDraft"; // 👈 NEW
-
 
 // Save a simple "current story" snapshot for ProjectPage to read
 function saveCurrentStorySnapshot({ title }) {
@@ -39,7 +39,7 @@ function saveCurrentStorySnapshot({ title }) {
 }
 
 // Maintain a small list of projects/novels in localStorage
-function upsertUserProject({ title }) {
+function upsertUserProject({ title, ...rest }) {
   if (!title) return;
   try {
     const t = title.trim();
@@ -55,11 +55,13 @@ function upsertUserProject({ title }) {
     if (!Array.isArray(arr)) arr = [];
 
     const index = arr.findIndex((p) => p && p.title === t);
+
     const base = {
       title: t,
       status: "Draft",
       source: "Project",
       updatedAt: new Date().toISOString(),
+      ...rest, // ⬅️ wordCount, chapterCount, etc can be passed in
     };
 
     if (index >= 0) {
@@ -74,6 +76,7 @@ function upsertUserProject({ title }) {
     console.error("Failed to update userProjects:", err);
   }
 }
+
 
 const DEBUG_IMPORT = false;
 
@@ -269,41 +272,60 @@ export default function ComposePage() {
   }, [selectedId, selectedChapter]);
 
   // Save with visual feedback
-  const handleSave = async () => {
-    if (!hasChapter) return;
-    if (saveStatus === "saving") return;
+// Save with visual feedback
+const handleSave = async () => {
+  if (!hasChapter) return;
+  if (saveStatus === "saving") return;
 
-    setSaveStatus("saving");
+  setSaveStatus("saving");
 
-    try {
-      updateChapter(selectedId, {
-        title: title || selectedChapter?.title || "",
-        content: html,
-      });
+  try {
+    // Update the selected chapter content
+    updateChapter(selectedId, {
+      title: title || selectedChapter?.title || "",
+      content: html,
+    });
 
-      await Promise.resolve(
-        saveProject({
-          book: { ...book, title: bookTitle },
-        })
-      );
+    // Compute aggregate stats across all chapters
+    const totalWords = computeWordsFromChapters(chapters || []);
+    const chapterCount = Array.isArray(chapters) ? chapters.length : 0;
 
-      const safeTitle =
-        (bookTitle && bookTitle.trim()) ||
-        (book?.title && book.title.trim()) ||
-        "Untitled Book";
+    // Persist book meta + stats via the chapter manager
+    await Promise.resolve(
+      saveProject({
+        book: { ...book, title: bookTitle },
+        stats: {
+          wordCount: totalWords,
+          chapterCount,
+        },
+      })
+    );
 
-      saveCurrentStorySnapshot({ title: safeTitle });
-      upsertUserProject({ title: safeTitle });
+    const safeTitle =
+      (bookTitle && bookTitle.trim()) ||
+      (book?.title && book.title.trim()) ||
+      "Untitled Book";
 
-      setSaveStatus("saved");
-      setTimeout(() => {
-        setSaveStatus("idle");
-      }, 2000);
-    } catch (error) {
-      console.error("Save failed:", error);
+    // Snapshot for Dashboard & cross-page sync
+    saveCurrentStorySnapshot({ title: safeTitle });
+
+    // Update the projects list entry so ProjectPage shows correct stats
+    upsertUserProject({
+      title: safeTitle,
+      wordCount: totalWords,
+      chapterCount,
+      // characterCount: 0, // we can wire this later when you have a Characters module
+    });
+
+    setSaveStatus("saved");
+    setTimeout(() => {
       setSaveStatus("idle");
-    }
-  };
+    }, 2000);
+  } catch (error) {
+    console.error("Save failed:", error);
+    setSaveStatus("idle");
+  }
+};
 
   // Rename a chapter (used by sidebar rename ✏️)
   const handleRenameChapter = (chapterId, newTitle) => {
