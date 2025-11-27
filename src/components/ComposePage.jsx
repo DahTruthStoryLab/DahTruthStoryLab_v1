@@ -26,6 +26,7 @@ import {
   runReadability,
   runRewrite,
 } from "../lib/api";
+import { Sparkles } from "lucide-react";
 
 // Keys shared with ProjectPage for cross-page sync
 const CURRENT_STORY_KEY = "currentStory";
@@ -709,6 +710,20 @@ export default function ComposePage() {
             title="Toggle Select Mode"
           >
             {selectMode ? "✓ Select" : "Select"}
+          </button>
+
+          {/* NEW: AI Assistant quick action */}
+          <button
+            onClick={() => handleAI(activeAiTab || "proofread")}
+            disabled={!hasChapter || aiBusy || isImporting}
+            className={[
+              "inline-flex items-center gap-2 rounded-md border px-2.5 py-1 text-[13px]",
+              "bg-white hover:bg-slate-50 disabled:opacity-60 disabled:cursor-not-allowed",
+            ].join(" ")}
+            title="Run AI on the current chapter or selected text"
+          >
+            <Sparkles className="w-4 h-4 text-amber-500" />
+            <span>AI Assistant</span>
           </button>
 
           {/* Selection toolbar */}
