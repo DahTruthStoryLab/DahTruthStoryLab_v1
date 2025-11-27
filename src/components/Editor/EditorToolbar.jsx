@@ -11,6 +11,8 @@ export default function EditorToolbar({
   saveStatus = "idle", // "idle" | "saving" | "saved"
   activeAiTab = "proofread",
   setActiveAiTab, // optional; ComposePage passes this in
+  onToggleAssistant, // optional; toggles right-hand AI chat panel
+  assistantOpen = false, // optional; whether the chat panel is open
 }) {
   const fileInputRef = useRef(null);
 
@@ -46,7 +48,8 @@ export default function EditorToolbar({
 
   const renderSaveClass = () => {
     if (saveStatus === "saving") return "bg-slate-200 cursor-wait";
-    if (saveStatus === "saved") return "bg-emerald-100 text-emerald-800";
+    if (saveStatus === "saved")
+      return "bg-emerald-100 text-emerald-800";
     return "bg-slate-900 text-white hover:bg-slate-800";
   };
 
@@ -57,9 +60,11 @@ export default function EditorToolbar({
   const aiActive =
     "bg-slate-900 text-white border-slate-900 shadow-sm";
 
+  const aiDisabled = aiBusy ? "opacity-60 cursor-not-allowed" : "";
+
   return (
-    <div className="flex items-center gap-2">
-      {/* AI Actions */}
+    <div className="flex items-center gap-3">
+      {/* AI Actions (modes) */}
       <div className="flex items-center gap-1 rounded-full bg-slate-50 border border-slate-200 px-1 py-1">
         <button
           type="button"
@@ -68,11 +73,13 @@ export default function EditorToolbar({
           className={[
             aiButtonBase,
             activeAiTab === "proofread" ? aiActive : aiInactive,
-            aiBusy ? "opacity-60 cursor-not-allowed" : "",
+            aiDisabled,
           ].join(" ")}
           title="Check grammar and fix basic errors"
         >
-          {aiBusy && activeAiTab === "proofread" ? "Working…" : "Proofread"}
+          {aiBusy && activeAiTab === "proofread"
+            ? "Working…"
+            : "Proofread"}
         </button>
 
         <button
@@ -82,11 +89,13 @@ export default function EditorToolbar({
           className={[
             aiButtonBase,
             activeAiTab === "clarify" ? aiActive : aiInactive,
-            aiBusy ? "opacity-60 cursor-not-allowed" : "",
+            aiDisabled,
           ].join(" ")}
           title="Improve clarity and flow"
         >
-          {aiBusy && activeAiTab === "clarify" ? "Working…" : "Clarify"}
+          {aiBusy && activeAiTab === "clarify"
+            ? "Working…"
+            : "Clarify"}
         </button>
 
         <button
@@ -96,13 +105,54 @@ export default function EditorToolbar({
           className={[
             aiButtonBase,
             activeAiTab === "readability" ? aiActive : aiInactive,
-            aiBusy ? "opacity-60 cursor-not-allowed" : "",
+            aiDisabled,
           ].join(" ")}
           title="Enhance readability and pacing"
         >
-          {aiBusy && activeAiTab === "readability" ? "Working…" : "Readability"}
+          {aiBusy && activeAiTab === "readability"
+            ? "Working…"
+            : "Readability"}
+        </button>
+
+        <button
+          type="button"
+          disabled={aiBusy}
+          onClick={() => handleAiClick("rewrite")}
+          className={[
+            aiButtonBase,
+            activeAiTab === "rewrite" ? aiActive : aiInactive,
+            aiDisabled,
+          ].join(" ")}
+          title="Rewrite or polish the selected section"
+        >
+          {aiBusy && activeAiTab === "rewrite"
+            ? "Working…"
+            : "Rewrite"}
         </button>
       </div>
+
+      {/* Optional: AI Assistant toggle (right-hand chat) */}
+      {typeof onToggleAssistant === "function" && (
+        <button
+          type="button"
+          onClick={onToggleAssistant}
+          disabled={aiBusy}
+          className={[
+            "px-3 py-1.5 rounded-full text-xs font-medium border transition-colors",
+            assistantOpen
+              ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
+              : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50",
+            aiDisabled,
+          ].join(" ")}
+          title={
+            assistantOpen
+              ? "Hide AI chat assistant"
+              : "Show AI chat assistant"
+          }
+        >
+          {assistantOpen ? "Assistant Open" : "AI Assistant"}
+        </button>
+      )}
 
       {/* Import / Export */}
       <div className="flex items-center gap-1">
