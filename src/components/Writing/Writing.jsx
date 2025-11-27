@@ -251,7 +251,7 @@ const Writing = () => {
     }
   };
 
-  // 👉 NEW: call AI backend using your unified assistant
+  // 👉 Call AI backend using your unified assistant (/ai/assistant)
   const handleRunAi = async () => {
     const text = aiInput.trim();
     if (!text) {
@@ -263,36 +263,37 @@ const Writing = () => {
     setAiResult("");
 
     try {
-      let instructions = "";
+      let modeInstruction = "";
       if (aiMode === "grammar") {
-        instructions =
-          "Fix grammar, spelling, and clarity while keeping my voice and meaning.";
+        modeInstruction =
+          "Fix grammar, spelling, and clarity while keeping my voice, cadence, and meaning the same.";
       } else if (aiMode === "concise") {
-        instructions =
-          "Rewrite this passage to be more concise and tight, but keep my voice and emotional tone.";
+        modeInstruction =
+          "Rewrite this passage to be more concise and tight, but keep my voice, emotional tone, and point of view.";
       } else {
-        instructions =
-          "Act as a writing coach and offer an improved version of this passage while keeping my voice.";
+        modeInstruction =
+          "Act as a writing coach. Improve this passage while preserving my voice and perspective.";
       }
 
-      const res = await runAssistant(
-        text,
-        "chapter-help",
-        instructions,
-        "openai"
-      );
+      // Combine instructions + user text into one payload,
+      // since your backend expects a single `text` string plus an operation key.
+      const combined = `${modeInstruction}\n\n---\n\n${text}`;
+
+      // 🔸 Use the existing "assistant" operation that you already have wired in API Gateway
+      const res = await runAssistant(combined, "assistant", "", "openai");
 
       const out =
         (res && (res.result || res.text || res.output || res.content)) || "";
 
       setAiResult(out || "(AI did not return any text.)");
     } catch (err) {
-      console.error("AI error:", err);
-      alert("AI request failed. Please try again.");
+      console.error("AI error in Writing handleRunAi:", err);
+      alert("AI request failed. Check the console for details.");
     } finally {
       setAiBusy(false);
     }
   };
+
 
   // 👉 NEW: apply AI result directly to the current chapter's content
   const handleApplyAiToChapter = () => {
