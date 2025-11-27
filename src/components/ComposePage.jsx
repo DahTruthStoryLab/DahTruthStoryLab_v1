@@ -6,26 +6,17 @@ import EditorPane from "./Editor/EditorPane";
 import ChapterGrid from "./Writing/ChapterGrid";
 import ChapterSidebar from "./Writing/ChapterSidebar";
 import EditorToolbar from "./Editor/EditorToolbar";
-// We removed AIInstructions from the writing page to simplify
-// import AIInstructions from "./Editor/AIInstructions";
 import TrashDock from "./Writing/TrashDock";
 
 import { useChapterManager } from "../hooks/useChapterManager";
-// 🔄 REMOVED: useAIAssistant
-// import { useAIAssistant } from "../hooks/useAIAssistant";
 import { GoldButton, WritingCrumb } from "./UI/UIComponents";
 
 // NEW: Import the document parser and rate limiter
 import { documentParser } from "../utils/documentParser";
 import { rateLimiter } from "../utils/rateLimiter";
 
-// ✅ NEW: Import AI helpers that talk to /ai-assistant
-import {
-  runGrammar,
-  runStyle,
-  runReadability,
-  runRewrite,
-} from "../lib/api";
+// ✅ Use runAssistant so we can send instructions/questions
+import { runAssistant } from "../lib/api";
 import { Sparkles } from "lucide-react";
 
 // Keys shared with ProjectPage for cross-page sync
@@ -37,9 +28,9 @@ function saveCurrentStorySnapshot({ title }) {
   if (!title) return;
   try {
     const snapshot = {
-      id: "main", // you can customize later if you support multiple
+      id: "main",
       title: title.trim(),
-      status: "Draft", // or pull real status if you add it here
+      status: "Draft",
       updatedAt: new Date().toISOString(),
     };
     localStorage.setItem(CURRENT_STORY_KEY, JSON.stringify(snapshot));
@@ -68,19 +59,17 @@ function upsertUserProject({ title }) {
     const base = {
       title: t,
       status: "Draft",
-      source: "Project", // matches what ProjectPage expects
+      source: "Project",
       updatedAt: new Date().toISOString(),
     };
 
     if (index >= 0) {
-      // update existing entry
       arr[index] = { ...arr[index], ...base };
     } else {
       arr.push(base);
     }
 
     localStorage.setItem(USER_PROJECTS_KEY, JSON.stringify(arr));
-    // Let other tabs/pages (like ProjectPage) know something changed
     window.dispatchEvent(new Event("project:change"));
   } catch (err) {
     console.error("Failed to update userProjects:", err);
@@ -93,21 +82,17 @@ const DEBUG_IMPORT = false;
 const applyDoubleSpacing = (text = "") => {
   if (!text) return "";
 
-  // If this looks like HTML with <p> tags, insert a blank paragraph between each
   if (text.includes("<p")) {
     return text
       .replace(/\r\n/g, "\n")
-      // close each paragraph, then insert an empty spacer paragraph
       .replace(/<\/p>/g, "</p><p>&nbsp;</p>")
-      // avoid stacking too many spacer paragraphs
       .replace(/(<p>&nbsp;<\/p>){3,}/g, "<p>&nbsp;</p><p>&nbsp;</p>");
   }
 
-  // Plain text fallback: convert single newlines to double
   return text
-    .replace(/\r\n/g, "\n") // normalize
-    .replace(/\n/g, "\n\n") // double space
-    .replace(/\n{3,}/g, "\n\n"); // collapse 3+ into exactly 2
+    .replace(/\r\n/g, "\n")
+    .replace(/\n/g, "\n\n")
+    .replace(/\n{3,}/g, "\n\n");
 };
 
 export default function ComposePage() {
@@ -127,10 +112,10 @@ export default function ComposePage() {
     saveProject,
   } = useChapterManager();
 
-  // 🔹 LOCAL AI STATE (replaces useAIAssistant)
+  // 🔹 LOCAL AI STATE
   const [aiBusy, setAiBusy] = useState(false);
-  const [provider, setProvider] = useState("openai"); // or "anthropic" if you want
-  const [instructions, setInstructions] = useState(""); // optional: extended guidance text
+  const [provider, setProvider] = useState("openai");
+  const [instructions, setInstructions] = useState(""); // what you tell the assistant
 
   // Guard + normalize chapters (just require an id)
   const chapters = useMemo(
@@ -168,11 +153,8 @@ export default function ComposePage() {
   // TOC headings for the current chapter
   const [headings, setHeadings] = useState([]); // [{level, text, id}]
 
-  // NEW: remember which AI tab/mode is active across sessions
+  // Remember which AI tab/mode is active across sessions
   const [activeAiTab, setActiveAiTab] = useState("proofread");
-
-  // NEW: remember where you were on the page so AI does not jump you back to top
-  const [lastScrollY, setLastScrollY] = useState(0);
 
   const hasChapter = !!selectedId && !!selectedChapter;
 
@@ -275,32 +257,28 @@ export default function ComposePage() {
       setTitle(selectedChapter.title || "");
       setHtml(selectedChapter.content || "");
     }
-    // reset headings when switching chapters
     setHeadings([]);
   }, [selectedId, selectedChapter]);
 
   // Save with visual feedback
   const handleSave = async () => {
     if (!hasChapter) return;
-    if (saveStatus === "saving") return; // avoid double-taps
+    if (saveStatus === "saving") return;
 
     setSaveStatus("saving");
 
     try {
-      // Update the current chapter
       updateChapter(selectedId, {
         title: title || selectedChapter?.title || "",
         content: html,
       });
 
-      // Save the project – supports sync or async
       await Promise.resolve(
         saveProject({
           book: { ...book, title: bookTitle },
         })
       );
 
-      // 🔹 NEW: sync title to ProjectPage via localStorage
       const safeTitle =
         (bookTitle && bookTitle.trim()) ||
         (book?.title && book.title.trim()) ||
@@ -327,19 +305,19 @@ export default function ComposePage() {
     });
   };
 
-  // Map friendly button labels to backend modes
+  // Map friendly button labels to backend modes/actions
   const resolveAIMode = (mode) => {
     switch (mode) {
       case "proofread":
-        return "grammar"; // treat "Proofread" as grammar check
+        return "proofread"; // grammar
       case "clarify":
-        return "style"; // treat "Clarify" as style/readability
+        return "clarify"; // style/readability
       case "readability":
         return "readability";
       case "rewrite":
         return "rewrite";
       default:
-        return mode; // fallback
+        return "improve";
     }
   };
 
@@ -347,15 +325,14 @@ export default function ComposePage() {
   const handleAI = async (mode, targetHtmlOverride) => {
     if (!hasChapter) return;
 
-    const MAX_CHARS = 3000; // safe size for now
-    const op = resolveAIMode(mode);
+    const MAX_CHARS = 3000;
+    const action = resolveAIMode(mode);
 
-    // Always work off the latest full chapter HTML
     const fullHtml = (html || "").toString();
     let target = "";
     let useSelection = false;
 
-    // 🔹 Capture current scroll position of the editor so we can restore it after AI
+    // Capture current scroll position of the editor so we can restore it after AI
     let prevScrollTop = 0;
     if (typeof window !== "undefined") {
       try {
@@ -400,7 +377,7 @@ export default function ComposePage() {
       }
     }
 
-    // 2) If no valid selection, fall back to the first chunk (old behavior)
+    // 2) If no valid selection, fall back to the first chunk
     if (!useSelection) {
       const raw = (targetHtmlOverride ?? fullHtml) || "";
       target = raw.slice(0, MAX_CHARS);
@@ -411,59 +388,44 @@ export default function ComposePage() {
     try {
       setAiBusy(true);
 
-      // Choose correct AI helper based on op
-      const runner = (() => {
-        switch (op) {
-          case "grammar":
-            return (text) => runGrammar(text, provider);
-          case "style":
-            return (text) => runStyle(text, provider);
-          case "readability":
-            return (text) => runReadability(text, provider);
-          case "rewrite":
-          default:
-            return (text) => runRewrite(text, provider);
-        }
-      })();
-
       const result = await rateLimiter.addToQueue(async () =>
-        runner(target)
+        runAssistant(target, action, instructions || "", provider)
       );
 
-      const resultText =
-        (result && (result.result || result.text || result.output || result.data)) ||
-        result ||
-        "";
+      const resultTextRaw =
+  (result && (result.result || result.text || result.output || result.data)) ||
+  result ||
+  "";
 
-      if (!resultText) {
-        alert(
-          "The AI did not return any text. Please try again with a smaller section or a different mode."
-        );
-        return;
-      }
+if (!resultTextRaw) {
+  alert(
+    "The AI did not return any text. Please try again with a smaller section or a different mode."
+  );
+  return;
+}
 
-      let combinedHtml = fullHtml;
+// 🔹 NEW: reapply double-spacing to whatever the AI gave us
+const resultText = applyDoubleSpacing(resultTextRaw);
 
-      if (useSelection) {
-        // Replace ONLY the selected fragment inside the chapter HTML
-        const idx = fullHtml.indexOf(target);
+let combinedHtml = fullHtml;
 
-        if (idx !== -1) {
-          combinedHtml =
-            fullHtml.slice(0, idx) +
-            resultText +
-            fullHtml.slice(idx + target.length);
-        } else {
-          // Fallback: simple replace once
-          const replacedOnce = fullHtml.replace(target, resultText);
-          combinedHtml =
-            replacedOnce === fullHtml ? resultText + fullHtml : replacedOnce;
-        }
-      } else {
-        // Chunk mode: edited chunk + remainder
-        const remainder = fullHtml.slice(target.length);
-        combinedHtml = resultText + remainder;
-      }
+if (useSelection) {
+  const idx = fullHtml.indexOf(target);
+
+  if (idx !== -1) {
+    combinedHtml =
+      fullHtml.slice(0, idx) +
+      resultText +
+      fullHtml.slice(idx + target.length);
+  } else {
+    const replacedOnce = fullHtml.replace(target, resultText);
+    combinedHtml =
+      replacedOnce === fullHtml ? resultText + fullHtml : replacedOnce;
+  }
+} else {
+  const remainder = fullHtml.slice(target.length);
+  combinedHtml = resultText + remainder;
+}
 
       setHtml(combinedHtml);
       updateChapter(selectedId, {
@@ -471,7 +433,6 @@ export default function ComposePage() {
         content: combinedHtml,
       });
 
-      // 🔹 Restore scroll position AFTER the editor has updated
       if (typeof window !== "undefined") {
         setTimeout(() => {
           try {
@@ -499,7 +460,7 @@ export default function ComposePage() {
     }
   };
 
-  // NEW: simplified import using documentParser
+  // Import using documentParser
   const handleImport = async (file, options = {}) => {
     if (!file) return;
 
@@ -513,7 +474,6 @@ export default function ComposePage() {
       let parsed;
 
       if (name.endsWith(".doc") || name.endsWith(".docx")) {
-        // Use rate limiter for Word docs (if parser ever hits AI)
         parsed = await rateLimiter.addToQueue(() =>
           documentParser.parseWordDocument(file)
         );
@@ -537,12 +497,10 @@ export default function ComposePage() {
         });
       }
 
-      // Keep book title in sync if we like the parsed title
       if (parsed.title && parsed.title !== bookTitle) {
         setBookTitle(parsed.title);
       }
 
-      // Option A: split into multiple chapters when headings found
       if (splitByHeadings && parsed.chapters && parsed.chapters.length > 0) {
         setImportProgress(
           `Creating ${parsed.chapters.length} chapter(s) from "${file.name}"...`
@@ -561,7 +519,6 @@ export default function ComposePage() {
           `✅ Imported ${parsed.chapters.length} chapter(s) from "${file.name}".`
         );
       } else {
-        // Fallback: single-chapter import
         setImportProgress("Importing manuscript into a single chapter...");
 
         const fullContentRaw =
@@ -573,7 +530,6 @@ export default function ComposePage() {
         const fullContent = applyDoubleSpacing(fullContentRaw);
 
         if (hasChapter) {
-          // Overwrite current chapter
           setHtml(fullContent);
           updateChapter(selectedId, {
             title:
@@ -584,7 +540,6 @@ export default function ComposePage() {
             content: fullContent,
           });
         } else {
-          // Create a brand new chapter
           const newId = addChapter();
           updateChapter(newId, {
             title: parsed.title || "Imported Manuscript",
@@ -599,7 +554,6 @@ export default function ComposePage() {
         );
       }
 
-      // Save snapshot using latest chapters from state
       saveProject({
         book: { ...book, title: parsed.title || bookTitle },
       });
@@ -712,7 +666,7 @@ export default function ComposePage() {
             {selectMode ? "✓ Select" : "Select"}
           </button>
 
-          {/* NEW: AI Assistant quick action */}
+          {/* AI Assistant quick button */}
           <button
             onClick={() => handleAI(activeAiTab || "proofread")}
             disabled={!hasChapter || aiBusy || isImporting}
@@ -725,36 +679,6 @@ export default function ComposePage() {
             <Sparkles className="w-4 h-4 text-amber-500" />
             <span>AI Assistant</span>
           </button>
-
-          {/* Selection toolbar */}
-          {selectMode && selectedIds.size > 0 && (
-            <div className="flex items-center gap-2 px-3 py-1 bg-blue-50 rounded-md border border-blue-200">
-              <span className="text-xs font-medium text-blue-900">
-                {selectedIds.size} selected
-              </span>
-              <button
-                onClick={() => handleDeleteMultiple(Array.from(selectedIds))}
-                className="text-xs px-2 py-0.5 rounded bg-red-500 text-white hover:bg-red-600"
-                title="Delete Selected"
-              >
-                🗑️ Delete
-              </button>
-              <button
-                onClick={clearSelection}
-                className="text-xs px-2 py-0.5 rounded border border-slate-300 bg-white hover:bg-slate-50"
-                title="Clear Selection"
-              >
-                Clear
-              </button>
-              <button
-                onClick={handleSelectAll}
-                className="text-xs px-2 py-0.5 rounded border border-slate-300 bg-white hover:bg-slate-50"
-                title="Select All Chapters"
-              >
-                Select All
-              </button>
-            </div>
-          )}
 
           {/* Provider selector */}
           <div className="ml-2 flex items-center gap-1">
@@ -797,8 +721,8 @@ export default function ComposePage() {
             onDelete={handleDeleteCurrent}
             aiBusy={aiBusy || isImporting}
             saveStatus={saveStatus}
-            activeAiTab={activeAiTab}      // 👈 lets toolbar highlight current tab
-            setActiveAiTab={setActiveAiTab} // 👈 toolbar can update the selection
+            activeAiTab={activeAiTab}
+            setActiveAiTab={setActiveAiTab}
           />
         </div>
       </div>
@@ -883,18 +807,85 @@ export default function ComposePage() {
             )}
           </aside>
 
-          {/* Main Editor */}
-          <EditorPane
-            title={title}
-            setTitle={setTitle}
-            html={html}
-            setHtml={setHtml}
-            onSave={handleSave}
-            onAI={handleAI}
-            aiBusy={aiBusy}
-            pageWidth={1000}
-            onHeadingsChange={setHeadings} // 👈 wire TOC data from editor
-          />
+          {/* Main Editor + AI Panel */}
+          <div className="space-y-4">
+            <EditorPane
+              title={title}
+              setTitle={setTitle}
+              html={html}
+              setHtml={setHtml}
+              onSave={handleSave}
+              onAI={handleAI}
+              aiBusy={aiBusy}
+              pageWidth={1000}
+              onHeadingsChange={setHeadings}
+            />
+
+            {/* 🔹 AI Assistant Panel */}
+            <section className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-amber-500" />
+                  <span className="text-xs font-semibold text-slate-800">
+                    AI Writing Assistant
+                  </span>
+                </div>
+                {aiBusy && (
+                  <span className="text-[11px] text-amber-700">
+                    Thinking…
+                  </span>
+                )}
+              </div>
+
+              <textarea
+                className="w-full border border-slate-300 rounded-md px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-amber-500 focus:border-amber-500 resize-y min-h-[60px]"
+                placeholder="Tell the assistant how to help (for example: 'Tighten this paragraph but keep my voice' or 'Improve clarity without changing meaning')."
+                value={instructions}
+                onChange={(e) => setInstructions(e.target.value)}
+              />
+
+              <div className="mt-2 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={!hasChapter || aiBusy}
+                  onClick={() => handleAI("proofread")}
+                  className="text-xs px-2 py-1 rounded border border-slate-300 bg-slate-50 hover:bg-slate-100 disabled:opacity-60"
+                >
+                  Proofread
+                </button>
+                <button
+                  type="button"
+                  disabled={!hasChapter || aiBusy}
+                  onClick={() => handleAI("clarify")}
+                  className="text-xs px-2 py-1 rounded border border-slate-300 bg-slate-50 hover:bg-slate-100 disabled:opacity-60"
+                >
+                  Clarify
+                </button>
+                <button
+                  type="button"
+                  disabled={!hasChapter || aiBusy}
+                  onClick={() => handleAI("rewrite")}
+                  className="text-xs px-2 py-1 rounded border border-slate-300 bg-slate-50 hover:bg-slate-100 disabled:opacity-60"
+                >
+                  Rewrite
+                </button>
+                <button
+                  type="button"
+                  disabled={!hasChapter || aiBusy}
+                  onClick={() => handleAI("readability")}
+                  className="text-xs px-2 py-1 rounded border border-slate-300 bg-slate-50 hover:bg-slate-100 disabled:opacity-60"
+                >
+                  Readability
+                </button>
+              </div>
+
+              <p className="mt-1 text-[11px] text-slate-500">
+                Tip: select a section in the editor first, then choose a mode.
+                The assistant will focus on just that selection and apply your
+                instructions.
+              </p>
+            </section>
+          </div>
 
           <TrashDock onDelete={handleDeleteMultiple} />
         </div>
