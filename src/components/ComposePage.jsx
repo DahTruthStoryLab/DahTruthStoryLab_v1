@@ -11,12 +11,21 @@ import EditorToolbar from "./Editor/EditorToolbar";
 import TrashDock from "./Writing/TrashDock";
 
 import { useChapterManager } from "../hooks/useChapterManager";
-import { useAIAssistant } from "../hooks/useAIAssistant";
+// 🔄 REMOVED: useAIAssistant
+// import { useAIAssistant } from "../hooks/useAIAssistant";
 import { GoldButton, WritingCrumb } from "./UI/UIComponents";
 
 // NEW: Import the document parser and rate limiter
 import { documentParser } from "../utils/documentParser";
 import { rateLimiter } from "../utils/rateLimiter";
+
+// ✅ NEW: Import AI helpers that talk to /ai-assistant
+import {
+  runGrammar,
+  runStyle,
+  runReadability,
+  runRewrite,
+} from "../lib/api";
 
 // Keys shared with ProjectPage for cross-page sync
 const CURRENT_STORY_KEY = "currentStory";
@@ -27,9 +36,9 @@ function saveCurrentStorySnapshot({ title }) {
   if (!title) return;
   try {
     const snapshot = {
-      id: "main",                   // you can customize later if you support multiple
+      id: "main", // you can customize later if you support multiple
       title: title.trim(),
-      status: "Draft",              // or pull real status if you add it here
+      status: "Draft", // or pull real status if you add it here
       updatedAt: new Date().toISOString(),
     };
     localStorage.setItem(CURRENT_STORY_KEY, JSON.stringify(snapshot));
@@ -58,7 +67,7 @@ function upsertUserProject({ title }) {
     const base = {
       title: t,
       status: "Draft",
-      source: "Project",          // matches what ProjectPage expects
+      source: "Project", // matches what ProjectPage expects
       updatedAt: new Date().toISOString(),
     };
 
@@ -117,17 +126,10 @@ export default function ComposePage() {
     saveProject,
   } = useChapterManager();
 
-  // AI operations
-  const {
-    runAI,
-    aiBusy,
-    aiError,
-    instructions,
-    setInstructions,
-    provider,
-    setProvider,
-    generateChapterPrompt,
-  } = useAIAssistant();
+  // 🔹 LOCAL AI STATE (replaces useAIAssistant)
+  const [aiBusy, setAiBusy] = useState(false);
+  const [provider, setProvider] = useState("openai"); // or "anthropic" if you want
+  const [instructions, setInstructions] = useState(""); // optional: extended guidance text
 
   // Guard + normalize chapters (just require an id)
   const chapters = useMemo(
@@ -277,45 +279,44 @@ export default function ComposePage() {
   }, [selectedId, selectedChapter]);
 
   // Save with visual feedback
-  // Save with visual feedback
-const handleSave = async () => {
-  if (!hasChapter) return;
-  if (saveStatus === "saving") return; // avoid double-taps
+  const handleSave = async () => {
+    if (!hasChapter) return;
+    if (saveStatus === "saving") return; // avoid double-taps
 
-  setSaveStatus("saving");
+    setSaveStatus("saving");
 
-  try {
-    // Update the current chapter
-    updateChapter(selectedId, {
-      title: title || selectedChapter?.title || "",
-      content: html,
-    });
+    try {
+      // Update the current chapter
+      updateChapter(selectedId, {
+        title: title || selectedChapter?.title || "",
+        content: html,
+      });
 
-    // Save the project – supports sync or async
-    await Promise.resolve(
-      saveProject({
-        book: { ...book, title: bookTitle },
-      })
-    );
+      // Save the project – supports sync or async
+      await Promise.resolve(
+        saveProject({
+          book: { ...book, title: bookTitle },
+        })
+      );
 
-    // 🔹 NEW: sync title to ProjectPage via localStorage
-    const safeTitle =
-      (bookTitle && bookTitle.trim()) ||
-      (book?.title && book.title.trim()) ||
-      "Untitled Book";
+      // 🔹 NEW: sync title to ProjectPage via localStorage
+      const safeTitle =
+        (bookTitle && bookTitle.trim()) ||
+        (book?.title && book.title.trim()) ||
+        "Untitled Book";
 
-    saveCurrentStorySnapshot({ title: safeTitle });
-    upsertUserProject({ title: safeTitle });
+      saveCurrentStorySnapshot({ title: safeTitle });
+      upsertUserProject({ title: safeTitle });
 
-    setSaveStatus("saved");
-    setTimeout(() => {
+      setSaveStatus("saved");
+      setTimeout(() => {
+        setSaveStatus("idle");
+      }, 2000);
+    } catch (error) {
+      console.error("Save failed:", error);
       setSaveStatus("idle");
-    }, 2000);
-  } catch (error) {
-    console.error("Save failed:", error);
-    setSaveStatus("idle");
-  }
-};
+    }
+  };
 
   // Rename a chapter (used by sidebar rename ✏️)
   const handleRenameChapter = (chapterId, newTitle) => {
@@ -329,168 +330,173 @@ const handleSave = async () => {
   const resolveAIMode = (mode) => {
     switch (mode) {
       case "proofread":
-        // treat "Proofread" as a grammar check
-        return "grammar";
+        return "grammar"; // treat "Proofread" as grammar check
       case "clarify":
-        // treat "Clarify" as a style/readability pass
-        return "style"; // or "readability" if your backend expects that
+        return "style"; // treat "Clarify" as style/readability
+      case "readability":
+        return "readability";
+      case "rewrite":
+        return "rewrite";
       default:
-        return mode; // "grammar", "readability", etc.
+        return mode; // fallback
     }
   };
 
-  // Helpers to remember & restore scroll
-  const rememberScrollPosition = () => {
-    try {
-      setLastScrollY(window.scrollY || 0);
-    } catch {
-      // ignore
-    }
-  };
+  // SMART AI HANDLER — prefers selected text, falls back to first chunk
+  const handleAI = async (mode, targetHtmlOverride) => {
+    if (!hasChapter) return;
 
-  const restoreScrollPositionSoon = () => {
-    try {
-      window.requestAnimationFrame(() => {
-        window.scrollTo({ top: lastScrollY, behavior: "auto" });
-      });
-    } catch {
-      // ignore
-    }
-  };
+    const MAX_CHARS = 3000; // safe size for now
+    const op = resolveAIMode(mode);
 
- // SMART AI HANDLER — prefers selected text, falls back to first chunk
-const handleAI = async (mode, targetHtmlOverride) => {
-  if (!hasChapter) return;
+    // Always work off the latest full chapter HTML
+    const fullHtml = (html || "").toString();
+    let target = "";
+    let useSelection = false;
 
-  const MAX_CHARS = 3000; // safe size for now
-  const op = resolveAIMode(mode);
-
-  // Always work off the latest full chapter HTML
-  const fullHtml = (html || "").toString();
-  let target = "";
-  let useSelection = false;
-
-  // 🔹 Capture current scroll position of the editor so we can restore it after AI
-  let prevScrollTop = 0;
-  if (typeof window !== "undefined") {
-    try {
-      const editorEl = document.querySelector(".ql-editor");
-      const scroller =
-        editorEl?.parentElement ||
-        editorEl?.closest(".ql-container") ||
-        null;
-
-      if (scroller) {
-        prevScrollTop = scroller.scrollTop || 0;
-      }
-    } catch (err) {
-      console.warn("Could not read editor scroll position:", err);
-    }
-  }
-
-  // 1) Try to grab selected HTML from the editor (Quill uses .ql-editor)
-  if (!targetHtmlOverride && typeof window !== "undefined") {
-    try {
-      const selection = window.getSelection();
-      const editorEl = document.querySelector(".ql-editor");
-
-      if (
-        selection &&
-        selection.rangeCount > 0 &&
-        editorEl &&
-        editorEl.contains(selection.getRangeAt(0).commonAncestorContainer)
-      ) {
-        const range = selection.getRangeAt(0);
-        const container = document.createElement("div");
-        container.appendChild(range.cloneContents());
-        const selectedHtml = container.innerHTML.trim();
-
-        if (selectedHtml) {
-          useSelection = true;
-          target = selectedHtml.slice(0, MAX_CHARS);
-        }
-      }
-    } catch (err) {
-      console.warn("AI selection detection failed, falling back:", err);
-    }
-  }
-
-  // 2) If no valid selection, fall back to the first chunk (old behavior)
-  if (!useSelection) {
-    const raw = (targetHtmlOverride ?? fullHtml) || "";
-    target = raw.slice(0, MAX_CHARS);
-  }
-
-  if (!target || !target.trim()) return;
-
-  try {
-    const result = await rateLimiter.addToQueue(async () =>
-      runAI(op, target, instructions, provider)
-    );
-
-    console.log("AI mode:", op, "chars:", target.length, "result length:", result?.length);
-
-    if (!result) {
-      alert(
-        "The AI did not return any text. Please try again with a smaller section or a different mode."
-      );
-      return;
-    }
-
-    let combinedHtml = fullHtml;
-
-    if (useSelection) {
-      // 3A) Replace ONLY the selected fragment inside the chapter HTML
-      const idx = fullHtml.indexOf(target);
-
-      if (idx !== -1) {
-        combinedHtml =
-          fullHtml.slice(0, idx) + result + fullHtml.slice(idx + target.length);
-      } else {
-        // Fallback: simple replace once
-        const replacedOnce = fullHtml.replace(target, result);
-        combinedHtml =
-          replacedOnce === fullHtml ? result + fullHtml : replacedOnce;
-      }
-    } else {
-      // 3B) Chunk mode: keep old behavior (edited chunk + remainder)
-      const remainder = fullHtml.slice(target.length);
-      combinedHtml = result + remainder;
-    }
-
-    setHtml(combinedHtml);
-    updateChapter(selectedId, {
-      title: title || selectedChapter?.title || "",
-      content: combinedHtml,
-    });
-
-    // 🔹 Restore scroll position AFTER the editor has updated
+    // 🔹 Capture current scroll position of the editor so we can restore it after AI
+    let prevScrollTop = 0;
     if (typeof window !== "undefined") {
-      setTimeout(() => {
-        try {
-          const editorEl = document.querySelector(".ql-editor");
-          const scroller =
-            editorEl?.parentElement ||
-            editorEl?.closest(".ql-container") ||
-            null;
+      try {
+        const editorEl = document.querySelector(".ql-editor");
+        const scroller =
+          editorEl?.parentElement ||
+          editorEl?.closest(".ql-container") ||
+          null;
 
-          if (scroller && typeof prevScrollTop === "number") {
-            scroller.scrollTop = prevScrollTop;
-          }
-        } catch (err) {
-          console.warn("Could not restore editor scroll position:", err);
+        if (scroller) {
+          prevScrollTop = scroller.scrollTop || 0;
         }
-      }, 50);
+      } catch (err) {
+        console.warn("Could not read editor scroll position:", err);
+      }
     }
-  } catch (error) {
-    console.error("AI request error:", error);
-    alert(
-      "There was an error calling the AI service. Please try again in a moment."
-    );
-  }
-};
 
+    // 1) Try to grab selected HTML from the editor (Quill uses .ql-editor)
+    if (!targetHtmlOverride && typeof window !== "undefined") {
+      try {
+        const selection = window.getSelection();
+        const editorEl = document.querySelector(".ql-editor");
 
+        if (
+          selection &&
+          selection.rangeCount > 0 &&
+          editorEl &&
+          editorEl.contains(selection.getRangeAt(0).commonAncestorContainer)
+        ) {
+          const range = selection.getRangeAt(0);
+          const container = document.createElement("div");
+          container.appendChild(range.cloneContents());
+          const selectedHtml = container.innerHTML.trim();
+
+          if (selectedHtml) {
+            useSelection = true;
+            target = selectedHtml.slice(0, MAX_CHARS);
+          }
+        }
+      } catch (err) {
+        console.warn("AI selection detection failed, falling back:", err);
+      }
+    }
+
+    // 2) If no valid selection, fall back to the first chunk (old behavior)
+    if (!useSelection) {
+      const raw = (targetHtmlOverride ?? fullHtml) || "";
+      target = raw.slice(0, MAX_CHARS);
+    }
+
+    if (!target || !target.trim()) return;
+
+    try {
+      setAiBusy(true);
+
+      // Choose correct AI helper based on op
+      const runner = (() => {
+        switch (op) {
+          case "grammar":
+            return (text) => runGrammar(text, provider);
+          case "style":
+            return (text) => runStyle(text, provider);
+          case "readability":
+            return (text) => runReadability(text, provider);
+          case "rewrite":
+          default:
+            return (text) => runRewrite(text, provider);
+        }
+      })();
+
+      const result = await rateLimiter.addToQueue(async () =>
+        runner(target)
+      );
+
+      const resultText =
+        (result && (result.result || result.text || result.output || result.data)) ||
+        result ||
+        "";
+
+      if (!resultText) {
+        alert(
+          "The AI did not return any text. Please try again with a smaller section or a different mode."
+        );
+        return;
+      }
+
+      let combinedHtml = fullHtml;
+
+      if (useSelection) {
+        // Replace ONLY the selected fragment inside the chapter HTML
+        const idx = fullHtml.indexOf(target);
+
+        if (idx !== -1) {
+          combinedHtml =
+            fullHtml.slice(0, idx) +
+            resultText +
+            fullHtml.slice(idx + target.length);
+        } else {
+          // Fallback: simple replace once
+          const replacedOnce = fullHtml.replace(target, resultText);
+          combinedHtml =
+            replacedOnce === fullHtml ? resultText + fullHtml : replacedOnce;
+        }
+      } else {
+        // Chunk mode: edited chunk + remainder
+        const remainder = fullHtml.slice(target.length);
+        combinedHtml = resultText + remainder;
+      }
+
+      setHtml(combinedHtml);
+      updateChapter(selectedId, {
+        title: title || selectedChapter?.title || "",
+        content: combinedHtml,
+      });
+
+      // 🔹 Restore scroll position AFTER the editor has updated
+      if (typeof window !== "undefined") {
+        setTimeout(() => {
+          try {
+            const editorEl = document.querySelector(".ql-editor");
+            const scroller =
+              editorEl?.parentElement ||
+              editorEl?.closest(".ql-container") ||
+              null;
+
+            if (scroller && typeof prevScrollTop === "number") {
+              scroller.scrollTop = prevScrollTop;
+            }
+          } catch (err) {
+            console.warn("Could not restore editor scroll position:", err);
+          }
+        }, 50);
+      }
+    } catch (error) {
+      console.error("AI request error:", error);
+      alert(
+        "There was an error calling the AI service. Please try again in a moment."
+      );
+    } finally {
+      setAiBusy(false);
+    }
+  };
 
   // NEW: simplified import using documentParser
   const handleImport = async (file, options = {}) => {
