@@ -300,7 +300,6 @@ const PLATFORM_PRESETS: Record<
   },
 };
 
-
 /* ---------- Styles ---------- */
 const styles = {
   outer: {
@@ -1262,9 +1261,6 @@ function mapToWritingChapters(rawChapters: any[]): any[] {
     };
   });
 }
-
-const STORAGE_KEY = "dahtruth_chapters";
-const META_KEY = "dahtruth_project_meta";
 
 function mapToWritingChapters(rawChapters: any[]): any[] {
   const now = new Date().toISOString();
