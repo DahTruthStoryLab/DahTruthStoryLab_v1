@@ -755,6 +755,35 @@ if (useSelection) {
         </>
       )}
 
+        {/* GRID VIEW */}
+      {view === "grid" && (
+        <>
+          <ChapterGrid
+            chapters={chapters}
+            selectedId={selectedId}
+            onSelectChapter={(id) => {
+              if (!id) return;
+              if (selectMode) {
+                toggleSelect(id);
+              } else {
+                setSelectedId(id);
+                setView("editor");
+              }
+            }}
+            onAddChapter={addChapter}
+            onMoveChapter={moveChapter}
+            onDeleteChapter={deleteChapter}
+            selectMode={selectMode}
+            selectedIds={selectedIds}
+            onToggleSelect={toggleSelect}
+            onRangeSelect={(idx) => rangeSelect(idx)}
+            lastClickedIndexRef={lastClickedIndexRef}
+          />
+          {/* ✅ TrashDock ONLY in grid mode, where drag-to-trash makes sense */}
+          <TrashDock onDelete={handleDeleteMultiple} />
+        </>
+      )}
+
       {/* EDITOR VIEW */}
       {view === "editor" && (
         <div
@@ -807,19 +836,21 @@ if (useSelection) {
             )}
           </aside>
 
-          {/* Main Editor + AI Panel */}
-          <div className="space-y-4">
-            <EditorPane
-              title={title}
-              setTitle={setTitle}
-              html={html}
-              setHtml={setHtml}
-              onSave={handleSave}
-              onAI={handleAI}
-              aiBusy={aiBusy}
-              pageWidth={1000}
-              onHeadingsChange={setHeadings}
-            />
+          {/* Main Editor */}
+          <EditorPane
+            title={title}
+            setTitle={setTitle}
+            html={html}
+            setHtml={setHtml}
+            onSave={handleSave}
+            onAI={handleAI}
+            aiBusy={aiBusy}
+            pageWidth={1000}
+            onHeadingsChange={setHeadings}
+          />
+          {/* ❌ No TrashDock here anymore */}
+        </div>
+      )}
 
             {/* 🔹 AI Assistant Panel */}
             <section className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
