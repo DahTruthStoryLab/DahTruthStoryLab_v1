@@ -1,5 +1,5 @@
 // src/components/Editor/EditorPane.jsx
-import React, { useMemo, useEffect } from "react";
+import React, { useMemo, useEffect, useState } from "react";
 import ReactQuill from "react-quill";
 
 function stripHtml(html = "") {
@@ -20,12 +20,15 @@ export default function EditorPane({
   html,
   setHtml,
   onSave,
-  onAI,
+  onAI,       // still available for toolbar buttons, but not used here
   aiBusy,
   pageWidth = 1000,
   onHeadingsChange,
 }) {
-  // Quill modules (including line-height control)
+  // ✅ Simple line spacing state (applies to the whole page)
+  const [lineSpacing, setLineSpacing] = useState("1.5");
+
+  // Quill modules – keep them simple and stable
   const modules = useMemo(
     () => ({
       toolbar: [
@@ -37,8 +40,6 @@ export default function EditorPane({
         [{ align: [] }],
         [{ list: "ordered" }, { list: "bullet" }],
         [{ indent: "-1" }, { indent: "+1" }],
-        // 👇 line-height picker: 1, 1.5, 2
-        [{ lineHeight: ["1", "1.5", "2"] }],
         ["clean"],
       ],
     }),
@@ -60,7 +61,6 @@ export default function EditorPane({
       "align",
       "list",
       "indent",
-      "lineHeight",
     ],
     []
   );
@@ -98,15 +98,6 @@ export default function EditorPane({
     <div className="relative flex flex-col gap-3">
       {/* Title row + stats */}
       <div className="flex items-center justify-between gap-3">
-        {/* 👇 Move word/page info to the LEFT */}
-        <div className="flex items-center gap-3 text-xs text-slate-600">
-          <span>{wordCount.toLocaleString()} words</span>
-          <span className="inline-flex items-center rounded-full border border-slate-200 bg-white/80 px-3 py-1 shadow-sm">
-            Pg ~{pageCount}
-          </span>
-        </div>
-
-        {/* Title takes remaining space on the right */}
         <input
           type="text"
           value={title}
@@ -115,6 +106,28 @@ export default function EditorPane({
           placeholder="Untitled chapter"
           className="flex-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
         />
+
+        {/* ✅ Stats + line spacing control over on the right, away from the trash can */}
+        <div className="flex items-center gap-4 text-xs text-slate-600">
+          <span>{wordCount.toLocaleString()} words</span>
+          <span className="inline-flex items-center rounded-full border border-slate-200 bg-white/80 px-3 py-1 shadow-sm">
+            Pg ~{pageCount}
+          </span>
+
+          {/* Line spacing select – NOT inside the Quill toolbar, so it can't disappear */}
+          <div className="flex items-center gap-1">
+            <span className="text-[11px] text-slate-600">Line</span>
+            <select
+              value={lineSpacing}
+              onChange={(e) => setLineSpacing(e.target.value)}
+              className="border rounded px-2 py-[2px] text-[11px] bg-white"
+            >
+              <option value="1">Single</option>
+              <option value="1.5">1.5</option>
+              <option value="2">Double</option>
+            </select>
+          </div>
+        </div>
       </div>
 
       {/* Editor "page" */}
@@ -133,13 +146,11 @@ export default function EditorPane({
             modules={modules}
             formats={formats}
             className="h-full"
+            // ✅ This actually changes line spacing
+            style={{ height: "100%", lineHeight: lineSpacing }}
           />
 
-          {aiBusy && (
-            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 text-[11px] text-slate-500 bg-white/80 px-2 py-1 rounded border border-slate-200 shadow-sm">
-              AI working…
-            </div>
-          )}
+          {/* No bottom AI bar here – all AI is handled by the top toolbar + right-hand panel */}
         </div>
       </div>
     </div>
