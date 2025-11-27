@@ -8,7 +8,6 @@ import {
   Edit3,
   Image as ImageIcon,
   Sparkles,
-  X,
 } from "lucide-react";
 import { DndProvider } from "react-dnd";
 import { HTML5Backend } from "react-dnd-html5-backend";
@@ -20,7 +19,7 @@ import {
   syncProjectForCurrentStory,
 } from "../lib/projectsSync";
 import { uploadImage } from "../lib/uploads";
-import { runAssistant } from "../lib/api"; // 🔹 use your unified AI assistant
+import { runAssistant } from "../lib/api";
 
 const STORAGE_KEY = "dahtruth_chapters";
 const META_KEY = "dahtruth_project_meta";
@@ -41,12 +40,13 @@ const Writing = () => {
     year: new Date().getFullYear().toString(),
   });
 
-  // 👉 NEW: AI sidebar state
-  const [showAiPanel, setShowAiPanel] = useState(false);
-  const [aiMode, setAiMode] = useState("assistant"); // "assistant" | "grammar" | "concise"
+  // 🔹 AI assistant state
+  const [showAIPanel, setShowAIPanel] = useState(false);
+  const [aiBusy, setAiBusy] = useState(false);
   const [aiInput, setAiInput] = useState("");
   const [aiResult, setAiResult] = useState("");
-  const [aiBusy, setAiBusy] = useState(false);
+  const [aiMode, setAiMode] = useState("concise"); // future: "tone", "expand", etc.
+  const [provider] = useState("openai");
 
   // Load project meta from localStorage on mount
   useEffect(() => {
@@ -211,6 +211,75 @@ const Writing = () => {
     handleRenameChapter(selectedChapter.id, newTitle);
   };
 
+  // 🧠 Prefill AI input when the selected chapter changes
+  useEffect(() => {
+    if (selectedChapter) {
+      // Prefer summary; fall back to content
+      setAiInput(selectedChapter.summary || selectedChapter.content || "");
+    } else {
+      setAiInput("");
+      setAiResult("");
+    }
+  }, [selectedChapter]);
+
+  // 🧠 Run AI assistant on the current aiInput
+  const handleRunAI = async () => {
+    if (!aiInput.trim()) {
+      alert("Add some text for the AI assistant to work on.");
+      return;
+    }
+
+    try {
+      setAiBusy(true);
+      setAiResult("");
+
+      const extraInstruction =
+        aiMode === "concise"
+          ? "Rewrite this passage so it is concise, clear, and polished, but keep the author's voice and meaning."
+          : "Rewrite this passage with improved flow, clarity, and style, but preserve the author's voice and intent.";
+
+      const res = await runAssistant(
+        aiInput,
+        "rewrite",
+        extraInstruction,
+        provider
+      );
+
+      const text =
+        (res && (res.result || res.text || res.output || res.data)) || "";
+
+      if (!text) {
+        throw new Error("AI returned an empty response.");
+      }
+
+      setAiResult(text);
+    } catch (err) {
+      console.error("AI assistant error:", err);
+      alert("The AI assistant could not process your text. Please try again.");
+    } finally {
+      setAiBusy(false);
+    }
+  };
+
+  // 🧠 Apply AI result back to chapter outline
+  const handleApplyAIToOutline = () => {
+    if (!selectedChapter || !aiResult.trim()) return;
+    handleOutlineChange(aiResult);
+    setAiInput(aiResult);
+  };
+
+  // 🧠 Copy AI result to clipboard
+  const handleCopyAIResult = async () => {
+    if (!aiResult.trim()) return;
+    try {
+      await navigator.clipboard.writeText(aiResult);
+      alert("AI suggestion copied to clipboard.");
+    } catch (err) {
+      console.error("Clipboard error:", err);
+      alert("Could not copy to clipboard. You can copy it manually.");
+    }
+  };
+
   // 🖼 Image upload handlers
   const handleClickInsertImage = () => {
     if (!selectedChapterId) return;
@@ -251,71 +320,11 @@ const Writing = () => {
     }
   };
 
-  // 👉 Call AI backend using your unified assistant (/ai/assistant)
-  const handleRunAi = async () => {
-    const text = aiInput.trim();
-    if (!text) {
-      alert("Paste or type a passage for AI to work on.");
-      return;
-    }
-
-    setAiBusy(true);
-    setAiResult("");
-
-    try {
-      let modeInstruction = "";
-      if (aiMode === "grammar") {
-        modeInstruction =
-          "Fix grammar, spelling, and clarity while keeping my voice, cadence, and meaning the same.";
-      } else if (aiMode === "concise") {
-        modeInstruction =
-          "Rewrite this passage to be more concise and tight, but keep my voice, emotional tone, and point of view.";
-      } else {
-        modeInstruction =
-          "Act as a writing coach. Improve this passage while preserving my voice and perspective.";
-      }
-
-      // Combine instructions + user text into one payload,
-      // since your backend expects a single `text` string plus an operation key.
-      const combined = `${modeInstruction}\n\n---\n\n${text}`;
-
-      // 🔸 Use the existing "assistant" operation that you already have wired in API Gateway
-      const res = await runAssistant(combined, "assistant", "", "openai");
-
-      const out =
-        (res && (res.result || res.text || res.output || res.content)) || "";
-
-      setAiResult(out || "(AI did not return any text.)");
-    } catch (err) {
-      console.error("AI error in Writing handleRunAi:", err);
-      alert("AI request failed. Check the console for details.");
-    } finally {
-      setAiBusy(false);
-    }
-  };
-
-
-  // 👉 NEW: apply AI result directly to the current chapter's content
-  const handleApplyAiToChapter = () => {
-    if (!selectedChapter) {
-      alert("Select a chapter first to apply the AI suggestion.");
-      return;
-    }
-    if (!aiResult.trim()) {
-      alert("There is no AI suggestion to apply yet.");
-      return;
-    }
-
-    // For now we replace the whole chapter `content`.
-    // Later you could evolve this to only replace a selection.
-    handleUpdateChapter(selectedChapter.id, { content: aiResult });
-  };
-
   return (
     <DndProvider backend={HTML5Backend}>
-      <div className="min-h-screen bg-gradient-to-br from-[#0a0e27] via-[#1a1f3a] to-[#0a0e27] relative">
+      <div className="min-h-screen bg-gradient-to-br from-[#0a0e27] via-[#1a1f3a] to-[#0a0e27]">
         {/* Header */}
-        <header className="border-b border-white/10 bg-[#050819]/90 backdrop-blur z-20 relative">
+        <header className="border-b border-white/10 bg-[#050819]/90 backdrop-blur">
           <div className="max-w-7xl mx-auto px-4 py-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             {/* Left: Title + subtitle */}
             <div className="flex items-center gap-3">
@@ -374,6 +383,19 @@ const Writing = () => {
                 </button>
               </div>
 
+              {/* AI Assistant toggle */}
+              <button
+                onClick={() => setShowAIPanel((v) => !v)}
+                className={`inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs transition ${
+                  showAIPanel
+                    ? "border-[#D4AF37]/60 bg-[#1a237e] text-[#D4AF37]"
+                    : "border-white/15 bg-white/5 text-white/80 hover:bg-white/10 hover:border-[#D4AF37]/40"
+                }`}
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                <span>AI Assistant</span>
+              </button>
+
               {/* Insert Image */}
               <button
                 onClick={handleClickInsertImage}
@@ -381,9 +403,7 @@ const Writing = () => {
                 className="inline-flex items-center gap-1.5 rounded-md border border-white/15 bg-white/5 px-3 py-1.5 text-xs text-white/80 hover:bg-white/10 hover:border-[#D4AF37]/40 transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <ImageIcon className="w-3.5 h-3.5" />
-                <span>
-                  {isUploadingImage ? "Uploading..." : "Insert image"}
-                </span>
+                <span>{isUploadingImage ? "Uploading..." : "Insert image"}</span>
               </button>
 
               <input
@@ -393,15 +413,6 @@ const Writing = () => {
                 onChange={handleImageSelected}
                 className="hidden"
               />
-
-              {/* Ask AI button */}
-              <button
-                onClick={() => setShowAiPanel(true)}
-                className="inline-flex items-center gap-1.5 rounded-md bg-[#1a237e] px-3 py-1.5 text-xs font-medium text-white hover:bg-[#0d47a1] border border-[#D4AF37]/60 shadow-sm"
-              >
-                <Sparkles className="w-3.5 h-3.5" />
-                <span>Ask AI</span>
-              </button>
 
               {/* New chapter */}
               <button
@@ -439,91 +450,190 @@ const Writing = () => {
               onSelectChapter={handleSelectChapter}
               onAddChapter={handleAddChapter}
               onRenameChapter={handleRenameChapter}
-              onMoveChapter={handleMoveChapter} // 👈 drag-reorder in sidebar
+              onMoveChapter={handleMoveChapter} // drag-reorder in sidebar
             />
           )}
 
-          {/* Main Content */}
-          <div className="flex-1 overflow-auto">
-            {viewMode === "grid" ? (
-              // Grid view + small outline editor
-              <div className="h-full grid grid-rows-[minmax(0,1.5fr),minmax(0,1fr)] lg:grid-rows-none lg:grid-cols-[minmax(0,2fr),minmax(0,1.3fr)]">
-                {/* Left: Chapters grid */}
-                <div className="p-4 lg:p-6 overflow-auto">
-                  <ChapterGrid
-                    chapters={chapters}
-                    selectedId={selectedChapterId}
-                    onSelectChapter={handleSelectChapter}
-                    onAddChapter={handleAddChapter}
-                    onUpdateChapter={handleUpdateChapter}
-                    onDeleteChapter={handleDeleteChapter}
-                    onMoveChapter={handleMoveChapter} // 👈 drag-reorder in grid
-                  />
-                </div>
+          {/* Main content + AI panel */}
+          <div className="flex-1 flex overflow-hidden">
+            {/* Main Content */}
+            <div className="flex-1 overflow-auto">
+              {viewMode === "grid" ? (
+                // Grid view + small outline editor
+                <div className="h-full grid grid-rows-[minmax(0,1.5fr),minmax(0,1fr)] lg:grid-rows-none lg:grid-cols-[minmax(0,2fr),minmax(0,1.3fr)]">
+                  {/* Left: Chapters grid */}
+                  <div className="p-4 lg:p-6 overflow-auto">
+                    <ChapterGrid
+                      chapters={chapters}
+                      selectedId={selectedChapterId}
+                      onSelectChapter={handleSelectChapter}
+                      onAddChapter={handleAddChapter}
+                      onUpdateChapter={handleUpdateChapter}
+                      onDeleteChapter={handleDeleteChapter}
+                      onMoveChapter={handleMoveChapter} // drag-reorder in grid
+                    />
+                  </div>
 
-                {/* Right: Small Chapter Outline editor */}
-                <div className="border-t border-white/10 lg:border-t-0 lg:border-l border-white/10 bg-white/5/40 backdrop-blur-xl px-4 py-4 lg:px-6 lg:py-6 flex flex-col">
-                  {selectedChapter ? (
-                    <>
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2">
-                          <div className="p-2 rounded-lg bg-white/5 border border-white/15">
-                            <Edit3 className="w-4 h-4 text-[#D4AF37]" />
-                          </div>
-                          <div>
-                            <p className="text-[10px] uppercase tracking-wide text-white/50">
-                              Chapter {selectedChapter.order ?? ""}
-                            </p>
-                            <input
-                              className="mt-0.5 w-full bg-transparent border-0 border-b border-white/10 focus:border-[#D4AF37]/60 text-sm font-semibold text-white outline-none placeholder:text-white/40"
-                              value={selectedChapter.title || ""}
-                              onChange={(e) =>
-                                handleTitleChangeFromEditor(e.target.value)
-                              }
-                              placeholder="Chapter title..."
-                            />
+                  {/* Right: Small Chapter Outline editor */}
+                  <div className="border-t border-white/10 lg:border-t-0 lg:border-l border-white/10 bg-white/5/40 backdrop-blur-xl px-4 py-4 lg:px-6 lg:py-6 flex flex-col">
+                    {selectedChapter ? (
+                      <>
+                        <div className="flex items-center justify-between mb-3">
+                          <div className="flex items-center gap-2">
+                            <div className="p-2 rounded-lg bg-white/5 border border-white/15">
+                              <Edit3 className="w-4 h-4 text-[#D4AF37]" />
+                            </div>
+                            <div>
+                              <p className="text-[10px] uppercase tracking-wide text-white/50">
+                                Chapter {selectedChapter.order ?? ""}
+                              </p>
+                              <input
+                                className="mt-0.5 w-full bg-transparent border-0 border-b border-white/10 focus:border-[#D4AF37]/60 text-sm font-semibold text-white outline-none placeholder:text-white/40"
+                                value={selectedChapter.title || ""}
+                                onChange={(e) =>
+                                  handleTitleChangeFromEditor(e.target.value)
+                                }
+                                placeholder="Chapter title..."
+                              />
+                            </div>
                           </div>
                         </div>
-                      </div>
 
-                      <label className="text-[11px] text-white/60 mb-1 block">
-                        Small Chapter Outline
-                      </label>
-                      <textarea
-                        className="flex-1 w-full rounded-lg border border-white/15 bg-[#050819]/60 px-3 py-2 text-sm text-white outline-none resize-none min-h-[140px] placeholder:text-white/40"
-                        placeholder="Briefly describe what happens in this chapter..."
-                        value={selectedChapter.summary || ""}
-                        onChange={(e) => handleOutlineChange(e.target.value)}
-                      />
-                      <p className="mt-2 text-[11px] text-white/50">
-                        This short outline is shared with your Table of Contents,
-                        so you can see each chapter's purpose at a glance.
+                        <label className="text-[11px] text-white/60 mb-1 block">
+                          Small Chapter Outline
+                        </label>
+                        <textarea
+                          className="flex-1 w-full rounded-lg border border-white/15 bg-[#050819]/60 px-3 py-2 text-sm text-white outline-none resize-none min-h-[140px] placeholder:text-white/40"
+                          placeholder="Briefly describe what happens in this chapter..."
+                          value={selectedChapter.summary || ""}
+                          onChange={(e) => handleOutlineChange(e.target.value)}
+                        />
+                        <p className="mt-2 text-[11px] text-white/50">
+                          This short outline is shared with your Table of Contents,
+                          so you can see each chapter's purpose at a glance.
+                        </p>
+                      </>
+                    ) : (
+                      <div className="flex-1 flex flex-col items-center justify-center text-center text-white/70">
+                        <Edit3 className="w-8 h-8 mb-3 opacity-70" />
+                        <p className="text-sm mb-1">
+                          Select a chapter to add a small outline.
+                        </p>
+                        <p className="text-xs text-white/60">
+                          Your outline stays synced with the Table of Contents view.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                // List view placeholder
+                <div className="p-6">
+                  <div className="bg-white/5 backdrop-blur-xl rounded-2xl border border-white/10 p-12 text-center">
+                    <List className="w-16 h-16 text-[#D4AF37] mx-auto mb-4 opacity-50" />
+                    <h3 className="text-xl font-semibold text-white mb-2">
+                      List View
+                    </h3>
+                    <p className="text-white/60">
+                      Coming soon! Use grid view for now.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* AI Assistant Panel */}
+            {showAIPanel && (
+              <div className="w-full max-w-sm border-l border-white/15 bg-[#050819]/95 backdrop-blur-xl px-4 py-4 lg:px-5 lg:py-5 flex flex-col">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-[#1a237e]/60 border border-[#D4AF37]/50">
+                      <Sparkles className="w-3.5 h-3.5 text-[#D4AF37]" />
+                    </span>
+                    <div>
+                      <p className="text-xs font-semibold text-white">
+                        AI Assistant
                       </p>
-                    </>
-                  ) : (
-                    <div className="flex-1 flex flex-col items-center justify-center text-center text-white/70">
-                      <Edit3 className="w-8 h-8 mb-3 opacity-70" />
-                      <p className="text-sm mb-1">
-                        Select a chapter to add a small outline.
-                      </p>
-                      <p className="text-xs text-white/60">
-                        Your outline stays synced with the Table of Contents view.
+                      <p className="text-[10px] text-white/50">
+                        Ask for help on this chapter’s outline or content.
                       </p>
                     </div>
-                  )}
+                  </div>
                 </div>
-              </div>
-            ) : (
-              // List view placeholder
-              <div className="p-6">
-                <div className="bg-white/5 backdrop-blur-xl rounded-2xl border border-white/10 p-12 text-center">
-                  <List className="w-16 h-16 text-[#D4AF37] mx-auto mb-4 opacity-50" />
-                  <h3 className="text-xl font-semibold text-white mb-2">
-                    List View
-                  </h3>
-                  <p className="text-white/60">
-                    Coming soon! Use grid view for now.
-                  </p>
+
+                {/* Mode toggle (for now: concise vs polish) */}
+                <div className="flex items-center gap-2 mb-3">
+                  <button
+                    onClick={() => setAiMode("concise")}
+                    className={`flex-1 text-[11px] py-1.5 rounded-md border transition ${
+                      aiMode === "concise"
+                        ? "border-[#D4AF37]/70 bg-[#1a237e] text-[#D4AF37]"
+                        : "border-white/15 bg-white/5 text-white/70 hover:border-[#D4AF37]/40"
+                    }`}
+                  >
+                    Make concise
+                  </button>
+                  <button
+                    onClick={() => setAiMode("polish")}
+                    className={`flex-1 text-[11px] py-1.5 rounded-md border transition ${
+                      aiMode === "polish"
+                        ? "border-[#D4AF37]/70 bg-[#1a237e] text-[#D4AF37]"
+                        : "border-white/15 bg-white/5 text-white/70 hover:border-[#D4AF37]/40"
+                    }`}
+                  >
+                    Polish style
+                  </button>
+                </div>
+
+                <label className="text-[11px] text-white/60 mb-1 block">
+                  Text to improve
+                </label>
+                <textarea
+                  className="w-full rounded-md border border-white/20 bg-[#050819] px-2.5 py-2 text-xs text-white outline-none resize-none min-h-[90px] max-h-[140px] placeholder:text-white/40"
+                  placeholder="Paste a paragraph from your chapter, or edit the outline text here..."
+                  value={aiInput}
+                  onChange={(e) => setAiInput(e.target.value)}
+                />
+
+                <button
+                  type="button"
+                  onClick={handleRunAI}
+                  disabled={aiBusy || !aiInput.trim()}
+                  className="mt-2 inline-flex items-center justify-center gap-1.5 rounded-md bg-[#1a237e] px-3 py-1.5 text-xs font-medium text-white border border-[#D4AF37]/50 hover:bg-[#0d47a1] disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>{aiBusy ? "Working..." : "Ask AI for suggestion"}</span>
+                </button>
+
+                <div className="mt-4 flex-1 flex flex-col">
+                  <label className="text-[11px] text-white/60 mb-1 block">
+                    AI suggestion
+                  </label>
+                  <textarea
+                    className="flex-1 w-full rounded-md border border-white/20 bg-[#050819] px-2.5 py-2 text-xs text-white outline-none resize-none min-h-[110px] placeholder:text-white/40"
+                    placeholder="AI’s revision will appear here..."
+                    value={aiResult}
+                    onChange={(e) => setAiResult(e.target.value)}
+                  />
+
+                  <div className="mt-2 flex items-center justify-between gap-2">
+                    <button
+                      type="button"
+                      onClick={handleApplyAIToOutline}
+                      disabled={!aiResult.trim() || !selectedChapter}
+                      className="flex-1 rounded-md bg-[#1a237e] px-3 py-1.5 text-[11px] font-medium text-white border border-[#D4AF37]/50 disabled:opacity-60 disabled:cursor-not-allowed hover:bg-[#0d47a1]"
+                    >
+                      Apply to chapter outline
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleCopyAIResult}
+                      disabled={!aiResult.trim()}
+                      className="flex-none rounded-md border border-white/25 bg-white/5 px-3 py-1.5 text-[11px] text-white/80 hover:border-[#D4AF37]/50 disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      Copy text
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
@@ -550,118 +660,6 @@ const Writing = () => {
                 <Plus className="w-5 h-5" />
                 <span>Create First Chapter</span>
               </button>
-            </div>
-          </div>
-        )}
-
-        {/* 👉 NEW: AI Sidebar Drawer */}
-        {showAiPanel && (
-          <div className="fixed right-0 top-[64px] bottom-0 w-full max-w-md bg-[#050819]/95 border-l border-white/10 shadow-2xl z-40 flex flex-col">
-            <div className="px-4 py-3 border-b border-white/10 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-[#D4AF37]" />
-                <div>
-                  <p className="text-xs font-semibold text-white">
-                    AI Writing Assistant
-                  </p>
-                  <p className="text-[10px] text-white/50">
-                    Paste a passage, choose a mode, and refine it with AI.
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowAiPanel(false)}
-                className="text-white/50 hover:text-white p-1 rounded-md hover:bg-white/10"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            {/* Mode selector */}
-            <div className="px-4 pt-3 pb-2 flex gap-1 text-[11px]">
-              <button
-                onClick={() => setAiMode("assistant")}
-                className={`flex-1 px-2 py-1 rounded-full border ${
-                  aiMode === "assistant"
-                    ? "border-[#D4AF37] bg-[#1a237e]"
-                    : "border-white/15 bg-white/5 text-white/70"
-                } text-white/90`}
-              >
-                Assistant
-              </button>
-              <button
-                onClick={() => setAiMode("grammar")}
-                className={`flex-1 px-2 py-1 rounded-full border ${
-                  aiMode === "grammar"
-                    ? "border-[#D4AF37] bg-[#1a237e]"
-                    : "border-white/15 bg-white/5 text-white/70"
-                } text-white/90`}
-              >
-                Grammar & clarity
-              </button>
-              <button
-                onClick={() => setAiMode("concise")}
-                className={`flex-1 px-2 py-1 rounded-full border ${
-                  aiMode === "concise"
-                    ? "border-[#D4AF37] bg-[#1a237e]"
-                    : "border-white/15 bg-white/5 text-white/70"
-                } text-white/90`}
-              >
-                Make concise
-              </button>
-            </div>
-
-            {/* Input + actions */}
-            <div className="px-4 pt-2 pb-3 border-b border-white/10">
-              <label className="text-[11px] text-white/60 mb-1 block">
-                Passage for AI to work on
-              </label>
-              <textarea
-                className="w-full rounded-lg border border-white/15 bg-[#050819] px-3 py-2 text-xs text-white outline-none resize-none min-h-[100px] placeholder:text-white/35"
-                placeholder="Paste a paragraph or scene from your chapter..."
-                value={aiInput}
-                onChange={(e) => setAiInput(e.target.value)}
-              />
-              <div className="mt-2 flex items-center justify-between gap-2">
-                <p className="text-[10px] text-white/40">
-                  Tip: Copy a section from your chapter, refine it here, then
-                  apply it back to the chapter.
-                </p>
-                <button
-                  onClick={handleRunAi}
-                  disabled={aiBusy}
-                  className="inline-flex items-center gap-1.5 rounded-md bg-[#1a237e] px-3 py-1.5 text-[11px] font-medium text-white hover:bg-[#0d47a1] border border-[#D4AF37]/60 disabled:opacity-60 disabled:cursor-not-allowed"
-                >
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>{aiBusy ? "Working..." : "Run AI"}</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Result + apply */}
-            <div className="flex-1 px-4 py-3 overflow-auto flex flex-col">
-              <label className="text-[11px] text-white/60 mb-1 block">
-                AI suggestion
-              </label>
-              <textarea
-                className="flex-1 w-full rounded-lg border border-white/15 bg-[#050819] px-3 py-2 text-xs text-white outline-none resize-none placeholder:text-white/35"
-                placeholder="AI's revision will appear here..."
-                value={aiResult}
-                onChange={(e) => setAiResult(e.target.value)}
-              />
-              <div className="mt-2 flex items-center justify-between gap-2">
-                <p className="text-[10px] text-white/45">
-                  You can still edit the AI suggestion before applying it.
-                </p>
-                <button
-                  onClick={handleApplyAiToChapter}
-                  disabled={!selectedChapter || !aiResult.trim()}
-                  className="inline-flex items-center gap-1.5 rounded-md bg-[#0c1b3d] px-3 py-1.5 text-[11px] font-medium text-white hover:bg-[#13264f] border border-[#D4AF37]/40 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <Edit3 className="w-3.5 h-3.5" />
-                  <span>Apply to chapter</span>
-                </button>
-              </div>
             </div>
           </div>
         )}
