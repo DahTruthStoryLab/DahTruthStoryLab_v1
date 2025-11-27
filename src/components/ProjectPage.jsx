@@ -43,6 +43,12 @@ function saveProjects(projects) {
   }
 }
 
+// inside ProjectPage
+const navigate = useNavigate();
+const handleProjectImportClick = () => {
+  navigate("/compose?import=1");
+};
+
 // -------------------- Profile helper --------------------
 function readAuthorProfile() {
   let name = "New Author";
