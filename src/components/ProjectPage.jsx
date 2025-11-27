@@ -549,23 +549,19 @@ export default function ProjectPage() {
                 </button>
               </div>
 
-              {/* Import Button */}
-              <label
-                className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl text-sm font-semibold cursor-pointer transition-all hover:scale-105"
+            {/* Import Button – now just opens Writer, where the real import happens */}
+              <button
+                type="button"
+                onClick={() => navigate("/writer")}  // or "/compose" if that’s your route
+                className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl text-sm font-semibold transition-all hover:scale-105"
                 style={{
                   background: "rgba(255,255,255,0.9)",
                   border: "1px solid rgba(148,163,184,0.4)",
                 }}
               >
                 <Upload size={16} />
-                Import Project
-                <input
-                  type="file"
-                  accept=".doc,.docx,.txt,.rtf"
-                  className="hidden"
-                  onChange={handleImport}
-                />
-              </label>
+                Import Manuscript
+              </button>
 
               {/* New Project Button */}
               <button
