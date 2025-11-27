@@ -113,11 +113,11 @@ export default function ComposePage() {
   // 🔹 LOCAL AI STATE
   const [aiBusy, setAiBusy] = useState(false);
   const [provider, setProvider] = useState("openai");
-  const [instructions, setInstructions] = useState(""); // optional extra guidance
+  const [instructions, setInstructions] = useState(""); // optional extra guidance (for top AI modes if you re-add the box later)
 
   // 🔹 Right-hand AI assistant chat state
   const [showAssistant, setShowAssistant] = useState(false);
-  const [chatMessages, setChatMessages] = useState([]); // {role: 'user'|'assistant', content: string}
+  const [chatMessages, setChatMessages] = useState([]); // {role: 'user'|'assistant', content, id}
   const [chatInput, setChatInput] = useState("");
   const [chatBusy, setChatBusy] = useState(false);
 
@@ -242,11 +242,6 @@ export default function ComposePage() {
       if (s) clearSelection();
       return !s;
     });
-  }
-
-  function handleSelectAll() {
-    if (!Array.isArray(chapters) || chapters.length === 0) return;
-    setSelectedIds(new Set(chapters.map((c) => c.id)));
   }
 
   // Keyboard delete
@@ -838,7 +833,7 @@ export default function ComposePage() {
             onRangeSelect={(idx) => rangeSelect(idx)}
             lastClickedIndexRef={lastClickedIndexRef}
           />
-          {/* ✅ TrashDock ONLY in grid mode, where drag-to-trash makes sense */}
+          {/* ✅ TrashDock ONLY in grid mode */}
           <TrashDock onDelete={handleDeleteMultiple} />
         </>
       )}
@@ -950,16 +945,39 @@ export default function ComposePage() {
                   </p>
                 )}
 
-                {chatMessages.map((m) => (
+                {chatMessages.map((msg) => (
                   <div
-                    key={m.id}
+                    key={msg.id}
                     className={
-                      m.role === "user"
-                        ? "ml-auto max-w-[90%] rounded-lg bg-indigo-50 px-3 py-2 text-[13px] text-slate-800"
-                        : "mr-auto max-w-[90%] rounded-lg bg-slate-100 px-3 py-2 text-[13px] text-slate-800"
+                      msg.role === "user"
+                        ? "self-end max-w-[80%] rounded-lg bg-indigo-50 px-3 py-2 text-xs"
+                        : "self-start max-w-[80%] rounded-lg bg-slate-50 px-3 py-2 text-xs"
                     }
                   >
-                    {m.content}
+                    <div className="whitespace-pre-wrap text-slate-800">
+                      {msg.content}
+                    </div>
+
+                    {msg.role === "assistant" && (
+                      <div className="mt-1 flex gap-2 text-[10px] text-slate-500">
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              await navigator.clipboard.writeText(msg.content);
+                              alert("Copied to clipboard");
+                            } catch (e) {
+                              alert(
+                                "Could not copy. You can still select and copy manually."
+                              );
+                            }
+                          }}
+                          className="px-2 py-0.5 rounded border border-slate-200 bg-white hover:bg-slate-100"
+                        >
+                          Copy
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
