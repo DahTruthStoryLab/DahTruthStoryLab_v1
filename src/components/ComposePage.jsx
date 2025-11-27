@@ -17,9 +17,10 @@ import { rateLimiter } from "../utils/rateLimiter";
 import { runAssistant } from "../lib/api";
 import { Sparkles } from "lucide-react";
 
-// Keys shared with ProjectPage for cross-page sync
 const CURRENT_STORY_KEY = "currentStory";
 const USER_PROJECTS_KEY = "userProjects";
+const PUBLISHING_DRAFT_KEY = "publishingDraft"; // 👈 NEW
+
 
 // Save a simple "current story" snapshot for ProjectPage to read
 function saveCurrentStorySnapshot({ title }) {
@@ -646,6 +647,41 @@ export default function ComposePage() {
     }
   };
 
+  const handleSendToPublishing = async () => {
+  if (!Array.isArray(chapters) || chapters.length === 0) {
+    alert("You need at least one chapter before sending to Publishing.");
+    return;
+  }
+
+  // 1) Make sure the latest changes are saved
+  await handleSave();
+
+  try {
+    const payload = {
+      book: {
+        ...book,
+        title: bookTitle,
+        status: "ReadyForPublishing",
+        updatedAt: new Date().toISOString(),
+      },
+      chapters,
+    };
+
+    localStorage.setItem(PUBLISHING_DRAFT_KEY, JSON.stringify(payload));
+
+    // Also update the project list status
+    upsertUserProject({
+      title: bookTitle || book?.title || "Untitled Book",
+    });
+
+    // 2) Go to Publishing page
+    navigate("/publishing");
+  } catch (err) {
+    console.error("Failed to send manuscript to publishing:", err);
+    alert("Something went wrong sending this to Publishing. Please try again.");
+  }
+};
+
   // Export current chapter as HTML
   const handleExport = () => {
     const blob = new Blob([html], { type: "text/html" });
@@ -759,7 +795,18 @@ export default function ComposePage() {
             <Sparkles className="w-4 h-4 text-amber-500" />
             <span>Run AI</span>
           </button>
-
+          
+        {/* Send to Publishing */}
+        <button
+          type="button"
+          onClick={handleSendToPublishing}
+          disabled={!hasChapter || saveStatus === "saving"}
+          className="inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-[13px] bg-[var(--brand-gold)] text-white hover:bg-amber-600 disabled:opacity-60"
+          title="Lock in this manuscript and open the Publishing workspace"
+        >
+          <span>Send to Publishing</span>
+        </button>
+          
           {/* Provider selector */}
           <div className="ml-2 flex items-center gap-1">
             <label className="text-[12px] text-slate-600">Provider:</label>
