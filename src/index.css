@@ -54,6 +54,32 @@
   background-color: rgba(0, 0, 0, 0.05);
 }
 
+/* Make sure the Quill toolbar can show dropdowns fully */
+.ql-toolbar {
+  overflow: visible !important;
+  z-index: 30;
+}
+
+/* === NEW: Line-height picker (1 / 1.5 / 2) visibility & styling === */
+.ql-toolbar .ql-picker.ql-line-height .ql-picker-label::before,
+.ql-toolbar .ql-picker.ql-line-height .ql-picker-item::before {
+  color: #0f172a;       /* dark text (slate-900-ish) */
+  font-size: 12px;
+}
+
+/* Dropdown panel background for the line-height picker */
+.ql-toolbar .ql-picker.ql-line-height .ql-picker-options {
+  background: #ffffff;
+  border: 1px solid #e5e7eb; /* slate-200 */
+  box-shadow: 0 8px 16px rgba(15, 23, 42, 0.12);
+  z-index: 40;
+}
+
+/* Give the line-height picker a bit of width so numbers do not get clipped */
+.ql-toolbar .ql-picker.ql-line-height {
+  min-width: 2.5rem;
+}
+
 /* ================================
    Brand + Global Base (LIGHT THEME)
    ================================ */
