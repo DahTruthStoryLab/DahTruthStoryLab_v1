@@ -44,9 +44,7 @@ type Normalized = {
 function withTimeout(ms: number, signal?: AbortSignal) {
   const controller = new AbortController();
   const t = setTimeout(() => controller.abort(), ms);
-  if (signal) {
-    signal.addEventListener("abort", () => controller.abort(), { once: true });
-  }
+  if (signal) signal.addEventListener("abort", () => controller.abort(), { once: true });
   return { signal: controller.signal, clear: () => clearTimeout(t) };
 }
 
@@ -94,17 +92,8 @@ const backoff = (attempts = 2) =>
   Array.from({ length: Math.max(0, attempts) }, (_ , i) => 250 * 2 ** i);
 
 function isAnthropicCreditError(msg?: string) {
-  return /credit balance|insufficient funds|billing|purchase|upgrade/i.test(
-    String(msg || "")
-  );
+  return /credit balance|insufficient funds|billing|purchase|upgrade/i.test(String(msg || ""));
 }
-
-/* --------------------------------- Routes --------------------------------- */
-
-const ROUTES = {
-  aiAssistant: "/ai-assistant",
-  files: "/files",
-} as const;
 
 /* --------------------------- Core assistant call -------------------------- */
 /**
@@ -141,7 +130,7 @@ async function callAssistant(
     const norm = normalizeResponse(res, text);
 
     if (!norm.ok) {
-      const err = new Error(norm.error || `HTTP ${norm.status}`);
+      const err = new Error(norm.error || `HTTP ${res.status}`);
       (err as any).status = norm.status;
       (err as any).messageText = norm.message;
       (err as any).provider = prov;
@@ -163,9 +152,7 @@ async function callAssistant(
 
         // Anthropic credit fallback → one immediate swap to OpenAI
         if (prov === "anthropic" && isAnthropicCreditError(e?.messageText)) {
-          if (DEBUG) {
-            console.warn("[api] Anthropic credit issue — falling back to OpenAI");
-          }
+          if (DEBUG) console.warn("[api] Anthropic credit issue — falling back to OpenAI");
           return await attempt("openai");
         }
 
@@ -181,6 +168,13 @@ async function callAssistant(
 
   return run(provider);
 }
+
+/* --------------------------------- Routes --------------------------------- */
+
+const ROUTES = {
+  aiAssistant: "/ai-assistant",
+  files: "/files",
+} as const;
 
 /* ------------------------------ AI Helpers -------------------------------- */
 /** Generic chat/improve endpoint */
@@ -198,7 +192,6 @@ export function runAssistant(
     { retries: 2, timeoutMs: 45000 }  // Changed from 30000
   );
 }
-
 export function runRewrite(
   text: string,
   provider: "anthropic" | "openai" = "openai"
@@ -210,7 +203,6 @@ export function runRewrite(
     { retries: 2, timeoutMs: 60000 }  // Changed from 25000
   );
 }
-
 export function runGrammar(
   text: string,
   provider: "anthropic" | "openai" = "openai"
@@ -222,7 +214,6 @@ export function runGrammar(
     { retries: 2, timeoutMs: 60000 }  // Changed from 25000
   );
 }
-
 export function runStyle(
   text: string,
   provider: "anthropic" | "openai" = "openai"
@@ -234,7 +225,6 @@ export function runStyle(
     { retries: 2, timeoutMs: 60000 }  // Changed from 25000
   );
 }
-
 export function runReadability(
   text: string,
   provider: "anthropic" | "openai" = "openai"
@@ -246,7 +236,6 @@ export function runReadability(
     { retries: 2, timeoutMs: 60000 }  // Changed from 25000
   );
 }
-
 export function runPublishingPrep(
   meta: any,
   chapters: any[],
@@ -260,7 +249,6 @@ export function runPublishingPrep(
     { retries: 2, timeoutMs: 45000 }  // This one is fine as-is
   );
 }
-
 /* ------------------------- Convenience wrappers --------------------------- */
 export const proofread = (
   text: string,
@@ -346,10 +334,7 @@ export function filesPresignUpload(params: {
     `${API_BASE}${ROUTES.files}`,
     {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-operation": "presign-upload",
-      },
+      headers: { "Content-Type": "application/json", "x-operation": "presign-upload" },
       body: JSON.stringify({ operation: "presign-upload", ...params }),
     },
     25000
@@ -381,11 +366,7 @@ export function filesList(params: {
   });
 }
 
-export function filesGet(params: {
-  userId: string;
-  key: string;
-  expiresIn?: number;
-}) {
+export function filesGet(params: { userId: string; key: string; expiresIn?: number }) {
   return fetchWithTimeout(
     `${API_BASE}${ROUTES.files}`,
     {
@@ -401,11 +382,7 @@ export function filesGet(params: {
   });
 }
 
-export function filesDelete(params: {
-  userId: string;
-  manuscriptId?: string;
-  fileKey?: string;
-}) {
+export function filesDelete(params: { userId: string; manuscriptId?: string; fileKey?: string }) {
   return fetchWithTimeout(
     `${API_BASE}${ROUTES.files}`,
     {
@@ -423,16 +400,9 @@ export function filesDelete(params: {
 }
 
 /* --------------------------------- Ping ----------------------------------- */
-export async function ping(
-  provider: "openai" | "anthropic" = "openai"
-) {
+export async function ping(provider: "openai" | "anthropic" = "openai") {
   try {
-    const res = await callAssistant(
-      "ping",
-      { ts: Date.now() },
-      provider,
-      { retries: 0, timeoutMs: 8000 }
-    );
+    const res = await callAssistant("ping", { ts: Date.now() }, provider, { retries: 0, timeoutMs: 8000 });
     return { ok: true, res };
   } catch (e: any) {
     return { ok: false, error: e?.message || String(e) };
