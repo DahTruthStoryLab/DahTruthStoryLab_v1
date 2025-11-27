@@ -2,7 +2,6 @@
 
 // --------- Local helpers ---------
 const PROJECTS_KEY = "userProjects";
-const CURRENT_STORY_KEY = "currentStory";
 
 function loadProjects() {
   try {
@@ -24,231 +23,110 @@ function saveProjects(projects) {
   }
 }
 
-function stripHtml(html = "") {
-  if (!html) return "";
-  const tmp = document.createElement("div");
-  tmp.innerHTML = html;
-  return tmp.textContent || tmp.innerText || "";
-}
+const countWords = (s = "") =>
+  s.trim().split(/\s+/).filter(Boolean).length;
 
-const countPlainWords = (s = "") =>
-  s
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean).length;
+// 🔹 NEW: extract unique @char: tags from chapters
+function extractCharactersFromChapters(chapters = []) {
+  const names = new Set();
+  const tagRegex = /@char:([^|\n\r]+)/g; // grab text after @char: up to '|' or newline
 
-// --------- Character helpers ---------
+  for (const ch of chapters || []) {
+    const raw =
+      ch?.content ||
+      ch?.text ||
+      ch?.body ||
+      "";
 
-/**
- * Parse explicit tags like:
- *   @char:John Smith
- *   @char:John Smith|role:major
- *
- * Returns [{ name, role }]
- */
-function extractTaggedCharactersFromChapters(chapters = []) {
-  const tagRegex =
-    /@char:([^\|\n\r]+?)(?:\|role:(major|supporting|minor|small))?/gi;
+    if (!raw) continue;
 
-  const byName = new Map();
-
-  for (const ch of chapters) {
-    const html = ch?.content || ch?.text || ch?.body || "";
-    const plain = stripHtml(html);
+    let html = String(raw);
     let match;
-    while ((match = tagRegex.exec(plain)) !== null) {
-      const rawName = match[1].trim();
-      if (!rawName) continue;
-
-      const roleRaw = match[2]?.trim().toLowerCase();
-      const role =
-        roleRaw === "major" ||
-        roleRaw === "supporting" ||
-        roleRaw === "minor" ||
-        roleRaw === "small"
-          ? roleRaw
-          : undefined;
-
-      const key = rawName.toLowerCase();
-
-      if (!byName.has(key)) {
-        byName.set(key, {
-          name: rawName,
-          role: role || "supporting", // default for now
-        });
-      } else if (role && !byName.get(key).role) {
-        byName.get(key).role = role;
+    while ((match = tagRegex.exec(html)) !== null) {
+      let name = match[1] || "";
+      // strip any HTML tags that might have snuck in
+      name = name.replace(/<[^>]+>/g, "").trim();
+      if (name) {
+        names.add(name);
       }
     }
   }
 
-  return Array.from(byName.values());
-}
-
-/**
- * Very simple fallback if there are no @char tags yet.
- * You can delete this later once you're fully on @char: tags.
- */
-function extractHeuristicCharacters(chapters = []) {
-  const allText = chapters
-    .map((ch) => stripHtml(ch?.content || ch?.text || ch?.body || ""))
-    .join("\n\n");
-
-  const words = allText
-    .replace(/[\r\n]+/g, " ")
-    .split(/\s+/)
-    .filter(Boolean);
-
-  const counts = new Map();
-  const stopWords = new Set([
-    "The",
-    "And",
-    "But",
-    "For",
-    "From",
-    "With",
-    "This",
-    "That",
-    "There",
-    "Here",
-    "They",
-    "Them",
-    "Then",
-    "When",
-    "What",
-    "Where",
-    "Which",
-    "Who",
-    "Whose",
-    "Why",
-    "How",
-    "You",
-    "Your",
-    "Our",
-    "Their",
-    "His",
-    "Her",
-    "Its",
-    "It",
-    "He",
-    "She",
-    "We",
-    "I",
-  ]);
-
-  for (let i = 0; i < words.length; i++) {
-    const raw = words[i].replace(/[^A-Za-z']/g, "");
-    if (!raw) continue;
-
-    if (!/^[A-Z][a-z']+$/.test(raw)) continue;
-    if (stopWords.has(raw)) continue;
-
-    counts.set(raw, (counts.get(raw) || 0) + 1);
-  }
-
-  // Toss anything that only appears once or twice
-  const candidates = Array.from(counts.entries())
-    .filter(([_, count]) => count >= 3)
-    .sort((a, b) => b[1] - a[1])
-    .map(([name]) => ({ name, role: "supporting" }));
-
-  return candidates;
+  return Array.from(names);
 }
 
 // --------- Public helpers ---------
 
 /**
  * Compute total words from a chapters array.
- * Each chapter can use .content or .text or .body (we try several),
- * AND we strip HTML to avoid counting tags.
+ * Each chapter can use .content or .text or .body (we try several).
  */
 export function computeWordsFromChapters(chapters = []) {
   return chapters.reduce((sum, ch) => {
-    const html = ch?.content || ch?.text || ch?.body || "";
-    const plain = stripHtml(html);
-    return sum + countPlainWords(plain);
+    const text =
+      ch?.content ||
+      ch?.text ||
+      ch?.body ||
+      "";
+    return sum + countWords(text);
   }, 0);
+}
+
+// 🔹 NEW: compute character list + count from chapters
+export function computeCharactersFromChapters(chapters = []) {
+  const list = extractCharactersFromChapters(chapters);
+  return {
+    characters: list,
+    characterCount: list.length,
+  };
 }
 
 /**
  * Sync the currentStory and matching project in userProjects
- * with the latest wordCount / targetWords, and (optionally)
- * characters if chapters are provided.
+ * with the latest wordCount / targetWords / characterCount.
  *
- * You can call this in two ways:
- *   syncProjectForCurrentStory({ wordCount, targetWords });
- *   syncProjectForCurrentStory({ chapters, targetWords, bookTitle });
+ * Call this from Writer and TOC whenever words change.
  */
 export function syncProjectForCurrentStory({
   wordCount,
   targetWords,
-  chapters,
-  bookTitle,
-} = {}) {
+  characterCount,   // 🔹 NEW
+}) {
   try {
-    const rawStory = localStorage.getItem(CURRENT_STORY_KEY);
+    const rawStory = localStorage.getItem("currentStory");
     if (!rawStory) return;
 
     const currentStory = JSON.parse(rawStory) || {};
     const id = currentStory.id;
-    const existingTitle = (currentStory.title || "").trim();
-    const safeTitle =
-      (bookTitle && bookTitle.trim()) || existingTitle || "Untitled Project";
-
+    const title = (currentStory.title || "").trim();
     const now = new Date().toISOString();
-
-    // If chapters are passed, we compute words from text;
-    // otherwise we trust the explicit wordCount (like you had before).
-    const computedWordCount =
-      typeof wordCount === "number"
-        ? wordCount
-        : Array.isArray(chapters) && chapters.length
-        ? computeWordsFromChapters(chapters)
-        : currentStory.wordCount || 0;
-
-    // --- Character extraction (only if chapters are provided) ---
-    let characters = undefined;
-    let characterCount = undefined;
-
-    if (Array.isArray(chapters) && chapters.length) {
-      let tagged = extractTaggedCharactersFromChapters(chapters);
-      if (!tagged.length) {
-        tagged = extractHeuristicCharacters(chapters);
-      }
-      characters = tagged;
-      characterCount = tagged.length;
-    }
 
     let projects = loadProjects();
     let changed = false;
 
     projects = projects.map((p) => {
       const sameById = id && p.id === id;
-      const sameByTitle = !id && safeTitle && (p.title || "").trim() === safeTitle;
+      const sameByTitle =
+        !id && title && (p.title || "").trim() === title;
 
       if (sameById || sameByTitle) {
         changed = true;
-
-        const patch = {
-          wordCount: computedWordCount,
+        return {
+          ...p,
+          wordCount:
+            typeof wordCount === "number"
+              ? wordCount
+              : (p.wordCount || 0),
           targetWords:
             typeof targetWords === "number"
               ? targetWords
-              : p.targetWords || currentStory.targetWords || 0,
+              : (p.targetWords || currentStory.targetWords || 0),
+          // 🔹 keep characterCount in sync too
+          characterCount:
+            typeof characterCount === "number"
+              ? characterCount
+              : (p.characterCount || 0),
           lastModified: now,
-        };
-
-        if (characters !== undefined) {
-          patch.characters = characters;
-          patch.characterCount = characterCount;
-        }
-
-        // make sure title is up to date
-        patch.title = safeTitle;
-
-        return {
-          ...p,
-          ...patch,
         };
       }
       return p;
@@ -261,21 +139,22 @@ export function syncProjectForCurrentStory({
     // Also refresh currentStory snapshot so Dashboard & others see it
     const updatedCurrent = {
       ...currentStory,
-      title: safeTitle,
-      wordCount: computedWordCount,
+      wordCount:
+        typeof wordCount === "number"
+          ? wordCount
+          : currentStory.wordCount || 0,
       targetWords:
         typeof targetWords === "number"
           ? targetWords
           : currentStory.targetWords || 0,
+      characterCount:
+        typeof characterCount === "number"
+          ? characterCount
+          : currentStory.characterCount || 0,
       lastModified: now,
     };
 
-    if (characters !== undefined) {
-      updatedCurrent.characters = characters;
-      updatedCurrent.characterCount = characterCount;
-    }
-
-    localStorage.setItem(CURRENT_STORY_KEY, JSON.stringify(updatedCurrent));
+    localStorage.setItem("currentStory", JSON.stringify(updatedCurrent));
     window.dispatchEvent(new Event("project:change"));
   } catch (err) {
     console.error("Failed to sync project for current story:", err);
