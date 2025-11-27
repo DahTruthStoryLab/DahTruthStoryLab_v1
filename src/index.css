@@ -85,6 +85,23 @@
   margin: 0 0 0.75em 0;
 }
 
+/* 🔹 Editor line spacing helpers */
+.storylab-editor .ql-editor {
+  line-height: 1.5; /* default */
+}
+
+.storylab-lh-1 .ql-editor {
+  line-height: 1;
+}
+
+.storylab-lh-1_5 .ql-editor {
+  line-height: 1.5;
+}
+
+.storylab-lh-2 .ql-editor {
+  line-height: 2;
+}
+
 /* ================================
    Brand + Global Base (LIGHT THEME)
    ================================ */
