@@ -1293,133 +1293,77 @@ function mapToWritingChapters(rawChapters: any[]): any[] {
   });
 }
 
-async function handleImportManuscript(file: File) {
-  const parsed = await parseDocxToChapters(file);
-  // parsed: { title?: string, author?: string, chapters: [...] }
-
-  const chapters = mapToWritingChapters(parsed.chapters || []);
-
-  // Optional: warn if we’re going to overwrite existing chapters
-  const existing = localStorage.getItem(STORAGE_KEY);
-  if (existing && chapters.length > 0) {
-    const ok = window.confirm(
-      "Replace existing chapters with this imported manuscript?"
+const handleGenerateMaterial = async (key: MaterialKey) => {
+  if (!compiledPlain) {
+    alert(
+      "Your publishing manuscript is empty. Add chapters and front matter first."
     );
-    if (!ok) return;
+    return;
   }
+  if (materialBusy) return;
 
-  // 1️⃣ Save chapters so Writing *and* Publishing can see them
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(chapters));
+  setMaterialBusy(true);
+  setMaterialKey(key);
 
-  // 2️⃣ Save project meta (title/author/year)
-  const meta = {
-    title: parsed.title || "Working Title",
-    author: parsed.author || "Your Name",
-    year: new Date().getFullYear().toString(),
-  };
-  localStorage.setItem(META_KEY, JSON.stringify(meta));
+  try {
+    let generatedText = "";
 
-  // 3️⃣ Optionally route user straight to Writing
-  navigate("/writing"); // or however you navigate
-}
-
-  const chapters = mapToWritingChapters(parsed.chapters || []);
-
-  // Optional: warn if we’re going to overwrite existing chapters
-  const existing = localStorage.getItem(STORAGE_KEY);
-  if (existing && chapters.length > 0) {
-    const ok = window.confirm(
-      "Replace existing chapters with this imported manuscript?"
-    );
-    if (!ok) return;
-  }
-
-  // 1️⃣ Save chapters so Writing *and* Publishing can see them
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(chapters));
-
-  // 2️⃣ Save project meta (title/author/year)
-  const meta = {
-    title: parsed.title || "Working Title",
-    author: parsed.author || "Your Name",
-    year: new Date().getFullYear().toString(),
-  };
-  localStorage.setItem(META_KEY, JSON.stringify(meta));
-
-  // 3️⃣ Optionally route user straight to Writing
-  navigate("/writing"); // or however you navigate
-}
-
-
-  const handleGenerateMaterial = async (key: MaterialKey) => {
-    if (!compiledPlain) {
-      alert(
-        "Your publishing manuscript is empty. Add chapters and front matter first."
-      );
-      return;
-    }
-    if (materialBusy) return;
-
-    setMaterialBusy(true);
-    setMaterialKey(key);
-
-    try {
-      let generatedText = "";
-
-      // 🔸 Use the dedicated synopsis endpoint for synopsis requests
-      if (key === "synopsis-short" || key === "synopsis-long") {
-        const synopsisRes = await generateSynopsis({
-          manuscriptText: compiledPlain,
-          title:
-            (meta as any)?.title ||
-            (meta as any)?.workingTitle ||
-            "Untitled Manuscript",
-          genre: (meta as any)?.genre || "",
-          tone:
-            key === "synopsis-short"
-              ? "brief agent-ready synopsis"
-              : "expanded reader-facing synopsis",
-          maxWords: key === "synopsis-short" ? 300 : 800,
-        });
-
-        generatedText = synopsisRes.synopsis || "";
-      } else {
-        // 🔸 Everything else still uses the unified AI assistant
-        const res: any = await runAssistant(
-          compiledPlain,
-          key,
-          "",
-          provider
-        );
-
-        generatedText =
-          res?.result || res?.text || res?.output || compiledPlain;
-      }
-
-      if (!generatedText) {
-        throw new Error("AI returned an empty response.");
-      }
-
-      setMaterialOutput(generatedText);
-
-      navigate("/publishing-prep", {
-        state: {
-          from: "story-materials",
-          materialType: key,
-          manuscriptMeta: meta,
-          manuscriptText: compiledPlain,
-          generated: generatedText,
-        },
+    // 🔸 Use the dedicated synopsis endpoint for synopsis requests
+    if (key === "synopsis-short" || key === "synopsis-long") {
+      const synopsisRes = await generateSynopsis({
+        manuscriptText: compiledPlain,
+        title:
+          (meta as any)?.title ||
+          (meta as any)?.workingTitle ||
+          "Untitled Manuscript",
+        genre: (meta as any)?.genre || "",
+        tone:
+          key === "synopsis-short"
+            ? "brief agent-ready synopsis"
+            : "expanded reader-facing synopsis",
+        maxWords: key === "synopsis-short" ? 300 : 800,
       });
-    } catch (e: any) {
-      console.error("[Story Material Error]:", e);
-      alert(
-        e?.message ||
-          "Could not generate story material. Please try again."
+
+      generatedText = synopsisRes.synopsis || "";
+    } else {
+      // 🔸 Everything else still uses the unified AI assistant
+      const res: any = await runAssistant(
+        compiledPlain,
+        key,
+        "",
+        provider
       );
-    } finally {
-      setMaterialBusy(false);
+
+      generatedText =
+        res?.result || res?.text || res?.output || compiledPlain;
     }
-  };
+
+    if (!generatedText) {
+      throw new Error("AI returned an empty response.");
+    }
+
+    setMaterialOutput(generatedText);
+
+    navigate("/publishing-prep", {
+      state: {
+        from: "story-materials",
+        materialType: key,
+        manuscriptMeta: meta,
+        manuscriptText: compiledPlain,
+        generated: generatedText,
+      },
+    });
+  } catch (e: any) {
+    console.error("[Story Material Error]:", e);
+    alert(
+      e?.message ||
+        "Could not generate story material. Please try again."
+    );
+  } finally {
+    setMaterialBusy(false);
+  }
+};
+
 
   /* ---------- UI ---------- */
   return (
