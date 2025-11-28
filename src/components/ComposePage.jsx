@@ -15,19 +15,18 @@ import { documentParser } from "../utils/documentParser";
 import { rateLimiter } from "../utils/rateLimiter";
 
 import { runAssistant } from "../lib/api";
-import { Sparkles } from "lucide-react"; 
+import { Sparkles } from "lucide-react";
 
 import {
   computeWordsFromChapters,
   syncProjectForCurrentStory,
-  computeCharactersFromChapters,   // 🔹 add this
+  computeCharactersFromChapters, // 🔹 character helper
 } from "../lib/projectsSync";
 
 const CURRENT_STORY_KEY = "currentStory";
 const USER_PROJECTS_KEY = "userProjects";
-const PUBLISHING_DRAFT_KEY = "publishingDraft"; // 👈 NEW
+const PUBLISHING_DRAFT_KEY = "publishingDraft";
 
-// Save a simple "current story" snapshot for ProjectPage to read
 function saveCurrentStorySnapshot({ title }) {
   if (!title) return;
   try {
@@ -43,7 +42,6 @@ function saveCurrentStorySnapshot({ title }) {
   }
 }
 
-// Maintain a small list of projects/novels in localStorage
 function upsertUserProject({ title, ...rest }) {
   if (!title) return;
   try {
@@ -66,7 +64,7 @@ function upsertUserProject({ title, ...rest }) {
       status: "Draft",
       source: "Project",
       updatedAt: new Date().toISOString(),
-      ...rest, // ⬅️ wordCount, chapterCount, etc can be passed in
+      ...rest,
     };
 
     if (index >= 0) {
@@ -82,10 +80,8 @@ function upsertUserProject({ title, ...rest }) {
   }
 }
 
-
 const DEBUG_IMPORT = false;
 
-// Helper: normalize to "double spaced" paragraphs on import / AI
 const applyDoubleSpacing = (text = "") => {
   if (!text) return "";
 
@@ -105,7 +101,6 @@ const applyDoubleSpacing = (text = "") => {
 export default function ComposePage() {
   const navigate = useNavigate();
 
-  // Chapter management
   const {
     book,
     chapters: rawChapters = [],
@@ -119,60 +114,53 @@ export default function ComposePage() {
     saveProject,
   } = useChapterManager();
 
-  // 🔹 LOCAL AI STATE
   const [aiBusy, setAiBusy] = useState(false);
   const [provider, setProvider] = useState("openai");
-  const [instructions, setInstructions] = useState(""); // optional extra guidance (for top AI modes if you re-add the box later)
+  const [instructions, setInstructions] = useState("");
 
-  // 🔹 Right-hand AI assistant chat state
   const [showAssistant, setShowAssistant] = useState(false);
-  const [chatMessages, setChatMessages] = useState([]); // {role: 'user'|'assistant', content, id}
+  const [chatMessages, setChatMessages] = useState([]);
   const [chatInput, setChatInput] = useState("");
   const [chatBusy, setChatBusy] = useState(false);
 
-  // Guard + normalize chapters (just require an id)
   const chapters = useMemo(
     () =>
-
       Array.isArray(rawChapters)
         ? rawChapters.filter((c) => c && c.id != null)
         : [],
     [rawChapters]
   );
 
-  // View state
   const [view, setView] = useState("grid");
 
-  // Editor state
   const [title, setTitle] = useState(selectedChapter?.title ?? "");
   const [html, setHtml] = useState(selectedChapter?.content ?? "");
 
-  // Book metadata (kept for future use)
   const [author, setAuthor] = useState("Jacqueline Session Ausby");
   const [bookTitle, setBookTitle] = useState(book?.title || "Raising Daisy");
 
-  // Selection state
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [selectMode, setSelectMode] = useState(false);
   const lastClickedIndexRef = useRef(null);
 
-  // Import + rate limiter indicators
   const [isImporting, setIsImporting] = useState(false);
   const [importProgress, setImportProgress] = useState("");
   const [queueLength, setQueueLength] = useState(0);
 
-  // Save status for the toolbar
-  const [saveStatus, setSaveStatus] = useState("idle"); // "idle" | "saving" | "saved"
+  const [saveStatus, setSaveStatus] = useState("idle");
 
-  // TOC headings for the current chapter
-  const [headings, setHeadings] = useState([]); // [{level, text, id}]
+  const [headings, setHeadings] = useState([]);
 
-  // Remember which AI tab/mode is active across sessions
   const [activeAiTab, setActiveAiTab] = useState("proofread");
 
   const hasChapter = !!selectedId && !!selectedChapter;
 
-  // Plain text version of current chapter for AI context (chat)
+  // 🔹 Characters detected from @char: tags across all chapters
+  const { characters, characterCount } = useMemo(
+    () => computeCharactersFromChapters(chapters || []),
+    [chapters]
+  );
+
   const chapterPlainText = useMemo(() => {
     if (!html) return "";
     const tmp = document.createElement("div");
@@ -180,7 +168,6 @@ export default function ComposePage() {
     return tmp.textContent || tmp.innerText || "";
   }, [html]);
 
-  // Monitor rate limiter queue (for AI)
   useEffect(() => {
     const interval = setInterval(() => {
       setQueueLength(rateLimiter.getQueueLength());
@@ -188,7 +175,6 @@ export default function ComposePage() {
     return () => clearInterval(interval);
   }, []);
 
-  // Load active AI tab from localStorage on mount
   useEffect(() => {
     try {
       const stored = localStorage.getItem("dt_activeAiTab");
@@ -198,7 +184,6 @@ export default function ComposePage() {
     }
   }, []);
 
-  // Persist active AI tab when it changes
   useEffect(() => {
     try {
       if (activeAiTab) {
@@ -209,7 +194,6 @@ export default function ComposePage() {
     }
   }, [activeAiTab]);
 
-  // Selection helpers
   const clearSelection = () => setSelectedIds(new Set());
 
   function toggleSelect(id, { additive = false } = {}) {
@@ -254,7 +238,6 @@ export default function ComposePage() {
     });
   }
 
-  // Keyboard delete
   useEffect(() => {
     const onKey = (e) => {
       const tag = (e.target && e.target.tagName) || "";
@@ -268,7 +251,6 @@ export default function ComposePage() {
     return () => window.removeEventListener("keydown", onKey, { capture: true });
   }, [selectedIds]);
 
-  // Sync editor with selected chapter
   useEffect(() => {
     if (selectedChapter) {
       setTitle(selectedChapter.title || "");
@@ -278,20 +260,18 @@ export default function ComposePage() {
   }, [selectedId, selectedChapter]);
 
   // Save with visual feedback
-     const handleSave = async () => {
+  const handleSave = async () => {
     if (!hasChapter) return;
     if (saveStatus === "saving") return;
 
     setSaveStatus("saving");
 
     try {
-      // Update the selected chapter content
       updateChapter(selectedId, {
         title: title || selectedChapter?.title || "",
         content: html,
       });
 
-      // Compute aggregate stats across all chapters
       const totalWords = computeWordsFromChapters(chapters || []);
       const chapterCount = Array.isArray(chapters) ? chapters.length : 0;
 
@@ -299,7 +279,6 @@ export default function ComposePage() {
       const { characterCount: computedCharacterCount } =
         computeCharactersFromChapters(chapters || []);
 
-      // Persist book meta + stats via the chapter manager
       await Promise.resolve(
         saveProject({
           book: { ...book, title: bookTitle },
@@ -316,10 +295,8 @@ export default function ComposePage() {
         (book?.title && book.title.trim()) ||
         "Untitled Book";
 
-      // Snapshot for Dashboard & cross-page sync
       saveCurrentStorySnapshot({ title: safeTitle });
 
-      // Update the projects list entry so ProjectPage shows correct stats
       upsertUserProject({
         title: safeTitle,
         wordCount: totalWords,
@@ -327,10 +304,9 @@ export default function ComposePage() {
         characterCount: computedCharacterCount,
       });
 
-      // 🔹 keep central currentStory + userProjects in sync
       syncProjectForCurrentStory({
         wordCount: totalWords,
-        targetWords: 50000, // adjust when you add per-book targets
+        targetWords: 50000,
         characterCount: computedCharacterCount,
       });
 
@@ -344,7 +320,6 @@ export default function ComposePage() {
     }
   };
 
-  // Rename a chapter (used by sidebar rename ✏️)
   const handleRenameChapter = (chapterId, newTitle) => {
     if (!chapterId || !newTitle) return;
     updateChapter(chapterId, {
@@ -352,13 +327,12 @@ export default function ComposePage() {
     });
   };
 
-  // Map friendly button labels to backend modes/actions
   const resolveAIMode = (mode) => {
     switch (mode) {
       case "proofread":
-        return "proofread"; // grammar
+        return "proofread";
       case "clarify":
-        return "clarify"; // style/readability
+        return "clarify";
       case "readability":
         return "readability";
       case "rewrite":
@@ -368,7 +342,6 @@ export default function ComposePage() {
     }
   };
 
-  // SMART AI HANDLER — prefers selected text, falls back to first chunk
   const handleAI = async (mode, targetHtmlOverride) => {
     if (!hasChapter) return;
 
@@ -378,14 +351,7 @@ export default function ComposePage() {
     const fullHtml = (html || "").toString();
     let target = "";
     let useSelection = false;
-    
-  // 🔹 Characters detected from @char: tags across all chapters
-  const { characters, characterCount } = useMemo(
-    () => computeCharactersFromChapters(chapters || []),
-    [chapters]
-  );
-    
-    // Capture current scroll position of the editor so we can restore it after AI
+
     let prevScrollTop = 0;
     if (typeof window !== "undefined") {
       try {
@@ -403,7 +369,6 @@ export default function ComposePage() {
       }
     }
 
-    // 1) Try to grab selected HTML from the editor
     if (!targetHtmlOverride && typeof window !== "undefined") {
       try {
         const selection = window.getSelection();
@@ -430,7 +395,6 @@ export default function ComposePage() {
       }
     }
 
-    // 2) If no valid selection, fall back to the first chunk
     if (!useSelection) {
       const raw = (targetHtmlOverride ?? fullHtml) || "";
       target = raw.slice(0, MAX_CHARS);
@@ -458,7 +422,6 @@ export default function ComposePage() {
         return;
       }
 
-      // 🔹 Reapply double-spacing to whatever the AI gave us
       const resultText = applyDoubleSpacing(resultTextRaw);
 
       let combinedHtml = fullHtml;
@@ -487,7 +450,6 @@ export default function ComposePage() {
         content: combinedHtml,
       });
 
-      // Restore scroll
       if (typeof window !== "undefined") {
         setTimeout(() => {
           try {
@@ -515,12 +477,10 @@ export default function ComposePage() {
     }
   };
 
-  // 🔹 Chat: send a message to the AI assistant
   const handleAssistantSend = async () => {
     const text = chatInput.trim();
     if (!text) return;
 
-    // Push user message into UI
     const userMessage = {
       role: "user",
       content: text,
@@ -574,7 +534,6 @@ export default function ComposePage() {
     }
   };
 
-  // Allow Enter to send (Shift+Enter = newline) in chat box
   const handleAssistantKeyDown = (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -582,7 +541,6 @@ export default function ComposePage() {
     }
   };
 
-  // Import using documentParser
   const handleImport = async (file, options = {}) => {
     if (!file) return;
 
@@ -693,41 +651,37 @@ export default function ComposePage() {
   };
 
   const handleSendToPublishing = async () => {
-  if (!Array.isArray(chapters) || chapters.length === 0) {
-    alert("You need at least one chapter before sending to Publishing.");
-    return;
-  }
+    if (!Array.isArray(chapters) || chapters.length === 0) {
+      alert("You need at least one chapter before sending to Publishing.");
+      return;
+    }
 
-  // 1) Make sure the latest changes are saved
-  await handleSave();
+    await handleSave();
 
-  try {
-    const payload = {
-      book: {
-        ...book,
-        title: bookTitle,
-        status: "ReadyForPublishing",
-        updatedAt: new Date().toISOString(),
-      },
-      chapters,
-    };
+    try {
+      const payload = {
+        book: {
+          ...book,
+          title: bookTitle,
+          status: "ReadyForPublishing",
+          updatedAt: new Date().toISOString(),
+        },
+        chapters,
+      };
 
-    localStorage.setItem(PUBLISHING_DRAFT_KEY, JSON.stringify(payload));
+      localStorage.setItem(PUBLISHING_DRAFT_KEY, JSON.stringify(payload));
 
-    // Also update the project list status
-    upsertUserProject({
-      title: bookTitle || book?.title || "Untitled Book",
-    });
+      upsertUserProject({
+        title: bookTitle || book?.title || "Untitled Book",
+      });
 
-    // 2) Go to Publishing page
-    navigate("/publishing");
-  } catch (err) {
-    console.error("Failed to send manuscript to publishing:", err);
-    alert("Something went wrong sending this to Publishing. Please try again.");
-  }
-};
+      navigate("/publishing");
+    } catch (err) {
+      console.error("Failed to send manuscript to publishing:", err);
+      alert("Something went wrong sending this to Publishing. Please try again.");
+    }
+  };
 
-  // Export current chapter as HTML
   const handleExport = () => {
     const blob = new Blob([html], { type: "text/html" });
     const url = URL.createObjectURL(blob);
@@ -738,7 +692,6 @@ export default function ComposePage() {
     URL.revokeObjectURL(url);
   };
 
-  // Delete single chapter
   const handleDeleteCurrent = () => {
     if (!hasChapter) return;
     if (
@@ -751,7 +704,6 @@ export default function ComposePage() {
     }
   };
 
-  // Bulk delete
   const handleDeleteMultiple = (ids) => {
     if (!ids?.length) return;
     if (
@@ -768,7 +720,6 @@ export default function ComposePage() {
 
   const goBack = () => navigate("/dashboard");
 
-  // Simple guard
   if (!Array.isArray(chapters)) {
     return (
       <div className="min-h-screen bg-[rgb(244,247,250)] flex items-center justify-center">
@@ -777,7 +728,6 @@ export default function ComposePage() {
     );
   }
 
-  // Render
   return (
     <div className="min-h-screen bg-[rgb(244,247,250)] text-slate-900">
       {/* TOP BAR */}
@@ -827,7 +777,7 @@ export default function ComposePage() {
             {selectMode ? "✓ Select" : "Select"}
           </button>
 
-          {/* Quick AI run button (uses current active tab) */}
+          {/* Quick AI run button */}
           <button
             onClick={() => handleAI(activeAiTab || "proofread")}
             disabled={!hasChapter || aiBusy || isImporting}
@@ -840,18 +790,18 @@ export default function ComposePage() {
             <Sparkles className="w-4 h-4 text-amber-500" />
             <span>Run AI</span>
           </button>
-          
-        {/* Send to Publishing */}
-        <button
-          type="button"
-          onClick={handleSendToPublishing}
-          disabled={!hasChapter || saveStatus === "saving"}
-          className="inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-[13px] bg-[var(--brand-gold)] text-white hover:bg-amber-600 disabled:opacity-60"
-          title="Lock in this manuscript and open the Publishing workspace"
-        >
-          <span>Send to Publishing</span>
-        </button>
-          
+
+          {/* Send to Publishing */}
+          <button
+            type="button"
+            onClick={handleSendToPublishing}
+            disabled={!hasChapter || saveStatus === "saving"}
+            className="inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-[13px] bg-[var(--brand-gold)] text-white hover:bg-amber-600 disabled:opacity-60"
+            title="Lock in this manuscript and open the Publishing workspace"
+          >
+            <span>Send to Publishing</span>
+          </button>
+
           {/* Provider selector */}
           <div className="ml-2 flex items-center gap-1">
             <label className="text-[12px] text-slate-600">Provider:</label>
@@ -884,7 +834,7 @@ export default function ComposePage() {
 
           <div className="w-full sm:flex-1" />
 
-          {/* Toolbar with AI mode buttons + Assistant toggle */}
+          {/* Toolbar */}
           <EditorToolbar
             onAI={handleAI}
             onSave={handleSave}
@@ -925,7 +875,6 @@ export default function ComposePage() {
             onRangeSelect={(idx) => rangeSelect(idx)}
             lastClickedIndexRef={lastClickedIndexRef}
           />
-          {/* ✅ TrashDock ONLY in grid mode */}
           <TrashDock onDelete={handleDeleteMultiple} />
         </>
       )}
@@ -957,7 +906,7 @@ export default function ComposePage() {
               onRenameChapter={handleRenameChapter}
             />
 
-            {/* Simple TOC box under the chapters */}
+            {/* TOC */}
             {headings.length > 0 && (
               <div className="mt-3 rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
                 <div className="text-xs font-semibold text-slate-700 mb-2">
@@ -985,9 +934,8 @@ export default function ComposePage() {
                 </ul>
               </div>
             )}
-          </aside>
 
-                      {/* Character Manager – based on @char: tags */}
+            {/* Character Manager – based on @char: tags */}
             <div className="mt-3 rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
               <div className="text-xs font-semibold text-slate-700 mb-2 flex items-center justify-between">
                 <span>Characters</span>
@@ -1020,6 +968,7 @@ export default function ComposePage() {
                 </ul>
               )}
             </div>
+          </aside>
 
           {/* Main Editor */}
           <EditorPane
@@ -1034,10 +983,9 @@ export default function ComposePage() {
             onHeadingsChange={setHeadings}
           />
 
-          {/* 🔹 Right-hand AI Assistant chat panel */}
+          {/* Right-hand AI Assistant chat panel */}
           {showAssistant && (
             <section className="flex flex-col bg-white border border-slate-200 rounded-xl shadow-sm h-[calc(100vh-8rem)]">
-              {/* Header */}
               <div className="px-3 py-2 border-b border-slate-200 flex items-center justify-between">
                 <div>
                   <div className="text-xs font-semibold text-slate-800">
@@ -1057,7 +1005,6 @@ export default function ComposePage() {
                 </button>
               </div>
 
-              {/* Messages */}
               <div className="flex-1 overflow-y-auto px-3 py-2 space-y-2 text-sm">
                 {chatMessages.length === 0 && (
                   <p className="text-[12px] text-slate-500 mt-2">
@@ -1108,7 +1055,6 @@ export default function ComposePage() {
                 ))}
               </div>
 
-              {/* Input */}
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
