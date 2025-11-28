@@ -20,8 +20,8 @@ import { Sparkles } from "lucide-react";
 import {
   computeWordsFromChapters,
   syncProjectForCurrentStory,
+  computeCharactersFromChapters,   // 🔹 add this
 } from "../lib/projectsSync";
-
 
 const CURRENT_STORY_KEY = "currentStory";
 const USER_PROJECTS_KEY = "userProjects";
@@ -278,7 +278,7 @@ export default function ComposePage() {
   }, [selectedId, selectedChapter]);
 
   // Save with visual feedback
-  const handleSave = async () => {
+     const handleSave = async () => {
     if (!hasChapter) return;
     if (saveStatus === "saving") return;
 
@@ -295,6 +295,10 @@ export default function ComposePage() {
       const totalWords = computeWordsFromChapters(chapters || []);
       const chapterCount = Array.isArray(chapters) ? chapters.length : 0;
 
+      // 🔹 compute characters from @char: tags
+      const { characterCount: computedCharacterCount } =
+        computeCharactersFromChapters(chapters || []);
+
       // Persist book meta + stats via the chapter manager
       await Promise.resolve(
         saveProject({
@@ -302,6 +306,7 @@ export default function ComposePage() {
           stats: {
             wordCount: totalWords,
             chapterCount,
+            characterCount: computedCharacterCount,
           },
         })
       );
@@ -319,15 +324,14 @@ export default function ComposePage() {
         title: safeTitle,
         wordCount: totalWords,
         chapterCount,
-        // characterCount: 0, // we can wire this later when you have a Characters module
+        characterCount: computedCharacterCount,
       });
 
-      // 🔄 Central sync: currentStory + userProjects
+      // 🔹 keep central currentStory + userProjects in sync
       syncProjectForCurrentStory({
         wordCount: totalWords,
-        targetWords: 50000, // adjust if you expose this per book
-        chapters,
-        bookTitle: safeTitle,
+        targetWords: 50000, // adjust when you add per-book targets
+        characterCount: computedCharacterCount,
       });
 
       setSaveStatus("saved");
@@ -374,7 +378,13 @@ export default function ComposePage() {
     const fullHtml = (html || "").toString();
     let target = "";
     let useSelection = false;
-
+    
+  // 🔹 Characters detected from @char: tags across all chapters
+  const { characters, characterCount } = useMemo(
+    () => computeCharactersFromChapters(chapters || []),
+    [chapters]
+  );
+    
     // Capture current scroll position of the editor so we can restore it after AI
     let prevScrollTop = 0;
     if (typeof window !== "undefined") {
@@ -976,6 +986,40 @@ export default function ComposePage() {
               </div>
             )}
           </aside>
+
+                      {/* Character Manager – based on @char: tags */}
+            <div className="mt-3 rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+              <div className="text-xs font-semibold text-slate-700 mb-2 flex items-center justify-between">
+                <span>Characters</span>
+                <span className="text-[11px] text-slate-500">
+                  {characterCount} tagged
+                </span>
+              </div>
+
+              {characterCount === 0 ? (
+                <p className="text-[11px] text-slate-500 leading-snug">
+                  No characters tagged yet.
+                  <br />
+                  Introduce a character in your manuscript as{" "}
+                  <span className="font-mono text-[11px] bg-slate-100 px-1 py-0.5 rounded">
+                    @char: John Smith
+                  </span>{" "}
+                  the first time they appear.
+                </p>
+              ) : (
+                <ul className="space-y-1 max-h-40 overflow-auto text-xs">
+                  {characters.map((name) => (
+                    <li
+                      key={name}
+                      className="flex items-center justify-between text-slate-700"
+                    >
+                      <span className="truncate">{name}</span>
+                      {/* placeholder for future: role / arc badges */}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
 
           {/* Main Editor */}
           <EditorPane
