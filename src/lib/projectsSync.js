@@ -58,20 +58,22 @@ function extractCharactersFromHtml(html = "") {
 export function computeCharactersFromChapters(chapters = []) {
   const all = new Set();
 
-  (chapters || []).forEach((ch) => {
-    if (!ch) return;
-    const html = ch.content || ch.body || ch.text || "";
-    const names = extractCharactersFromHtml(html);
-    names.forEach((n) => all.add(n));
+  chapters.forEach((ch) => {
+    if (!ch || !ch.content) return;
+    const html = ch.content;
+
+    // match: @char: Daisy Knox
+    const matches = [...html.matchAll(/@char:\s*([A-Za-z0-9 .'-]+)/gi)];
+
+    matches.forEach((m) => {
+      const name = m[1].trim();
+      if (name) all.add(name);
+    });
   });
 
-  const characters = Array.from(all).sort((a, b) =>
-    a.localeCompare(b, undefined, { sensitivity: "base" })
-  );
-
   return {
-    characters,
-    characterCount: characters.length,
+    characters: Array.from(all),
+    characterCount: all.size,
   };
 }
 
