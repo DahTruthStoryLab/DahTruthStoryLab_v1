@@ -1,89 +1,56 @@
-// src/lib/projectsSync.js
+// src/lib/projectsSync.ts
 
-// --------- Local helpers ---------
 const PROJECTS_KEY = "userProjects";
+const CURRENT_STORY_KEY = "currentStory";
 
-function loadProjects() {
+// ---------- Helpers ----------
+
+function safeParseJSON(value: string | null) {
+  if (!value) return null;
   try {
-    const raw = localStorage.getItem(PROJECTS_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    return JSON.parse(value);
   } catch {
-    return [];
+    return null;
   }
 }
 
-function saveProjects(projects) {
+// Basic word counter for plain text or HTML
+function countWords(text: string = ""): number {
+  if (!text) return 0;
+
+  // Strip HTML tags if present
+  const plain = text.replace(/<[^>]*>/g, " ");
+  const cleaned = plain.replace(/\s+/g, " ").trim();
+  if (!cleaned) return 0;
+  return cleaned.split(" ").length;
+}
+
+// ---------- Projects storage ----------
+
+export function loadProjects(): any[] {
+  if (typeof localStorage === "undefined") return [];
+  const raw = localStorage.getItem(PROJECTS_KEY);
+  const parsed = safeParseJSON(raw);
+  if (!parsed || !Array.isArray(parsed)) return [];
+  return parsed;
+}
+
+export function saveProjects(projects: any[]): void {
+  if (typeof localStorage === "undefined") return;
   try {
-    localStorage.setItem(PROJECTS_KEY, JSON.stringify(projects));
-    window.dispatchEvent(new Event("project:change"));
+    localStorage.setItem(PROJECTS_KEY, JSON.stringify(projects || []));
+    // Let dashboards / project lists know something changed
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new Event("project:change"));
+    }
   } catch (err) {
-    console.error("Failed to save projects:", err);
+    console.error("saveProjects error:", err);
   }
 }
 
-// Remove @char: markers when counting words so they don’t inflate word count
-const countWords = (s = "") => {
-  const cleaned = s.replace(/@char:\s*/g, " "); // drop the marker, keep the name
-  return cleaned.trim().split(/\s+/).filter(Boolean).length;
-};
+// ---------- Aggregate stats ----------
 
-// --------- Character helpers ---------
-
-function extractCharactersFromHtml(html = "") {
-  // Strip HTML tags to get plain text
-  const text = html.replace(/<[^>]+>/g, " ");
-
-  // Look for patterns like: @char: John Smith
-  const re = /@char:\s*([^\n\r<]+)/g;
-  const names = new Set();
-  let match;
-
-  while ((match = re.exec(text)) !== null) {
-    const rawName = (match[1] || "").trim();
-    if (!rawName) continue;
-
-    const name = rawName.replace(/\s+/g, " "); // normalize spaces
-    if (name) names.add(name);
-  }
-
-  return Array.from(names);
-}
-
-/**
- * Compute characters and count from a chapters array.
- * Returns { characters: string[], characterCount: number }
- */
-export function computeCharactersFromChapters(chapters = []) {
-  const all = new Set();
-
-  chapters.forEach((ch) => {
-    if (!ch || !ch.content) return;
-    const html = ch.content;
-
-    // match: @char: Daisy Knox
-    const matches = [...html.matchAll(/@char:\s*([A-Za-z0-9 .'-]+)/gi)];
-
-    matches.forEach((m) => {
-      const name = m[1].trim();
-      if (name) all.add(name);
-    });
-  });
-
-  return {
-    characters: Array.from(all),
-    characterCount: all.size,
-  };
-}
-
-// --------- Public helpers ---------
-
-/**
- * Compute total words from a chapters array.
- * Each chapter can use .content or .text or .body (we try several).
- */
-export function computeWordsFromChapters(chapters = []) {
+export function computeWordsFromChapters(chapters: any[] = []): number {
   return chapters.reduce((sum, ch) => {
     const text = ch?.content || ch?.text || ch?.body || "";
     return sum + countWords(text);
@@ -91,21 +58,86 @@ export function computeWordsFromChapters(chapters = []) {
 }
 
 /**
- * Sync the currentStory and matching project in userProjects
- * with the latest wordCount / targetWords / characterCount.
+ * Scan chapter content for `@char: Name` tags and return:
+ *   - a unique, sorted list of character names
+ *   - how many distinct characters were tagged
  *
- * Call this from Writer and TOC whenever words change.
+ * This is used by ComposePage to populate the Characters box and to
+ * sync `characterCount` into the project + currentStory.
+ */
+export function computeCharactersFromChapters(
+  chapters: Array<{ content?: string }> = []
+): { characters: string[]; characterCount: number } {
+  const found = new Set<string>();
+
+  for (const ch of chapters) {
+    if (!ch || !ch.content) continue;
+
+    const html = String(ch.content);
+
+    // Strip HTML tags so we only work with the visible text
+    const text = html.replace(/<[^>]*>/g, " ");
+
+    /**
+     * Look for patterns like:
+     *   @char: June Baxter
+     *   @char: Jonas "Big Man" Smith
+     *
+     * We cap the length so it does NOT swallow the whole sentence.
+     */
+    const regex = /@char:\s*([A-Za-z][A-Za-z0-9 .'-]{0,80})/gi;
+    let match: RegExpExecArray | null;
+
+    while ((match = regex.exec(text)) !== null) {
+      const raw = match[1] || "";
+
+      // If the user kept typing a sentence after the name,
+      // stop at the first punctuation or line break.
+      let name = raw.split(/[.!?;,\n\r]/)[0].trim();
+      if (!name) continue;
+
+      // Normalize multiple spaces
+      name = name.replace(/\s+/g, " ");
+
+      found.add(name);
+    }
+  }
+
+  const characters = Array.from(found).sort((a, b) =>
+    a.localeCompare(b)
+  );
+
+  return {
+    characters,
+    characterCount: characters.length,
+  };
+}
+
+/**
+ * Sync the `currentStory` and any matching project in `userProjects`
+ * with the latest:
+ *   - wordCount
+ *   - targetWords (if you pass one)
+ *   - characterCount (from @char: tags)
+ *
+ * Called from ComposePage after saving.
  */
 export function syncProjectForCurrentStory({
   wordCount,
   targetWords,
   characterCount,
+}: {
+  wordCount?: number;
+  targetWords?: number;
+  characterCount?: number;
 }) {
+  if (typeof localStorage === "undefined") return;
+
   try {
-    const rawStory = localStorage.getItem("currentStory");
+    const rawStory = localStorage.getItem(CURRENT_STORY_KEY);
     if (!rawStory) return;
 
-    const currentStory = JSON.parse(rawStory) || {};
+    const currentStory = safeParseJSON(rawStory) || {};
     const id = currentStory.id;
     const title = (currentStory.title || "").trim();
     const now = new Date().toISOString();
@@ -114,6 +146,8 @@ export function syncProjectForCurrentStory({
     let changed = false;
 
     projects = projects.map((p) => {
+      if (!p) return p;
+
       const sameById = id && p.id === id;
       const sameByTitle = !id && title && (p.title || "").trim() === title;
 
@@ -141,8 +175,8 @@ export function syncProjectForCurrentStory({
       saveProjects(projects);
     }
 
-    // Also refresh currentStory snapshot so Dashboard & others see it
-    const updatedCurrent = {
+    // Also keep the currentStory itself in sync
+    const updatedStory = {
       ...currentStory,
       wordCount:
         typeof wordCount === "number" ? wordCount : currentStory.wordCount || 0,
@@ -157,9 +191,8 @@ export function syncProjectForCurrentStory({
       lastModified: now,
     };
 
-    localStorage.setItem("currentStory", JSON.stringify(updatedCurrent));
-    window.dispatchEvent(new Event("project:change"));
+    localStorage.setItem(CURRENT_STORY_KEY, JSON.stringify(updatedStory));
   } catch (err) {
-    console.error("Failed to sync project for current story:", err);
+    console.error("syncProjectForCurrentStory error:", err);
   }
 }
