@@ -14,6 +14,14 @@ function countWords(text = "") {
   return cleaned.split(" ").length;
 }
 
+function highlightCharacters(html) {
+  return html.replace(
+    /@char:\s*([A-Za-z0-9 .'-]+)/gi,
+    (match, name) =>
+      `<span class="dt-character-tag" data-name="${name}">@char: ${name}</span>`
+  );
+}
+
 export default function EditorPane({
   title,
   setTitle,
@@ -52,6 +60,14 @@ export default function EditorPane({
     }),
     []
   );
+
+  const highlighted = highlightCharacters(incomingHtml);
+setHtml(highlighted);
+
+  <div
+  className="ql-editor"
+  dangerouslySetInnerHTML={{ __html: highlightCharacters(html) }}
+/>
 
   const formats = useMemo(
     () => [
