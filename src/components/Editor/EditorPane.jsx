@@ -14,22 +14,12 @@ function countWords(text = "") {
   return cleaned.split(" ").length;
 }
 
-// 🔹 Remove our character highlight spans, leaving just the text
-function stripCharacterSpans(html = "") {
-  return html.replace(
-    /<span[^>]*class=["']dt-character-tag["'][^>]*>(.*?)<\/span>/gi,
-    "$1"
-  );
-}
-
-// 🔹 Wrap all @char: tags in a tinted span
+// 🔹 Only highlight the @char: NAME part (capitalized words)
 function highlightCharacters(html = "") {
-  const withoutSpans = stripCharacterSpans(html);
-
-  return withoutSpans.replace(
-    /@char:\s*([A-Za-z0-9 .'-]+)/gi,
+  return html.replace(
+    /@char:\s*([A-Z][A-Za-z'-]+(?:\s+[A-Z][A-Za-z'-]+)*)/g,
     (match, name) =>
-      `<span class="dt-character-tag" data-name="${name}" style="background-color:#fef3c7;border-radius:3px;padding:0 2px;">${match}</span>`
+      `<span class="dt-character-tag" data-name="${name}">@char: ${name}</span>`
   );
 }
 
@@ -46,18 +36,8 @@ export default function EditorPane({
 }) {
   const quillRef = useRef(null);
 
-  // 🔹 NEW: what ReactQuill actually displays (highlighted HTML)
-  const [internalHtml, setInternalHtml] = useState(() =>
-    highlightCharacters(html || "")
-  );
-
   // 🔹 NEW: line spacing state ("1", "1.5", "2")
   const [lineSpacing, setLineSpacing] = useState("1.5");
-
-  // Keep internalHtml in sync if parent html changes (e.g. switching chapters)
-  useEffect(() => {
-    setInternalHtml(highlightCharacters(html || ""));
-  }, [html]);
 
   // Quill modules (including history for undo/redo)
   const modules = useMemo(
@@ -101,8 +81,8 @@ export default function EditorPane({
     []
   );
 
-  // Word + page count (ignore the highlight spans by stripping HTML)
-  const plainText = useMemo(() => stripHtml(internalHtml), [internalHtml]);
+  // Word + page count
+  const plainText = useMemo(() => stripHtml(html), [html]);
   const wordCount = useMemo(() => countWords(plainText), [plainText]);
   const pageCount = useMemo(
     () => Math.max(1, Math.ceil(wordCount / 300)), // simple estimate
@@ -114,7 +94,7 @@ export default function EditorPane({
     if (!onHeadingsChange) return;
     try {
       const tmp = document.createElement("div");
-      tmp.innerHTML = internalHtml || "";
+      tmp.innerHTML = html || "";
       const hs = Array.from(tmp.querySelectorAll("h1, h2, h3")).map((el) => ({
         level: el.tagName.toLowerCase(), // "h1" | "h2" | "h3"
         text: el.textContent || "",
@@ -124,16 +104,12 @@ export default function EditorPane({
     } catch {
       onHeadingsChange([]);
     }
-  }, [internalHtml, onHeadingsChange]);
+  }, [html, onHeadingsChange]);
 
-  // 🔹 When the user types / edits
+  // 🔹 Apply highlighting to any @char: tags before saving content upward
   const handleChange = (value) => {
-    // Remove any old highlight spans, then re-apply fresh ones
-    const cleaned = stripCharacterSpans(value);
-    const highlighted = highlightCharacters(cleaned);
-
-    setInternalHtml(highlighted);
-    setHtml(highlighted); // propagate back up to ComposePage
+    const withHighlight = highlightCharacters(value);
+    setHtml(withHighlight);
   };
 
   // 🔹 Undo / Redo using Quill history
@@ -222,14 +198,14 @@ export default function EditorPane({
           <ReactQuill
             ref={quillRef}
             theme="snow"
-            value={internalHtml}
+            value={html}
             onChange={handleChange}
             modules={modules}
             formats={formats}
             className={`h-full storylab-editor ${spacingClass}`}
           />
 
-          {/* AI busy indicator */}
+          {/* Optional footer inside the page (AI busy indicator) */}
           {aiBusy && (
             <div className="absolute bottom-3 left-1/2 -translate-x-1/2 text-[11px] text-slate-500 bg-white/80 px-2 py-1 rounded border border-slate-200 shadow-sm">
               AI working…
