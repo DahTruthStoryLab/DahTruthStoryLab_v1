@@ -14,8 +14,18 @@ function countWords(text = "") {
   return cleaned.split(" ").length;
 }
 
-function highlightCharacters(html) {
-  return html.replace(
+// 🔹 Highlight @char: tags in the editor, but avoid double-wrapping
+function highlightCharacters(html = "") {
+  if (!html) return "";
+
+  // 1) Remove any existing dt-character-tag wrappers we created earlier
+  const cleaned = html.replace(
+    /<span class="dt-character-tag"[^>]*>@char:\s*([A-Za-z0-9 .'-]+)<\/span>/gi,
+    "@char: $1"
+  );
+
+  // 2) Wrap every @char: Name with a span for visual tint
+  return cleaned.replace(
     /@char:\s*([A-Za-z0-9 .'-]+)/gi,
     (match, name) =>
       `<span class="dt-character-tag" data-name="${name}">@char: ${name}</span>`
@@ -35,7 +45,7 @@ export default function EditorPane({
 }) {
   const quillRef = useRef(null);
 
-  // 🔹 NEW: line spacing state ("1", "1.5", "2")
+  // 🔹 line spacing state ("1", "1.5", "2")
   const [lineSpacing, setLineSpacing] = useState("1.5");
 
   // Quill modules (including history for undo/redo)
@@ -60,14 +70,6 @@ export default function EditorPane({
     }),
     []
   );
-
-  const highlighted = highlightCharacters(incomingHtml);
-setHtml(highlighted);
-
-  <div
-  className="ql-editor"
-  dangerouslySetInnerHTML={{ __html: highlightCharacters(html) }}
-/>
 
   const formats = useMemo(
     () => [
@@ -113,11 +115,13 @@ setHtml(highlighted);
     }
   }, [html, onHeadingsChange]);
 
+  // 🔹 On editor change: apply character highlighting before storing
   const handleChange = (value) => {
-    setHtml(value);
+    const highlighted = highlightCharacters(value);
+    setHtml(highlighted);
   };
 
-  // 🔹 NEW: Undo / Redo using Quill history
+  // 🔹 Undo / Redo using Quill history
   const handleUndo = () => {
     const editor = quillRef.current?.getEditor?.();
     if (editor && editor.history) {
@@ -156,7 +160,7 @@ setHtml(highlighted);
           </span>
         </div>
 
-        {/* 🔹 Line spacing selector */}
+        {/* Line spacing selector */}
         <div className="flex items-center gap-2 text-xs text-slate-600">
           <span>Spacing:</span>
           <select
@@ -170,7 +174,7 @@ setHtml(highlighted);
           </select>
         </div>
 
-        {/* 🔹 Undo / Redo buttons */}
+        {/* Undo / Redo buttons */}
         <div className="flex items-center gap-1 text-xs">
           <button
             type="button"
