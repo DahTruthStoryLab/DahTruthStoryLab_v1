@@ -37,6 +37,19 @@ class DocumentParser {
     /^Part\s+(\d+|[IVXLCDM]+)[\s:.-]*(.*?)$/im,
   ];
 
+  class DocumentParser {
+  // 🔹 Generate a truly unique ID for each chapter
+  private makeChapterId(chapterNumber: number, order: number): string {
+    // Use crypto.randomUUID when available
+    if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+      return (crypto as any).randomUUID();
+    }
+    // Fallback: timestamp + chapter info + random segment
+    return `chapter-${chapterNumber}-${order}-${Date.now()}-${Math.random()
+      .toString(36)
+      .slice(2, 8)}`;
+  }
+
   async parseWordDocument(file: File): Promise<ParsedDocument> {
     try {
       const arrayBuffer = await file.arrayBuffer();
@@ -317,29 +330,27 @@ class DocumentParser {
     }
   }
 
-  private createChapterFromText(
-    chapterNumber: number,
-    title: string,
-    content: string,
-    order: number
-  ): ChapterCard {
-    const htmlContent = content
-      .split("\n")
-      .map((line) => `<p>${this.escapeHtml(line)}</p>`)
-      .join("\n");
+  private createChapterCard(
+  chapterNumber: number,
+  title: string,
+  htmlContent: string,
+  textContent: string,
+  order: number
+): ChapterCard {
+  const words = textContent.split(/\s+/).filter((w) => w.length > 0);
+  const preview =
+    words.slice(0, 20).join(" ") + (words.length > 20 ? "..." : "");
 
-    // If someone somehow pasted StoryLab spans into a txt/md file,
-    // normalize them as well.
-    const normalizedHtml = normalizeCharacterTags(htmlContent);
-
-    return this.createChapterCard(
-      chapterNumber,
-      title,
-      normalizedHtml,
-      content,
-      order
-    );
-  }
+  return {
+    id: this.makeChapterId(chapterNumber, order), // 🔹 UNIQUE ID
+    chapterNumber,
+    title,
+    content: htmlContent,
+    preview,
+    wordCount: words.length,
+    order,
+  };
+}
 
   private escapeHtml(text: string): string {
     const div = document.createElement("div");
