@@ -14,15 +14,6 @@ function countWords(text = "") {
   return cleaned.split(" ").length;
 }
 
-// 🔹 Only highlight the @char: NAME part (capitalized words)
-function highlightCharacters(html = "") {
-  return html.replace(
-    /@char:\s*([A-Z][A-Za-z'-]+(?:\s+[A-Z][A-Za-z'-]+)*)/g,
-    (match, name) =>
-      `<span class="dt-character-tag" data-name="${name}">@char: ${name}</span>`
-  );
-}
-
 export default function EditorPane({
   title,
   setTitle,
@@ -36,7 +27,7 @@ export default function EditorPane({
 }) {
   const quillRef = useRef(null);
 
-  // 🔹 NEW: line spacing state ("1", "1.5", "2")
+  // 🔹 line spacing state ("1", "1.5", "2")
   const [lineSpacing, setLineSpacing] = useState("1.5");
 
   // Quill modules (including history for undo/redo)
@@ -106,10 +97,8 @@ export default function EditorPane({
     }
   }, [html, onHeadingsChange]);
 
-  // 🔹 Apply highlighting to any @char: tags before saving content upward
   const handleChange = (value) => {
-    const withHighlight = highlightCharacters(value);
-    setHtml(withHighlight);
+    setHtml(value);
   };
 
   // 🔹 Undo / Redo using Quill history
