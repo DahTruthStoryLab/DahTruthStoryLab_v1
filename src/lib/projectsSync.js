@@ -23,36 +23,56 @@ function saveProjects(projects) {
   }
 }
 
-const countWords = (s = "") =>
-  s.trim().split(/\s+/).filter(Boolean).length;
+// Remove @char: markers when counting words so they don’t inflate word count
+const countWords = (s = "") => {
+  const cleaned = s.replace(/@char:\s*/g, " "); // drop the marker, keep the name
+  return cleaned.trim().split(/\s+/).filter(Boolean).length;
+};
 
-// 🔹 NEW: extract unique @char: tags from chapters
-function extractCharactersFromChapters(chapters = []) {
+// --------- Character helpers ---------
+
+function extractCharactersFromHtml(html = "") {
+  // Strip HTML tags to get plain text
+  const text = html.replace(/<[^>]+>/g, " ");
+
+  // Look for patterns like: @char: John Smith
+  const re = /@char:\s*([^\n\r<]+)/g;
   const names = new Set();
-  const tagRegex = /@char:([^|\n\r]+)/g; // grab text after @char: up to '|' or newline
+  let match;
 
-  for (const ch of chapters || []) {
-    const raw =
-      ch?.content ||
-      ch?.text ||
-      ch?.body ||
-      "";
+  while ((match = re.exec(text)) !== null) {
+    const rawName = (match[1] || "").trim();
+    if (!rawName) continue;
 
-    if (!raw) continue;
-
-    let html = String(raw);
-    let match;
-    while ((match = tagRegex.exec(html)) !== null) {
-      let name = match[1] || "";
-      // strip any HTML tags that might have snuck in
-      name = name.replace(/<[^>]+>/g, "").trim();
-      if (name) {
-        names.add(name);
-      }
-    }
+    const name = rawName.replace(/\s+/g, " "); // normalize spaces
+    if (name) names.add(name);
   }
 
   return Array.from(names);
+}
+
+/**
+ * Compute characters and count from a chapters array.
+ * Returns { characters: string[], characterCount: number }
+ */
+export function computeCharactersFromChapters(chapters = []) {
+  const all = new Set();
+
+  (chapters || []).forEach((ch) => {
+    if (!ch) return;
+    const html = ch.content || ch.body || ch.text || "";
+    const names = extractCharactersFromHtml(html);
+    names.forEach((n) => all.add(n));
+  });
+
+  const characters = Array.from(all).sort((a, b) =>
+    a.localeCompare(b, undefined, { sensitivity: "base" })
+  );
+
+  return {
+    characters,
+    characterCount: characters.length,
+  };
 }
 
 // --------- Public helpers ---------
@@ -63,22 +83,9 @@ function extractCharactersFromChapters(chapters = []) {
  */
 export function computeWordsFromChapters(chapters = []) {
   return chapters.reduce((sum, ch) => {
-    const text =
-      ch?.content ||
-      ch?.text ||
-      ch?.body ||
-      "";
+    const text = ch?.content || ch?.text || ch?.body || "";
     return sum + countWords(text);
   }, 0);
-}
-
-// 🔹 NEW: compute character list + count from chapters
-export function computeCharactersFromChapters(chapters = []) {
-  const list = extractCharactersFromChapters(chapters);
-  return {
-    characters: list,
-    characterCount: list.length,
-  };
 }
 
 /**
@@ -90,7 +97,7 @@ export function computeCharactersFromChapters(chapters = []) {
 export function syncProjectForCurrentStory({
   wordCount,
   targetWords,
-  characterCount,   // 🔹 NEW
+  characterCount,
 }) {
   try {
     const rawStory = localStorage.getItem("currentStory");
@@ -106,26 +113,22 @@ export function syncProjectForCurrentStory({
 
     projects = projects.map((p) => {
       const sameById = id && p.id === id;
-      const sameByTitle =
-        !id && title && (p.title || "").trim() === title;
+      const sameByTitle = !id && title && (p.title || "").trim() === title;
 
       if (sameById || sameByTitle) {
         changed = true;
         return {
           ...p,
           wordCount:
-            typeof wordCount === "number"
-              ? wordCount
-              : (p.wordCount || 0),
+            typeof wordCount === "number" ? wordCount : p.wordCount || 0,
           targetWords:
             typeof targetWords === "number"
               ? targetWords
-              : (p.targetWords || currentStory.targetWords || 0),
-          // 🔹 keep characterCount in sync too
+              : p.targetWords || currentStory.targetWords || 0,
           characterCount:
             typeof characterCount === "number"
               ? characterCount
-              : (p.characterCount || 0),
+              : p.characterCount || currentStory.characterCount || 0,
           lastModified: now,
         };
       }
@@ -140,9 +143,7 @@ export function syncProjectForCurrentStory({
     const updatedCurrent = {
       ...currentStory,
       wordCount:
-        typeof wordCount === "number"
-          ? wordCount
-          : currentStory.wordCount || 0,
+        typeof wordCount === "number" ? wordCount : currentStory.wordCount || 0,
       targetWords:
         typeof targetWords === "number"
           ? targetWords
