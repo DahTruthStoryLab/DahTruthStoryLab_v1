@@ -107,6 +107,13 @@ function upsertUserProject({ title, ...rest }) {
   }
 }
 
+// Helper to strip HTML to text (for detecting blank chapters)
+const stripHtml = (html = "") => {
+  const tmp = document.createElement("div");
+  tmp.innerHTML = html;
+  return tmp.textContent || tmp.innerText || "";
+};
+
 export default function ComposePage() {
   const navigate = useNavigate();
 
@@ -587,113 +594,146 @@ export default function ComposePage() {
 
   // Import using documentParser
   const handleImport = async (file, options = {}) => {
-    if (!file) return;
+  if (!file) return;
 
-    const { splitByHeadings = true } = options;
+  const { splitByHeadings = true } = options;
 
-    setIsImporting(true);
-    setImportProgress("Parsing document...");
+  setIsImporting(true);
+  setImportProgress("Parsing document...");
 
-    try {
-      const name = file.name.toLowerCase();
-      let parsed;
+  try {
+    const name = file.name.toLowerCase();
+    let parsed;
 
-      if (name.endsWith(".doc") || name.endsWith(".docx")) {
-        parsed = await rateLimiter.addToQueue(() =>
-          documentParser.parseWordDocument(file)
-        );
-      } else if (name.endsWith(".txt") || name.endsWith(".md")) {
-        parsed = await documentParser.parseTextDocument(file);
-      } else {
-        alert("Unsupported file type. Please use .doc, .docx, .txt, or .md");
-        return;
-      }
+    if (name.endsWith(".doc") || name.endsWith(".docx")) {
+      parsed = await rateLimiter.addToQueue(() =>
+        documentParser.parseWordDocument(file)
+      );
+    } else if (name.endsWith(".txt") || name.endsWith(".md")) {
+      parsed = await documentParser.parseTextDocument(file);
+    } else {
+      alert("Unsupported file type. Please use .doc, .docx, .txt, or .md");
+      return;
+    }
 
-      if (!parsed) {
-        alert("Could not parse this document.");
-        return;
-      }
+    if (!parsed) {
+      alert("Could not parse this document.");
+      return;
+    }
 
-      if (DEBUG_IMPORT) {
-        console.log("Parsed document:", {
-          title: parsed.title,
-          chapters: parsed.chapters?.length,
-          totalWordCount: parsed.totalWordCount,
-        });
-      }
+    if (DEBUG_IMPORT) {
+      console.log("Parsed document:", {
+        title: parsed.title,
+        chapters: parsed.chapters?.length,
+        totalWordCount: parsed.totalWordCount,
+      });
+    }
 
-      if (parsed.title && parsed.title !== bookTitle) {
-        setBookTitle(parsed.title);
-      }
+    if (parsed.title && parsed.title !== bookTitle) {
+      setBookTitle(parsed.title);
+    }
 
-      if (splitByHeadings && parsed.chapters && parsed.chapters.length > 0) {
-        setImportProgress(
-          `Creating ${parsed.chapters.length} chapter(s) from "${file.name}"...`
-        );
+    const existing = Array.isArray(chapters) ? chapters : [];
 
-        for (const c of parsed.chapters) {
+    // 🔹 Detect the single blank starter chapter (no title, no content)
+    const isSingleBlank =
+      existing.length === 1 &&
+      !stripHtml(existing[0].content || "").trim() &&
+      !(existing[0].title || "").trim();
+
+    // ---------- MULTI-CHAPTER IMPORT ----------
+    if (splitByHeadings && parsed.chapters && parsed.chapters.length > 0) {
+      setImportProgress(
+        `Creating ${parsed.chapters.length} chapter(s) from "${file.name}"...`
+      );
+
+      parsed.chapters.forEach((c, index) => {
+        const doubleSpacedContent = applyDoubleSpacing(c.content || "");
+
+        if (isSingleBlank && index === 0) {
+          // 🔹 Reuse the initial blank chapter for the first imported one
+          const firstId = existing[0].id;
+          updateChapter(firstId, {
+            title: c.title || "Untitled Chapter",
+            content: doubleSpacedContent,
+          });
+          setSelectedId(firstId);
+        } else {
+          // 🔹 Create new chapter for the rest
           const newId = addChapter();
-          const doubleSpacedContent = applyDoubleSpacing(c.content || "");
           updateChapter(newId, {
             title: c.title || "Untitled Chapter",
             content: doubleSpacedContent,
           });
         }
+      });
 
-        alert(
-          `✅ Imported ${parsed.chapters.length} chapter(s) from "${file.name}".`
-        );
+      alert(
+        `✅ Imported ${parsed.chapters.length} chapter(s) from "${file.name}".`
+      );
+    } else {
+      // ---------- SINGLE-CHAPTER IMPORT ----------
+      setImportProgress("Importing manuscript into a single chapter...");
+
+      const fullContentRaw =
+        parsed.fullContent ||
+        (parsed.chapters && parsed.chapters.length
+          ? parsed.chapters.map((c) => c.content || "").join("\n\n")
+          : "");
+
+      const fullContent = applyDoubleSpacing(fullContentRaw);
+
+      if (isSingleBlank) {
+        // Reuse the existing starter chapter
+        const firstId = existing[0].id;
+        updateChapter(firstId, {
+          title: parsed.title || "Imported Manuscript",
+          content: fullContent,
+        });
+        setSelectedId(firstId);
+      } else if (hasChapter) {
+        // Overwrite current selection
+        setHtml(fullContent);
+        updateChapter(selectedId, {
+          title:
+            title ||
+            selectedChapter?.title ||
+            parsed.title ||
+            "Imported Manuscript",
+          content: fullContent,
+        });
       } else {
-        setImportProgress("Importing manuscript into a single chapter...");
-
-        const fullContentRaw =
-          parsed.fullContent ||
-          (parsed.chapters && parsed.chapters.length
-            ? parsed.chapters.map((c) => c.content || "").join("\n\n")
-            : "");
-
-        const fullContent = applyDoubleSpacing(fullContentRaw);
-
-        if (hasChapter) {
-          setHtml(fullContent);
-          updateChapter(selectedId, {
-            title:
-              title ||
-              selectedChapter?.title ||
-              parsed.title ||
-              "Imported Manuscript",
-            content: fullContent,
-          });
-        } else {
-          const newId = addChapter();
-          updateChapter(newId, {
-            title: parsed.title || "Imported Manuscript",
-            content: fullContent,
-          });
-          setSelectedId(newId);
-          setView("editor");
-        }
-
-        alert(
-          `✅ Document imported into a single chapter from "${file.name}".`
-        );
+        // No chapters yet → create one
+        const newId = addChapter();
+        updateChapter(newId, {
+          title: parsed.title || "Imported Manuscript",
+          content: fullContent,
+        });
+        setSelectedId(newId);
+        setView("editor");
       }
 
-      saveProject({
-        book: { ...book, title: parsed.title || bookTitle },
-      });
-    } catch (error) {
-      console.error("Import failed:", error);
       alert(
-        `❌ Failed to import document: ${
-          error instanceof Error ? error.message : "Unknown error"
-        }`
+        `✅ Document imported into a single chapter from "${file.name}".`
       );
-    } finally {
-      setIsImporting(false);
-      setImportProgress("");
     }
-  };
+
+    // Save book meta
+    saveProject({
+      book: { ...book, title: parsed.title || bookTitle },
+    });
+  } catch (error) {
+    console.error("Import failed:", error);
+    alert(
+      `❌ Failed to import document: ${
+        error instanceof Error ? error.message : "Unknown error"
+      }`
+    );
+  } finally {
+    setIsImporting(false);
+    setImportProgress("");
+  }
+};
 
   const handleSendToPublishing = async () => {
     if (!Array.isArray(chapters) || chapters.length === 0) {
