@@ -440,24 +440,34 @@ export default function ComposePage() {
     const targetText = selectedPlain.slice(0, MAX_CHARS);
 
     // Helper: wrap AI result into simple <p> HTML
-    const wrapAsHtml = (text) => {
-      const safe = String(text)
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;");
+   // Helper: wrap AI result into simple <p> HTML
+const wrapAsHtml = (text) => {
+  // 1) Normalize to string
+  let cleaned = String(text || "");
 
-      // Split on blank lines into paragraphs
-      const parts = safe
-        .split(/\n{2,}/)
-        .map((p) => p.trim())
-        .filter(Boolean);
+  // 2) If the AI happened to return raw <p> tags, strip them out
+  //    so they do not appear as literal text later.
+  cleaned = cleaned.replace(/<\/?p>/gi, "");
 
-      if (parts.length === 0) {
-        return `<p>${safe}</p>`;
-      }
+  // 3) Now escape any remaining HTML so it is treated as text,
+  //    not as executable HTML.
+  const safe = cleaned
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
 
-      return parts.map((p) => `<p>${p}</p>`).join("");
-    };
+  // 4) Split on blank lines into paragraphs
+  const parts = safe
+    .split(/\n{2,}/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+
+  if (parts.length === 0) {
+    return `<p>${safe}</p>`;
+  }
+
+  return parts.map((p) => `<p>${p}</p>`).join("");
+};
 
     try {
       setAiBusy(true);
