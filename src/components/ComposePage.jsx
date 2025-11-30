@@ -372,7 +372,6 @@ export default function ComposePage() {
     switch (mode) {
       case "grammar":
       case "proofread":
-        // Use your grammar / proofread backend action
         return "proofread";
       case "clarify":
         return "clarify";
@@ -385,8 +384,7 @@ export default function ComposePage() {
     }
   };
 
-
- // SMART AI HANDLER — rewrites ONLY the selected text in the editor
+  // SMART AI HANDLER — rewrites ONLY the selected text in the editor
   const handleAI = async (mode) => {
     if (!hasChapter) return;
 
@@ -596,147 +594,155 @@ export default function ComposePage() {
 
   // Import using documentParser
   const handleImport = async (file, options = {}) => {
-  if (!file) return;
+    if (!file) return;
 
-  const { splitByHeadings = true } = options;
+    const { splitByHeadings = true } = options;
 
-  setIsImporting(true);
-  setImportProgress("Parsing document...");
+    setIsImporting(true);
+    setImportProgress("Parsing document...");
 
-  try {
-    const name = file.name.toLowerCase();
-    let parsed;
+    try {
+      const name = file.name.toLowerCase();
+      let parsed;
 
-    if (name.endsWith(".doc") || name.endsWith(".docx")) {
-      parsed = await rateLimiter.addToQueue(() =>
-        documentParser.parseWordDocument(file)
-      );
-    } else if (name.endsWith(".txt") || name.endsWith(".md")) {
-      parsed = await documentParser.parseTextDocument(file);
-    } else {
-      alert("Unsupported file type. Please use .doc, .docx, .txt, or .md");
-      return;
-    }
-
-    if (!parsed) {
-      alert("Could not parse this document.");
-      return;
-    }
-
-    if (DEBUG_IMPORT) {
-      console.log("Parsed document:", {
-        title: parsed.title,
-        chapters: parsed.chapters?.length,
-        totalWordCount: parsed.totalWordCount,
-      });
-    }
-
-    if (parsed.title && parsed.title !== bookTitle) {
-      setBookTitle(parsed.title);
-    }
-
-    const existing = Array.isArray(chapters) ? chapters : [];
-
-    // 🔹 Detect the single blank starter chapter (no title, no content)
-    const isSingleBlank =
-      existing.length === 1 &&
-      !stripHtml(existing[0].content || "").trim() &&
-      !(existing[0].title || "").trim();
-
-    // ---------- MULTI-CHAPTER IMPORT ----------
-    if (splitByHeadings && parsed.chapters && parsed.chapters.length > 0) {
-      setImportProgress(
-        `Creating ${parsed.chapters.length} chapter(s) from "${file.name}"...`
-      );
-
-      parsed.chapters.forEach((c, index) => {
-        const doubleSpacedContent = applyDoubleSpacing(c.content || "");
-
-        if (isSingleBlank && index === 0) {
-          // 🔹 Reuse the initial blank chapter for the first imported one
-          const firstId = existing[0].id;
-          updateChapter(firstId, {
-            title: c.title || "Untitled Chapter",
-            content: doubleSpacedContent,
-          });
-          setSelectedId(firstId);
-        } else {
-          // 🔹 Create new chapter for the rest
-          const newId = addChapter();
-          updateChapter(newId, {
-            title: c.title || "Untitled Chapter",
-            content: doubleSpacedContent,
-          });
-        }
-      });
-
-      alert(
-        `✅ Imported ${parsed.chapters.length} chapter(s) from "${file.name}".`
-      );
-    } else {
-      // ---------- SINGLE-CHAPTER IMPORT ----------
-      setImportProgress("Importing manuscript into a single chapter...");
-
-      const fullContentRaw =
-        parsed.fullContent ||
-        (parsed.chapters && parsed.chapters.length
-          ? parsed.chapters.map((c) => c.content || "").join("\n\n")
-          : "");
-
-      const fullContent = applyDoubleSpacing(fullContentRaw);
-
-      if (isSingleBlank) {
-        // Reuse the existing starter chapter
-        const firstId = existing[0].id;
-        updateChapter(firstId, {
-          title: parsed.title || "Imported Manuscript",
-          content: fullContent,
-        });
-        setSelectedId(firstId);
-      } else if (hasChapter) {
-        // Overwrite current selection
-        setHtml(fullContent);
-        updateChapter(selectedId, {
-          title:
-            title ||
-            selectedChapter?.title ||
-            parsed.title ||
-            "Imported Manuscript",
-          content: fullContent,
-        });
+      if (name.endsWith(".doc") || name.endsWith(".docx")) {
+        parsed = await rateLimiter.addToQueue(() =>
+          documentParser.parseWordDocument(file)
+        );
+      } else if (name.endsWith(".txt") || name.endsWith(".md")) {
+        parsed = await documentParser.parseTextDocument(file);
       } else {
-        // No chapters yet → create one
-        const newId = addChapter();
-        updateChapter(newId, {
-          title: parsed.title || "Imported Manuscript",
-          content: fullContent,
-        });
-        setSelectedId(newId);
-        setView("editor");
+        alert("Unsupported file type. Please use .doc, .docx, .txt, or .md");
+        return;
       }
 
+      if (!parsed) {
+        alert("Could not parse this document.");
+        return;
+      }
+
+      if (DEBUG_IMPORT) {
+        console.log("Parsed document:", {
+          title: parsed.title,
+          chapters: parsed.chapters?.length,
+          totalWordCount: parsed.totalWordCount,
+        });
+      }
+
+      if (parsed.title && parsed.title !== bookTitle) {
+        setBookTitle(parsed.title);
+      }
+
+      const existing = Array.isArray(chapters) ? chapters : [];
+
+      // 🔹 Detect the single blank starter chapter (no title, no content)
+      const isSingleBlank =
+        existing.length === 1 &&
+        !stripHtml(existing[0].content || "").trim() &&
+        !(existing[0].title || "").trim();
+
+      // ---------- MULTI-CHAPTER IMPORT ----------
+      if (splitByHeadings && parsed.chapters && parsed.chapters.length > 0) {
+        setImportProgress(
+          `Creating ${parsed.chapters.length} chapter(s) from "${file.name}"...`
+        );
+
+        parsed.chapters.forEach((c, index) => {
+          const doubleSpacedContent = applyDoubleSpacing(c.content || "");
+
+          if (isSingleBlank && index === 0) {
+            // 🔹 Reuse the initial blank chapter for the first imported one
+            const firstId = existing[0].id;
+            updateChapter(firstId, {
+              title: c.title || "Untitled Chapter",
+              content: doubleSpacedContent,
+            });
+            setSelectedId(firstId);
+          } else {
+            // 🔹 Create new chapter for the rest
+            const newId = addChapter();
+            updateChapter(newId, {
+              title: c.title || "Untitled Chapter",
+              content: doubleSpacedContent,
+            });
+          }
+        });
+
+        alert(
+          `✅ Imported ${parsed.chapters.length} chapter(s) from "${file.name}".`
+        );
+      } else {
+        // ---------- SINGLE-CHAPTER IMPORT ----------
+        setImportProgress("Importing manuscript into a single chapter...");
+
+        const fullContentRaw =
+          parsed.fullContent ||
+          (parsed.chapters && parsed.chapters.length
+            ? parsed.chapters.map((c) => c.content || "").join("\n\n")
+            : "");
+
+        const fullContent = applyDoubleSpacing(fullContentRaw);
+
+        if (isSingleBlank) {
+          // Reuse the existing starter chapter
+          const firstId = existing[0].id;
+          updateChapter(firstId, {
+            title: parsed.title || "Imported Manuscript",
+            content: fullContent,
+          });
+          setSelectedId(firstId);
+        } else if (hasChapter) {
+          // Overwrite current selection
+          setHtml(fullContent);
+          updateChapter(selectedId, {
+            title:
+              title ||
+              selectedChapter?.title ||
+              parsed.title ||
+              "Imported Manuscript",
+            content: fullContent,
+          });
+        } else {
+          // No chapters yet → create one
+          const newId = addChapter();
+          updateChapter(newId, {
+            title: parsed.title || "Imported Manuscript",
+            content: fullContent,
+          });
+          setSelectedId(newId);
+          setView("editor");
+        }
+
+        alert(
+          `✅ Document imported into a single chapter from "${file.name}".`
+        );
+      }
+
+      // Save book meta
+      saveProject({
+        book: { ...book, title: parsed.title || bookTitle },
+      });
+    } catch (error) {
+      console.error("Import failed:", error);
       alert(
-        `✅ Document imported into a single chapter from "${file.name}".`
+        `❌ Failed to import document: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
       );
+    } finally {
+      setIsImporting(false);
+      setImportProgress("");
     }
+  };
 
-    // Save book meta
-    saveProject({
-      book: { ...book, title: parsed.title || bookTitle },
-    });
-  } catch (error) {
-    console.error("Import failed:", error);
-    alert(
-      `❌ Failed to import document: ${
-        error instanceof Error ? error.message : "Unknown error"
-      }`
-    );
-  } finally {
-    setIsImporting(false);
-    setImportProgress("");
-  }
-};
-
+  /**
+   * SEND TO PUBLISHING
+   * 1) Save latest changes
+   * 2) Strip @char: tags
+   * 3) Write a clean chapter list to `dahtruth_chapters` for Publishing.tsx
+   * 4) Also store a richer snapshot under `publishingDraft`
+   * 5) Navigate to /publishing
+   */
   const handleSendToPublishing = async () => {
     if (!Array.isArray(chapters) || chapters.length === 0) {
       alert("You need at least one chapter before sending to Publishing.");
@@ -747,32 +753,76 @@ export default function ComposePage() {
     await handleSave();
 
     try {
-      // Strip @char: from content for Publishing version
-      const cleanedChapters = chapters.map((ch) => ({
-        ...ch,
-        content: stripCharacterTags(
-          ch.content || ch.body || ch.text || ""
-        ),
+      // 2) Strip @char: tags from content for Publishing version
+      const cleanedChapters = chapters.map((ch, idx) => {
+        const rawContent = ch.content || ch.body || ch.text || "";
+        const withoutCharTags = stripCharacterTags(rawContent);
+
+        // plain text for Publishing.tsx (it will rebuild simple HTML paragraphs)
+        const plain = stripHtml(withoutCharTags);
+
+        return {
+          ...ch,
+          content: withoutCharTags,
+          _plainForPublishing: plain,
+          _index: idx,
+        };
+      });
+
+      // 3) Normalized structure for Publishing.tsx (dahtruth_chapters)
+      const normalizedForPublishing = cleanedChapters.map((ch) => ({
+        id: ch.id || `c_${(ch._index ?? 0) + 1}`,
+        title: ch.title || `Chapter ${(ch._index ?? 0) + 1}`,
+        included:
+          typeof ch.included === "boolean" ? ch.included : true,
+        text: ch._plainForPublishing || "",
+        // Leave textHTML undefined so Publishing builds <p> tags from text
+        textHTML: ch.textHTML || undefined,
       }));
 
+      localStorage.setItem(
+        "dahtruth_chapters",
+        JSON.stringify(normalizedForPublishing)
+      );
+
+      // Optional: project meta for Publishing header
+      const safeBookTitle =
+        (bookTitle && bookTitle.trim()) ||
+        (book?.title && book.title.trim()) ||
+        "Untitled Book";
+
+      const meta = {
+        title: safeBookTitle,
+        author: author || "Unknown Author",
+        year: new Date().getFullYear().toString(),
+        authorLast: (author || "").split(" ").slice(-1)[0] || "Author",
+      };
+
+      localStorage.setItem("dahtruth_project_meta", JSON.stringify(meta));
+
+      // 4) Richer payload under publishingDraft for future extensions
       const payload = {
         book: {
           ...book,
-          title: bookTitle,
+          title: safeBookTitle,
           status: "ReadyForPublishing",
           updatedAt: new Date().toISOString(),
         },
-        chapters: cleanedChapters,
+        chapters: cleanedChapters.map((ch) => ({
+          id: ch.id,
+          title: ch.title,
+          content: ch.content,
+        })),
       };
 
       localStorage.setItem(PUBLISHING_DRAFT_KEY, JSON.stringify(payload));
 
       // Also update the project list status
       upsertUserProject({
-        title: bookTitle || book?.title || "Untitled Book",
+        title: safeBookTitle,
       });
 
-      // 2) Go to Publishing page
+      // 5) Go to Publishing page
       navigate("/publishing");
     } catch (err) {
       console.error("Failed to send manuscript to publishing:", err);
