@@ -36,6 +36,7 @@ const theme = {
 
 const STORAGE_KEY = "dahtruth_chapters";
 const META_KEY = "dahtruth_project_meta";
+const PUBLISHING_DRAFT_KEY = "publishingDraft";
 
 const GOOGLE_PALETTE = {
   primary: "#1a73e8",
@@ -631,42 +632,71 @@ export default function Publishing(): JSX.Element {
 
   // ---------- Chapters + active chapter ----------
 
-  const [chapters, setChapters] = useState<Chapter[]>([]);
-  const [activeChapterId, setActiveChapterId] = useState<string>("");
+const [chapters, setChapters] = useState<Chapter[]>([]);
+const [activeChapterId, setActiveChapterId] = useState<string>("");
 
   // Load chapters saved by Writing
-  useEffect(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (!saved) return;
-      const parsed = JSON.parse(saved) as any[];
-      if (!Array.isArray(parsed) || parsed.length === 0) return;
+useEffect(() => {
+  try {
+    // --- Prefer structured publishingDraft from ComposePage ---
+    const draftRaw = localStorage.getItem(PUBLISHING_DRAFT_KEY);
 
-      const normalized: Chapter[] = parsed.map((c, idx) => {
-        const baseText =
-          typeof c.text === "string" && c.text.trim().length > 0
-            ? c.text
-            : typeof c.content === "string"
-            ? c.content
-            : "";
+    if (draftRaw) {
+      const parsed = JSON.parse(draftRaw) as {
+        book?: any;
+        chapters?: any[];
+      };
 
-        return {
+      // hydrate meta title from the book object if present
+      if (parsed.book?.title) {
+        setMeta((prev) => ({
+          ...prev,
+          title: parsed.book.title || prev.title,
+        }));
+      }
+
+      const rawChapters = Array.isArray(parsed.chapters)
+        ? parsed.chapters
+        : [];
+
+      if (rawChapters.length > 0) {
+        const normalized: Chapter[] = rawChapters.map((c, idx) => ({
           id: c.id || `c_${idx + 1}`,
           title: c.title || `Chapter ${idx + 1}`,
-          included: typeof c.included === "boolean" ? c.included : true,
-          text: baseText,
+          included:
+            typeof c.included === "boolean" ? c.included : true,
+          text: c.text || c.content || "",
           textHTML: c.textHTML,
-        };
-      });
+        }));
 
-      setChapters(normalized);
-      if (normalized.length > 0) {
+        setChapters(normalized);
         setActiveChapterId(normalized[0].id);
+        return; // ✅ Done, no need to fall back
       }
-    } catch (err) {
-      console.error("Failed to load dahtruth_chapters for Publishing:", err);
     }
-  }, []);
+
+    // --- Fallback: legacy dahtruth_chapters behavior ---
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (!saved) return;
+
+    const parsedCh = JSON.parse(saved) as any[];
+    if (!Array.isArray(parsedCh) || parsedCh.length === 0) return;
+
+    const normalizedLegacy: Chapter[] = parsedCh.map((c, idx) => ({
+      id: c.id || `c_${idx + 1}`,
+      title: c.title || `Chapter ${idx + 1}`,
+      included:
+        typeof c.included === "boolean" ? c.included : true,
+      text: c.text || c.content || "",
+      textHTML: c.textHTML,
+    }));
+
+    setChapters(normalizedLegacy);
+    setActiveChapterId(normalizedLegacy[0].id);
+  } catch (err) {
+    console.error("Failed to load chapters for Publishing:", err);
+  }
+}, []);
 
   // Persist chapters when edited in Publishing
   useEffect(() => {
