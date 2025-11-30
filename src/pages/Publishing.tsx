@@ -859,14 +859,64 @@ export default function Publishing(): JSX.Element {
     []
   );
 
-  const importHTML = useCallback(
-    async (_file: File, _asNewChapter: boolean = true) => {
+const importHTML = useCallback(
+  async (file: File, asNewChapter: boolean = true) => {
+    try {
+      const html = await file.text();
+
+      if (asNewChapter) {
+        const id = genId();
+        const title =
+          file.name.replace(/\.(html?|xhtml)$/i, "") || "Imported HTML";
+
+        const ch: Chapter = {
+          id,
+          title,
+          included: true,
+          // store a plain-text version too (for compiled manuscript)
+          text: stripHtml(html),
+          textHTML: html,
+        };
+
+        setChapters((prev) => [...prev, ch]);
+        setActiveChapterId(id);
+
+        alert(
+          `Imported "${title}" successfully! Use the chapter dropdown to open it.`
+        );
+      } else {
+        // Replace the current active chapter content with imported HTML
+        setChapters((prev) => {
+          const next = [...prev];
+          const cur = next[activeIdx];
+          if (cur) {
+            const title =
+              cur.title ||
+              file.name.replace(/\.(html?|xhtml)$/i, "") ||
+              "Imported HTML";
+
+            next[activeIdx] = {
+              ...cur,
+              title,
+              text: stripHtml(html),
+              textHTML: html,
+            };
+          }
+          return next;
+        });
+
+        alert("Chapter replaced successfully!");
+      }
+    } catch (err) {
+      console.error(err);
       alert(
-        "HTML import will be wired back in soon. For now, paste your text directly into the editor."
+        "Sorry—HTML import failed. The file may be malformed or unreadable."
       );
-    },
-    []
-  );
+    }
+  },
+  [activeIdx]
+);
+
 
   /* ---------- Compile (Preview/Export) ---------- */
 
