@@ -36,21 +36,22 @@ function stripCharacterTags(html = "") {
 }
 
 // Helper: normalize to "double spaced" paragraphs on import / AI
+// ✅ Only touch plain text. If it's already HTML, leave it alone.
 const applyDoubleSpacing = (text = "") => {
   if (!text) return "";
 
-  if (text.includes("<p")) {
-    return text
-      .replace(/\r\n/g, "\n")
-      .replace(/<\/p>/g, "</p><p>&nbsp;</p>")
-      .replace(/(<p>&nbsp;<\/p>){3,}/g, "<p>&nbsp;</p><p>&nbsp;</p>");
+  // If it already looks like HTML, don't inject extra <p>&nbsp;</p>
+  if (/<\/p>/i.test(text) || /<br\s*\/?>/i.test(text)) {
+    return text;
   }
 
+  // Plain text → use blank lines between paragraphs
   return text
     .replace(/\r\n/g, "\n")
     .replace(/\n/g, "\n\n")
     .replace(/\n{3,}/g, "\n\n");
 };
+
 
 // Save a simple "current story" snapshot for ProjectPage to read
 function saveCurrentStorySnapshot({ title }) {
@@ -440,8 +441,7 @@ export default function ComposePage() {
     const targetText = selectedPlain.slice(0, MAX_CHARS);
 
     // Helper: wrap AI result into simple <p> HTML
-   // Helper: wrap AI result into simple <p> HTML
-const wrapAsHtml = (text) => {
+  const wrapAsHtml = (text) => {
   // 1) Normalize to string
   let cleaned = String(text || "");
 
@@ -764,18 +764,14 @@ const wrapAsHtml = (text) => {
 
     try {
       // 2) Strip @char: tags from content for Publishing version
-      const cleanedChapters = chapters.map((ch, idx) => {
-        const rawContent = ch.content || ch.body || ch.text || "";
-        const withoutCharTags = stripCharacterTags(rawContent);
-
-        // plain text for Publishing.tsx (it will rebuild simple HTML paragraphs)
-        const plain = stripHtml(withoutCharTags);
-
+        const cleanedChapters = chapters.map((ch) => {
+        const raw = ch.content || ch.body || ch.text || "";
+        const noChars = stripCharacterTags(raw);
+        const noSpacers = stripSpacerParagraphs(noChars);
+      
         return {
           ...ch,
-          content: withoutCharTags,
-          _plainForPublishing: plain,
-          _index: idx,
+          content: noSpacers,
         };
       });
 
