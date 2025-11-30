@@ -63,73 +63,77 @@ export default function EditorToolbar({
   const aiDisabled = aiBusy ? "opacity-60 cursor-not-allowed" : "";
 
   return (
-    <div className="flex items-center gap-3">
-      {/* AI Actions (modes) */}
-      <div className="flex items-center gap-1 rounded-full bg-slate-50 border border-slate-200 px-1 py-1">
-        <button
-          type="button"
-          disabled={aiBusy}
-          onClick={() => handleAiClick("proofread")}
-          className={[
-            aiButtonBase,
-            activeAiTab === "proofread" ? aiActive : aiInactive,
-            aiDisabled,
-          ].join(" ")}
-          title="Check grammar and fix basic errors"
-        >
-          {aiBusy && activeAiTab === "proofread"
-            ? "Working…"
-            : "Proofread"}
-        </button>
+// Example AI buttons section inside EditorToolbar
 
-        <button
-          type="button"
-          disabled={aiBusy}
-          onClick={() => handleAiClick("clarify")}
-          className={[
-            aiButtonBase,
-            activeAiTab === "clarify" ? aiActive : aiInactive,
-            aiDisabled,
-          ].join(" ")}
-          title="Improve clarity and flow"
-        >
-          {aiBusy && activeAiTab === "clarify"
-            ? "Working…"
-            : "Clarify"}
-        </button>
+<div className="flex items-center gap-2">
+  {/* Grammar (uses proofread under the hood) */}
+  <button
+    type="button"
+    onClick={() => {
+      setActiveAiTab("grammar");
+      onAI("grammar");
+    }}
+    className={`px-3 py-1.5 rounded-md border text-[12px] ${
+      activeAiTab === "grammar"
+        ? "bg-indigo-600 text-white border-indigo-600"
+        : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+    }`}
+    disabled={aiBusy}
+  >
+    Grammar
+  </button>
 
-        <button
-          type="button"
-          disabled={aiBusy}
-          onClick={() => handleAiClick("readability")}
-          className={[
-            aiButtonBase,
-            activeAiTab === "readability" ? aiActive : aiInactive,
-            aiDisabled,
-          ].join(" ")}
-          title="Enhance readability and pacing"
-        >
-          {aiBusy && activeAiTab === "readability"
-            ? "Working…"
-            : "Readability"}
-        </button>
+  {/* Clarify */}
+  <button
+    type="button"
+    onClick={() => {
+      setActiveAiTab("clarify");
+      onAI("clarify");
+    }}
+    className={`px-3 py-1.5 rounded-md border text-[12px] ${
+      activeAiTab === "clarify"
+        ? "bg-indigo-600 text-white border-indigo-600"
+        : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+    }`}
+    disabled={aiBusy}
+  >
+    Clarify
+  </button>
 
-        <button
-          type="button"
-          disabled={aiBusy}
-          onClick={() => handleAiClick("rewrite")}
-          className={[
-            aiButtonBase,
-            activeAiTab === "rewrite" ? aiActive : aiInactive,
-            aiDisabled,
-          ].join(" ")}
-          title="Rewrite or polish the selected section"
-        >
-          {aiBusy && activeAiTab === "rewrite"
-            ? "Working…"
-            : "Rewrite"}
-        </button>
-      </div>
+  {/* Readability */}
+  <button
+    type="button"
+    onClick={() => {
+      setActiveAiTab("readability");
+      onAI("readability");
+    }}
+    className={`px-3 py-1.5 rounded-md border text-[12px] ${
+      activeAiTab === "readability"
+        ? "bg-indigo-600 text-white border-indigo-600"
+        : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+    }`}
+    disabled={aiBusy}
+  >
+    Readability
+  </button>
+
+  {/* Rewrite */}
+  <button
+    type="button"
+    onClick={() => {
+      setActiveAiTab("rewrite");
+      onAI("rewrite");
+    }}
+    className={`px-3 py-1.5 rounded-md border text-[12px] ${
+      activeAiTab === "rewrite"
+        ? "bg-indigo-600 text-white border-indigo-600"
+        : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+    }`}
+    disabled={aiBusy}
+  >
+    Rewrite
+  </button>
+</div>
 
       {/* Optional: AI Assistant toggle (right-hand chat) */}
       {typeof onToggleAssistant === "function" && (
