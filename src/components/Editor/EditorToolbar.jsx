@@ -1,5 +1,6 @@
 // src/components/Editor/EditorToolbar.jsx
-import React, { useRef } from "react";
+import React from "react";
+import { Upload, Save, Trash2, Sparkles } from "lucide-react";
 
 export default function EditorToolbar({
   onAI,
@@ -7,208 +8,135 @@ export default function EditorToolbar({
   onImport,
   onExport,
   onDelete,
-  aiBusy = false,
-  saveStatus = "idle", // "idle" | "saving" | "saved"
-  activeAiTab = "proofread",
-  setActiveAiTab, // optional; ComposePage passes this in
-  onToggleAssistant, // optional; toggles right-hand AI chat panel
-  assistantOpen = false, // optional; whether the chat panel is open
+  aiBusy,
+  saveStatus,
+  activeAiTab,
+  setActiveAiTab,
+  onToggleAssistant,
+  assistantOpen,
 }) {
-  const fileInputRef = useRef(null);
-
-  const handleFileClick = () => {
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-      fileInputRef.current.click();
-    }
-  };
-
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
-    if (file && onImport) {
-      onImport(file, { splitByHeadings: true });
+    if (file && typeof onImport === "function") {
+      onImport(file);
     }
+    // reset so selecting same file again still fires
+    e.target.value = "";
   };
 
-  const handleAiClick = (mode) => {
-    // remember active tab (if the parent provided the setter)
-    if (typeof setActiveAiTab === "function") {
-      setActiveAiTab(mode);
-    }
-    if (onAI) {
-      onAI(mode);
-    }
-  };
+  const isSaving = saveStatus === "saving";
+  const isSaved = saveStatus === "saved";
 
-  const renderSaveLabel = () => {
-    if (saveStatus === "saving") return "Saving...";
-    if (saveStatus === "saved") return "Saved ✓";
-    return "Save";
-  };
-
-  const renderSaveClass = () => {
-    if (saveStatus === "saving") return "bg-slate-200 cursor-wait";
-    if (saveStatus === "saved")
-      return "bg-emerald-100 text-emerald-800";
-    return "bg-slate-900 text-white hover:bg-slate-800";
-  };
-
-  const aiButtonBase =
-    "px-3 py-1.5 rounded-full text-xs font-medium border transition-colors";
-  const aiInactive =
-    "bg-white text-slate-700 border-slate-200 hover:bg-slate-50";
-  const aiActive =
-    "bg-slate-900 text-white border-slate-900 shadow-sm";
-
-  const aiDisabled = aiBusy ? "opacity-60 cursor-not-allowed" : "";
+  const aiButtons = [
+    { id: "grammar", label: "Grammar", title: "Check grammar and punctuation" },
+    { id: "clarify", label: "Clarify", title: "Tighten and clarify wording" },
+    { id: "readability", label: "Readability", title: "Improve flow and readability" },
+    { id: "rewrite", label: "Rewrite", title: "Stronger revision of the selection" },
+  ];
 
   return (
-// Example AI buttons section inside EditorToolbar
+    <div className="flex items-center gap-2">
+      {/* AI mode buttons */}
+      <div className="flex items-center gap-1">
+        {aiButtons.map((btn) => (
+          <button
+            key={btn.id}
+            type="button"
+            onClick={() => onAI && onAI(btn.id)}
+            disabled={aiBusy}
+            title={btn.title}
+            className={[
+              "inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-[12px]",
+              activeAiTab === btn.id
+                ? "bg-indigo-50 border-indigo-300 text-indigo-700"
+                : "bg-white border-slate-200 text-slate-700 hover:bg-slate-50",
+              aiBusy ? "opacity-60 cursor-not-allowed" : "",
+            ].join(" ")}
+          >
+            {btn.id === "grammar" && (
+              <Sparkles className="w-3 h-3 text-amber-500" />
+            )}
+            <span>{btn.label}</span>
+          </button>
+        ))}
+      </div>
 
-<div className="flex items-center gap-2">
-  {/* Grammar (uses proofread under the hood) */}
-  <button
-    type="button"
-    onClick={() => {
-      setActiveAiTab("grammar");
-      onAI("grammar");
-    }}
-    className={`px-3 py-1.5 rounded-md border text-[12px] ${
-      activeAiTab === "grammar"
-        ? "bg-indigo-600 text-white border-indigo-600"
-        : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
-    }`}
-    disabled={aiBusy}
-  >
-    Grammar
-  </button>
+      {/* Save button + status */}
+      <button
+        type="button"
+        onClick={onSave}
+        disabled={isSaving}
+        className={[
+          "inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-[12px]",
+          "bg-emerald-600 text-white hover:bg-emerald-700",
+          isSaving ? "opacity-60 cursor-not-allowed" : "",
+        ].join(" ")}
+        title="Save chapter"
+      >
+        <Save className="w-3 h-3" />
+        <span>{isSaving ? "Saving…" : "Save"}</span>
+      </button>
+      {isSaved && (
+        <span className="text-[11px] text-emerald-700">Saved</span>
+      )}
 
-  {/* Clarify */}
-  <button
-    type="button"
-    onClick={() => {
-      setActiveAiTab("clarify");
-      onAI("clarify");
-    }}
-    className={`px-3 py-1.5 rounded-md border text-[12px] ${
-      activeAiTab === "clarify"
-        ? "bg-indigo-600 text-white border-indigo-600"
-        : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
-    }`}
-    disabled={aiBusy}
-  >
-    Clarify
-  </button>
+      {/* Import (Word / Text) */}
+      <label
+        className="inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-[12px] bg-white hover:bg-slate-50 cursor-pointer"
+        title="Import .docx, .doc, .txt, or .md"
+      >
+        <Upload className="w-3 h-3" />
+        <span>Import</span>
+        <input
+          type="file"
+          accept=".doc,.docx,.txt,.md"
+          onChange={handleFileChange}
+          className="hidden"
+        />
+      </label>
 
-  {/* Readability */}
-  <button
-    type="button"
-    onClick={() => {
-      setActiveAiTab("readability");
-      onAI("readability");
-    }}
-    className={`px-3 py-1.5 rounded-md border text-[12px] ${
-      activeAiTab === "readability"
-        ? "bg-indigo-600 text-white border-indigo-600"
-        : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
-    }`}
-    disabled={aiBusy}
-  >
-    Readability
-  </button>
+      {/* Export current chapter as HTML */}
+      <button
+        type="button"
+        onClick={onExport}
+        className="inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-[12px] bg-white hover:bg-slate-50"
+        title="Download this chapter as HTML"
+      >
+        <span>Export</span>
+      </button>
 
-  {/* Rewrite */}
-  <button
-    type="button"
-    onClick={() => {
-      setActiveAiTab("rewrite");
-      onAI("rewrite");
-    }}
-    className={`px-3 py-1.5 rounded-md border text-[12px] ${
-      activeAiTab === "rewrite"
-        ? "bg-indigo-600 text-white border-indigo-600"
-        : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
-    }`}
-    disabled={aiBusy}
-  >
-    Rewrite
-  </button>
-</div>
+      {/* Delete current chapter */}
+      <button
+        type="button"
+        onClick={onDelete}
+        className="inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-[12px] bg-white text-red-700 border-red-200 hover:bg-red-50"
+        title="Delete current chapter"
+      >
+        <Trash2 className="w-3 h-3" />
+        <span>Delete</span>
+      </button>
 
       {/* Optional: AI Assistant toggle (right-hand chat) */}
       {typeof onToggleAssistant === "function" && (
         <button
           type="button"
           onClick={onToggleAssistant}
-          disabled={aiBusy}
           className={[
-            "px-3 py-1.5 rounded-full text-xs font-medium border transition-colors",
+            "ml-2 inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-[12px]",
             assistantOpen
-              ? "bg-indigo-600 text-white border-indigo-600 shadow-sm"
-              : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50",
-            aiDisabled,
+              ? "bg-indigo-600 text-white border-indigo-700"
+              : "bg-white text-indigo-700 border-indigo-300 hover:bg-indigo-50",
           ].join(" ")}
           title={
             assistantOpen
-              ? "Hide AI chat assistant"
-              : "Show AI chat assistant"
+              ? "Hide AI Assistant chat"
+              : "Open AI Assistant chat panel"
           }
         >
-          {assistantOpen ? "Assistant Open" : "AI Assistant"}
+          <Sparkles className="w-3 h-3" />
+          <span>{assistantOpen ? "Hide Assistant" : "AI Assistant"}</span>
         </button>
       )}
-
-      {/* Import / Export */}
-      <div className="flex items-center gap-1">
-        <button
-          type="button"
-          onClick={handleFileClick}
-          className="px-3 py-1.5 rounded-md border border-slate-200 bg-white text-xs hover:bg-slate-50"
-          title="Import manuscript (.docx, .txt, .md)"
-        >
-          Import
-        </button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept=".doc,.docx,.txt,.md"
-          className="hidden"
-          onChange={handleFileChange}
-        />
-
-        <button
-          type="button"
-          onClick={onExport}
-          className="px-3 py-1.5 rounded-md border border-slate-200 bg-white text-xs hover:bg-slate-50"
-          title="Export current chapter as HTML"
-        >
-          Export
-        </button>
-      </div>
-
-      {/* Save */}
-      <button
-        type="button"
-        onClick={onSave}
-        disabled={saveStatus === "saving"}
-        className={[
-          "ml-2 px-4 py-1.5 rounded-full text-xs font-semibold shadow-sm",
-          renderSaveClass(),
-        ].join(" ")}
-        title="Save project"
-      >
-        {renderSaveLabel()}
-      </button>
-
-      {/* Delete */}
-      <button
-        type="button"
-        onClick={onDelete}
-        className="px-3 py-1.5 rounded-full text-xs border border-red-200 text-red-700 bg-red-50 hover:bg-red-100"
-        title="Delete current chapter"
-      >
-        Delete
-      </button>
     </div>
   );
 }
