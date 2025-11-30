@@ -36,7 +36,12 @@ const theme = {
 
 const STORAGE_KEY = "dahtruth_chapters";
 const META_KEY = "dahtruth_project_meta";
-const PUBLISHING_DRAFT_KEY = "publishingDraft";
+
+// Publishing-specific keys
+const PUBLISHING_DRAFT_KEY = "dt_publishing_draft";
+const PUBLISHING_CHAPTERS_KEY = "dt_publishing_chapters";
+const PUBLISHING_MATTER_KEY = "dt_publishing_matter";
+const PUBLISHING_META_KEY = "dt_publishing_meta";
 
 const GOOGLE_PALETTE = {
   primary: "#1a73e8",
@@ -271,8 +276,8 @@ const PLATFORM_PRESETS: Record<
     headers: true,
     footers: true,
     pageNumbers: true,
-    showTOCInEebook: false,
-  } as any, // harmless; this key isn't actually used
+    showTOCInEbook: false,
+  } as any,
   KDP_Ebook: {
     label: "KDP Kindle eBook (reflowable)",
     trim: null,
@@ -299,8 +304,8 @@ const PLATFORM_PRESETS: Record<
     headers: true,
     footers: true,
     pageNumbers: true,
-    showTOCInEbook: false,
-  },
+    showTOCInEebook: false,
+  } as any,
 };
 
 /* ---------- Styles ---------- */
@@ -423,7 +428,21 @@ function stripHtml(html: string = ""): string {
   if (!html) return "";
   const tmp = document.createElement("div");
   tmp.innerHTML = html;
-  return tmp.textContent || tmp.innerText || "";
+  return (tmp.textContent || tmp.innerText || "").trim();
+}
+
+// Remove @char: markers
+function stripCharacterTags(html: string = ""): string {
+  return html.replace(/@char:\s*/g, "");
+}
+
+// Remove spacer paragraphs like <p>&nbsp;</p>, empty <p></p>, or <p><br/></p>
+function stripSpacerParagraphs(html: string = ""): string {
+  if (!html) return "";
+  return html
+    .replace(/<p>&nbsp;<\/p>/gi, "")
+    .replace(/<p>\s*<\/p>/gi, "")
+    .replace(/<p><br\s*\/?><\/p>/gi, "");
 }
 
 /* ---------- Small UI helpers ---------- */
@@ -607,9 +626,19 @@ export default function Publishing(): JSX.Element {
     authorLast: "YourLastName",
   });
 
-  // Load meta from localStorage
+  // Load meta from localStorage (Writing / legacy)
   useEffect(() => {
     try {
+      // Prefer publishing meta if present
+      const pubMetaRaw = localStorage.getItem(PUBLISHING_META_KEY);
+      if (pubMetaRaw) {
+        const parsed = JSON.parse(pubMetaRaw);
+        if (parsed && typeof parsed === "object") {
+          setMeta((prev) => ({ ...prev, ...parsed }));
+          return;
+        }
+      }
+
       const saved = localStorage.getItem(META_KEY);
       if (!saved) return;
       const parsed = JSON.parse(saved);
@@ -621,10 +650,11 @@ export default function Publishing(): JSX.Element {
     }
   }, []);
 
-  // Persist meta
+  // Persist meta to both keys
   useEffect(() => {
     try {
       localStorage.setItem(META_KEY, JSON.stringify(meta));
+      localStorage.setItem(PUBLISHING_META_KEY, JSON.stringify(meta));
     } catch {
       // ignore storage errors
     }
@@ -632,77 +662,111 @@ export default function Publishing(): JSX.Element {
 
   // ---------- Chapters + active chapter ----------
 
-const [chapters, setChapters] = useState<Chapter[]>([]);
-const [activeChapterId, setActiveChapterId] = useState<string>("");
+  const [chapters, setChapters] = useState<Chapter[]>([]);
+  const [activeChapterId, setActiveChapterId] = useState<string>("");
 
-  // Load chapters saved by Writing
-useEffect(() => {
-  try {
-    // --- Prefer structured publishingDraft from ComposePage ---
-    const draftRaw = localStorage.getItem(PUBLISHING_DRAFT_KEY);
+  // Load chapters saved by Writing / Compose → Publishing draft
+  useEffect(() => {
+    try {
+      // --- Prefer structured publishingDraft from ComposePage ---
+      const draftRaw = localStorage.getItem(PUBLISHING_DRAFT_KEY);
 
-    if (draftRaw) {
-      const parsed = JSON.parse(draftRaw) as {
-        book?: any;
-        chapters?: any[];
-      };
+      if (draftRaw) {
+        const parsed = JSON.parse(draftRaw) as {
+          book?: any;
+          chapters?: any[];
+        };
 
-      // hydrate meta title from the book object if present
-      if (parsed.book?.title) {
-        setMeta((prev) => ({
-          ...prev,
-          title: parsed.book.title || prev.title,
-        }));
+        // hydrate meta title from the book object if present
+        if (parsed.book?.title) {
+          setMeta((prev) => ({
+            ...prev,
+            title: parsed.book.title || prev.title,
+          }));
+        }
+
+        const rawChapters = Array.isArray(parsed.chapters)
+          ? parsed.chapters
+          : [];
+
+        if (rawChapters.length > 0) {
+          const normalized: Chapter[] = rawChapters.map((c, idx) => {
+            const rawHtml = c.textHTML || c.content || c.text || "";
+            const cleanedHtml = stripSpacerParagraphs(
+              stripCharacterTags(rawHtml)
+            );
+            return {
+              id: c.id || `c_${idx + 1}`,
+              title: c.title || `Chapter ${idx + 1}`,
+              included:
+                typeof c.included === "boolean" ? c.included : true,
+              text: stripHtml(cleanedHtml),
+              textHTML: cleanedHtml,
+            };
+          });
+
+          setChapters(normalized);
+          if (normalized[0]) {
+            setActiveChapterId(normalized[0].id);
+          }
+
+          // Save for Proof page
+          localStorage.setItem(
+            PUBLISHING_CHAPTERS_KEY,
+            JSON.stringify(normalized)
+          );
+
+          return; // ✅ Done, no need to fall back
+        }
       }
 
-      const rawChapters = Array.isArray(parsed.chapters)
-        ? parsed.chapters
-        : [];
+      // --- Fallback: legacy dahtruth_chapters behavior ---
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (!saved) return;
 
-      if (rawChapters.length > 0) {
-        const normalized: Chapter[] = rawChapters.map((c, idx) => ({
+      const parsedCh = JSON.parse(saved) as any[];
+      if (!Array.isArray(parsedCh) || parsedCh.length === 0) return;
+
+      const normalizedLegacy: Chapter[] = parsedCh.map((c, idx) => {
+        const rawHtml = c.textHTML || c.content || c.text || "";
+        const cleanedHtml = stripSpacerParagraphs(
+          stripCharacterTags(rawHtml)
+        );
+        return {
           id: c.id || `c_${idx + 1}`,
           title: c.title || `Chapter ${idx + 1}`,
           included:
             typeof c.included === "boolean" ? c.included : true,
-          text: c.text || c.content || "",
-          textHTML: c.textHTML,
-        }));
+          text: stripHtml(cleanedHtml),
+          textHTML: cleanedHtml,
+        };
+      });
 
-        setChapters(normalized);
-        setActiveChapterId(normalized[0].id);
-        return; // ✅ Done, no need to fall back
+      setChapters(normalizedLegacy);
+      if (normalizedLegacy[0]) {
+        setActiveChapterId(normalizedLegacy[0].id);
       }
+
+      localStorage.setItem(
+        PUBLISHING_CHAPTERS_KEY,
+        JSON.stringify(normalizedLegacy)
+      );
+    } catch (err) {
+      console.error("Failed to load chapters for Publishing:", err);
     }
-
-    // --- Fallback: legacy dahtruth_chapters behavior ---
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (!saved) return;
-
-    const parsedCh = JSON.parse(saved) as any[];
-    if (!Array.isArray(parsedCh) || parsedCh.length === 0) return;
-
-    const normalizedLegacy: Chapter[] = parsedCh.map((c, idx) => ({
-      id: c.id || `c_${idx + 1}`,
-      title: c.title || `Chapter ${idx + 1}`,
-      included:
-        typeof c.included === "boolean" ? c.included : true,
-      text: c.text || c.content || "",
-      textHTML: c.textHTML,
-    }));
-
-    setChapters(normalizedLegacy);
-    setActiveChapterId(normalizedLegacy[0].id);
-  } catch (err) {
-    console.error("Failed to load chapters for Publishing:", err);
-  }
-}, []);
+  }, []);
 
   // Persist chapters when edited in Publishing
   useEffect(() => {
     try {
       if (!chapters.length) return;
+      // Keep legacy behavior for Writing
       localStorage.setItem(STORAGE_KEY, JSON.stringify(chapters));
+      // Also keep Publishing copy for Proof
+      localStorage.setItem(
+        PUBLISHING_CHAPTERS_KEY,
+        JSON.stringify(chapters)
+      );
     } catch (err) {
       console.error("Failed to persist chapters from Publishing:", err);
     }
@@ -710,7 +774,9 @@ useEffect(() => {
 
   // ---------- AI + layout state ----------
 
-  const [provider, setProvider] = useState<"openai" | "anthropic">("openai");
+  const [provider, setProvider] = useState<"openai" | "anthropic">(
+    "openai"
+  );
 
   const [matter, setMatter] = useState<Matter>({
     titlePage: "{title}\nby {author}",
@@ -724,6 +790,32 @@ useEffect(() => {
     notes: "",
     tocFromHeadings: true,
   });
+
+  // Load matter for Publishing (for Proof tab)
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(PUBLISHING_MATTER_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object") {
+        setMatter((prev) => ({ ...prev, ...parsed }));
+      }
+    } catch (err) {
+      console.error("Failed to load publishing matter:", err);
+    }
+  }, []);
+
+  // Persist matter to storage
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        PUBLISHING_MATTER_KEY,
+        JSON.stringify(matter)
+      );
+    } catch {
+      /* ignore */
+    }
+  }, [matter]);
 
   const [manuscriptPreset, setManuscriptPreset] =
     useState<ManuscriptPresetKey>("Agents_Standard_12pt_TNR_Double");
@@ -778,24 +870,40 @@ useEffect(() => {
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
-  // Load HTML for active chapter into editor
+  // Load HTML for active chapter into editor (and clean it)
   useEffect(() => {
     const chap = chapters[activeIdx];
     const el = editorRef.current;
     if (!chap || !el) return;
 
+    // compute or clean HTML
     if (!chap.textHTML) {
       const html = `<p>${htmlEscape(chap.text)
         .replaceAll("\n\n", "</p><p>")
         .replaceAll("\n", "<br/>")}</p>`;
+      const cleaned = stripSpacerParagraphs(stripCharacterTags(html));
       setChapters((prev) => {
         const next = [...prev];
-        next[activeIdx] = { ...chap, textHTML: html };
+        next[activeIdx] = { ...chap, textHTML: cleaned };
         return next;
       });
-      el.innerHTML = html;
+      el.innerHTML = cleaned;
     } else {
-      el.innerHTML = chap.textHTML;
+      const cleaned = stripSpacerParagraphs(
+        stripCharacterTags(chap.textHTML)
+      );
+      if (cleaned !== chap.textHTML) {
+        setChapters((prev) => {
+          const next = [...prev];
+          next[activeIdx] = {
+            ...chap,
+            textHTML: cleaned,
+            text: stripHtml(cleaned),
+          };
+          return next;
+        });
+      }
+      el.innerHTML = cleaned;
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeChapterId]);
@@ -844,13 +952,19 @@ useEffect(() => {
       alert("⚠️ No editor content to save.");
       return;
     }
+    const rawHtml = editorRef.current.innerHTML || "";
+    const cleaned = stripSpacerParagraphs(stripCharacterTags(rawHtml));
+
+    editorRef.current.innerHTML = cleaned;
+
     setChapters((prev) => {
       const next = [...prev];
       const ch = next[activeIdx];
       if (ch) {
         next[activeIdx] = {
           ...ch,
-          textHTML: editorRef.current!.innerHTML,
+          textHTML: cleaned,
+          text: stripHtml(cleaned),
         };
       }
       return next;
@@ -867,12 +981,14 @@ useEffect(() => {
     setChapters((prev) => {
       const id = genId();
       const idx = prev.length + 1;
+      const html = `<h1>Chapter ${idx} – Untitled</h1><p>New chapter text…</p>`;
+      const cleaned = stripSpacerParagraphs(stripCharacterTags(html));
       const ch: Chapter = {
         id,
         title: `Chapter ${idx} – Untitled`,
         included: true,
-        text: "",
-        textHTML: `<h1>Chapter ${idx} – Untitled</h1><p>New chapter text…</p>`,
+        text: stripHtml(cleaned),
+        textHTML: cleaned,
       };
       return [...prev, ch];
     });
@@ -889,64 +1005,66 @@ useEffect(() => {
     []
   );
 
-const importHTML = useCallback(
-  async (file: File, asNewChapter: boolean = true) => {
-    try {
-      const html = await file.text();
-
-      if (asNewChapter) {
-        const id = genId();
-        const title =
-          file.name.replace(/\.(html?|xhtml)$/i, "") || "Imported HTML";
-
-        const ch: Chapter = {
-          id,
-          title,
-          included: true,
-          // store a plain-text version too (for compiled manuscript)
-          text: stripHtml(html),
-          textHTML: html,
-        };
-
-        setChapters((prev) => [...prev, ch]);
-        setActiveChapterId(id);
-
-        alert(
-          `Imported "${title}" successfully! Use the chapter dropdown to open it.`
+  const importHTML = useCallback(
+    async (file: File, asNewChapter: boolean = true) => {
+      try {
+        const html = await file.text();
+        const cleanedHtml = stripSpacerParagraphs(
+          stripCharacterTags(html)
         );
-      } else {
-        // Replace the current active chapter content with imported HTML
-        setChapters((prev) => {
-          const next = [...prev];
-          const cur = next[activeIdx];
-          if (cur) {
-            const title =
-              cur.title ||
-              file.name.replace(/\.(html?|xhtml)$/i, "") ||
-              "Imported HTML";
+        const plain = stripHtml(cleanedHtml);
 
-            next[activeIdx] = {
-              ...cur,
-              title,
-              text: stripHtml(html),
-              textHTML: html,
-            };
-          }
-          return next;
-        });
+        if (asNewChapter) {
+          const id = genId();
+          const title =
+            file.name.replace(/\.(html?|xhtml)$/i, "") || "Imported HTML";
 
-        alert("Chapter replaced successfully!");
+          const ch: Chapter = {
+            id,
+            title,
+            included: true,
+            text: plain,
+            textHTML: cleanedHtml,
+          };
+
+          setChapters((prev) => [...prev, ch]);
+          setActiveChapterId(id);
+
+          alert(
+            `Imported "${title}" successfully! Use the chapter dropdown to open it.`
+          );
+        } else {
+          // Replace the current active chapter content with imported HTML
+          setChapters((prev) => {
+            const next = [...prev];
+            const cur = next[activeIdx];
+            if (cur) {
+              const title =
+                cur.title ||
+                file.name.replace(/\.(html?|xhtml)$/i, "") ||
+                "Imported HTML";
+
+              next[activeIdx] = {
+                ...cur,
+                title,
+                text: plain,
+                textHTML: cleanedHtml,
+              };
+            }
+            return next;
+          });
+
+          alert("Chapter replaced successfully!");
+        }
+      } catch (err) {
+        console.error(err);
+        alert(
+          "Sorry—HTML import failed. The file may be malformed or unreadable."
+        );
       }
-    } catch (err) {
-      console.error(err);
-      alert(
-        "Sorry—HTML import failed. The file may be malformed or unreadable."
-      );
-    }
-  },
-  [activeIdx]
-);
-
+    },
+    [activeIdx]
+  );
 
   /* ---------- Compile (Preview/Export) ---------- */
 
@@ -997,9 +1115,7 @@ const importHTML = useCallback(
         : chapters.filter((c) => c.included).map((c) => c.title);
       parts.push(
         "\n\nContents\n" +
-          tocList
-            .map((t, i) => `${i + 1}. ${t}`)
-            .join("\n")
+          tocList.map((t, i) => `${i + 1}. ${t}`).join("\n")
       );
     }
 
@@ -1023,7 +1139,7 @@ const importHTML = useCallback(
   }, [chapters, matter, meta, tocFromHeadings]);
 
   const wordCount = useMemo(
-    () => compiledPlain.split(/\s+/).filter(Boolean).length,
+    () => (compiledPlain ? compiledPlain.split(/\s+/).filter(Boolean).length : 0),
     [compiledPlain]
   );
 
@@ -1115,6 +1231,39 @@ const importHTML = useCallback(
     }
   };
 
+  // Clear Publishing manuscript and local state (without touching Writing)
+  const handleClearPublishingDraft = () => {
+    const confirmed = window.confirm(
+      "Clear the current Publishing manuscript? This will NOT delete your chapters in Compose."
+    );
+    if (!confirmed) return;
+
+    try {
+      localStorage.removeItem(PUBLISHING_DRAFT_KEY);
+      localStorage.removeItem(PUBLISHING_CHAPTERS_KEY);
+      localStorage.removeItem(PUBLISHING_META_KEY);
+      localStorage.removeItem(PUBLISHING_MATTER_KEY);
+      localStorage.removeItem("dahtruth_publishing_manuscript");
+    } catch (err) {
+      console.error("Failed to clear publishing draft:", err);
+    }
+
+    setChapters([]);
+    setActiveChapterId("");
+    setMatter({
+      titlePage: "{title}\nby {author}",
+      copyright: "© {year} {author}. All rights reserved.",
+      dedication: "For those who kept the light on.",
+      epigraph: '"We live by stories."',
+      toc: true,
+      acknowledgments: "Thank you to every early reader.",
+      aboutAuthor:
+        "{author} writes stories about family, faith, and becoming.",
+      notes: "",
+      tocFromHeadings: true,
+    });
+  };
+
   /* ---------- UI ---------- */
 
   return (
@@ -1203,7 +1352,7 @@ const importHTML = useCallback(
                 flexDirection: "column",
                 alignItems: "flex-end",
                 gap: 4,
-                minWidth: 140,
+                minWidth: 160,
               }}
             >
               <div style={{ fontSize: 11 }}>
@@ -1218,6 +1367,22 @@ const importHTML = useCallback(
                   {PLATFORM_PRESETS[platformPreset].label}
                 </span>
               </div>
+              <button
+                type="button"
+                onClick={handleClearPublishingDraft}
+                style={{
+                  marginTop: 4,
+                  padding: "4px 10px",
+                  borderRadius: 999,
+                  border: "1px solid rgba(255,255,255,0.6)",
+                  background: "rgba(255,255,255,0.12)",
+                  color: theme.white,
+                  fontSize: 10,
+                  cursor: "pointer",
+                }}
+              >
+                Clear Manuscript
+              </button>
             </div>
           </div>
         </div>
@@ -1504,12 +1669,18 @@ const importHTML = useCallback(
                       try {
                         const currentHtml =
                           editorRef.current?.innerHTML ?? "";
+                        const cleanedCurrentHtml = stripSpacerParagraphs(
+                          stripCharacterTags(currentHtml)
+                        );
                         const currentText =
-                          stripHtml(currentHtml) || "";
+                          stripHtml(cleanedCurrentHtml) || "";
                         let res: any;
 
                         if (a.key === "grammar") {
-                          res = await runGrammar(currentText, provider);
+                          res = await runGrammar(
+                            currentText,
+                            provider
+                          );
                         } else if (a.key === "style") {
                           res = await runStyle(currentText, provider);
                         } else if (a.key === "readability") {
@@ -1540,13 +1711,17 @@ const importHTML = useCallback(
                                 /<p><\/p>/g,
                                 "<p><br/></p>"
                               )
-                            : currentHtml;
+                            : cleanedCurrentHtml;
+
+                        const finalHtml = stripSpacerParagraphs(
+                          stripCharacterTags(improved)
+                        );
 
                         if (
                           editorRef.current &&
-                          improved !== currentHtml
+                          finalHtml !== currentHtml
                         ) {
-                          editorRef.current.innerHTML = improved;
+                          editorRef.current.innerHTML = finalHtml;
                         }
 
                         setChapters((prev) => {
@@ -1555,7 +1730,8 @@ const importHTML = useCallback(
                           if (ch) {
                             next[activeIdx] = {
                               ...ch,
-                              textHTML: improved,
+                              textHTML: finalHtml,
+                              text: stripHtml(finalHtml),
                             };
                           }
                           return next;
