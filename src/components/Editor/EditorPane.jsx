@@ -185,14 +185,17 @@ export default function EditorPane({
           }}
         >
           <ReactQuill
-            ref={quillRef}
-            theme="snow"
-            value={html}
-            onChange={handleChange}
-            modules={modules}
-            formats={formats}
-            className={`h-full storylab-editor ${spacingClass}`}
-          />
+          ref={quillRef}
+          theme="snow"
+          value={html}
+          onChange={handleChange}
+          modules={modules}
+          formats={formats}
+          className={`storylab-editor ${spacingClass}`}
+          style={{
+            height: "calc(100vh - 200px)", // fixed “page” height
+          }}
+        />
 
           {/* Optional footer inside the page (AI busy indicator) */}
           {aiBusy && (
