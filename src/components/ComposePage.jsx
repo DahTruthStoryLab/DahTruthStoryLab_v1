@@ -384,8 +384,7 @@ export default function ComposePage() {
     }
   };
 
-  // SMART AI HANDLER — prefers selected text, falls back to first chunk
-    // SMART AI HANDLER — now ONLY edits the selected text
+ // SMART AI HANDLER — rewrites ONLY the selected text in the editor
   const handleAI = async (mode) => {
     if (!hasChapter) return;
 
@@ -396,7 +395,7 @@ export default function ComposePage() {
     const editorEl = document.querySelector(".ql-editor");
     const selection = window.getSelection();
 
-    // 1) Ensure there is a selection inside the editor
+    // Ensure the selection is inside the editor and not collapsed
     if (
       !editorEl ||
       !selection ||
@@ -405,26 +404,26 @@ export default function ComposePage() {
       !editorEl.contains(selection.getRangeAt(0).commonAncestorContainer)
     ) {
       alert(
-        "Please select the sentence or paragraph you want the AI to revise, then click the AI button again."
+        "Please highlight the text you want the AI to revise, then click the AI button again."
       );
       return;
     }
 
     const range = selection.getRangeAt(0);
 
-    // Clone the selected HTML
+    // Clone the selected HTML (this is what we'll replace later)
     const container = document.createElement("div");
     container.appendChild(range.cloneContents());
     const selectedHtml = container.innerHTML.trim();
 
     if (!selectedHtml) {
       alert(
-        "I couldn't read any text from your selection. Please select the exact text you want revised and try again."
+        "I couldn't read any content from your selection. Please select the exact sentence or paragraph you want revised and try again."
       );
       return;
     }
 
-    // Convert the selected HTML to plain text for the AI
+    // Convert selected HTML → plain text for AI
     const selectedPlain = selectedHtml
       .replace(/<[^>]*>/g, " ")
       .replace(/\s+/g, " ")
@@ -432,7 +431,7 @@ export default function ComposePage() {
 
     if (!selectedPlain) {
       alert(
-        "The selected content seems to be empty or formatting-only. Please select normal text and try again."
+        "The selected content seems to be empty or only formatting. Please select normal text and try again."
       );
       return;
     }
@@ -440,19 +439,25 @@ export default function ComposePage() {
     const MAX_CHARS = 3000;
     const targetText = selectedPlain.slice(0, MAX_CHARS);
 
-    const fullHtml = (html || "").toString();
-    let prevScrollTop = 0;
+    // Helper: wrap AI result into simple <p> HTML
+    const wrapAsHtml = (text) => {
+      const safe = String(text)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
 
-    // Remember scroll position so we can restore it after
-    try {
-      const scroller =
-        editorEl.parentElement || editorEl.closest(".ql-container") || null;
-      if (scroller) {
-        prevScrollTop = scroller.scrollTop || 0;
+      // Split on blank lines into paragraphs
+      const parts = safe
+        .split(/\n{2,}/)
+        .map((p) => p.trim())
+        .filter(Boolean);
+
+      if (parts.length === 0) {
+        return `<p>${safe}</p>`;
       }
-    } catch (err) {
-      console.warn("Could not read editor scroll position:", err);
-    }
+
+      return parts.map((p) => `<p>${p}</p>`).join("");
+    };
 
     try {
       setAiBusy(true);
@@ -474,43 +479,42 @@ export default function ComposePage() {
         return;
       }
 
-      // 🔹 Reapply double-spacing to the AI output
-      const resultHtml = applyDoubleSpacing(resultTextRaw);
+      // Optional: keep your double-spacing logic for the TEXT
+      const processedText = applyDoubleSpacing(resultTextRaw);
 
-      // 2) Safely replace ONLY the selected HTML fragment
-      const newHtml = fullHtml.replace(selectedHtml, resultHtml);
+      // Turn the AI text into paragraph HTML
+      const replacementHtml = wrapAsHtml(processedText);
 
-      if (newHtml === fullHtml) {
-        // Replacement failed (patterns did not match exactly)
+      const fullHtml = (html || "").toString();
+
+      if (!fullHtml.includes(selectedHtml)) {
+        // Fallback: don't touch anything if we can't find the exact match
         alert(
-          "I couldn't safely replace the selected text. No changes were applied."
+          "I couldn't safely locate that selection in the chapter. No changes were made."
         );
         return;
       }
 
+      // Replace ONLY the selected HTML once
+      const updatedHtml = fullHtml.replace(selectedHtml, replacementHtml);
+
       // Update editor + chapter
-      setHtml(newHtml);
+      setHtml(updatedHtml);
       updateChapter(selectedId, {
         title: title || selectedChapter?.title || "",
-        content: newHtml,
+        content: updatedHtml,
       });
 
-      // Restore scroll after ReactQuill re-renders
-      setTimeout(() => {
-        try {
-          const editorEl2 = document.querySelector(".ql-editor");
-          const scroller2 =
-            editorEl2?.parentElement ||
-            editorEl2?.closest(".ql-container") ||
-            null;
-
-          if (scroller2 && typeof prevScrollTop === "number") {
-            scroller2.scrollTop = prevScrollTop;
-          }
-        } catch (err) {
-          console.warn("Could not restore editor scroll position:", err);
-        }
-      }, 50);
+      // Optionally add a message to the Assistant so you can see the result too
+      setChatMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content:
+            "AI revision applied to your selection:\n\n" + processedText,
+          id: Date.now(),
+        },
+      ]);
     } catch (error) {
       console.error("AI request error:", error);
       alert(
