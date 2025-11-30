@@ -2,13 +2,14 @@
 import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import PageShell from "../components/layout/PageShell.tsx";
+import { API_BASE } from "../lib/api"; // ✅ use the shared API base
 
-/* ---------- Where to call your backend ---------- */
-/** If you proxy /api -> API Gateway in dev/hosting, keep "/api".
- *  Otherwise set your deployed API Gateway base URL, e.g.:
-    "https://ud9loepble.execute-api.us-east-1.amazonaws.com/prod";
+/* ---------- API endpoint for AI proof ---------- */
+/** Make sure you have a matching route in API Gateway, e.g.:
+ *   POST {API_BASE}/ai/proof
+ * that accepts { text: string } and returns { suggestions: string[] }
  */
-const API_BASE = "/api";
+const PROOF_ENDPOINT = `${API_BASE}/ai/proof`;
 
 /* ---------- Theme ---------- */
 const theme = {
@@ -76,8 +77,19 @@ function stripHtml(html: string): string {
 }
 
 /* Light types only for loading */
-type ChapterLocal = { id: string; title: string; included?: boolean; text?: string; textHTML?: string };
-type MatterLocal = { toc?: boolean; acknowledgments?: string; aboutAuthor?: string; notes?: string };
+type ChapterLocal = {
+  id: string;
+  title: string;
+  included?: boolean;
+  text?: string;
+  textHTML?: string;
+};
+type MatterLocal = {
+  toc?: boolean;
+  acknowledgments?: string;
+  aboutAuthor?: string;
+  notes?: string;
+};
 type MetaLocal = { title?: string; author?: string; year?: string };
 
 /* ---------- Component ---------- */
@@ -93,10 +105,14 @@ export default function Proof(): JSX.Element {
     let meta: MetaLocal = {};
 
     try {
-      chapters = JSON.parse(localStorage.getItem("dt_publishing_chapters") || "[]");
+      chapters = JSON.parse(
+        localStorage.getItem("dt_publishing_chapters") || "[]"
+      );
     } catch {}
     try {
-      matter = JSON.parse(localStorage.getItem("dt_publishing_matter") || "{}");
+      matter = JSON.parse(
+        localStorage.getItem("dt_publishing_matter") || "{}"
+      );
     } catch {}
     try {
       meta = JSON.parse(localStorage.getItem("dt_publishing_meta") || "{}");
@@ -107,7 +123,15 @@ export default function Proof(): JSX.Element {
 
     // Optional front matter
     if (meta?.title || meta?.author || meta?.year) {
-      pieces.push([meta?.title, meta?.author ? `by ${meta.author}` : "", meta?.year].filter(Boolean).join("\n"));
+      pieces.push(
+        [
+          meta?.title,
+          meta?.author ? `by ${meta.author}` : "",
+          meta?.year,
+        ]
+          .filter(Boolean)
+          .join("\n")
+      );
     }
 
     // Chapters
@@ -117,8 +141,10 @@ export default function Proof(): JSX.Element {
     });
 
     // Optional back matter
-    if (matter?.acknowledgments) pieces.push("Acknowledgments\n" + matter.acknowledgments);
-    if (matter?.aboutAuthor) pieces.push("About the Author\n" + matter.aboutAuthor);
+    if (matter?.acknowledgments)
+      pieces.push("Acknowledgments\n" + matter.acknowledgments);
+    if (matter?.aboutAuthor)
+      pieces.push("About the Author\n" + matter.aboutAuthor);
     if (matter?.notes) pieces.push("Notes\n" + matter.notes);
 
     const manuscriptText = pieces.join("\n\n").trim();
@@ -126,7 +152,10 @@ export default function Proof(): JSX.Element {
   }, []);
 
   const wordCount = useMemo(
-    () => (manuscriptText ? manuscriptText.split(/\s+/).filter(Boolean).length : 0),
+    () =>
+      manuscriptText
+        ? manuscriptText.split(/\s+/).filter(Boolean).length
+        : 0,
     [manuscriptText]
   );
 
@@ -136,72 +165,96 @@ export default function Proof(): JSX.Element {
     const compiled = manuscriptText;
 
     if (!compiled) {
-      setProofResults(["No manuscript found. Open Publishing and click Save (or type to autosave)."]);
+      setProofResults([
+        "No manuscript found. Open Publishing and click Save (or type to autosave).",
+      ]);
       return;
     }
 
     if (compiled.match(/ {2,}/)) issues.push("Multiple consecutive spaces found.");
     if (/[“”]/.test(compiled) && !/[‘’]/.test(compiled))
       issues.push("Smart quotes present; ensure consistency of curly quotes.");
-    if (/--/.test(compiled)) issues.push("Double hyphen found; consider an em dash (—) or a period.");
+    if (/--/.test(compiled))
+      issues.push("Double hyphen found; consider an em dash (—) or a period.");
 
-    const longParas = compiled.split(/\n\n+/).filter((p) => p.trim().split(/\s+/).length > 250).length;
-    if (longParas) issues.push(`${longParas} very long paragraph(s); consider breaking them up.`);
+    const longParas = compiled
+      .split(/\n\n+/)
+      .filter((p) => p.trim().split(/\s+/).length > 250).length;
+    if (longParas)
+      issues.push(
+        `${longParas} very long paragraph(s); consider breaking them up.`
+      );
 
     setProofResults(issues.length ? issues : ["No basic issues found."]);
   }
 
   /* ---------- AI checks (calls your API) ---------- */
-// put this near the top of Proof.tsx
-const API_URL = "https://ud9loepble.execute-api.us-east-1.amazonaws.com/prod";
+  async function runAIChecks() {
+    setAiBusy(true);
+    const compiled = manuscriptText;
 
-async function runAIChecks() {
-  setAiBusy(true);
-  const compiled = manuscriptText;
+    if (!compiled) {
+      setProofResults([
+        "No manuscript found. Open Publishing and click Save (or type to autosave).",
+      ]);
+      setAiBusy(false);
+      return;
+    }
 
-  if (!compiled) {
-    setProofResults(["No manuscript found. Open Publishing and click Save (or type to autosave)."]);
-    setAiBusy(false);
-    return;
+    try {
+      const res = await fetch(PROOF_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: compiled }),
+      });
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json(); // expected: { suggestions: string[] }
+
+      const local: string[] = [];
+      if (/ {2,}/.test(compiled))
+        local.push("Multiple consecutive spaces found.");
+      if (/--/.test(compiled))
+        local.push(
+          "Double hyphen found; consider an em dash (—) or a period."
+        );
+
+      const apiSuggestions: string[] = Array.isArray(data?.suggestions)
+        ? data.suggestions
+        : [];
+
+      setProofResults(
+        [...local, ...apiSuggestions].length
+          ? [...local, ...apiSuggestions]
+          : ["No issues returned by AI."]
+      );
+    } catch (e: any) {
+      setProofResults([
+        `AI check failed: ${e.message}. Try again or check API Gateway logs.`,
+      ]);
+    } finally {
+      setAiBusy(false);
+    }
   }
-
-  try {
-    const res = await fetch(API_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: compiled })
-    });
-
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json(); // { ok: true, received: "...", suggestions: [...] }
-
-    // keep local checks + add API suggestions
-    const local: string[] = [];
-    if (/ {2,}/.test(compiled)) local.push("Multiple consecutive spaces found.");
-    if (/--/.test(compiled)) local.push("Double hyphen found; consider an em dash (—) or a period.");
-
-    const apiSuggestions: string[] = Array.isArray(data?.suggestions) ? data.suggestions : [];
-    setProofResults([...local, ...apiSuggestions]);
-
-  } catch (e: any) {
-    setProofResults([`AI check failed: ${e.message}. Try again or check API Gateway logs.`]);
-  } finally {
-    setAiBusy(false);
-  }
-}
 
   function runGrammarCheck() {
     const compiled = manuscriptText;
     if (!compiled) {
-      setProofResults(["No manuscript found. Open Publishing and click Save (or type to autosave)."]);
+      setProofResults([
+        "No manuscript found. Open Publishing and click Save (or type to autosave).",
+      ]);
       return;
     }
 
     const issues: string[] = [];
-    if (/\btheir\b.*\bthere\b|\bthere\b.*\btheir\b/i.test(compiled)) {
+    if (
+      /\btheir\b.*\bthere\b|\bthere\b.*\btheir\b/i.test(compiled)
+    ) {
       issues.push("Possible their/there confusion detected.");
     }
-    if (/\bits\b.*\bit's\b|\bit's\b.*\bits\b/i.test(compiled)) {
+    if (
+      /\bits\b.*\bit's\b|\bit's\b.*\bits\b/i.test(compiled)
+    ) {
       issues.push("Possible its/it's confusion detected.");
     }
     setProofResults(issues.length ? issues : ["No grammar issues detected."]);
@@ -210,16 +263,25 @@ async function runAIChecks() {
   function runStyleAnalysis() {
     const compiled = manuscriptText;
     if (!compiled) {
-      setProofResults(["No manuscript found. Open Publishing and click Save (or type to autosave)."]);
+      setProofResults([
+        "No manuscript found. Open Publishing and click Save (or type to autosave).",
+      ]);
       return;
     }
 
     const issues: string[] = [];
     const adverbs = compiled.match(/\b\w+ly\b/gi) || [];
-    if (adverbs.length > 20) issues.push(`Found ${adverbs.length} adverbs. Consider reducing for stronger prose.`);
+    if (adverbs.length > 20)
+      issues.push(
+        `Found ${adverbs.length} adverbs. Consider reducing for stronger prose.`
+      );
 
-    const passiveVoice = compiled.match(/\b(was|were|been|being)\s+\w+ed\b/gi) || [];
-    if (passiveVoice.length > 10) issues.push(`Found ${passiveVoice.length} instances of passive voice. Consider active voice.`);
+    const passiveVoice =
+      compiled.match(/\b(was|were|been|being)\s+\w+ed\b/gi) || [];
+    if (passiveVoice.length > 10)
+      issues.push(
+        `Found ${passiveVoice.length} instances of passive voice. Consider active voice.`
+      );
 
     setProofResults(issues.length ? issues : ["Style looks good!"]);
   }
@@ -243,7 +305,7 @@ async function runAIChecks() {
   return (
     <PageShell style={{ background: theme.bg, minHeight: "100vh" }}>
       <div style={styles.outer}>
-        {/* Header — rose/pink (no dark/blue) */}
+        {/* Header — rose/pink */}
         <div
           style={{
             background: `linear-gradient(135deg, rgba(236,72,153,0.65), rgba(249,168,212,0.65))`,
@@ -277,10 +339,24 @@ async function runAIChecks() {
             </button>
 
             <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-              <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <svg
+                width="26"
+                height="26"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                aria-hidden="true"
+              >
                 <path d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
               </svg>
-              <h1 style={{ margin: 0, fontSize: 22, fontWeight: 600 }}>Proof &amp; Consistency</h1>
+              <h1
+                style={{
+                  margin: 0,
+                  fontSize: 22,
+                  fontWeight: 600,
+                }}
+              >
+                Proof &amp; Consistency
+              </h1>
             </div>
             <div style={{ width: 150 }} />
           </div>
@@ -290,19 +366,60 @@ async function runAIChecks() {
         <div style={{ ...styles.inner, ...styles.sectionShell }}>
           {/* Stats Card */}
           <div style={{ ...styles.glassCard, marginBottom: 20 }}>
-            <div style={{ display: "flex", gap: 32, alignItems: "center", flexWrap: "wrap" }}>
+            <div
+              style={{
+                display: "flex",
+                gap: 32,
+                alignItems: "center",
+                flexWrap: "wrap",
+              }}
+            >
               <div>
-                <div style={{ fontSize: 12, color: theme.subtext, marginBottom: 4 }}>Word Count</div>
-                <div style={{ fontSize: 24, fontWeight: 700, color: theme.primary }}>
+                <div
+                  style={{
+                    fontSize: 12,
+                    color: theme.subtext,
+                    marginBottom: 4,
+                  }}
+                >
+                  Word Count
+                </div>
+                <div
+                  style={{
+                    fontSize: 24,
+                    fontWeight: 700,
+                    color: theme.primary,
+                  }}
+                >
                   {wordCount.toLocaleString()}
                 </div>
               </div>
               <div>
-                <div style={{ fontSize: 12, color: theme.subtext, marginBottom: 4 }}>Issues Listed</div>
-                <div style={{ fontSize: 24, fontWeight: 700, color: theme.accent }}>{proofResults.length}</div>
+                <div
+                  style={{
+                    fontSize: 12,
+                    color: theme.subtext,
+                    marginBottom: 4,
+                  }}
+                >
+                  Issues Listed
+                </div>
+                <div
+                  style={{
+                    fontSize: 24,
+                    fontWeight: 700,
+                    color: theme.accent,
+                  }}
+                >
+                  {proofResults.length}
+                </div>
               </div>
               <div style={{ marginLeft: "auto" }}>
-                <button style={styles.btnPrimary} onClick={runAIChecks} disabled={aiBusy}>
+                <button
+                  style={styles.btnPrimary}
+                  onClick={runAIChecks}
+                  disabled={aiBusy}
+                >
                   {aiBusy ? "Running AI Proof…" : "🤖 AI Proof (All Checks)"}
                 </button>
               </div>
@@ -311,26 +428,80 @@ async function runAIChecks() {
 
           {/* Check Buttons */}
           <div style={{ ...styles.glassCard, marginBottom: 20 }}>
-            <h3 style={{ margin: "0 0 16px 0", fontSize: 18, color: theme.text }}>Quick Checks</h3>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 12 }}>
-              <button style={styles.btn} onClick={runGrammarCheck}>📝 Grammar Check</button>
-              <button style={styles.btn} onClick={runStyleAnalysis}>✨ Style Analysis</button>
-              <button style={styles.btn} onClick={runCharacterConsistency}>👤 Character Consistency</button>
-              <button style={styles.btn} onClick={runTimelineValidation}>📅 Timeline Validation</button>
-              <button style={styles.btn} onClick={runLocalChecks}>🔍 Basic Issues</button>
+            <h3
+              style={{
+                margin: "0 0 16px 0",
+                fontSize: 18,
+                color: theme.text,
+              }}
+            >
+              Quick Checks
+            </h3>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns:
+                  "repeat(auto-fit, minmax(220px, 1fr))",
+                gap: 12,
+              }}
+            >
+              <button style={styles.btn} onClick={runGrammarCheck}>
+                📝 Grammar Check
+              </button>
+              <button style={styles.btn} onClick={runStyleAnalysis}>
+                ✨ Style Analysis
+              </button>
+              <button style={styles.btn} onClick={runCharacterConsistency}>
+                👤 Character Consistency
+              </button>
+              <button style={styles.btn} onClick={runTimelineValidation}>
+                📅 Timeline Validation
+              </button>
+              <button style={styles.btn} onClick={runLocalChecks}>
+                🔍 Basic Issues
+              </button>
             </div>
           </div>
 
           {/* Results */}
           {proofResults.length > 0 ? (
             <div style={styles.glassCard}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-                <h3 style={{ margin: 0, fontSize: 18, color: theme.text }}>Results</h3>
-                <button style={{ ...styles.btn, padding: "8px 12px", fontSize: 12 }} onClick={() => setProofResults([])}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: 12,
+                }}
+              >
+                <h3
+                  style={{
+                    margin: 0,
+                    fontSize: 18,
+                    color: theme.text,
+                  }}
+                >
+                  Results
+                </h3>
+                <button
+                  style={{
+                    ...styles.btn,
+                    padding: "8px 12px",
+                    fontSize: 12,
+                  }}
+                  onClick={() => setProofResults([])}
+                >
                   Clear
                 </button>
               </div>
-              <ul style={{ margin: 0, paddingLeft: 24, color: theme.text, lineHeight: 1.8 }}>
+              <ul
+                style={{
+                  margin: 0,
+                  paddingLeft: 24,
+                  color: theme.text,
+                  lineHeight: 1.8,
+                }}
+              >
                 {proofResults.map((r, i) => (
                   <li key={i} style={{ marginBottom: 8 }}>
                     {r}
@@ -339,10 +510,31 @@ async function runAIChecks() {
               </ul>
             </div>
           ) : (
-            <div style={{ ...styles.glassCard, textAlign: "center", padding: 60 }}>
+            <div
+              style={{
+                ...styles.glassCard,
+                textAlign: "center",
+                padding: 60,
+              }}
+            >
               <div style={{ fontSize: 48, marginBottom: 16 }}>🔍</div>
-              <div style={{ fontSize: 18, color: theme.subtext, marginBottom: 8 }}>No checks run yet</div>
-              <div style={{ fontSize: 14, color: theme.subtext }}>Click any button above to analyze your manuscript</div>
+              <div
+                style={{
+                  fontSize: 18,
+                  color: theme.subtext,
+                  marginBottom: 8,
+                }}
+              >
+                No checks run yet
+              </div>
+              <div
+                style={{
+                  fontSize: 14,
+                  color: theme.subtext,
+                }}
+              >
+                Click any button above to analyze your manuscript
+              </div>
             </div>
           )}
         </div>
