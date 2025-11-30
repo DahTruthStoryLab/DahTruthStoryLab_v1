@@ -368,9 +368,6 @@ export default function ComposePage() {
     });
   };
 
-  // Default AI tab
-  const [activeAiTab, setActiveAiTab] = useState("grammar");
-
   const resolveAIMode = (mode) => {
     switch (mode) {
       case "grammar":
