@@ -368,13 +368,17 @@ export default function ComposePage() {
     });
   };
 
-  // Map friendly button labels to backend modes/actions
+  // Default AI tab
+  const [activeAiTab, setActiveAiTab] = useState("grammar");
+
   const resolveAIMode = (mode) => {
     switch (mode) {
+      case "grammar":
       case "proofread":
-        return "proofread"; // grammar
+        // Use your grammar / proofread backend action
+        return "proofread";
       case "clarify":
-        return "clarify"; // style/readability
+        return "clarify";
       case "readability":
         return "readability";
       case "rewrite":
@@ -383,6 +387,7 @@ export default function ComposePage() {
         return "improve";
     }
   };
+
 
  // SMART AI HANDLER — rewrites ONLY the selected text in the editor
   const handleAI = async (mode) => {
