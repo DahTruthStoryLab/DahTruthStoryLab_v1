@@ -279,7 +279,6 @@ const PLATFORM_PRESETS: Record<
     showTOCInEbook: false,
   },
 
-  } as any,
   KDP_Ebook: {
     label: "KDP Kindle eBook (reflowable)",
     trim: null,
