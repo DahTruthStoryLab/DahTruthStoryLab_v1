@@ -35,6 +35,12 @@ function stripCharacterTags(html = "") {
   return html.replace(/@char:\s*/g, "");
 }
 
+// Remove spacer paragraphs like <p>&nbsp;</p> that you don't want in Publishing
+function stripSpacerParagraphs(html = "") {
+  if (!html) return "";
+  return html.replace(/<p>(?:&nbsp;|\s|<br\s*\/?>)*<\/p>/gi, "");
+}
+
 // Helper: normalize to "double spaced" paragraphs on import / AI
 // ✅ Only touch plain text. If it's already HTML, leave it alone.
 const applyDoubleSpacing = (text = "") => {
@@ -51,7 +57,6 @@ const applyDoubleSpacing = (text = "") => {
     .replace(/\n/g, "\n\n")
     .replace(/\n{3,}/g, "\n\n");
 };
-
 
 // Save a simple "current story" snapshot for ProjectPage to read
 function saveCurrentStorySnapshot({ title }) {
@@ -189,6 +194,24 @@ export default function ComposePage() {
   const [activeAiTab, setActiveAiTab] = useState("proofread");
 
   const hasChapter = !!selectedId && !!selectedChapter;
+  const hasAnyChapters = Array.isArray(chapters) && chapters.length > 0;
+
+  // Make sure we always have a version of chapters that includes the latest editor state
+  const getChaptersWithCurrent = () => {
+    if (!hasChapter) {
+      return chapters || [];
+    }
+
+    return (chapters || []).map((ch) =>
+      ch.id === selectedId
+        ? {
+            ...ch,
+            title: title || selectedChapter?.title || "",
+            content: html,
+          }
+        : ch
+    );
+  };
 
   // Plain text version of current chapter for AI context (chat)
   const chapterPlainText = useMemo(() => {
@@ -441,33 +464,31 @@ export default function ComposePage() {
     const targetText = selectedPlain.slice(0, MAX_CHARS);
 
     // Helper: wrap AI result into simple <p> HTML
-  const wrapAsHtml = (text) => {
-  // 1) Normalize to string
-  let cleaned = String(text || "");
+    const wrapAsHtml = (text) => {
+      // 1) Normalize to string
+      let cleaned = String(text || "");
 
-  // 2) If the AI happened to return raw <p> tags, strip them out
-  //    so they do not appear as literal text later.
-  cleaned = cleaned.replace(/<\/?p>/gi, "");
+      // 2) If the AI happened to return raw <p> tags, strip them out
+      cleaned = cleaned.replace(/<\/?p>/gi, "");
 
-  // 3) Now escape any remaining HTML so it is treated as text,
-  //    not as executable HTML.
-  const safe = cleaned
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;");
+      // 3) Escape any remaining HTML
+      const safe = cleaned
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
 
-  // 4) Split on blank lines into paragraphs
-  const parts = safe
-    .split(/\n{2,}/)
-    .map((p) => p.trim())
-    .filter(Boolean);
+      // 4) Split on blank lines into paragraphs
+      const parts = safe
+        .split(/\n{2,}/)
+        .map((p) => p.trim())
+        .filter(Boolean);
 
-  if (parts.length === 0) {
-    return `<p>${safe}</p>`;
-  }
+      if (parts.length === 0) {
+        return `<p>${safe}</p>`;
+      }
 
-  return parts.map((p) => `<p>${p}</p>`).join("");
-};
+      return parts.map((p) => `<p>${p}</p>`).join("");
+    };
 
     try {
       setAiBusy(true);
@@ -747,43 +768,55 @@ export default function ComposePage() {
 
   /**
    * SEND TO PUBLISHING
-   * 1) Save latest changes
-   * 2) Strip @char: tags
-   * 3) Write a clean chapter list to `dahtruth_chapters` for Publishing.tsx
-   * 4) Also store a richer snapshot under `publishingDraft`
+   * 1) Save latest changes (best effort)
+   * 2) Strip @char: tags and spacer <p>&nbsp;</p>
+   * 3) Write clean chapter list to `dahtruth_chapters` for Publishing.tsx
+   * 4) Also store richer snapshot under `publishingDraft`
    * 5) Navigate to /publishing
    */
   const handleSendToPublishing = async () => {
-    if (!Array.isArray(chapters) || chapters.length === 0) {
+    if (!hasAnyChapters) {
       alert("You need at least one chapter before sending to Publishing.");
       return;
     }
 
-    // 1) Make sure the latest changes are saved
-    await handleSave();
+    // 1) Best-effort save of the selected chapter (if any)
+    try {
+      await handleSave();
+    } catch (e) {
+      console.warn("handleSave failed or was skipped, continuing anyway:", e);
+    }
 
     try {
-      // 2) Strip @char: tags from content for Publishing version
-        const cleanedChapters = chapters.map((ch) => {
+      // 2) Use chapters that include the latest editor state
+      const baseChapters = getChaptersWithCurrent();
+
+      const cleanedChapters = baseChapters.map((ch, index) => {
         const raw = ch.content || ch.body || ch.text || "";
         const noChars = stripCharacterTags(raw);
         const noSpacers = stripSpacerParagraphs(noChars);
-      
+        const plain = stripHtml(noSpacers).trim();
+
         return {
           ...ch,
+          id: ch.id || `c_${index + 1}`,
+          title: ch.title || `Chapter ${index + 1}`,
+          included:
+            typeof ch.included === "boolean" ? ch.included : true,
           content: noSpacers,
+          _plainForPublishing: plain,
         };
       });
 
       // 3) Normalized structure for Publishing.tsx (dahtruth_chapters)
       const normalizedForPublishing = cleanedChapters.map((ch) => ({
-        id: ch.id || `c_${(ch._index ?? 0) + 1}`,
-        title: ch.title || `Chapter ${(ch._index ?? 0) + 1}`,
+        id: ch.id,
+        title: ch.title,
         included:
           typeof ch.included === "boolean" ? ch.included : true,
         text: ch._plainForPublishing || "",
         // Leave textHTML undefined so Publishing builds <p> tags from text
-        textHTML: ch.textHTML || undefined,
+        textHTML: undefined,
       }));
 
       localStorage.setItem(
@@ -817,7 +850,10 @@ export default function ComposePage() {
         chapters: cleanedChapters.map((ch) => ({
           id: ch.id,
           title: ch.title,
-          content: ch.content,
+          text: ch._plainForPublishing || "",
+          textHTML: undefined,
+          included:
+            typeof ch.included === "boolean" ? ch.included : true,
         })),
       };
 
@@ -952,10 +988,10 @@ export default function ComposePage() {
           </button>
 
           {/* Send to Publishing */}
-            <button
+          <button
             type="button"
             onClick={handleSendToPublishing}
-            disabled={!hasChapter || saveStatus === "saving"}
+            disabled={!hasAnyChapters || saveStatus === "saving"}
             className="inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-[13px] bg-[var(--brand-gold)] text-white hover:bg-amber-600 disabled:opacity-60"
             title="Lock in this manuscript and open the Publishing workspace"
           >
