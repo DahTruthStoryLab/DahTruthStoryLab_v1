@@ -663,7 +663,7 @@ export default function Publishing(): JSX.Element {
 
   // ---------- Chapters + active chapter ----------
 
-    // ---------- Chapters + active chapter ----------
+   // ---------- Chapters + active chapter ----------
 
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [activeChapterId, setActiveChapterId] = useState<string>("");
@@ -693,14 +693,24 @@ export default function Publishing(): JSX.Element {
           : [];
 
         if (rawChapters.length > 0) {
-          const normalized: Chapter[] = rawChapters.map((c: any, idx: number) => ({
-            id: c.id || `c_${idx + 1}`,
-            title: c.title || `Chapter ${idx + 1}`,
-            included:
-              typeof c.included === "boolean" ? c.included : true,
-            text: c.text || c.content || "",
-            textHTML: c.textHTML,
-          }));
+          const normalized: Chapter[] = rawChapters.map(
+            (c: any, idx: number) => ({
+              id: c.id || `c_${idx + 1}`,
+              title: c.title || `Chapter ${idx + 1}`,
+              included:
+                typeof c.included === "boolean" ? c.included : true,
+              text:
+                typeof c.text === "string"
+                  ? c.text
+                  : typeof c.content === "string"
+                  ? c.content
+                  : "",
+              textHTML:
+                typeof c.textHTML === "string"
+                  ? c.textHTML
+                  : undefined,
+            })
+          );
 
           setChapters(normalized);
           setActiveChapterId(normalized[0].id);
@@ -715,14 +725,24 @@ export default function Publishing(): JSX.Element {
       const parsedCh = JSON.parse(saved) as any[];
       if (!Array.isArray(parsedCh) || parsedCh.length === 0) return;
 
-      const normalizedLegacy: Chapter[] = parsedCh.map((c: any, idx: number) => ({
-        id: c.id || `c_${idx + 1}`,
-        title: c.title || `Chapter ${idx + 1}`,
-        included:
-          typeof c.included === "boolean" ? c.included : true,
-        text: c.text || c.content || "",
-        textHTML: c.textHTML,
-      }));
+      const normalizedLegacy: Chapter[] = parsedCh.map(
+        (c: any, idx: number) => ({
+          id: c.id || `c_${idx + 1}`,
+          title: c.title || `Chapter ${idx + 1}`,
+          included:
+            typeof c.included === "boolean" ? c.included : true,
+          text:
+            typeof c.text === "string"
+              ? c.text
+              : typeof c.content === "string"
+              ? c.content
+              : "",
+          textHTML:
+            typeof c.textHTML === "string"
+              ? c.textHTML
+              : undefined,
+        })
+      );
 
       setChapters(normalizedLegacy);
       setActiveChapterId(normalizedLegacy[0].id);
