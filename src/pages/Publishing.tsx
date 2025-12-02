@@ -201,6 +201,7 @@ const PLATFORM_PRESETS: Record<
     headers: true,
     footers: true,
     pageNumbers: true,
+    showTOCInEebook: false as any, // unused property kept only if you need it
     showTOCInEbook: false,
   },
   KDP_Paperback_5_25x8: {
@@ -263,7 +264,7 @@ const PLATFORM_PRESETS: Record<
     pageNumbers: true,
     showTOCInEbook: false,
   },
-    KDP_Paperback_8x10: {
+  KDP_Paperback_8x10: {
     label: "KDP Paperback – 8 x 10 in",
     trim: { widthInch: 8, heightInch: 10 },
     margins: {
@@ -305,8 +306,8 @@ const PLATFORM_PRESETS: Record<
     headers: true,
     footers: true,
     pageNumbers: true,
-    showTOCInEebook: false,
-  } as any,
+    showTOCInEbook: false,
+  },
 };
 
 /* ---------- Styles ---------- */
@@ -663,8 +664,6 @@ export default function Publishing(): JSX.Element {
 
   // ---------- Chapters + active chapter ----------
 
-   // ---------- Chapters + active chapter ----------
-
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [activeChapterId, setActiveChapterId] = useState<string>("");
 
@@ -706,14 +705,13 @@ export default function Publishing(): JSX.Element {
                   ? c.content
                   : "",
               textHTML:
-                typeof c.textHTML === "string"
-                  ? c.textHTML
-                  : undefined,
+                typeof c.textHTML === "string" ? c.textHTML : undefined,
             })
           );
 
           setChapters(normalized);
           setActiveChapterId(normalized[0].id);
+
           return; // ✅ Done, no need to fall back
         }
       }
@@ -726,95 +724,26 @@ export default function Publishing(): JSX.Element {
       if (!Array.isArray(parsedCh) || parsedCh.length === 0) return;
 
       const normalizedLegacy: Chapter[] = parsedCh.map(
-        (c: any, idx: number) => ({
-          id: c.id || `c_${idx + 1}`,
-          title: c.title || `Chapter ${idx + 1}`,
-          included:
-            typeof c.included === "boolean" ? c.included : true,
-          text:
-            typeof c.text === "string"
-              ? c.text
-              : typeof c.content === "string"
-              ? c.content
-              : "",
-          textHTML:
-            typeof c.textHTML === "string"
-              ? c.textHTML
-              : undefined,
-        })
-      );
-
-      setChapters(normalizedLegacy);
-      setActiveChapterId(normalizedLegacy[0].id);
-    } catch (err) {
-      console.error("Failed to load chapters for Publishing:", err);
-    }
-  }, []);
-
-      // 3) Final fallback: old dahtruth_chapters from Writing
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (!saved) return;
-
-      const parsedCh = JSON.parse(saved) as any[];
-      if (!Array.isArray(parsedCh) || parsedCh.length === 0) return;
-
-      const normalizedFallback: Chapter[] = parsedCh.map((c, idx) => ({
-        id: c.id || `c_${idx + 1}`,
-        title: c.title || `Chapter ${idx + 1}`,
-        included:
-          typeof c.included === "boolean" ? c.included : true,
-        text: c.text || c.content || "",
-        textHTML: c.textHTML,
-      }));
-
-      setChapters(normalizedFallback);
-      setActiveChapterId(normalizedFallback[0].id);
-    } catch (err) {
-      console.error("Failed to load chapters for Publishing:", err);
-    }
-  }, []);
-
-          // Save for Proof page
-          localStorage.setItem(
-            PUBLISHING_CHAPTERS_KEY,
-            JSON.stringify(normalized)
+        (c: any, idx: number) => {
+          const rawHtml = c.textHTML || c.content || c.text || "";
+          const cleanedHtml = stripSpacerParagraphs(
+            stripCharacterTags(rawHtml)
           );
-
-          return; // ✅ Done, no need to fall back
+          return {
+            id: c.id || `c_${idx + 1}`,
+            title: c.title || `Chapter ${idx + 1}`,
+            included:
+              typeof c.included === "boolean" ? c.included : true,
+            text: stripHtml(cleanedHtml),
+            textHTML: cleanedHtml,
+          };
         }
-      }
-
-      // --- Fallback: legacy dahtruth_chapters behavior ---
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (!saved) return;
-
-      const parsedCh = JSON.parse(saved) as any[];
-      if (!Array.isArray(parsedCh) || parsedCh.length === 0) return;
-
-      const normalizedLegacy: Chapter[] = parsedCh.map((c, idx) => {
-        const rawHtml = c.textHTML || c.content || c.text || "";
-        const cleanedHtml = stripSpacerParagraphs(
-          stripCharacterTags(rawHtml)
-        );
-        return {
-          id: c.id || `c_${idx + 1}`,
-          title: c.title || `Chapter ${idx + 1}`,
-          included:
-            typeof c.included === "boolean" ? c.included : true,
-          text: stripHtml(cleanedHtml),
-          textHTML: cleanedHtml,
-        };
-      });
+      );
 
       setChapters(normalizedLegacy);
       if (normalizedLegacy[0]) {
         setActiveChapterId(normalizedLegacy[0].id);
       }
-
-      localStorage.setItem(
-        PUBLISHING_CHAPTERS_KEY,
-        JSON.stringify(normalizedLegacy)
-      );
     } catch (err) {
       console.error("Failed to load chapters for Publishing:", err);
     }
@@ -831,21 +760,9 @@ export default function Publishing(): JSX.Element {
     }
   }, [chapters]);
 
-      // Also keep Publishing copy for Proof
-      localStorage.setItem(
-        PUBLISHING_CHAPTERS_KEY,
-        JSON.stringify(chapters)
-      );
-    } catch (err) {
-      console.error("Failed to persist chapters from Publishing:", err);
-    }
-  }, [chapters]);
-
   // ---------- AI + layout state ----------
 
-  const [provider, setProvider] = useState<"openai" | "anthropic">(
-    "openai"
-  );
+  const [provider, setProvider] = useState<"openai" | "anthropic">("openai");
 
   const [matter, setMatter] = useState<Matter>({
     titlePage: "{title}\nby {author}",
@@ -877,10 +794,7 @@ export default function Publishing(): JSX.Element {
   // Persist matter to storage
   useEffect(() => {
     try {
-      localStorage.setItem(
-        PUBLISHING_MATTER_KEY,
-        JSON.stringify(matter)
-      );
+      localStorage.setItem(PUBLISHING_MATTER_KEY, JSON.stringify(matter));
     } catch {
       /* ignore */
     }
@@ -1086,7 +1000,8 @@ export default function Publishing(): JSX.Element {
         if (asNewChapter) {
           const id = genId();
           const title =
-            file.name.replace(/\.(html?|xhtml)$/i, "") || "Imported HTML";
+            file.name.replace(/\.(html?|xhtml)$/i, "") ||
+            "Imported HTML";
 
           const ch: Chapter = {
             id,
@@ -1208,7 +1123,8 @@ export default function Publishing(): JSX.Element {
   }, [chapters, matter, meta, tocFromHeadings]);
 
   const wordCount = useMemo(
-    () => (compiledPlain ? compiledPlain.split(/\s+/).filter(Boolean).length : 0),
+    () =>
+      compiledPlain ? compiledPlain.split(/\s+/).filter(Boolean).length : 0,
     [compiledPlain]
   );
 
@@ -1578,9 +1494,7 @@ export default function Publishing(): JSX.Element {
                 >
                   <span style={{ fontSize: 18 }}>✅</span>
                   <div>
-                    <div
-                      style={{ fontSize: 13, fontWeight: 600 }}
-                    >
+                    <div style={{ fontSize: 13, fontWeight: 600 }}>
                       Proof & Consistency
                     </div>
                     <div
@@ -1606,9 +1520,7 @@ export default function Publishing(): JSX.Element {
                 >
                   <span style={{ fontSize: 18 }}>🎨</span>
                   <div>
-                    <div
-                      style={{ fontSize: 13, fontWeight: 600 }}
-                    >
+                    <div style={{ fontSize: 13, fontWeight: 600 }}>
                       Format & Styles
                     </div>
                     <div
@@ -1634,9 +1546,7 @@ export default function Publishing(): JSX.Element {
                 >
                   <span style={{ fontSize: 18 }}>📦</span>
                   <div>
-                    <div
-                      style={{ fontSize: 13, fontWeight: 600 }}
-                    >
+                    <div style={{ fontSize: 13, fontWeight: 600 }}>
                       Export
                     </div>
                     <div
@@ -1662,9 +1572,7 @@ export default function Publishing(): JSX.Element {
                 >
                   <span style={{ fontSize: 18 }}>🚀</span>
                   <div>
-                    <div
-                      style={{ fontSize: 13, fontWeight: 600 }}
-                    >
+                    <div style={{ fontSize: 13, fontWeight: 600 }}>
                       Publishing Prep
                     </div>
                     <div
@@ -1709,9 +1617,7 @@ export default function Publishing(): JSX.Element {
                 <select
                   value={provider}
                   onChange={(e) =>
-                    setProvider(
-                      e.target.value as "openai" | "anthropic"
-                    )
+                    setProvider(e.target.value as "openai" | "anthropic")
                   }
                   style={{ ...styles.input, fontSize: 12 }}
                 >
@@ -1746,10 +1652,7 @@ export default function Publishing(): JSX.Element {
                         let res: any;
 
                         if (a.key === "grammar") {
-                          res = await runGrammar(
-                            currentText,
-                            provider
-                          );
+                          res = await runGrammar(currentText, provider);
                         } else if (a.key === "style") {
                           res = await runStyle(currentText, provider);
                         } else if (a.key === "readability") {
@@ -2058,9 +1961,7 @@ export default function Publishing(): JSX.Element {
                   </label>
                   <select
                     value={activeChapter?.id}
-                    onChange={(e) =>
-                      setActiveChapterId(e.target.value)
-                    }
+                    onChange={(e) => setActiveChapterId(e.target.value)}
                     style={styles.input}
                   >
                     {chapters.map((c, idx) => (
