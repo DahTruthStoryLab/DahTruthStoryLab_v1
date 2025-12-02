@@ -815,15 +815,21 @@ export default function ComposePage() {
       });
 
       // 3) Normalized structure for Publishing.tsx (dahtruth_chapters)
-      const normalizedForPublishing = cleanedChapters.map((ch) => ({
-        id: ch.id || `c_${(ch._index ?? 0) + 1}`,
-        title: ch.title || `Chapter ${(ch._index ?? 0) + 1}`,
-        included:
-          typeof ch.included === "boolean" ? ch.included : true,
-        text: ch._plainForPublishing || "",
-        // 👉 this now has your actual formatted HTML
-        textHTML: ch.textHTML || undefined,
-      }));
+        const normalizedForPublishing = cleanedChapters.map((ch, index) => {
+        const htmlForPublishing = ch.content || "";
+        const plainForPublishing = stripHtml(htmlForPublishing).trim();
+
+        return {
+          id: ch.id || `c_${index + 1}`,
+          title: ch.title || `Chapter ${index + 1}`,
+          included:
+            typeof ch.included === "boolean" ? ch.included : true,
+          // Plain text version (no HTML tags)
+          text: plainForPublishing,
+          // Full HTML version so Publishing can keep your formatting
+          textHTML: htmlForPublishing || undefined,
+        };
+      });
 
       localStorage.setItem(
         "dahtruth_chapters",
