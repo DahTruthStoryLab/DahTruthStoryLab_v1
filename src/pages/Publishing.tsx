@@ -663,77 +663,73 @@ export default function Publishing(): JSX.Element {
 
   // ---------- Chapters + active chapter ----------
 
+    // ---------- Chapters + active chapter ----------
+
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [activeChapterId, setActiveChapterId] = useState<string>("");
 
-  // Load chapters saved by Compose / Writing
+  // Load chapters saved by Writing / Compose
   useEffect(() => {
     try {
-      // 1) Prefer new dt_publishing_draft payload: { book, chapters }
+      // --- Prefer structured publishingDraft from ComposePage ---
       const draftRaw = localStorage.getItem(PUBLISHING_DRAFT_KEY);
 
       if (draftRaw) {
-        try {
-          const parsed = JSON.parse(draftRaw) as {
-            book?: any;
-            chapters?: any[];
-          };
+        const parsed = JSON.parse(draftRaw) as {
+          book?: any;
+          chapters?: any[];
+        };
 
-          if (parsed?.book?.title) {
-            setMeta((prev) => ({
-              ...prev,
-              title: parsed.book.title || prev.title,
-              author: parsed.book.author || prev.author,
-              year: parsed.book.year || prev.year,
-            }));
-          }
+        // hydrate meta title from the book object if present
+        if (parsed.book?.title) {
+          setMeta((prev) => ({
+            ...prev,
+            title: parsed.book.title || prev.title,
+          }));
+        }
 
-          const rawChapters = Array.isArray(parsed?.chapters)
-            ? parsed.chapters!
-            : [];
+        const rawChapters = Array.isArray(parsed.chapters)
+          ? parsed.chapters
+          : [];
 
-          if (rawChapters.length > 0) {
-            const normalized: Chapter[] = rawChapters.map((c: any, idx: number) => ({
-              id: c.id || `c_${idx + 1}`,
-              title: c.title || `Chapter ${idx + 1}`,
-              included:
-                typeof c.included === "boolean" ? c.included : true,
-              text: c.text || c.content || "",
-              textHTML: c.textHTML,
-            }));
+        if (rawChapters.length > 0) {
+          const normalized: Chapter[] = rawChapters.map((c: any, idx: number) => ({
+            id: c.id || `c_${idx + 1}`,
+            title: c.title || `Chapter ${idx + 1}`,
+            included:
+              typeof c.included === "boolean" ? c.included : true,
+            text: c.text || c.content || "",
+            textHTML: c.textHTML,
+          }));
 
-            setChapters(normalized);
-            setActiveChapterId(normalized[0].id);
-            return; // ✅ Done, no need to fall back
-          }
-        } catch (err) {
-          console.error("Bad JSON in dt_publishing_draft:", err);
+          setChapters(normalized);
+          setActiveChapterId(normalized[0].id);
+          return; // ✅ Done, no need to fall back
         }
       }
 
-      // 2) Fallback: dt_publishing_chapters as a plain array
-      const pubChaptersRaw = localStorage.getItem(PUBLISHING_CHAPTERS_KEY);
-      if (pubChaptersRaw) {
-        try {
-          const parsedPub = JSON.parse(pubChaptersRaw);
-          if (Array.isArray(parsedPub) && parsedPub.length > 0) {
-            const normalizedLegacy: Chapter[] = parsedPub.map((c: any, idx: number) => ({
-              id: c.id || `c_${idx + 1}`,
-              title: c.title || `Chapter ${idx + 1}`,
-              included:
-                typeof c.included === "boolean" ? c.included : true,
-              text: c.text || c.content || "",
-              textHTML: c.textHTML,
-            }));
+      // --- Fallback: legacy dahtruth_chapters behavior ---
+      const saved = localStorage.getItem(STORAGE_KEY);
+      if (!saved) return;
 
-            setChapters(normalizedLegacy);
-            setActiveChapterId(normalizedLegacy[0].id);
-            return;
-          }
-        } catch (err) {
-          console.error("Bad JSON in dt_publishing_chapters:", err);
-        }
-      }
+      const parsedCh = JSON.parse(saved) as any[];
+      if (!Array.isArray(parsedCh) || parsedCh.length === 0) return;
+
+      const normalizedLegacy: Chapter[] = parsedCh.map((c: any, idx: number) => ({
+        id: c.id || `c_${idx + 1}`,
+        title: c.title || `Chapter ${idx + 1}`,
+        included:
+          typeof c.included === "boolean" ? c.included : true,
+        text: c.text || c.content || "",
+        textHTML: c.textHTML,
+      }));
+
+      setChapters(normalizedLegacy);
+      setActiveChapterId(normalizedLegacy[0].id);
+    } catch (err) {
+      console.error("Failed to load chapters for Publishing:", err);
+    }
+  }, []);
 
       // 3) Final fallback: old dahtruth_chapters from Writing
       const saved = localStorage.getItem(STORAGE_KEY);
