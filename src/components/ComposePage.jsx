@@ -120,6 +120,25 @@ const stripHtml = (html = "") => {
   return tmp.textContent || tmp.innerText || "";
 };
 
+// Remove "spacer" paragraphs like <p>&nbsp;</p> or empty <p> tags
+function stripSpacerParagraphs(html = "") {
+  if (!html) return "";
+  return html.replace(
+    /<p>(?:&nbsp;|\s|<\/?br\s*\/?>)*<\/p>/gi,
+    ""
+  );
+}
+
+// Convert cleaned HTML → plain text for Publishing AI + exports
+function htmlToPlainText(html = "") {
+  if (!html) return "";
+  const tmp = document.createElement("div");
+  tmp.innerHTML = html;
+  let text = tmp.textContent || tmp.innerText || "";
+  // Normalize whitespace a bit
+  return text.replace(/\r\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+
 export default function ComposePage() {
   const navigate = useNavigate();
 
@@ -774,49 +793,46 @@ export default function ComposePage() {
    * 4) Also store richer snapshot under `publishingDraft`
    * 5) Navigate to /publishing
    */
-  const handleSendToPublishing = async () => {
-    if (!hasAnyChapters) {
+   const handleSendToPublishing = async () => {
+    if (!Array.isArray(chapters) || chapters.length === 0) {
       alert("You need at least one chapter before sending to Publishing.");
       return;
     }
 
-    // 1) Best-effort save of the selected chapter (if any)
-    try {
-      await handleSave();
-    } catch (e) {
-      console.warn("handleSave failed or was skipped, continuing anyway:", e);
-    }
+    // 1) Make sure the latest changes are saved
+    await handleSave();
 
     try {
-      // 2) Use chapters that include the latest editor state
-      const baseChapters = getChaptersWithCurrent();
-
-      const cleanedChapters = baseChapters.map((ch, index) => {
+      // 2) Strip @char: tags and spacer paragraphs for Publishing version
+      const cleanedChapters = chapters.map((ch, idx) => {
         const raw = ch.content || ch.body || ch.text || "";
         const noChars = stripCharacterTags(raw);
         const noSpacers = stripSpacerParagraphs(noChars);
-        const plain = stripHtml(noSpacers).trim();
+
+        const safeHtml = noSpacers;
+        const plain = htmlToPlainText(safeHtml);
 
         return {
           ...ch,
-          id: ch.id || `c_${index + 1}`,
-          title: ch.title || `Chapter ${index + 1}`,
-          included:
-            typeof ch.included === "boolean" ? ch.included : true,
-          content: noSpacers,
+          // canonical HTML content for Publishing
+          content: safeHtml,
+          // used for AI + combined manuscript text
           _plainForPublishing: plain,
+          // used for formatted preview in Publishing page
+          textHTML: safeHtml,
+          _index: idx,
         };
       });
 
       // 3) Normalized structure for Publishing.tsx (dahtruth_chapters)
       const normalizedForPublishing = cleanedChapters.map((ch) => ({
-        id: ch.id,
-        title: ch.title,
+        id: ch.id || `c_${(ch._index ?? 0) + 1}`,
+        title: ch.title || `Chapter ${(ch._index ?? 0) + 1}`,
         included:
           typeof ch.included === "boolean" ? ch.included : true,
         text: ch._plainForPublishing || "",
-        // Leave textHTML undefined so Publishing builds <p> tags from text
-        textHTML: undefined,
+        // 👉 this now has your actual formatted HTML
+        textHTML: ch.textHTML || undefined,
       }));
 
       localStorage.setItem(
@@ -850,10 +866,7 @@ export default function ComposePage() {
         chapters: cleanedChapters.map((ch) => ({
           id: ch.id,
           title: ch.title,
-          text: ch._plainForPublishing || "",
-          textHTML: undefined,
-          included:
-            typeof ch.included === "boolean" ? ch.included : true,
+          content: ch.content, // cleaned HTML
         })),
       };
 
