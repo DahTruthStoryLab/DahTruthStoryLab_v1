@@ -952,7 +952,7 @@ export default function ComposePage() {
           </button>
 
           {/* Send to Publishing */}
-          <button
+            <button
             type="button"
             onClick={handleSendToPublishing}
             disabled={!hasChapter || saveStatus === "saving"}
