@@ -35,12 +35,6 @@ function stripCharacterTags(html = "") {
   return html.replace(/@char:\s*/g, "");
 }
 
-// Remove spacer paragraphs like <p>&nbsp;</p> that you don't want in Publishing
-function stripSpacerParagraphs(html = "") {
-  if (!html) return "";
-  return html.replace(/<p>(?:&nbsp;|\s|<br\s*\/?>)*<\/p>/gi, "");
-}
-
 // Helper: normalize to "double spaced" paragraphs on import / AI
 // ✅ Only touch plain text. If it's already HTML, leave it alone.
 const applyDoubleSpacing = (text = "") => {
