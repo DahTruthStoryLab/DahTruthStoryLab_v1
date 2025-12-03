@@ -2,14 +2,12 @@
 import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import PageShell from "../components/layout/PageShell.tsx";
-import { API_BASE } from "../lib/api"; // ✅ use the shared API base
-
-/* ---------- API endpoint for AI proof ---------- */
-/** Make sure you have a matching route in API Gateway, e.g.:
- *   POST {API_BASE}/ai/proof
- * that accepts { text: string } and returns { suggestions: string[] }
- */
-const PROOF_ENDPOINT = `${API_BASE}/ai/proof`;
+import {
+  runGrammar,
+  runStyle,
+  runReadability,
+  runAssistant,
+} from "../lib/api"; // ✅ use existing AI helpers
 
 /* ---------- Theme ---------- */
 const theme = {
@@ -95,8 +93,10 @@ type MetaLocal = { title?: string; author?: string; year?: string };
 /* ---------- Component ---------- */
 export default function Proof(): JSX.Element {
   const navigate = useNavigate();
+
   const [proofResults, setProofResults] = useState<string[]>([]);
   const [aiBusy, setAiBusy] = useState(false);
+  const [provider, setProvider] = useState<"openai" | "anthropic">("openai");
 
   // Load manuscript saved by Publishing.tsx
   const { manuscriptText, meta } = useMemo(() => {
@@ -124,11 +124,7 @@ export default function Proof(): JSX.Element {
     // Optional front matter
     if (meta?.title || meta?.author || meta?.year) {
       pieces.push(
-        [
-          meta?.title,
-          meta?.author ? `by ${meta.author}` : "",
-          meta?.year,
-        ]
+        [meta?.title, meta?.author ? `by ${meta.author}` : "", meta?.year]
           .filter(Boolean)
           .join("\n")
       );
@@ -159,7 +155,7 @@ export default function Proof(): JSX.Element {
     [manuscriptText]
   );
 
-  /* ---------- Local checks ---------- */
+  /* ---------- Local baseline checks ---------- */
   function runLocalChecks() {
     const issues: string[] = [];
     const compiled = manuscriptText;
@@ -171,7 +167,8 @@ export default function Proof(): JSX.Element {
       return;
     }
 
-    if (compiled.match(/ {2,}/)) issues.push("Multiple consecutive spaces found.");
+    if (compiled.match(/ {2,}/))
+      issues.push("Multiple consecutive spaces found.");
     if (/[“”]/.test(compiled) && !/[‘’]/.test(compiled))
       issues.push("Smart quotes present; ensure consistency of curly quotes.");
     if (/--/.test(compiled))
@@ -188,56 +185,43 @@ export default function Proof(): JSX.Element {
     setProofResults(issues.length ? issues : ["No basic issues found."]);
   }
 
-  /* ---------- AI checks (calls your API) ---------- */
-  async function runAIChecks() {
-    setAiBusy(true);
-    const compiled = manuscriptText;
+  /* ---------- AI-backed checks using lib/api ---------- */
 
+  function normalizeAiText(res: any, fallbackLabel: string): string {
+    const text =
+      res?.result || res?.text || res?.output || (typeof res === "string" ? res : "");
+    if (!text) {
+      return `${fallbackLabel}: AI returned an empty response.`;
+    }
+    return String(text).trim();
+  }
+
+  async function runGrammarCheck() {
+    const compiled = manuscriptText;
     if (!compiled) {
       setProofResults([
         "No manuscript found. Open Publishing and click Save (or type to autosave).",
       ]);
-      setAiBusy(false);
       return;
     }
 
     try {
-      const res = await fetch(PROOF_ENDPOINT, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: compiled }),
-      });
-
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json(); // expected: { suggestions: string[] }
-
-      const local: string[] = [];
-      if (/ {2,}/.test(compiled))
-        local.push("Multiple consecutive spaces found.");
-      if (/--/.test(compiled))
-        local.push(
-          "Double hyphen found; consider an em dash (—) or a period."
-        );
-
-      const apiSuggestions: string[] = Array.isArray(data?.suggestions)
-        ? data.suggestions
-        : [];
-
-      setProofResults(
-        [...local, ...apiSuggestions].length
-          ? [...local, ...apiSuggestions]
-          : ["No issues returned by AI."]
-      );
+      setAiBusy(true);
+      const res = await runGrammar(compiled, provider);
+      const text = normalizeAiText(res, "Grammar check");
+      const lines = text.split("\n").filter((l) => l.trim());
+      setProofResults(lines.length ? lines : ["No grammar issues detected."]);
     } catch (e: any) {
+      console.error("Grammar check error:", e);
       setProofResults([
-        `AI check failed: ${e.message}. Try again or check API Gateway logs.`,
+        `Grammar check failed: ${e?.message || "Unknown error."}`,
       ]);
     } finally {
       setAiBusy(false);
     }
   }
 
-  function runGrammarCheck() {
+  async function runStyleAnalysis() {
     const compiled = manuscriptText;
     if (!compiled) {
       setProofResults([
@@ -246,21 +230,23 @@ export default function Proof(): JSX.Element {
       return;
     }
 
-    const issues: string[] = [];
-    if (
-      /\btheir\b.*\bthere\b|\bthere\b.*\btheir\b/i.test(compiled)
-    ) {
-      issues.push("Possible their/there confusion detected.");
+    try {
+      setAiBusy(true);
+      const res = await runStyle(compiled, provider);
+      const text = normalizeAiText(res, "Style analysis");
+      const lines = text.split("\n").filter((l) => l.trim());
+      setProofResults(lines.length ? lines : ["Style looks good!"]);
+    } catch (e: any) {
+      console.error("Style analysis error:", e);
+      setProofResults([
+        `Style analysis failed: ${e?.message || "Unknown error."}`,
+      ]);
+    } finally {
+      setAiBusy(false);
     }
-    if (
-      /\bits\b.*\bit's\b|\bit's\b.*\bits\b/i.test(compiled)
-    ) {
-      issues.push("Possible its/it's confusion detected.");
-    }
-    setProofResults(issues.length ? issues : ["No grammar issues detected."]);
   }
 
-  function runStyleAnalysis() {
+  async function runCharacterConsistency() {
     const compiled = manuscriptText;
     if (!compiled) {
       setProofResults([
@@ -269,37 +255,131 @@ export default function Proof(): JSX.Element {
       return;
     }
 
-    const issues: string[] = [];
-    const adverbs = compiled.match(/\b\w+ly\b/gi) || [];
-    if (adverbs.length > 20)
-      issues.push(
-        `Found ${adverbs.length} adverbs. Consider reducing for stronger prose.`
-      );
+    const prompt =
+      "You are a professional fiction editor. Read the following full manuscript and return:\n" +
+      "1) A list of main characters with a short description of each (age, key traits, relationships).\n" +
+      "2) Any places where a character's description, age, or backstory seems to conflict with earlier details.\n" +
+      "3) Suggestions to tighten character consistency.\n\n" +
+      "Manuscript:\n\n" +
+      compiled;
 
-    const passiveVoice =
-      compiled.match(/\b(was|were|been|being)\s+\w+ed\b/gi) || [];
-    if (passiveVoice.length > 10)
-      issues.push(
-        `Found ${passiveVoice.length} instances of passive voice. Consider active voice.`
+    try {
+      setAiBusy(true);
+      const res = await runAssistant(
+        prompt,
+        "character_consistency",
+        "",
+        provider
       );
-
-    setProofResults(issues.length ? issues : ["Style looks good!"]);
+      const text = normalizeAiText(res, "Character consistency");
+      const lines = text.split("\n").filter((l) => l.trim());
+      setProofResults(
+        lines.length
+          ? lines
+          : ["No obvious character consistency issues detected."]
+      );
+    } catch (e: any) {
+      console.error("Character consistency error:", e);
+      setProofResults([
+        `Character consistency check failed: ${
+          e?.message || "Unknown error."
+        }`,
+      ]);
+    } finally {
+      setAiBusy(false);
+    }
   }
 
-  function runCharacterConsistency() {
-    const msg = [
-      "Character consistency placeholder — wire this to your character bible.",
-      "Tip: Track names, traits, ages, and relationships across chapters.",
-    ];
-    setProofResults(msg);
+  async function runTimelineValidation() {
+    const compiled = manuscriptText;
+    if (!compiled) {
+      setProofResults([
+        "No manuscript found. Open Publishing and click Save (or type to autosave).",
+      ]);
+      return;
+    }
+
+    const prompt =
+      "You are a continuity editor. Read the full manuscript and look for timeline issues.\n" +
+      "Return:\n" +
+      "1) A brief timeline of major events.\n" +
+      "2) Any inconsistencies in dates, ages, seasons, holidays, pregnancies, school years, etc.\n" +
+      "3) Clear notes on what might confuse a reader.\n\n" +
+      "Manuscript:\n\n" +
+      compiled;
+
+    try {
+      setAiBusy(true);
+      const res = await runAssistant(
+        prompt,
+        "timeline_consistency",
+        "",
+        provider
+      );
+      const text = normalizeAiText(res, "Timeline validation");
+      const lines = text.split("\n").filter((l) => l.trim());
+      setProofResults(
+        lines.length
+          ? lines
+          : ["No obvious timeline inconsistencies detected."]
+      );
+    } catch (e: any) {
+      console.error("Timeline validation error:", e);
+      setProofResults([
+        `Timeline validation failed: ${e?.message || "Unknown error."}`,
+      ]);
+    } finally {
+      setAiBusy(false);
+    }
   }
 
-  function runTimelineValidation() {
-    const msg = [
-      "Timeline validation placeholder — wire to your scene/event tracker.",
-      "Tip: Check dates, seasons, time-of-day, and age progressions.",
-    ];
-    setProofResults(msg);
+  /* ---------- AI Proof (All Checks) ---------- */
+  async function runAIChecks() {
+    const compiled = manuscriptText;
+    if (!compiled) {
+      setProofResults([
+        "No manuscript found. Open Publishing and click Save (or type to autosave).",
+      ]);
+      return;
+    }
+
+    setAiBusy(true);
+    const pieces: string[] = [];
+
+    try {
+      // Grammar
+      const g = await runGrammar(compiled, provider);
+      pieces.push("Grammar & Clarity:", normalizeAiText(g, "Grammar"));
+
+      // Style
+      const s = await runStyle(compiled, provider);
+      pieces.push("", "Style & Voice:", normalizeAiText(s, "Style"));
+
+      // Readability/basic
+      const r = await runReadability(compiled, provider);
+      pieces.push(
+        "",
+        "Readability & Basic Issues:",
+        normalizeAiText(r, "Readability")
+      );
+
+      // You can add character/timeline here later if you want
+
+      const lines = pieces
+        .join("\n")
+        .split("\n")
+        .map((l) => l.trimEnd())
+        .filter((l) => l.length > 0);
+
+      setProofResults(lines.length ? lines : ["No issues returned by AI."]);
+    } catch (e: any) {
+      console.error("AI proof error:", e);
+      setProofResults([
+        `AI proof failed: ${e?.message || "Unknown error."} Check your API logs.`,
+      ]);
+    } finally {
+      setAiBusy(false);
+    }
   }
 
   return (
@@ -338,7 +418,13 @@ export default function Proof(): JSX.Element {
               ← Back to Publishing
             </button>
 
-            <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+            <div
+              style={{
+                display: "flex",
+                gap: 12,
+                alignItems: "center",
+              }}
+            >
               <svg
                 width="26"
                 height="26"
@@ -358,7 +444,44 @@ export default function Proof(): JSX.Element {
                 Proof &amp; Consistency
               </h1>
             </div>
-            <div style={{ width: 150 }} />
+
+            <div
+              style={{
+                display: "flex",
+                flexDirection: "column",
+                alignItems: "flex-end",
+                gap: 4,
+                minWidth: 150,
+              }}
+            >
+              <label
+                style={{
+                  fontSize: 10,
+                  color: "rgba(255,255,255,0.8)",
+                  marginBottom: 2,
+                }}
+              >
+                AI Provider
+              </label>
+              <select
+                value={provider}
+                onChange={(e) =>
+                  setProvider(e.target.value as "openai" | "anthropic")
+                }
+                style={{
+                  borderRadius: 999,
+                  border: "1px solid rgba(255,255,255,0.7)",
+                  background: "rgba(255,255,255,0.16)",
+                  color: theme.white,
+                  fontSize: 11,
+                  padding: "4px 10px",
+                  outline: "none",
+                }}
+              >
+                <option value="openai">OpenAI</option>
+                <option value="anthropic">Anthropic</option>
+              </select>
+            </div>
           </div>
         </div>
 
@@ -445,19 +568,27 @@ export default function Proof(): JSX.Element {
                 gap: 12,
               }}
             >
-              <button style={styles.btn} onClick={runGrammarCheck}>
+              <button style={styles.btn} onClick={runGrammarCheck} disabled={aiBusy}>
                 📝 Grammar Check
               </button>
-              <button style={styles.btn} onClick={runStyleAnalysis}>
+              <button style={styles.btn} onClick={runStyleAnalysis} disabled={aiBusy}>
                 ✨ Style Analysis
               </button>
-              <button style={styles.btn} onClick={runCharacterConsistency}>
+              <button
+                style={styles.btn}
+                onClick={runCharacterConsistency}
+                disabled={aiBusy}
+              >
                 👤 Character Consistency
               </button>
-              <button style={styles.btn} onClick={runTimelineValidation}>
+              <button
+                style={styles.btn}
+                onClick={runTimelineValidation}
+                disabled={aiBusy}
+              >
                 📅 Timeline Validation
               </button>
-              <button style={styles.btn} onClick={runLocalChecks}>
+              <button style={styles.btn} onClick={runLocalChecks} disabled={aiBusy}>
                 🔍 Basic Issues
               </button>
             </div>
