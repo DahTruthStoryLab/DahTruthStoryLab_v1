@@ -200,7 +200,7 @@ const PLATFORM_PRESETS: Record<
     headers: true,
     footers: true,
     pageNumbers: true,
-    showTOCInEebook: false as any, // unused property kept only if you need it
+    // kept for backward compatibility (but unused)
     showTOCInEbook: false,
   },
   KDP_Paperback_5_25x8: {
@@ -216,6 +216,7 @@ const PLATFORM_PRESETS: Record<
     headers: true,
     footers: true,
     pageNumbers: true,
+    showTOCInEebook: false as any, // legacy field, ignore
     showTOCInEbook: false,
   },
   KDP_Paperback_5_5x8_5: {
@@ -271,14 +272,12 @@ const PLATFORM_PRESETS: Record<
       bottom: 0.75,
       left: 0.75,
       right: 0.5,
-      gutter: 0.375,
     },
     headers: true,
     footers: true,
     pageNumbers: true,
     showTOCInEbook: false,
   },
-
   KDP_Ebook: {
     label: "KDP Kindle eBook (reflowable)",
     trim: null,
@@ -667,7 +666,6 @@ export default function Publishing(): JSX.Element {
   const [activeChapterId, setActiveChapterId] = useState<string>("");
 
   // Load chapters saved by Writing / Compose
-   // Load chapters saved by Writing / Compose
   useEffect(() => {
     try {
       // --- Prefer structured publishingDraft from ComposePage ---
@@ -1192,11 +1190,34 @@ export default function Publishing(): JSX.Element {
         });
         generatedText = synopsisRes.synopsis || "";
       } else {
-        // other materials via assistant
+        // other materials via assistant with specific instructions
+        let instructions = "";
+
+        if (key === "back-cover") {
+          instructions =
+            `Write a compelling back-cover blurb for this book titled "${meta.title}" by ${meta.author}. ` +
+            "Aim for 150–250 words. Start with a strong hook, then briefly sketch the main character(s), central conflict, and emotional stakes. " +
+            "Write in present tense, in a voice that matches a thoughtful, character-driven novel. Do not include spoilers for the ending.";
+        } else if (key === "logline") {
+          instructions =
+            `Write a 1–2 sentence logline for this book titled "${meta.title}". ` +
+            "Capture the main character, their goal, the central obstacle, and what is at stake. " +
+            "Keep it sharp, clear, and compelling, suitable for pitching to agents or editors.";
+        } else if (key === "query-letter") {
+          instructions =
+            `Write a traditional publishing query letter to a literary agent for this book titled "${meta.title}" by ${meta.author}. ` +
+            "Use a professional but warm tone. Structure the letter as:\n" +
+            "1) A strong opening hook paragraph.\n" +
+            "2) 1–2 paragraphs summarizing the story (protagonist, setting, central conflict, stakes) in present tense.\n" +
+            "3) A brief author bio paragraph in third person using the information you can infer from the tone and themes.\n" +
+            "4) A short closing paragraph thanking the agent.\n\n" +
+            "Aim for about 350–450 words total. Do not invent awards or publications unless clearly implied by the manuscript voice.";
+        }
+
         const res: any = await runAssistant(
           compiledPlain,
-          key,
-          "",
+          "improve",
+          instructions,
           provider
         );
         generatedText =
