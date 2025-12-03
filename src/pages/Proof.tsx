@@ -334,17 +334,73 @@ export default function Proof(): JSX.Element {
   }
 
   /* ---------- AI Proof (All Checks) ---------- */
-  async function runAIChecks() {
-    const compiled = manuscriptText;
-    if (!compiled) {
-      setProofResults([
-        "No manuscript found. Open Publishing and click Save (or type to autosave).",
-      ]);
-      return;
-    }
+async function runAIChecks() {
+  setAiBusy(true);
+  const compiled = manuscriptText;
 
-    setAiBusy(true);
-    const pieces: string[] = [];
+  if (!compiled) {
+    setProofResults([
+      "No manuscript found. Open Publishing and click Save (or type to autosave).",
+    ]);
+    setAiBusy(false);
+    return;
+  }
+
+  // 🔹 NEW: only send a sample to AI to avoid rate limits
+  const MAX_WORDS_FOR_AI = 3000; // adjust if you like
+  const words = compiled.split(/\s+/);
+  const sampleText =
+    words.length > MAX_WORDS_FOR_AI
+      ? words.slice(0, MAX_WORDS_FOR_AI).join(" ")
+      : compiled;
+
+  const note =
+    words.length > MAX_WORDS_FOR_AI
+      ? `Note: AI Proof scanned the first ${MAX_WORDS_FOR_AI.toLocaleString()} words as a sample. Use the chapter tools in Publishing for detailed, chapter-by-chapter fixes.`
+      : "";
+
+  try {
+    const res = await fetch(PROOF_ENDPOINT, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text: sampleText }),
+    });
+
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json(); // expected: { suggestions: string[] }
+
+    const local: string[] = [];
+    if (/ {2,}/.test(compiled))
+      local.push("Multiple consecutive spaces found.");
+    if (/--/.test(compiled))
+      local.push(
+        "Double hyphen found; consider an em dash (—) or a period."
+      );
+
+    const apiSuggestions: string[] = Array.isArray(data?.suggestions)
+      ? data.suggestions
+      : [];
+
+    const combined = [
+      ...(note ? [note] : []),
+      ...local,
+      ...apiSuggestions,
+    ];
+
+    setProofResults(
+      combined.length ? combined : ["No issues returned by AI."]
+    );
+  } catch (e: any) {
+    // Friendlier message if we still hit a rate limit
+    const msg =
+      typeof e?.message === "string" && e.message.includes("429")
+        ? "AI Proof hit the provider’s rate limit. Try again later or use the chapter tools in Publishing for smaller checks."
+        : `AI check failed: ${e.message}. Try again or check API logs.`;
+    setProofResults([msg]);
+  } finally {
+    setAiBusy(false);
+  }
+}
 
     try {
       // Grammar
