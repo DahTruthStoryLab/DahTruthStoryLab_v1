@@ -2,12 +2,15 @@
 import React, { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import PageShell from "../components/layout/PageShell.tsx";
-import {
-  runGrammar,
-  runStyle,
-  runReadability,
-  runAssistant,
-} from "../lib/api"; // ✅ use existing AI helpers
+import { API_BASE } from "../lib/api"; // ✅ use the shared API base
+
+/* ---------- API endpoint for AI proof ---------- */
+/**
+ * Make sure you have a matching route in API Gateway, e.g.:
+ *   POST {API_BASE}/ai/proof
+ * that accepts { text: string } and returns { suggestions: string[] }
+ */
+const PROOF_ENDPOINT = `${API_BASE}/ai/proof`;
 
 /* ---------- Theme ---------- */
 const theme = {
@@ -93,13 +96,15 @@ type MetaLocal = { title?: string; author?: string; year?: string };
 /* ---------- Component ---------- */
 export default function Proof(): JSX.Element {
   const navigate = useNavigate();
-
   const [proofResults, setProofResults] = useState<string[]>([]);
   const [aiBusy, setAiBusy] = useState(false);
-  const [provider, setProvider] = useState<"openai" | "anthropic">("openai");
 
-  // Load manuscript saved by Publishing.tsx
-  const { manuscriptText, meta } = useMemo(() => {
+  // NEW: scope selection (whole book vs single chapter)
+  const [scope, setScope] = useState<"all" | "chapter">("all");
+  const [selectedChapterId, setSelectedChapterId] = useState<string>("");
+
+  // Load manuscript + chapters saved by Publishing.tsx
+  const { manuscriptText, meta, chapters } = useMemo(() => {
     let chapters: ChapterLocal[] = [];
     let matter: MatterLocal = {};
     let meta: MetaLocal = {};
@@ -144,7 +149,7 @@ export default function Proof(): JSX.Element {
     if (matter?.notes) pieces.push("Notes\n" + matter.notes);
 
     const manuscriptText = pieces.join("\n\n").trim();
-    return { manuscriptText, meta };
+    return { manuscriptText, meta, chapters: included };
   }, []);
 
   const wordCount = useMemo(
@@ -155,22 +160,52 @@ export default function Proof(): JSX.Element {
     [manuscriptText]
   );
 
-  /* ---------- Local baseline checks ---------- */
+  // Effective chapter for scope "chapter"
+  const effectiveChapterId =
+    selectedChapterId || (chapters.length ? chapters[0].id : "");
+  const currentChapter =
+    scope === "chapter"
+      ? chapters.find((c) => c.id === effectiveChapterId) || null
+      : null;
+
+  const scopeLabel =
+    scope === "all"
+      ? "Whole manuscript"
+      : currentChapter
+      ? `Chapter: ${currentChapter.title}`
+      : "Chapter (none selected)";
+
+  // Helper: get the text we are currently checking
+  function getScopedText(): { text: string; label: string } {
+    if (!manuscriptText) return { text: "", label: "manuscript" };
+    if (scope === "chapter" && currentChapter) {
+      const body = currentChapter.textHTML
+        ? stripHtml(currentChapter.textHTML)
+        : currentChapter.text || "";
+      const label = `chapter "${currentChapter.title}"`;
+      return { text: body.trim(), label };
+    }
+    return { text: manuscriptText, label: "entire manuscript" };
+  }
+
+  /* ---------- Local checks ---------- */
   function runLocalChecks() {
+    const { text: compiled, label } = getScopedText();
     const issues: string[] = [];
-    const compiled = manuscriptText;
 
     if (!compiled) {
       setProofResults([
-        "No manuscript found. Open Publishing and click Save (or type to autosave).",
+        `No ${label} text found. Open Publishing and click Save (or type to autosave).`,
       ]);
       return;
     }
 
+    issues.push(`Scope: ${scopeLabel}.`);
+
     if (compiled.match(/ {2,}/))
       issues.push("Multiple consecutive spaces found.");
     if (/[“”]/.test(compiled) && !/[‘’]/.test(compiled))
-      issues.push("Smart quotes present; ensure consistency of curly quotes.");
+      issues.push("Smart quotes present; ensure curly quotes are consistent.");
     if (/--/.test(compiled))
       issues.push("Double hyphen found; consider an em dash (—) or a period.");
 
@@ -185,257 +220,138 @@ export default function Proof(): JSX.Element {
     setProofResults(issues.length ? issues : ["No basic issues found."]);
   }
 
-  /* ---------- AI-backed checks using lib/api ---------- */
+  /* ---------- AI checks (calls your API) ---------- */
+  async function runAIChecks() {
+    setAiBusy(true);
+    const { text: compiled, label } = getScopedText();
 
-  function normalizeAiText(res: any, fallbackLabel: string): string {
-    const text =
-      res?.result || res?.text || res?.output || (typeof res === "string" ? res : "");
-    if (!text) {
-      return `${fallbackLabel}: AI returned an empty response.`;
-    }
-    return String(text).trim();
-  }
-
-  async function runGrammarCheck() {
-    const compiled = manuscriptText;
     if (!compiled) {
       setProofResults([
-        "No manuscript found. Open Publishing and click Save (or type to autosave).",
+        `No ${label} text found. Open Publishing and click Save (or type to autosave).`,
       ]);
-      return;
-    }
-
-    try {
-      setAiBusy(true);
-      const res = await runGrammar(compiled, provider);
-      const text = normalizeAiText(res, "Grammar check");
-      const lines = text.split("\n").filter((l) => l.trim());
-      setProofResults(lines.length ? lines : ["No grammar issues detected."]);
-    } catch (e: any) {
-      console.error("Grammar check error:", e);
-      setProofResults([
-        `Grammar check failed: ${e?.message || "Unknown error."}`,
-      ]);
-    } finally {
       setAiBusy(false);
-    }
-  }
-
-  async function runStyleAnalysis() {
-    const compiled = manuscriptText;
-    if (!compiled) {
-      setProofResults([
-        "No manuscript found. Open Publishing and click Save (or type to autosave).",
-      ]);
       return;
     }
 
-    try {
-      setAiBusy(true);
-      const res = await runStyle(compiled, provider);
-      const text = normalizeAiText(res, "Style analysis");
-      const lines = text.split("\n").filter((l) => l.trim());
-      setProofResults(lines.length ? lines : ["Style looks good!"]);
-    } catch (e: any) {
-      console.error("Style analysis error:", e);
-      setProofResults([
-        `Style analysis failed: ${e?.message || "Unknown error."}`,
-      ]);
-    } finally {
-      setAiBusy(false);
-    }
-  }
+    // 🔹 Only send a sample to avoid rate-limit problems
+    const MAX_WORDS_FOR_AI = 3000;
+    const words = compiled.split(/\s+/);
+    const sampleText =
+      words.length > MAX_WORDS_FOR_AI
+        ? words.slice(0, MAX_WORDS_FOR_AI).join(" ")
+        : compiled;
 
-  async function runCharacterConsistency() {
-    const compiled = manuscriptText;
-    if (!compiled) {
-      setProofResults([
-        "No manuscript found. Open Publishing and click Save (or type to autosave).",
-      ]);
-      return;
-    }
-
-    const prompt =
-      "You are a professional fiction editor. Read the following full manuscript and return:\n" +
-      "1) A list of main characters with a short description of each (age, key traits, relationships).\n" +
-      "2) Any places where a character's description, age, or backstory seems to conflict with earlier details.\n" +
-      "3) Suggestions to tighten character consistency.\n\n" +
-      "Manuscript:\n\n" +
-      compiled;
+    const sampleNote =
+      words.length > MAX_WORDS_FOR_AI
+        ? `Note: AI Proof scanned the first ${MAX_WORDS_FOR_AI.toLocaleString()} words of the ${scopeLabel.toLowerCase()} as a sample. Use the chapter tools in Publishing for detailed fixes.`
+        : "";
 
     try {
-      setAiBusy(true);
-      const res = await runAssistant(
-        prompt,
-        "character_consistency",
-        "",
-        provider
-      );
-      const text = normalizeAiText(res, "Character consistency");
-      const lines = text.split("\n").filter((l) => l.trim());
+      const res = await fetch(PROOF_ENDPOINT, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: sampleText }),
+      });
+
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json(); // expected: { suggestions: string[] }
+
+      const local: string[] = [];
+      local.push(`Scope: ${scopeLabel}.`);
+      if (/ {2,}/.test(compiled))
+        local.push("Multiple consecutive spaces found.");
+      if (/--/.test(compiled))
+        local.push(
+          "Double hyphen found; consider an em dash (—) or a period."
+        );
+
+      const apiSuggestions: string[] = Array.isArray(data?.suggestions)
+        ? data.suggestions
+        : [];
+
+      const combined = [
+        ...(sampleNote ? [sampleNote] : []),
+        ...local,
+        ...apiSuggestions,
+      ];
+
       setProofResults(
-        lines.length
-          ? lines
-          : ["No obvious character consistency issues detected."]
+        combined.length ? combined : ["No issues returned by AI."]
       );
     } catch (e: any) {
-      console.error("Character consistency error:", e);
-      setProofResults([
-        `Character consistency check failed: ${
-          e?.message || "Unknown error."
-        }`,
-      ]);
+      const msg =
+        typeof e?.message === "string" && e.message.includes("429")
+          ? "AI Proof hit the provider’s rate limit. Try again a bit later, or run checks on shorter sections."
+          : `AI check failed: ${e.message}. Try again or check API logs.`;
+      setProofResults([msg]);
     } finally {
       setAiBusy(false);
     }
   }
 
-  async function runTimelineValidation() {
-    const compiled = manuscriptText;
+  function runGrammarCheck() {
+    const { text: compiled, label } = getScopedText();
     if (!compiled) {
       setProofResults([
-        "No manuscript found. Open Publishing and click Save (or type to autosave).",
+        `No ${label} text found. Open Publishing and click Save (or type to autosave).`,
       ]);
       return;
     }
 
-    const prompt =
-      "You are a continuity editor. Read the full manuscript and look for timeline issues.\n" +
-      "Return:\n" +
-      "1) A brief timeline of major events.\n" +
-      "2) Any inconsistencies in dates, ages, seasons, holidays, pregnancies, school years, etc.\n" +
-      "3) Clear notes on what might confuse a reader.\n\n" +
-      "Manuscript:\n\n" +
-      compiled;
+    const issues: string[] = [`Scope: ${scopeLabel}.`];
 
-    try {
-      setAiBusy(true);
-      const res = await runAssistant(
-        prompt,
-        "timeline_consistency",
-        "",
-        provider
-      );
-      const text = normalizeAiText(res, "Timeline validation");
-      const lines = text.split("\n").filter((l) => l.trim());
-      setProofResults(
-        lines.length
-          ? lines
-          : ["No obvious timeline inconsistencies detected."]
-      );
-    } catch (e: any) {
-      console.error("Timeline validation error:", e);
-      setProofResults([
-        `Timeline validation failed: ${e?.message || "Unknown error."}`,
-      ]);
-    } finally {
-      setAiBusy(false);
+    if (/\btheir\b.*\bthere\b|\bthere\b.*\btheir\b/i.test(compiled)) {
+      issues.push("Possible their/there confusion detected.");
     }
+    if (/\bits\b.*\bit's\b|\bit's\b.*\bits\b/i.test(compiled)) {
+      issues.push("Possible its/it's confusion detected.");
+    }
+    setProofResults(issues.length > 1 ? issues : ["No grammar issues detected."]);
   }
 
-  /* ---------- AI Proof (All Checks) ---------- */
-async function runAIChecks() {
-  setAiBusy(true);
-  const compiled = manuscriptText;
+  function runStyleAnalysis() {
+    const { text: compiled, label } = getScopedText();
+    if (!compiled) {
+      setProofResults([
+        `No ${label} text found. Open Publishing and click Save (or type to autosave).`,
+      ]);
+      return;
+    }
 
-  if (!compiled) {
-    setProofResults([
-      "No manuscript found. Open Publishing and click Save (or type to autosave).",
-    ]);
-    setAiBusy(false);
-    return;
-  }
+    const issues: string[] = [`Scope: ${scopeLabel}.`];
 
-  // 🔹 NEW: only send a sample to AI to avoid rate limits
-  const MAX_WORDS_FOR_AI = 3000; // adjust if you like
-  const words = compiled.split(/\s+/);
-  const sampleText =
-    words.length > MAX_WORDS_FOR_AI
-      ? words.slice(0, MAX_WORDS_FOR_AI).join(" ")
-      : compiled;
-
-  const note =
-    words.length > MAX_WORDS_FOR_AI
-      ? `Note: AI Proof scanned the first ${MAX_WORDS_FOR_AI.toLocaleString()} words as a sample. Use the chapter tools in Publishing for detailed, chapter-by-chapter fixes.`
-      : "";
-
-  try {
-    const res = await fetch(PROOF_ENDPOINT, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text: sampleText }),
-    });
-
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data = await res.json(); // expected: { suggestions: string[] }
-
-    const local: string[] = [];
-    if (/ {2,}/.test(compiled))
-      local.push("Multiple consecutive spaces found.");
-    if (/--/.test(compiled))
-      local.push(
-        "Double hyphen found; consider an em dash (—) or a period."
+    const adverbs = compiled.match(/\b\w+ly\b/gi) || [];
+    if (adverbs.length > 20)
+      issues.push(
+        `Found ${adverbs.length} adverbs. Consider trimming them for stronger prose.`
       );
 
-    const apiSuggestions: string[] = Array.isArray(data?.suggestions)
-      ? data.suggestions
-      : [];
+    const passiveVoice =
+      compiled.match(/\b(was|were|been|being)\s+\w+ed\b/gi) || [];
+    if (passiveVoice.length > 10)
+      issues.push(
+        `Found ${passiveVoice.length} instances of passive voice. Consider revising to active voice where it matters.`
+      );
 
-    const combined = [
-      ...(note ? [note] : []),
-      ...local,
-      ...apiSuggestions,
+    setProofResults(issues.length > 1 ? issues : ["Style looks good!"]);
+  }
+
+  function runCharacterConsistency() {
+    const msg = [
+      `Scope: ${scopeLabel}.`,
+      "Character consistency placeholder — later this can wire to your character bible.",
+      "Tip: Track names, traits, ages, and relationships across chapters.",
     ];
-
-    setProofResults(
-      combined.length ? combined : ["No issues returned by AI."]
-    );
-  } catch (e: any) {
-    // Friendlier message if we still hit a rate limit
-    const msg =
-      typeof e?.message === "string" && e.message.includes("429")
-        ? "AI Proof hit the provider’s rate limit. Try again later or use the chapter tools in Publishing for smaller checks."
-        : `AI check failed: ${e.message}. Try again or check API logs.`;
-    setProofResults([msg]);
-  } finally {
-    setAiBusy(false);
+    setProofResults(msg);
   }
-}
 
-    try {
-      // Grammar
-      const g = await runGrammar(compiled, provider);
-      pieces.push("Grammar & Clarity:", normalizeAiText(g, "Grammar"));
-
-      // Style
-      const s = await runStyle(compiled, provider);
-      pieces.push("", "Style & Voice:", normalizeAiText(s, "Style"));
-
-      // Readability/basic
-      const r = await runReadability(compiled, provider);
-      pieces.push(
-        "",
-        "Readability & Basic Issues:",
-        normalizeAiText(r, "Readability")
-      );
-
-      // You can add character/timeline here later if you want
-
-      const lines = pieces
-        .join("\n")
-        .split("\n")
-        .map((l) => l.trimEnd())
-        .filter((l) => l.length > 0);
-
-      setProofResults(lines.length ? lines : ["No issues returned by AI."]);
-    } catch (e: any) {
-      console.error("AI proof error:", e);
-      setProofResults([
-        `AI proof failed: ${e?.message || "Unknown error."} Check your API logs.`,
-      ]);
-    } finally {
-      setAiBusy(false);
-    }
+  function runTimelineValidation() {
+    const msg = [
+      `Scope: ${scopeLabel}.`,
+      "Timeline validation placeholder — later this can wire to your scene/event tracker.",
+      "Tip: Check dates, seasons, time-of-day, and age progressions for continuity.",
+    ];
+    setProofResults(msg);
   }
 
   return (
@@ -474,13 +390,7 @@ async function runAIChecks() {
               ← Back to Publishing
             </button>
 
-            <div
-              style={{
-                display: "flex",
-                gap: 12,
-                alignItems: "center",
-              }}
-            >
+            <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
               <svg
                 width="26"
                 height="26"
@@ -500,55 +410,42 @@ async function runAIChecks() {
                 Proof &amp; Consistency
               </h1>
             </div>
-
-            <div
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "flex-end",
-                gap: 4,
-                minWidth: 150,
-              }}
-            >
-              <label
-                style={{
-                  fontSize: 10,
-                  color: "rgba(255,255,255,0.8)",
-                  marginBottom: 2,
-                }}
-              >
-                AI Provider
-              </label>
-              <select
-                value={provider}
-                onChange={(e) =>
-                  setProvider(e.target.value as "openai" | "anthropic")
-                }
-                style={{
-                  borderRadius: 999,
-                  border: "1px solid rgba(255,255,255,0.7)",
-                  background: "rgba(255,255,255,0.16)",
-                  color: theme.white,
-                  fontSize: 11,
-                  padding: "4px 10px",
-                  outline: "none",
-                }}
-              >
-                <option value="openai">OpenAI</option>
-                <option value="anthropic">Anthropic</option>
-              </select>
-            </div>
+            <div style={{ width: 150 }} />
           </div>
         </div>
 
         {/* Content */}
         <div style={{ ...styles.inner, ...styles.sectionShell }}>
-          {/* Stats Card */}
+          {/* 🔹 NEW: banner explaining how this page relates to Publishing */}
+          <div
+            style={{
+              ...styles.glassCard,
+              marginBottom: 16,
+              background:
+                "linear-gradient(120deg, rgba(248,250,252,0.96), rgba(255,240,246,0.96))",
+              borderColor: "rgba(248, 113, 166, 0.3)",
+              display: "flex",
+              gap: 12,
+              alignItems: "flex-start",
+            }}
+          >
+            <div style={{ fontSize: 20, marginTop: 2 }}>💡</div>
+            <div style={{ fontSize: 13, color: theme.text, lineHeight: 1.6 }}>
+              <strong>This page is your overview check.</strong> Use it to scan
+              the <em>whole manuscript</em> or a <em>single chapter</em> for
+              big-picture grammar, style, and consistency issues. For detailed,
+              line-by-line edits, use the AI tools on the right side of the{" "}
+              <strong>Publishing Studio</strong> page—those work chapter by
+              chapter and write changes directly into your manuscript.
+            </div>
+          </div>
+
+          {/* Stats + scope selector */}
           <div style={{ ...styles.glassCard, marginBottom: 20 }}>
             <div
               style={{
                 display: "flex",
-                gap: 32,
+                gap: 24,
                 alignItems: "center",
                 flexWrap: "wrap",
               }}
@@ -573,6 +470,7 @@ async function runAIChecks() {
                   {wordCount.toLocaleString()}
                 </div>
               </div>
+
               <div>
                 <div
                   style={{
@@ -593,6 +491,104 @@ async function runAIChecks() {
                   {proofResults.length}
                 </div>
               </div>
+
+              {/* Scope controls */}
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 6,
+                  minWidth: 220,
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: 12,
+                    color: theme.subtext,
+                  }}
+                >
+                  Check scope
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    gap: 8,
+                    flexWrap: "wrap",
+                    alignItems: "center",
+                  }}
+                >
+                  <label
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 6,
+                      fontSize: 12,
+                      cursor: "pointer",
+                    }}
+                  >
+                    <input
+                      type="radio"
+                      name="scope"
+                      value="all"
+                      checked={scope === "all"}
+                      onChange={() => setScope("all")}
+                    />
+                    Whole manuscript
+                  </label>
+                  <label
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 6,
+                      fontSize: 12,
+                      cursor: "pointer",
+                    }}
+                  >
+                    <input
+                      type="radio"
+                      name="scope"
+                      value="chapter"
+                      checked={scope === "chapter"}
+                      onChange={() => setScope("chapter")}
+                    />
+                    Single chapter
+                  </label>
+                </div>
+
+                {scope === "chapter" && chapters.length > 0 && (
+                  <select
+                    value={effectiveChapterId}
+                    onChange={(e) => {
+                      setScope("chapter");
+                      setSelectedChapterId(e.target.value);
+                    }}
+                    style={{
+                      borderRadius: 10,
+                      border: `1px solid ${theme.border}`,
+                      padding: "6px 10px",
+                      fontSize: 12,
+                      width: "100%",
+                    }}
+                  >
+                    {chapters.map((c, idx) => (
+                      <option key={c.id} value={c.id}>
+                        {idx + 1}. {c.title}
+                      </option>
+                    ))}
+                  </select>
+                )}
+
+                <div
+                  style={{
+                    fontSize: 11,
+                    color: theme.subtext,
+                    marginTop: 2,
+                  }}
+                >
+                  Current scope: <strong>{scopeLabel}</strong>
+                </div>
+              </div>
+
               <div style={{ marginLeft: "auto" }}>
                 <button
                   style={styles.btnPrimary}
@@ -624,27 +620,19 @@ async function runAIChecks() {
                 gap: 12,
               }}
             >
-              <button style={styles.btn} onClick={runGrammarCheck} disabled={aiBusy}>
+              <button style={styles.btn} onClick={runGrammarCheck}>
                 📝 Grammar Check
               </button>
-              <button style={styles.btn} onClick={runStyleAnalysis} disabled={aiBusy}>
+              <button style={styles.btn} onClick={runStyleAnalysis}>
                 ✨ Style Analysis
               </button>
-              <button
-                style={styles.btn}
-                onClick={runCharacterConsistency}
-                disabled={aiBusy}
-              >
+              <button style={styles.btn} onClick={runCharacterConsistency}>
                 👤 Character Consistency
               </button>
-              <button
-                style={styles.btn}
-                onClick={runTimelineValidation}
-                disabled={aiBusy}
-              >
+              <button style={styles.btn} onClick={runTimelineValidation}>
                 📅 Timeline Validation
               </button>
-              <button style={styles.btn} onClick={runLocalChecks} disabled={aiBusy}>
+              <button style={styles.btn} onClick={runLocalChecks}>
                 🔍 Basic Issues
               </button>
             </div>
@@ -720,7 +708,8 @@ async function runAIChecks() {
                   color: theme.subtext,
                 }}
               >
-                Click any button above to analyze your manuscript
+                Choose a scope above, then click any button to analyze your
+                manuscript.
               </div>
             </div>
           )}
