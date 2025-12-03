@@ -667,12 +667,11 @@ export default function Publishing(): JSX.Element {
   const [activeChapterId, setActiveChapterId] = useState<string>("");
 
   // Load chapters saved by Writing / Compose
+   // Load chapters saved by Writing / Compose
   useEffect(() => {
     try {
       // --- Prefer structured publishingDraft from ComposePage ---
-      const draftRaw =
-      localStorage.getItem("publishingDraft") ||
-      localStorage.getItem(PUBLISHING_DRAFT_KEY);
+      const draftRaw = localStorage.getItem(PUBLISHING_DRAFT_KEY);
 
       if (draftRaw) {
         const parsed = JSON.parse(draftRaw) as {
@@ -694,20 +693,33 @@ export default function Publishing(): JSX.Element {
 
         if (rawChapters.length > 0) {
           const normalized: Chapter[] = rawChapters.map(
-            (c: any, idx: number) => ({
-              id: c.id || `c_${idx + 1}`,
-              title: c.title || `Chapter ${idx + 1}`,
-              included:
-                typeof c.included === "boolean" ? c.included : true,
-              text:
-                typeof c.text === "string"
-                  ? c.text
+            (c: any, idx: number) => {
+              // Whatever Compose saved: textHTML, content, or text
+              const rawHtml =
+                typeof c.textHTML === "string"
+                  ? c.textHTML
                   : typeof c.content === "string"
                   ? c.content
-                  : "",
-              textHTML:
-                typeof c.textHTML === "string" ? c.textHTML : undefined,
-            })
+                  : typeof c.text === "string"
+                  ? c.text
+                  : "";
+
+              // 🔹 Strip any internal markers / spacer paragraphs
+              const cleanedHtml = stripSpacerParagraphs(
+                stripCharacterTags(rawHtml)
+              );
+
+              return {
+                id: c.id || `c_${idx + 1}`,
+                title: c.title || `Chapter ${idx + 1}`,
+                included:
+                  typeof c.included === "boolean" ? c.included : true,
+                // plain text used for compiled manuscript
+                text: stripHtml(cleanedHtml),
+                // keep cleaned HTML for the editor
+                textHTML: cleanedHtml || undefined,
+              };
+            }
           );
 
           setChapters(normalized);
