@@ -6,7 +6,6 @@ import React, {
   useMemo,
   useState,
   useCallback,
-  useRef,
 } from "react";
 import { useNavigate } from "react-router-dom";
 import PageShell from "../components/layout/PageShell.tsx";
@@ -27,9 +26,9 @@ type PublishingChapter = {
   id: string;
   title: string;
   included?: boolean;
-  text?: string;
-  textHTML?: string;
-  content?: string;
+  text?: string;      // plain text for tools
+  textHTML?: string;  // formatted HTML (from Compose)
+  content?: string;   // older content shape (HTML)
 };
 
 type ProjectMeta = {
@@ -87,9 +86,7 @@ const PublishingPage: React.FC = () => {
   const [draft, setDraft] = useState<PublishingDraft | null>(null);
 
   const [activeModule, setActiveModule] = useState<ModuleKey>("manuscript");
-  const [selectedChapterId, setSelectedChapterId] = useState<string | null>(
-    null
-  );
+  const [selectedChapterId, setSelectedChapterId] = useState<string | null>(null);
 
   // Status / feedback
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -152,8 +149,7 @@ const PublishingPage: React.FC = () => {
         mergedChapters = parsedChapters.map((ch, index) => ({
           id: ch.id || `c_${index + 1}`,
           title: ch.title || `Chapter ${index + 1}`,
-          included:
-            typeof ch.included === "boolean" ? ch.included : true,
+          included: typeof ch.included === "boolean" ? ch.included : true,
           text: ch.text || htmlToPlainText(ch.textHTML),
           textHTML: ch.textHTML,
           content: ch.content, // may be undefined in this path
@@ -190,15 +186,15 @@ const PublishingPage: React.FC = () => {
     }
   }, []);
 
-  // Currently selected chapter object
+  // ─────────────────────────────────────────────
+  // 2. Derived values (selected chapter, manuscript text + HTML, book meta)
+  // ─────────────────────────────────────────────
   const selectedChapter = useMemo(
-    () => chapters.find((c) => c.id === selectedChapterId) || null,
+    () =>
+      chapters.find((c) => c.id === selectedChapterId) || chapters[0] || null,
     [chapters, selectedChapterId]
   );
 
-  // ─────────────────────────────────────────────
-  // 2. Combined manuscript text (all included chapters)
-  // ─────────────────────────────────────────────
   const manuscriptText = useMemo(() => {
     if (!chapters.length) return "";
     return chapters
@@ -207,6 +203,15 @@ const PublishingPage: React.FC = () => {
       .filter(Boolean)
       .join("\n\n");
   }, [chapters]);
+
+  // HTML version of the currently selected chapter (for preview-style modules)
+  const manuscriptHTML = useMemo(() => {
+    if (!selectedChapter) return "";
+    return selectedChapter.textHTML || selectedChapter.content || "";
+  }, [selectedChapter]);
+
+  const bookTitle = meta?.title || "Untitled Book";
+  const authorName = meta?.author || "Unknown Author";
 
   // ─────────────────────────────────────────────
   // 3. Simple AI wiring (shared across modules)
@@ -284,7 +289,9 @@ const PublishingPage: React.FC = () => {
   const toggleChapterIncluded = (id: string) => {
     setChapters((prev) =>
       prev.map((ch) =>
-        ch.id === id ? { ...ch, included: ch.included === false ? true : false } : ch
+        ch.id === id
+          ? { ...ch, included: ch.included === false ? true : false }
+          : ch
       )
     );
   };
@@ -325,10 +332,10 @@ const PublishingPage: React.FC = () => {
           {/* Project summary */}
           <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <h2 className="text-sm font-semibold text-slate-800 mb-1">
-              {meta.title}
+              {bookTitle}
             </h2>
             <p className="text-xs text-slate-500 mb-2">
-              by {meta.author}
+              by {authorName}
               {meta.year ? ` · © ${meta.year}` : ""}
             </p>
             <p className="text-[11px] text-slate-500">
@@ -392,7 +399,9 @@ const PublishingPage: React.FC = () => {
                       {idx + 1}. {ch.title}
                     </div>
                     <div className="text-[10px] text-slate-500">
-                      {ch.included === false ? "Excluded from export" : "Included"}
+                      {ch.included === false
+                        ? "Excluded from export"
+                        : "Included"}
                     </div>
                   </div>
                   <button
