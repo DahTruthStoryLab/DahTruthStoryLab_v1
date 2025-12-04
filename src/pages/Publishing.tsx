@@ -1257,16 +1257,12 @@ export default function Publishing(): JSX.Element {
   }, [compiledPlain]);
 
   // Story materials state
-  const [materialKey, setMaterialKey] =
+    const [materialKey, setMaterialKey] =
     useState<MaterialKey>("synopsis-short");
-  const [materialOutput, setMaterialOutput] =
-    useState<string>("");
-  const [materialBusy, setMaterialBusy] =
-    useState<boolean>(false);
+  const [materialOutput, setMaterialOutput] = useState<string>("");
+  const [materialBusy, setMaterialBusy] = useState<boolean>(false);
 
-  const handleGenerateMaterial = async (
-    key: MaterialKey
-  ) => {
+  const handleGenerateMaterial = async (key: MaterialKey) => {
     if (!compiledPlain) {
       alert(
         "Your publishing manuscript is empty. Add chapters and front matter first."
@@ -1277,10 +1273,89 @@ export default function Publishing(): JSX.Element {
     setMaterialBusy(true);
     setMaterialKey(key);
 
+    // Keep using your helper so we don't blow the token limit
     const baseText = trimForAI(compiledPlain);
 
     try {
       let generatedText = "";
+
+      // 1) SYNOPSES → dedicated REST endpoint
+      if (key === "synopsis-short" || key === "synopsis-long") {
+        const synopsisRes = await generateSynopsis({
+          manuscriptText: baseText,
+          title:
+            (meta as any)?.title ||
+            (meta as any)?.workingTitle ||
+            "Untitled Manuscript",
+          genre: (meta as any)?.genre || "",
+          tone:
+            key === "synopsis-short"
+              ? "brief agent-ready synopsis"
+              : "expanded reader-facing synopsis",
+          maxWords: key === "synopsis-short" ? 300 : 800,
+        });
+
+        generatedText = synopsisRes.synopsis || "";
+      } else {
+        // 2) OTHER MATERIALS → AI assistant with focused instructions
+        let instructions = "";
+
+        if (key === "back-cover") {
+          instructions =
+            "Based on the manuscript above, write a compelling back-cover blurb (about 150–250 words). " +
+            "Hook the reader, highlight the central conflict and emotional stakes, and end with a strong teaser. " +
+            "Write in third person. Do not include spoilers. Return ONLY the back-cover copy.";
+        } else if (key === "logline") {
+          instructions =
+            "Based on the manuscript above, write 1–2 strong loglines (no more than 60 words each). " +
+            "Each logline should clearly state the main character, their goal, the central conflict, and what is at stake. " +
+            "Return ONLY the logline(s), each on its own line.";
+        } else if (key === "query-letter") {
+          instructions =
+            "You are a literary agent and query letter expert. Using the manuscript above, draft a professional query letter. " +
+            "Use a clear structure: opening hook, short 1–2 paragraph story summary, brief paragraph with genre, word count, and audience, " +
+            "and a short author bio using placeholders like AUTHOR NAME and any relevant background. " +
+            "Keep the entire letter under 450 words. Address the agent as 'Dear Agent,' and sign off with 'Sincerely,' followed by AUTHOR NAME. " +
+            "Return ONLY the query letter text.";
+        }
+
+        const res: any = await runAssistant(
+          baseText,
+          "improve",       // keep a valid action for the backend
+          instructions,
+          provider
+        );
+
+        generatedText =
+          res?.result || res?.text || res?.output || "";
+      }
+
+      if (!generatedText) {
+        throw new Error("AI returned an empty response.");
+      }
+
+      setMaterialOutput(generatedText);
+
+      // Send to Publishing Prep so you can edit / refine
+      navigate("/publishing-prep", {
+        state: {
+          from: "story-materials",
+          materialType: key,
+          manuscriptMeta: meta,
+          manuscriptText: compiledPlain,
+          generated: generatedText,
+        },
+      });
+    } catch (e: any) {
+      console.error("[Story Material Error]:", e);
+      alert(
+        e?.message ||
+          "Could not generate story material. Please try again."
+      );
+    } finally {
+      setMaterialBusy(false);
+    }
+  };
 
       // synopsis routes use dedicated endpoint
       if (
