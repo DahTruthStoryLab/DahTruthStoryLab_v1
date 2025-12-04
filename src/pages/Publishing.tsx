@@ -93,15 +93,6 @@ type PlatformPresetKey =
   | "KDP_Ebook"
   | "Generic_Manuscript_Submission";
 
-type NumFmt =
-  | "bullet"
-  | "decimal"
-  | "lowerLetter"
-  | "upperLetter"
-  | "lowerRoman"
-  | "upperRoman"
-  | string;
-
 type ChapterGroup = {
   title: string;
   content: string[];
@@ -158,7 +149,8 @@ const MANUSCRIPT_PRESETS: Record<
   },
   Poetry_Minimal_12pt_Serif: {
     label: "Poetry (Minimal Serif)",
-    fontFamily: "Georgia, 'Times New Roman', serif",
+    fontFamily:
+      "Georgia, 'Times New Roman', serif",
     fontSizePt: 12,
     lineHeight: 1.5,
     firstLineIndentInches: 0,
@@ -200,7 +192,6 @@ const PLATFORM_PRESETS: Record<
     headers: true,
     footers: true,
     pageNumbers: true,
-    // kept for backward compatibility (but unused)
     showTOCInEbook: false,
   },
   KDP_Paperback_5_25x8: {
@@ -216,7 +207,6 @@ const PLATFORM_PRESETS: Record<
     headers: true,
     footers: true,
     pageNumbers: true,
-    showTOCInEebook: false as any, // legacy field, ignore
     showTOCInEbook: false,
   },
   KDP_Paperback_5_5x8_5: {
@@ -262,6 +252,7 @@ const PLATFORM_PRESETS: Record<
     headers: true,
     footers: true,
     pageNumbers: true,
+    showTOCInEebook: false as any,
     showTOCInEbook: false,
   },
   KDP_Paperback_8x10: {
@@ -272,12 +263,14 @@ const PLATFORM_PRESETS: Record<
       bottom: 0.75,
       left: 0.75,
       right: 0.5,
+      gutter: 0.375,
     },
     headers: true,
     footers: true,
     pageNumbers: true,
     showTOCInEbook: false,
   },
+
   KDP_Ebook: {
     label: "KDP Kindle eBook (reflowable)",
     trim: null,
@@ -420,7 +413,9 @@ type MaterialKey = (typeof MATERIAL_ACTIONS)[number]["key"];
 /* ---------- Tiny helpers ---------- */
 
 const htmlEscape = (s: string) =>
-  s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+  s.replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
 
 const inchToPx = (inch: number) => inch * 96; // CSS assumes 96 DPI
 
@@ -445,6 +440,30 @@ function stripSpacerParagraphs(html: string = ""): string {
     .replace(/<p><br\s*\/?><\/p>/gi, "");
 }
 
+/**
+ * Trim very large manuscripts before sending to AI.
+ * Keeps the beginning + ending and drops the middle.
+ */
+function trimForAI(
+  text: string,
+  maxChars: number = 50000 // ~10–12k tokens-ish
+): string {
+  if (!text) return "";
+  if (text.length <= maxChars) return text;
+
+  const headLen = Math.floor(maxChars * 0.6);
+  const tailLen = Math.floor(maxChars * 0.3);
+
+  const head = text.slice(0, headLen);
+  const tail = text.slice(-tailLen);
+
+  return (
+    head +
+    "\n\n[...middle of manuscript omitted for AI context...]\n\n" +
+    tail
+  );
+}
+
 /* ---------- Small UI helpers ---------- */
 
 type ToggleProps = {
@@ -453,7 +472,11 @@ type ToggleProps = {
   label?: string;
 };
 
-const Toggle: React.FC<ToggleProps> = ({ checked, onChange, label }) => {
+const Toggle: React.FC<ToggleProps> = ({
+  checked,
+  onChange,
+  label,
+}) => {
   return (
     <button
       onClick={() => onChange(!checked)}
@@ -663,7 +686,8 @@ export default function Publishing(): JSX.Element {
   // ---------- Chapters + active chapter ----------
 
   const [chapters, setChapters] = useState<Chapter[]>([]);
-  const [activeChapterId, setActiveChapterId] = useState<string>("");
+  const [activeChapterId, setActiveChapterId] =
+    useState<string>("");
 
   // Load chapters saved by Writing / Compose
   useEffect(() => {
@@ -711,7 +735,9 @@ export default function Publishing(): JSX.Element {
                 id: c.id || `c_${idx + 1}`,
                 title: c.title || `Chapter ${idx + 1}`,
                 included:
-                  typeof c.included === "boolean" ? c.included : true,
+                  typeof c.included === "boolean"
+                    ? c.included
+                    : true,
                 // plain text used for compiled manuscript
                 text: stripHtml(cleanedHtml),
                 // keep cleaned HTML for the editor
@@ -744,7 +770,9 @@ export default function Publishing(): JSX.Element {
             id: c.id || `c_${idx + 1}`,
             title: c.title || `Chapter ${idx + 1}`,
             included:
-              typeof c.included === "boolean" ? c.included : true,
+              typeof c.included === "boolean"
+                ? c.included
+                : true,
             text: stripHtml(cleanedHtml),
             textHTML: cleanedHtml,
           };
@@ -765,15 +793,22 @@ export default function Publishing(): JSX.Element {
     try {
       if (!chapters.length) return;
       localStorage.setItem(STORAGE_KEY, JSON.stringify(chapters));
-      localStorage.setItem(PUBLISHING_CHAPTERS_KEY, JSON.stringify(chapters));
+      localStorage.setItem(
+        PUBLISHING_CHAPTERS_KEY,
+        JSON.stringify(chapters)
+      );
     } catch (err) {
-      console.error("Failed to persist chapters from Publishing:", err);
+      console.error(
+        "Failed to persist chapters from Publishing:",
+        err
+      );
     }
   }, [chapters]);
 
   // ---------- AI + layout state ----------
 
-  const [provider, setProvider] = useState<"openai" | "anthropic">("openai");
+  const [provider, setProvider] =
+    useState<"openai" | "anthropic">("openai");
 
   const [matter, setMatter] = useState<Matter>({
     titlePage: "{title}\nby {author}",
@@ -805,16 +840,23 @@ export default function Publishing(): JSX.Element {
   // Persist matter to storage
   useEffect(() => {
     try {
-      localStorage.setItem(PUBLISHING_MATTER_KEY, JSON.stringify(matter));
+      localStorage.setItem(
+        PUBLISHING_MATTER_KEY,
+        JSON.stringify(matter)
+      );
     } catch {
       /* ignore */
     }
   }, [matter]);
 
   const [manuscriptPreset, setManuscriptPreset] =
-    useState<ManuscriptPresetKey>("Agents_Standard_12pt_TNR_Double");
+    useState<ManuscriptPresetKey>(
+      "Agents_Standard_12pt_TNR_Double"
+    );
   const [platformPreset, setPlatformPreset] =
-    useState<PlatformPresetKey>("Generic_Manuscript_Submission");
+    useState<PlatformPresetKey>(
+      "Generic_Manuscript_Submission"
+    );
 
   const [msOverrides, setMsOverrides] = useState<
     Partial<(typeof MANUSCRIPT_PRESETS)[ManuscriptPresetKey]>
@@ -823,11 +865,15 @@ export default function Publishing(): JSX.Element {
   useEffect(() => {
     setMsOverrides((prev) => ({
       ...prev,
-      lineHeight: MANUSCRIPT_PRESETS[manuscriptPreset].lineHeight,
+      lineHeight:
+        MANUSCRIPT_PRESETS[manuscriptPreset].lineHeight,
     }));
   }, [manuscriptPreset]);
 
-  const ms = { ...MANUSCRIPT_PRESETS[manuscriptPreset], ...msOverrides };
+  const ms = {
+    ...MANUSCRIPT_PRESETS[manuscriptPreset],
+    ...msOverrides,
+  };
   const pf = PLATFORM_PRESETS[platformPreset];
   const includeHeadersFooters = pf.headers || pf.footers;
 
@@ -847,21 +893,26 @@ export default function Publishing(): JSX.Element {
     0,
     chapters.findIndex((c) => c.id === activeChapterId)
   );
-  const activeChapter = chapters[activeIdx] || chapters[0];
+  const activeChapter =
+    chapters[activeIdx] || chapters[0];
 
   const editorRef = useRef<HTMLDivElement>(null);
 
   const [isWide, setIsWide] = useState<boolean>(
-    typeof window !== "undefined" ? window.innerWidth >= 1100 : true
+    typeof window !== "undefined"
+      ? window.innerWidth >= 1100
+      : true
   );
 
   useEffect(() => {
     const onResize = () =>
       setIsWide(
-        typeof window !== "undefined" && window.innerWidth >= 1100
+        typeof window !== "undefined" &&
+          window.innerWidth >= 1100
       );
     window.addEventListener("resize", onResize);
-    return () => window.removeEventListener("resize", onResize);
+    return () =>
+      window.removeEventListener("resize", onResize);
   }, []);
 
   // Load HTML for active chapter into editor (and clean it)
@@ -875,10 +926,15 @@ export default function Publishing(): JSX.Element {
       const html = `<p>${htmlEscape(chap.text)
         .replaceAll("\n\n", "</p><p>")
         .replaceAll("\n", "<br/>")}</p>`;
-      const cleaned = stripSpacerParagraphs(stripCharacterTags(html));
+      const cleaned = stripSpacerParagraphs(
+        stripCharacterTags(html)
+      );
       setChapters((prev) => {
         const next = [...prev];
-        next[activeIdx] = { ...chap, textHTML: cleaned };
+        next[activeIdx] = {
+          ...chap,
+          textHTML: cleaned,
+        };
         return next;
       });
       el.innerHTML = cleaned;
@@ -912,7 +968,8 @@ export default function Publishing(): JSX.Element {
   const setBlock = (tag: "P" | "H1" | "H2" | "H3") =>
     exec("formatBlock", tag);
 
-  const setFont = (family: string) => exec("fontName", family);
+  const setFont = (family: string) =>
+    exec("fontName", family);
 
   const setFontSizePt = (sizePx: number) => {
     editorRef.current?.focus();
@@ -946,8 +1003,11 @@ export default function Publishing(): JSX.Element {
       alert("⚠️ No editor content to save.");
       return;
     }
-    const rawHtml = editorRef.current.innerHTML || "";
-    const cleaned = stripSpacerParagraphs(stripCharacterTags(rawHtml));
+    const rawHtml =
+      editorRef.current.innerHTML || "";
+    const cleaned = stripSpacerParagraphs(
+      stripCharacterTags(rawHtml)
+    );
 
     editorRef.current.innerHTML = cleaned;
 
@@ -967,16 +1027,21 @@ export default function Publishing(): JSX.Element {
   };
 
   const genId = () =>
-    typeof crypto !== "undefined" && "randomUUID" in crypto
+    typeof crypto !== "undefined" &&
+    "randomUUID" in crypto
       ? (crypto as any).randomUUID()
-      : `c_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+      : `c_${Date.now()}_${Math.random()
+          .toString(36)
+          .slice(2)}`;
 
   const addChapter = () => {
     setChapters((prev) => {
       const id = genId();
       const idx = prev.length + 1;
       const html = `<h1>Chapter ${idx} – Untitled</h1><p>New chapter text…</p>`;
-      const cleaned = stripSpacerParagraphs(stripCharacterTags(html));
+      const cleaned = stripSpacerParagraphs(
+        stripCharacterTags(html)
+      );
       const ch: Chapter = {
         id,
         title: `Chapter ${idx} – Untitled`,
@@ -1000,7 +1065,10 @@ export default function Publishing(): JSX.Element {
   );
 
   const importHTML = useCallback(
-    async (file: File, asNewChapter: boolean = true) => {
+    async (
+      file: File,
+      asNewChapter: boolean = true
+    ) => {
       try {
         const html = await file.text();
         const cleanedHtml = stripSpacerParagraphs(
@@ -1011,8 +1079,10 @@ export default function Publishing(): JSX.Element {
         if (asNewChapter) {
           const id = genId();
           const title =
-            file.name.replace(/\.(html?|xhtml)$/i, "") ||
-            "Imported HTML";
+            file.name.replace(
+              /\.(html?|xhtml)$/i,
+              ""
+            ) || "Imported HTML";
 
           const ch: Chapter = {
             id,
@@ -1036,7 +1106,10 @@ export default function Publishing(): JSX.Element {
             if (cur) {
               const title =
                 cur.title ||
-                file.name.replace(/\.(html?|xhtml)$/i, "") ||
+                file.name.replace(
+                  /\.(html?|xhtml)$/i,
+                  ""
+                ) ||
                 "Imported HTML";
 
               next[activeIdx] = {
@@ -1069,16 +1142,22 @@ export default function Publishing(): JSX.Element {
 
     chapters.forEach((c) => {
       if (!c.included) return;
-      const html = c.textHTML || `<p>${htmlEscape(c.text)}</p>`;
+      const html =
+        c.textHTML ||
+        `<p>${htmlEscape(c.text)}</p>`;
       const dom = new DOMParser().parseFromString(
         `<div>${html}</div>`,
         "text/html"
       );
-      const hs = Array.from(dom.querySelectorAll("h1, h2, h3"));
+      const hs = Array.from(
+        dom.querySelectorAll("h1, h2, h3")
+      );
       if (hs.length === 0) {
         items.push(c.title);
       } else {
-        hs.forEach((h) => items.push(h.textContent || ""));
+        hs.forEach((h) =>
+          items.push(h.textContent || "")
+        );
       }
     });
 
@@ -1097,34 +1176,54 @@ export default function Publishing(): JSX.Element {
     parts.push("\n\n" + vars(matter.copyright));
 
     if (matter.dedication) {
-      parts.push("\n\nDedication\n" + matter.dedication);
+      parts.push(
+        "\n\nDedication\n" + matter.dedication
+      );
     }
 
     if (matter.epigraph) {
-      parts.push("\n\nEpigraph\n" + matter.epigraph);
+      parts.push(
+        "\n\nEpigraph\n" + matter.epigraph
+      );
     }
 
     if (matter.toc) {
       const tocList = matter.tocFromHeadings
         ? tocFromHeadings
-        : chapters.filter((c) => c.included).map((c) => c.title);
+        : chapters
+            .filter((c) => c.included)
+            .map((c) => c.title);
       parts.push(
         "\n\nContents\n" +
-          tocList.map((t, i) => `${i + 1}. ${t}`).join("\n")
+          tocList
+            .map(
+              (t, i) => `${i + 1}. ${t}`
+            )
+            .join("\n")
       );
     }
 
     chapters.forEach((c) => {
       if (!c.included) return;
-      const textNoTags = c.textHTML ? stripHtml(c.textHTML) : c.text;
-      parts.push("\n\n" + c.title + "\n" + textNoTags);
+      const textNoTags = c.textHTML
+        ? stripHtml(c.textHTML)
+        : c.text;
+      parts.push(
+        "\n\n" + c.title + "\n" + textNoTags
+      );
     });
 
     if (matter.acknowledgments) {
-      parts.push("\n\nAcknowledgments\n" + matter.acknowledgments);
+      parts.push(
+        "\n\nAcknowledgments\n" +
+          matter.acknowledgments
+      );
     }
     if (matter.aboutAuthor) {
-      parts.push("\n\nAbout the Author\n" + vars(matter.aboutAuthor));
+      parts.push(
+        "\n\nAbout the Author\n" +
+          vars(matter.aboutAuthor)
+      );
     }
     if (matter.notes) {
       parts.push("\n\nNotes\n" + matter.notes);
@@ -1135,7 +1234,11 @@ export default function Publishing(): JSX.Element {
 
   const wordCount = useMemo(
     () =>
-      compiledPlain ? compiledPlain.split(/\s+/).filter(Boolean).length : 0,
+      compiledPlain
+        ? compiledPlain
+            .split(/\s+/)
+            .filter(Boolean).length
+        : 0,
     [compiledPlain]
   );
 
@@ -1156,10 +1259,14 @@ export default function Publishing(): JSX.Element {
   // Story materials state
   const [materialKey, setMaterialKey] =
     useState<MaterialKey>("synopsis-short");
-  const [materialOutput, setMaterialOutput] = useState<string>("");
-  const [materialBusy, setMaterialBusy] = useState<boolean>(false);
+  const [materialOutput, setMaterialOutput] =
+    useState<string>("");
+  const [materialBusy, setMaterialBusy] =
+    useState<boolean>(false);
 
-  const handleGenerateMaterial = async (key: MaterialKey) => {
+  const handleGenerateMaterial = async (
+    key: MaterialKey
+  ) => {
     if (!compiledPlain) {
       alert(
         "Your publishing manuscript is empty. Add chapters and front matter first."
@@ -1170,13 +1277,21 @@ export default function Publishing(): JSX.Element {
     setMaterialBusy(true);
     setMaterialKey(key);
 
+    const baseText = trimForAI(compiledPlain);
+
     try {
       let generatedText = "";
 
       // synopsis routes use dedicated endpoint
-      if (key === "synopsis-short" || key === "synopsis-long") {
+      if (
+        key === "synopsis-short" ||
+        key === "synopsis-long"
+      ) {
         const synopsisRes = await generateSynopsis({
-          manuscriptText: compiledPlain,
+          manuscriptText: trimForAI(
+            compiledPlain,
+            60000
+          ),
           title:
             (meta as any)?.title ||
             (meta as any)?.workingTitle ||
@@ -1186,42 +1301,38 @@ export default function Publishing(): JSX.Element {
             key === "synopsis-short"
               ? "brief agent-ready synopsis"
               : "expanded reader-facing synopsis",
-          maxWords: key === "synopsis-short" ? 300 : 800,
+          maxWords:
+            key === "synopsis-short" ? 300 : 800,
         });
-        generatedText = synopsisRes.synopsis || "";
+        generatedText =
+          synopsisRes.synopsis || "";
       } else {
-        // other materials via assistant with specific instructions
+        // other materials via assistant + instructions
         let instructions = "";
 
         if (key === "back-cover") {
           instructions =
-            `Write a compelling back-cover blurb for this book titled "${meta.title}" by ${meta.author}. ` +
-            "Aim for 150–250 words. Start with a strong hook, then briefly sketch the main character(s), central conflict, and emotional stakes. " +
-            "Write in present tense, in a voice that matches a thoughtful, character-driven novel. Do not include spoilers for the ending.";
+            "Using this manuscript, write a compelling back-cover blurb in 2–3 short paragraphs aimed at adult readers. Write in third person, highlight the central conflict and emotional stakes, avoid spoilers, and end with an intriguing hook. Keep it under 350 words.";
         } else if (key === "logline") {
           instructions =
-            `Write a 1–2 sentence logline for this book titled "${meta.title}". ` +
-            "Capture the main character, their goal, the central obstacle, and what is at stake. " +
-            "Keep it sharp, clear, and compelling, suitable for pitching to agents or editors.";
+            "Write a single-sentence logline for this story suitable for pitching to agents and editors. Focus on the main character, central conflict, and stakes. Provide 2–3 options.";
         } else if (key === "query-letter") {
           instructions =
-            `Write a traditional publishing query letter to a literary agent for this book titled "${meta.title}" by ${meta.author}. ` +
-            "Use a professional but warm tone. Structure the letter as:\n" +
-            "1) A strong opening hook paragraph.\n" +
-            "2) 1–2 paragraphs summarizing the story (protagonist, setting, central conflict, stakes) in present tense.\n" +
-            "3) A brief author bio paragraph in third person using the information you can infer from the tone and themes.\n" +
-            "4) A short closing paragraph thanking the agent.\n\n" +
-            "Aim for about 350–450 words total. Do not invent awards or publications unless clearly implied by the manuscript voice.";
+            "Write a professional query letter to a literary agent for this manuscript. Include: a strong hook opening paragraph, a 2–3 paragraph concise synopsis without major spoilers for the final pages, and a short third-person author bio paragraph. The tone should be confident, warm, and professional. Keep the whole letter between 350 and 500 words.";
         }
 
         const res: any = await runAssistant(
-          compiledPlain,
+          baseText,
           "improve",
           instructions,
           provider
         );
+
         generatedText =
-          res?.result || res?.text || res?.output || compiledPlain;
+          res?.result ||
+          res?.text ||
+          res?.output ||
+          baseText;
       }
 
       if (!generatedText) {
@@ -1240,11 +1351,28 @@ export default function Publishing(): JSX.Element {
         },
       });
     } catch (e: any) {
-      console.error("[Story Material Error]:", e);
-      alert(
-        e?.message ||
-          "Could not generate story material. Please try again."
+      console.error(
+        "[Story Material Error]:",
+        e
       );
+      const msg =
+        typeof e?.message === "string"
+          ? e.message
+          : String(e);
+      if (
+        /maximum context length|max tokens|context length/i.test(
+          msg
+        )
+      ) {
+        alert(
+          "Your manuscript is very large, and the AI hit its context limit. I’ve added trimming on our side, but if this continues, try generating materials by section or with a shorter working version."
+        );
+      } else {
+        alert(
+          msg ||
+            "Could not generate story material. Please try again."
+        );
+      }
     } finally {
       setMaterialBusy(false);
     }
@@ -1259,23 +1387,35 @@ export default function Publishing(): JSX.Element {
 
     try {
       localStorage.removeItem(PUBLISHING_DRAFT_KEY);
-      localStorage.removeItem(PUBLISHING_CHAPTERS_KEY);
+      localStorage.removeItem(
+        PUBLISHING_CHAPTERS_KEY
+      );
       localStorage.removeItem(PUBLISHING_META_KEY);
-      localStorage.removeItem(PUBLISHING_MATTER_KEY);
-      localStorage.removeItem("dahtruth_publishing_manuscript");
+      localStorage.removeItem(
+        PUBLISHING_MATTER_KEY
+      );
+      localStorage.removeItem(
+        "dahtruth_publishing_manuscript"
+      );
     } catch (err) {
-      console.error("Failed to clear publishing draft:", err);
+      console.error(
+        "Failed to clear publishing draft:",
+        err
+      );
     }
 
     setChapters([]);
     setActiveChapterId("");
     setMatter({
       titlePage: "{title}\nby {author}",
-      copyright: "© {year} {author}. All rights reserved.",
-      dedication: "For those who kept the light on.",
+      copyright:
+        "© {year} {author}. All rights reserved.",
+      dedication:
+        "For those who kept the light on.",
       epigraph: '"We live by stories."',
       toc: true,
-      acknowledgments: "Thank you to every early reader.",
+      acknowledgments:
+        "Thank you to every early reader.",
       aboutAuthor:
         "{author} writes stories about family, faith, and becoming.",
       notes: "",
@@ -1292,9 +1432,12 @@ export default function Publishing(): JSX.Element {
         minHeight: "100vh",
         ...(googleMode
           ? ({
-              ["--brand-primary" as any]: GOOGLE_PALETTE.primary,
-              ["--brand-accent" as any]: GOOGLE_PALETTE.accent,
-              ["--brand-highlight" as any]: GOOGLE_PALETTE.highlight,
+              ["--brand-primary" as any]:
+                GOOGLE_PALETTE.primary,
+              ["--brand-accent" as any]:
+                GOOGLE_PALETTE.accent,
+              ["--brand-highlight" as any]:
+                GOOGLE_PALETTE.highlight,
             } as React.CSSProperties)
           : {}),
       }}
@@ -1303,7 +1446,8 @@ export default function Publishing(): JSX.Element {
         {/* HEADER STRIP */}
         <div
           style={{
-            background: "linear-gradient(135deg, #b897d6, #e3c8ff)",
+            background:
+              "linear-gradient(135deg, #b897d6, #e3c8ff)",
             backdropFilter: "blur(12px)",
             color: theme.white,
             padding: "14px 24px",
@@ -1329,7 +1473,8 @@ export default function Publishing(): JSX.Element {
                 padding: "8px 14px",
                 fontSize: 13,
                 fontWeight: 600,
-                boxShadow: "0 4px 10px rgba(0,0,0,0.15)",
+                boxShadow:
+                  "0 4px 10px rgba(0,0,0,0.15)",
               }}
             >
               ← Back to Dashboard
@@ -1343,7 +1488,10 @@ export default function Publishing(): JSX.Element {
                 textAlign: "center",
               }}
             >
-              <span aria-hidden style={{ fontSize: 24 }}>
+              <span
+                aria-hidden
+                style={{ fontSize: 24 }}
+              >
                 📖✒️
               </span>
               <div>
@@ -1353,14 +1501,20 @@ export default function Publishing(): JSX.Element {
                     fontSize: 20,
                     fontWeight: 600,
                     letterSpacing: 0.4,
-                    fontFamily: "Garamond, Georgia, serif",
+                    fontFamily:
+                      "Garamond, Georgia, serif",
                   }}
                 >
                   Publishing Studio
                 </h1>
-                <div style={{ fontSize: 11, opacity: 0.9 }}>
-                  Format, polish, and prepare your manuscript for the
-                  world.
+                <div
+                  style={{
+                    fontSize: 11,
+                    opacity: 0.9,
+                  }}
+                >
+                  Format, polish, and prepare your
+                  manuscript for the world.
                 </div>
               </div>
             </div>
@@ -1376,25 +1530,34 @@ export default function Publishing(): JSX.Element {
             >
               <div style={{ fontSize: 11 }}>
                 Word count:{" "}
-                <span style={{ fontWeight: 600 }}>
+                <span
+                  style={{ fontWeight: 600 }}
+                >
                   {wordCount.toLocaleString()}
                 </span>
               </div>
               <div style={{ fontSize: 11 }}>
                 Platform:{" "}
-                <span style={{ fontWeight: 600 }}>
-                  {PLATFORM_PRESETS[platformPreset].label}
+                <span
+                  style={{ fontWeight: 600 }}
+                >
+                  {PLATFORM_PRESETS[platformPreset]
+                    .label}
                 </span>
               </div>
               <button
                 type="button"
-                onClick={handleClearPublishingDraft}
+                onClick={
+                  handleClearPublishingDraft
+                }
                 style={{
                   marginTop: 4,
                   padding: "4px 10px",
                   borderRadius: 999,
-                  border: "1px solid rgba(255,255,255,0.6)",
-                  background: "rgba(255,255,255,0.12)",
+                  border:
+                    "1px solid rgba(255,255,255,0.6)",
+                  background:
+                    "rgba(255,255,255,0.12)",
                   color: theme.white,
                   fontSize: 10,
                   cursor: "pointer",
@@ -1452,12 +1615,20 @@ export default function Publishing(): JSX.Element {
                   marginBottom: 10,
                 }}
               >
-                Based on your selected platform, this preview
-                approximates page size and margins for the editor.
+                Based on your selected platform,
+                this preview approximates page
+                size and margins for the editor.
               </p>
-              <div style={{ fontSize: 11, display: "grid", gap: 4 }}>
+              <div
+                style={{
+                  fontSize: 11,
+                  display: "grid",
+                  gap: 4,
+                }}
+              >
                 <div>
-                  <strong>Preset:</strong> {pf.label}
+                  <strong>Preset:</strong>{" "}
+                  {pf.label}
                 </div>
                 <div>
                   <strong>Trim size:</strong>{" "}
@@ -1466,26 +1637,45 @@ export default function Publishing(): JSX.Element {
                     : "Ebook / no fixed trim"}
                 </div>
                 <div>
-                  <strong>Margins (top / right / bottom / left):</strong>{" "}
-                  {pf.margins.top}" / {pf.margins.right}" /{" "}
-                  {pf.margins.bottom}" / {pf.margins.left}"
+                  <strong>
+                    Margins (top / right /
+                    bottom / left):
+                  </strong>{" "}
+                  {pf.margins.top}" /{" "}
+                  {pf.margins.right}" /{" "}
+                  {pf.margins.bottom}" /{" "}
+                  {pf.margins.left}"
                 </div>
-                {typeof pf.margins.gutter === "number" && (
+                {typeof pf.margins.gutter ===
+                  "number" && (
                   <div>
-                    <strong>Gutter:</strong> {pf.margins.gutter}"
+                    <strong>Gutter:</strong>{" "}
+                    {pf.margins.gutter}"
                   </div>
                 )}
                 <div>
-                  <strong>Headers / footers:</strong>{" "}
-                  {includeHeadersFooters ? "On" : "Off"}
+                  <strong>
+                    Headers / footers:
+                  </strong>{" "}
+                  {includeHeadersFooters
+                    ? "On"
+                    : "Off"}
                 </div>
                 <div>
-                  <strong>Page numbers:</strong>{" "}
-                  {pf.pageNumbers ? "Shown" : "Hidden"}
+                  <strong>
+                    Page numbers:
+                  </strong>{" "}
+                  {pf.pageNumbers
+                    ? "Shown"
+                    : "Hidden"}
                 </div>
                 <div>
-                  <strong>Show TOC in ebook:</strong>{" "}
-                  {pf.showTOCInEbook ? "Yes" : "No"}
+                  <strong>
+                    Show TOC in ebook:
+                  </strong>{" "}
+                  {pf.showTOCInEbook
+                    ? "Yes"
+                    : "No"}
                 </div>
               </div>
             </div>
@@ -1513,9 +1703,15 @@ export default function Publishing(): JSX.Element {
                   marginBottom: 10,
                 }}
               >
-                Quick routes into deeper tools when you are ready.
+                Quick routes into deeper tools
+                when you are ready.
               </p>
-              <div style={{ display: "grid", gap: 8 }}>
+              <div
+                style={{
+                  display: "grid",
+                  gap: 8,
+                }}
+              >
                 <button
                   style={{
                     ...styles.btn,
@@ -1524,11 +1720,22 @@ export default function Publishing(): JSX.Element {
                     alignItems: "center",
                     gap: 8,
                   }}
-                  onClick={() => navigate("/proof")}
+                  onClick={() =>
+                    navigate("/proof")
+                  }
                 >
-                  <span style={{ fontSize: 18 }}>✅</span>
+                  <span
+                    style={{ fontSize: 18 }}
+                  >
+                    ✅
+                  </span>
                   <div>
-                    <div style={{ fontSize: 13, fontWeight: 600 }}>
+                    <div
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 600,
+                      }}
+                    >
                       Proof & Consistency
                     </div>
                     <div
@@ -1550,11 +1757,22 @@ export default function Publishing(): JSX.Element {
                     alignItems: "center",
                     gap: 8,
                   }}
-                  onClick={() => navigate("/format")}
+                  onClick={() =>
+                    navigate("/format")
+                  }
                 >
-                  <span style={{ fontSize: 18 }}>🎨</span>
+                  <span
+                    style={{ fontSize: 18 }}
+                  >
+                    🎨
+                  </span>
                   <div>
-                    <div style={{ fontSize: 13, fontWeight: 600 }}>
+                    <div
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 600,
+                      }}
+                    >
                       Format & Styles
                     </div>
                     <div
@@ -1576,11 +1794,22 @@ export default function Publishing(): JSX.Element {
                     alignItems: "center",
                     gap: 8,
                   }}
-                  onClick={() => navigate("/export")}
+                  onClick={() =>
+                    navigate("/export")
+                  }
                 >
-                  <span style={{ fontSize: 18 }}>📦</span>
+                  <span
+                    style={{ fontSize: 18 }}
+                  >
+                    📦
+                  </span>
                   <div>
-                    <div style={{ fontSize: 13, fontWeight: 600 }}>
+                    <div
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 600,
+                      }}
+                    >
                       Export
                     </div>
                     <div
@@ -1602,11 +1831,24 @@ export default function Publishing(): JSX.Element {
                     alignItems: "center",
                     gap: 8,
                   }}
-                  onClick={() => navigate("/publishing-prep")}
+                  onClick={() =>
+                    navigate(
+                      "/publishing-prep"
+                    )
+                  }
                 >
-                  <span style={{ fontSize: 18 }}>🚀</span>
+                  <span
+                    style={{ fontSize: 18 }}
+                  >
+                    🚀
+                  </span>
                   <div>
-                    <div style={{ fontSize: 13, fontWeight: 600 }}>
+                    <div
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 600,
+                      }}
+                    >
                       Publishing Prep
                     </div>
                     <div
@@ -1615,7 +1857,8 @@ export default function Publishing(): JSX.Element {
                         color: theme.subtext,
                       }}
                     >
-                      Query, synopsis, marketing
+                      Query, synopsis,
+                      marketing
                     </div>
                   </div>
                 </button>
@@ -1638,7 +1881,9 @@ export default function Publishing(): JSX.Element {
                 <span aria-hidden>🤖</span>
                 Line-level AI Help
               </h3>
-              <div style={{ marginBottom: 10 }}>
+              <div
+                style={{ marginBottom: 10 }}
+              >
                 <label
                   style={{
                     ...styles.label,
@@ -1651,19 +1896,33 @@ export default function Publishing(): JSX.Element {
                 <select
                   value={provider}
                   onChange={(e) =>
-                    setProvider(e.target.value as "openai" | "anthropic")
+                    setProvider(
+                      e.target.value as
+                        | "openai"
+                        | "anthropic"
+                    )
                   }
-                  style={{ ...styles.input, fontSize: 12 }}
+                  style={{
+                    ...styles.input,
+                    fontSize: 12,
+                  }}
                 >
-                  <option value="openai">OpenAI</option>
-                  <option value="anthropic">Anthropic</option>
+                  <option value="openai">
+                    OpenAI
+                  </option>
+                  <option value="anthropic">
+                    Anthropic
+                  </option>
                 </select>
               </div>
 
               <div
                 role="group"
                 aria-label="AI tools"
-                style={{ display: "grid", gap: 6 }}
+                style={{
+                  display: "grid",
+                  gap: 6,
+                }}
               >
                 {AI_ACTIONS.map((a) => (
                   <AIActionButton
@@ -1677,30 +1936,56 @@ export default function Publishing(): JSX.Element {
                       setWorking(a.key);
                       try {
                         const currentHtml =
-                          editorRef.current?.innerHTML ?? "";
-                        const cleanedCurrentHtml = stripSpacerParagraphs(
-                          stripCharacterTags(currentHtml)
-                        );
+                          editorRef.current
+                            ?.innerHTML ?? "";
+                        const cleanedCurrentHtml =
+                          stripSpacerParagraphs(
+                            stripCharacterTags(
+                              currentHtml
+                            )
+                          );
                         const currentText =
-                          stripHtml(cleanedCurrentHtml) || "";
+                          stripHtml(
+                            cleanedCurrentHtml
+                          ) || "";
                         let res: any;
 
-                        if (a.key === "grammar") {
-                          res = await runGrammar(currentText, provider);
-                        } else if (a.key === "style") {
-                          res = await runStyle(currentText, provider);
-                        } else if (a.key === "readability") {
-                          res = await runReadability(
-                            currentText,
-                            provider
-                          );
-                        } else if (a.key === "assistant") {
-                          res = await runAssistant(
-                            currentText,
-                            "improve",
-                            "",
-                            provider
-                          );
+                        if (
+                          a.key === "grammar"
+                        ) {
+                          res =
+                            await runGrammar(
+                              currentText,
+                              provider
+                            );
+                        } else if (
+                          a.key === "style"
+                        ) {
+                          res =
+                            await runStyle(
+                              currentText,
+                              provider
+                            );
+                        } else if (
+                          a.key ===
+                          "readability"
+                        ) {
+                          res =
+                            await runReadability(
+                              currentText,
+                              provider
+                            );
+                        } else if (
+                          a.key ===
+                          "assistant"
+                        ) {
+                          res =
+                            await runAssistant(
+                              currentText,
+                              "improve",
+                              "",
+                              provider
+                            );
                         }
 
                         const improvedText =
@@ -1710,40 +1995,62 @@ export default function Publishing(): JSX.Element {
                           currentText;
 
                         const improved =
-                          improvedText !== currentText
+                          improvedText !==
+                          currentText
                             ? `<p>${improvedText
-                                .split("\n\n")
-                                .join("</p><p>")}</p>`.replace(
+                                .split(
+                                  "\n\n"
+                                )
+                                .join(
+                                  "</p><p>"
+                                )}</p>`.replace(
                                 /<p><\/p>/g,
                                 "<p><br/></p>"
                               )
                             : cleanedCurrentHtml;
 
-                        const finalHtml = stripSpacerParagraphs(
-                          stripCharacterTags(improved)
-                        );
+                        const finalHtml =
+                          stripSpacerParagraphs(
+                            stripCharacterTags(
+                              improved
+                            )
+                          );
 
                         if (
                           editorRef.current &&
-                          finalHtml !== currentHtml
+                          finalHtml !==
+                            currentHtml
                         ) {
-                          editorRef.current.innerHTML = finalHtml;
+                          editorRef.current.innerHTML =
+                            finalHtml;
                         }
 
                         setChapters((prev) => {
-                          const next = [...prev];
-                          const ch = next[activeIdx];
+                          const next = [
+                            ...prev,
+                          ];
+                          const ch =
+                            next[
+                              activeIdx
+                            ];
                           if (ch) {
-                            next[activeIdx] = {
-                              ...ch,
-                              textHTML: finalHtml,
-                              text: stripHtml(finalHtml),
-                            };
+                            next[activeIdx] =
+                              {
+                                ...ch,
+                                textHTML:
+                                  finalHtml,
+                                text: stripHtml(
+                                  finalHtml
+                                ),
+                              };
                           }
                           return next;
                         });
                       } catch (e: any) {
-                        console.error("[AI Error]:", e);
+                        console.error(
+                          "[AI Error]:",
+                          e
+                        );
                         alert(
                           e?.message ||
                             "AI request failed. Check console for details."
@@ -1760,7 +2067,8 @@ export default function Publishing(): JSX.Element {
                 style={{
                   marginTop: 10,
                   display: "flex",
-                  justifyContent: "flex-end",
+                  justifyContent:
+                    "flex-end",
                 }}
               >
                 <button
@@ -1770,39 +2078,59 @@ export default function Publishing(): JSX.Element {
                     if (working) return;
                     setWorking("assistant");
                     try {
-                      const chaptersPlain = chapters
-                        .filter((c) => c.included)
-                        .map((c) => ({
-                          id: c.id,
-                          title: c.title,
-                          text: c.textHTML
-                            ? stripHtml(c.textHTML)
-                            : c.text,
-                        }));
+                      const chaptersPlain =
+                        chapters
+                          .filter(
+                            (c) =>
+                              c.included
+                          )
+                          .map((c) => ({
+                            id: c.id,
+                            title: c.title,
+                            text: c.textHTML
+                              ? stripHtml(
+                                  c.textHTML
+                                )
+                              : c.text,
+                          }));
 
-                      const res = await runPublishingPrep(
-                        meta,
-                        chaptersPlain,
-                        {
-                          tone: "professional/warm",
-                          audience: "agents_and_publishers",
-                        },
-                        provider
-                      );
+                      const res =
+                        await runPublishingPrep(
+                          meta,
+                          chaptersPlain,
+                          {
+                            tone: "professional/warm",
+                            audience:
+                              "agents_and_publishers",
+                          },
+                          provider
+                        );
 
-                      if (!res?.prep && !res?.result) {
+                      if (
+                        !res?.prep &&
+                        !res?.result
+                      ) {
                         throw new Error(
                           "No prep content returned from AI."
                         );
                       }
 
-                      navigate("/publishing-prep", {
-                        state: {
-                          generated: res.prep || res.result || res,
-                        },
-                      });
+                      navigate(
+                        "/publishing-prep",
+                        {
+                          state: {
+                            generated:
+                              res.prep ||
+                              res.result ||
+                              res,
+                          },
+                        }
+                      );
                     } catch (e: any) {
-                      console.error("[Publishing Prep Error]:", e);
+                      console.error(
+                        "[Publishing Prep Error]:",
+                        e
+                      );
                       alert(
                         e?.message ||
                           "Couldn't generate publishing prep just yet."
@@ -1840,8 +2168,9 @@ export default function Publishing(): JSX.Element {
                   marginBottom: 8,
                 }}
               >
-                Uses your compiled manuscript (front matter + chapters)
-                to draft agent-ready materials.
+                Uses your compiled manuscript
+                (front matter + chapters) to
+                draft agent-ready materials.
               </p>
               <div
                 style={{
@@ -1855,7 +2184,11 @@ export default function Publishing(): JSX.Element {
                   <button
                     key={opt.key}
                     type="button"
-                    onClick={() => handleGenerateMaterial(opt.key)}
+                    onClick={() =>
+                      handleGenerateMaterial(
+                        opt.key
+                      )
+                    }
                     disabled={materialBusy}
                     style={{
                       ...styles.btn,
@@ -1863,14 +2196,18 @@ export default function Publishing(): JSX.Element {
                       fontSize: 11,
                       borderRadius: 999,
                       border:
-                        materialKey === opt.key
+                        materialKey ===
+                        opt.key
                           ? `1px solid ${theme.accent}`
                           : `1px solid ${theme.border}`,
                       background:
-                        materialKey === opt.key
+                        materialKey ===
+                        opt.key
                           ? theme.highlight
                           : theme.white,
-                      opacity: materialBusy ? 0.7 : 1,
+                      opacity: materialBusy
+                        ? 0.7
+                        : 1,
                     }}
                   >
                     {opt.label}
@@ -1879,7 +2216,11 @@ export default function Publishing(): JSX.Element {
               </div>
               <button
                 type="button"
-                onClick={() => handleGenerateMaterial(materialKey)}
+                onClick={() =>
+                  handleGenerateMaterial(
+                    materialKey
+                  )
+                }
                 disabled={materialBusy}
                 style={{
                   ...styles.btnPrimary,
@@ -1887,7 +2228,9 @@ export default function Publishing(): JSX.Element {
                   fontSize: 12,
                 }}
               >
-                {materialBusy ? "Generating..." : "Generate selected"}
+                {materialBusy
+                  ? "Generating..."
+                  : "Generate selected"}
               </button>
               {materialOutput && (
                 <div
@@ -1927,49 +2270,84 @@ export default function Publishing(): JSX.Element {
                   flexWrap: "wrap",
                   gap: 12,
                   alignItems: "center",
-                  justifyContent: "space-between",
+                  justifyContent:
+                    "space-between",
                 }}
               >
-                <div style={{ flex: 1, minWidth: 210 }}>
+                <div
+                  style={{
+                    flex: 1,
+                    minWidth: 210,
+                  }}
+                >
                   <label
-                    style={{ ...styles.label, display: "block" }}
+                    style={{
+                      ...styles.label,
+                      display: "block",
+                    }}
                   >
                     Project title
                   </label>
                   <input
                     value={meta.title}
                     onChange={(e) =>
-                      setMeta((m) => ({ ...m, title: e.target.value }))
+                      setMeta((m) => ({
+                        ...m,
+                        title:
+                          e.target.value,
+                      }))
                     }
                     style={styles.input}
                   />
                 </div>
-                <div style={{ flex: 1, minWidth: 180 }}>
+                <div
+                  style={{
+                    flex: 1,
+                    minWidth: 180,
+                  }}
+                >
                   <label
-                    style={{ ...styles.label, display: "block" }}
+                    style={{
+                      ...styles.label,
+                      display: "block",
+                    }}
                   >
                     Author
                   </label>
                   <input
                     value={meta.author}
                     onChange={(e) =>
-                      setMeta((m) => ({ ...m, author: e.target.value }))
+                      setMeta((m) => ({
+                        ...m,
+                        author:
+                          e.target.value,
+                      }))
                     }
                     style={styles.input}
                   />
                 </div>
                 <div style={{ width: 80 }}>
                   <label
-                    style={{ ...styles.label, display: "block" }}
+                    style={{
+                      ...styles.label,
+                      display: "block",
+                    }}
                   >
                     Year
                   </label>
                   <input
                     value={meta.year}
                     onChange={(e) =>
-                      setMeta((m) => ({ ...m, year: e.target.value }))
+                      setMeta((m) => ({
+                        ...m,
+                        year:
+                          e.target.value,
+                      }))
                     }
-                    style={{ ...styles.input, textAlign: "center" }}
+                    style={{
+                      ...styles.input,
+                      textAlign: "center",
+                    }}
                   />
                 </div>
               </div>
@@ -1987,34 +2365,59 @@ export default function Publishing(): JSX.Element {
                   marginBottom: 12,
                 }}
               >
-                <div style={{ flex: 1, minWidth: 200 }}>
+                <div
+                  style={{
+                    flex: 1,
+                    minWidth: 200,
+                  }}
+                >
                   <label
-                    style={{ ...styles.label, display: "block" }}
+                    style={{
+                      ...styles.label,
+                      display: "block",
+                    }}
                   >
                     Current chapter
                   </label>
                   <select
                     value={activeChapter?.id}
-                    onChange={(e) => setActiveChapterId(e.target.value)}
+                    onChange={(e) =>
+                      setActiveChapterId(
+                        e.target.value
+                      )
+                    }
                     style={styles.input}
                   >
-                    {chapters.map((c, idx) => (
-                      <option key={c.id} value={c.id}>
-                        {idx + 1}. {c.title}
-                        {c.included ? "" : " (excluded)"}
-                      </option>
-                    ))}
+                    {chapters.map(
+                      (c, idx) => (
+                        <option
+                          key={c.id}
+                          value={c.id}
+                        >
+                          {idx + 1}. {c.title}
+                          {c.included
+                            ? ""
+                            : " (excluded)"}
+                        </option>
+                      )
+                    )}
                   </select>
                 </div>
 
                 {activeChapter && (
                   <Toggle
-                    checked={activeChapter.included}
+                    checked={
+                      activeChapter.included
+                    }
                     onChange={(v) =>
                       setChapters((prev) =>
                         prev.map((c) =>
-                          c.id === activeChapter.id
-                            ? { ...c, included: v }
+                          c.id ===
+                          activeChapter.id
+                            ? {
+                                ...c,
+                                included: v,
+                              }
                             : c
                         )
                       )
@@ -2057,7 +2460,9 @@ export default function Publishing(): JSX.Element {
                 }}
               >
                 <select
-                  onChange={(e) => setFont(e.target.value)}
+                  onChange={(e) =>
+                    setFont(e.target.value)
+                  }
                   defaultValue="Times New Roman"
                   aria-label="Font family"
                   style={{
@@ -2068,7 +2473,9 @@ export default function Publishing(): JSX.Element {
                     height: 24,
                   }}
                 >
-                  <option>Times New Roman</option>
+                  <option>
+                    Times New Roman
+                  </option>
                   <option>Georgia</option>
                   <option>Garamond</option>
                   <option>Palatino</option>
@@ -2078,7 +2485,12 @@ export default function Publishing(): JSX.Element {
 
                 <select
                   onChange={(e) =>
-                    setFontSizePt(parseInt(e.target.value, 10))
+                    setFontSizePt(
+                      parseInt(
+                        e.target.value,
+                        10
+                      )
+                    )
                   }
                   defaultValue="16"
                   aria-label="Font size (pt)"
@@ -2090,30 +2502,46 @@ export default function Publishing(): JSX.Element {
                     height: 24,
                   }}
                 >
-                  <option value="14">14</option>
-                  <option value="16">16</option>
-                  <option value="18">18</option>
-                  <option value="20">20</option>
-                  <option value="22">22</option>
+                  <option value="14">
+                    14
+                  </option>
+                  <option value="16">
+                    16
+                  </option>
+                  <option value="18">
+                    18
+                  </option>
+                  <option value="20">
+                    20
+                  </option>
+                  <option value="22">
+                    22
+                  </option>
                 </select>
 
                 <ToolbarDivider />
 
                 <ToolbarButton
                   label="Bold"
-                  onClick={() => exec("bold")}
+                  onClick={() =>
+                    exec("bold")
+                  }
                 >
                   B
                 </ToolbarButton>
                 <ToolbarButton
                   label="Italic"
-                  onClick={() => exec("italic")}
+                  onClick={() =>
+                    exec("italic")
+                  }
                 >
                   <em>I</em>
                 </ToolbarButton>
                 <ToolbarButton
                   label="Underline"
-                  onClick={() => exec("underline")}
+                  onClick={() =>
+                    exec("underline")
+                  }
                 >
                   <u>U</u>
                 </ToolbarButton>
@@ -2122,21 +2550,27 @@ export default function Publishing(): JSX.Element {
 
                 <ToolbarButton
                   label="H1"
-                  onClick={() => setBlock("H1")}
+                  onClick={() =>
+                    setBlock("H1")
+                  }
                   small
                 >
                   H1
                 </ToolbarButton>
                 <ToolbarButton
                   label="H2"
-                  onClick={() => setBlock("H2")}
+                  onClick={() =>
+                    setBlock("H2")
+                  }
                   small
                 >
                   H2
                 </ToolbarButton>
                 <ToolbarButton
                   label="H3"
-                  onClick={() => setBlock("H3")}
+                  onClick={() =>
+                    setBlock("H3")
+                  }
                   small
                 >
                   H3
@@ -2146,13 +2580,21 @@ export default function Publishing(): JSX.Element {
 
                 <ToolbarButton
                   label="Bullet"
-                  onClick={() => exec("insertUnorderedList")}
+                  onClick={() =>
+                    exec(
+                      "insertUnorderedList"
+                    )
+                  }
                 >
                   •
                 </ToolbarButton>
                 <ToolbarButton
                   label="Number"
-                  onClick={() => exec("insertOrderedList")}
+                  onClick={() =>
+                    exec(
+                      "insertOrderedList"
+                    )
+                  }
                 >
                   1.
                 </ToolbarButton>
@@ -2161,19 +2603,25 @@ export default function Publishing(): JSX.Element {
 
                 <ToolbarButton
                   label="Left"
-                  onClick={() => exec("justifyLeft")}
+                  onClick={() =>
+                    exec("justifyLeft")
+                  }
                 >
                   ⟸
                 </ToolbarButton>
                 <ToolbarButton
                   label="Center"
-                  onClick={() => exec("justifyCenter")}
+                  onClick={() =>
+                    exec("justifyCenter")
+                  }
                 >
                   ⇔
                 </ToolbarButton>
                 <ToolbarButton
                   label="Right"
-                  onClick={() => exec("justifyRight")}
+                  onClick={() =>
+                    exec("justifyRight")
+                  }
                 >
                   ⟹
                 </ToolbarButton>
@@ -2198,7 +2646,8 @@ export default function Publishing(): JSX.Element {
                   <label
                     style={{
                       ...styles.btn,
-                      padding: "3px 8px",
+                      padding:
+                        "3px 8px",
                       fontSize: 9,
                       cursor: "pointer",
                       height: 24,
@@ -2210,10 +2659,14 @@ export default function Publishing(): JSX.Element {
                     <input
                       type="file"
                       accept=".docx"
-                      style={{ display: "none" }}
+                      style={{
+                        display: "none",
+                      }}
                       onChange={(e) => {
-                        const f = e.target.files?.[0];
-                        if (f) importDocx(f, true);
+                        const f =
+                          e.target.files?.[0];
+                        if (f)
+                          importDocx(f, true);
                       }}
                     />
                   </label>
@@ -2221,7 +2674,8 @@ export default function Publishing(): JSX.Element {
                   <label
                     style={{
                       ...styles.btn,
-                      padding: "3px 8px",
+                      padding:
+                        "3px 8px",
                       fontSize: 9,
                       cursor: "pointer",
                       height: 24,
@@ -2233,10 +2687,17 @@ export default function Publishing(): JSX.Element {
                     <input
                       type="file"
                       accept=".html,.htm,.xhtml"
-                      style={{ display: "none" }}
+                      style={{
+                        display: "none",
+                      }}
                       onChange={(e) => {
-                        const f = e.target.files?.[0];
-                        if (f) importHTML(f, true);
+                        const f =
+                          e.target.files?.[0];
+                        if (f)
+                          importHTML(
+                            f,
+                            true
+                          );
                       }}
                     />
                   </label>
@@ -2244,11 +2705,14 @@ export default function Publishing(): JSX.Element {
                   <button
                     style={{
                       ...styles.btnPrimary,
-                      padding: "6px 12px",
+                      padding:
+                        "6px 12px",
                       fontSize: 12,
                       height: 28,
                     }}
-                    onClick={saveActiveChapterHTML}
+                    onClick={
+                      saveActiveChapterHTML
+                    }
                   >
                     Save chapter
                   </button>
@@ -2259,7 +2723,10 @@ export default function Publishing(): JSX.Element {
               <div
                 style={{
                   padding: 16,
-                  background: `linear-gradient(180deg, ${theme.bg}, #e6ebf2)`,
+                  background:
+                    "linear-gradient(180deg, " +
+                    theme.bg +
+                    ", #e6ebf2)",
                   borderRadius: 12,
                   border: `1px solid ${theme.border}`,
                 }}
@@ -2275,22 +2742,34 @@ export default function Publishing(): JSX.Element {
                     minHeight: 1040,
                     background: "#ffffff",
                     color: "#111",
-                    border: "1px solid #e5e7eb",
-                    boxShadow: "0 8px 30px rgba(2,20,40,0.10)",
+                    border:
+                      "1px solid #e5e7eb",
+                    boxShadow:
+                      "0 8px 30px rgba(2,20,40,0.10)",
                     borderRadius: 6,
                     padding: `48px ${Math.max(
                       32,
-                      Math.min(leftPaddingPx, 80)
+                      Math.min(
+                        leftPaddingPx,
+                        80
+                      )
                     )}px 48px ${Math.max(
                       32,
-                      Math.min(rightPaddingPx, 80)
+                      Math.min(
+                        rightPaddingPx,
+                        80
+                      )
                     )}px`,
                     lineHeight: ms.lineHeight,
-                    fontFamily: ms.fontFamily,
-                    fontSize: ms.fontSizePt * (96 / 72),
+                    fontFamily:
+                      ms.fontFamily,
+                    fontSize:
+                      ms.fontSizePt *
+                      (96 / 72),
                     outline: "none",
                     direction: "ltr",
-                    unicodeBidi: "plaintext",
+                    unicodeBidi:
+                      "plaintext",
                     whiteSpace: "pre-wrap",
                   }}
                 ></div>
@@ -2304,8 +2783,9 @@ export default function Publishing(): JSX.Element {
                   textAlign: "right",
                 }}
               >
-                Tip: Use H1/H2/H3 for major sections so your contents
-                page can build from headings.
+                Tip: Use H1/H2/H3 for major
+                sections so your contents page
+                can build from headings.
               </div>
             </div>
           </div>
