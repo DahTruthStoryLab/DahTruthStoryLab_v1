@@ -1256,13 +1256,7 @@ export default function Publishing(): JSX.Element {
     }
   }, [compiledPlain]);
 
-  // Story materials state
-  const [materialKey, setMaterialKey] =
-  useState<MaterialKey>("synopsis-short");
-const [materialOutput, setMaterialOutput] = useState<string>("");
-const [materialBusy, setMaterialBusy] = useState<boolean>(false);
-
-// Story materials state
+ // Story materials state
 const [materialKey, setMaterialKey] =
   useState<MaterialKey>("synopsis-short");
 const [materialOutput, setMaterialOutput] = useState<string>("");
