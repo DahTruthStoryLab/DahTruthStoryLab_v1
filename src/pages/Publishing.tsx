@@ -1262,6 +1262,12 @@ export default function Publishing(): JSX.Element {
 const [materialOutput, setMaterialOutput] = useState<string>("");
 const [materialBusy, setMaterialBusy] = useState<boolean>(false);
 
+// Story materials state
+const [materialKey, setMaterialKey] =
+  useState<MaterialKey>("synopsis-short");
+const [materialOutput, setMaterialOutput] = useState<string>("");
+const [materialBusy, setMaterialBusy] = useState<boolean>(false);
+
 const handleGenerateMaterial = async (key: MaterialKey) => {
   if (!compiledPlain) {
     alert(
@@ -1275,13 +1281,12 @@ const handleGenerateMaterial = async (key: MaterialKey) => {
   setMaterialKey(key);
 
   // Trim the manuscript so we do not hit max tokens
-  // (assumes trimForAI(text, maxChars?) already exists in this file)
   const baseText = trimForAI(compiledPlain, 60000);
 
   try {
     let generatedText = "";
 
-    // 1) SYNOPSES → dedicated REST endpoint
+    // 1) SYNOPSES → dedicated REST endpoint (this is what is already working)
     if (key === "synopsis-short" || key === "synopsis-long") {
       const synopsisRes = await generateSynopsis({
         manuscriptText: baseText,
@@ -1323,7 +1328,7 @@ const handleGenerateMaterial = async (key: MaterialKey) => {
 
       const res: any = await runAssistant(
         baseText,
-        "improve", // stays a valid op for the backend
+        "improve", // valid op for your backend
         instructions,
         provider
       );
