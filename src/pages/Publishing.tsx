@@ -1280,7 +1280,7 @@ const handleGenerateMaterial = async (key: MaterialKey) => {
   try {
     let generatedText = "";
 
-    // 1) SYNOPSES → dedicated REST endpoint (this is what is already working)
+    // 1) SYNOPSES → dedicated REST endpoint (already working)
     if (key === "synopsis-short" || key === "synopsis-long") {
       const synopsisRes = await generateSynopsis({
         manuscriptText: baseText,
@@ -1300,6 +1300,8 @@ const handleGenerateMaterial = async (key: MaterialKey) => {
     } else {
       // 2) OTHER MATERIALS → AI assistant + focused instructions
       let instructions = "";
+      // This is what we actually send to runAssistant
+      let modelInput = baseText;
 
       if (key === "back-cover") {
         instructions =
@@ -1312,8 +1314,30 @@ const handleGenerateMaterial = async (key: MaterialKey) => {
           "Each logline should clearly state the main character, central conflict, and stakes. " +
           "Keep each under 60 words. Return ONLY the logline(s), each on its own line.";
       } else if (key === "query-letter") {
+        // 🔹 First, create a compact synopsis to use as context
+        const synopsisRes = await generateSynopsis({
+          manuscriptText: baseText,
+          title:
+            (meta as any)?.title ||
+            (meta as any)?.workingTitle ||
+            "Untitled Manuscript",
+          genre: (meta as any)?.genre || "",
+          tone: "agent-facing synopsis for query letter",
+          maxWords: 500,
+        });
+
+        const synopsisText =
+          synopsisRes?.synopsis ||
+          baseText.slice(0, 12000); // fallback if something odd happens
+
+        // This is what we actually send to the model
+        modelInput = trimForAI(
+          `Title: ${meta.title}\nAuthor: ${meta.author}\n\nSynopsis:\n${synopsisText}`,
+          16000
+        );
+
         instructions =
-          "You are a literary agent and query letter expert. Using the manuscript above, draft a professional query letter. " +
+          "You are a literary agent and query letter expert. Using the synopsis and details above, draft a professional query letter. " +
           "Use a clear structure: opening hook, 1–2 paragraph story summary, brief paragraph with genre, word count, and audience, " +
           "and a short author bio using placeholders like AUTHOR NAME and any relevant background. " +
           "Keep the entire letter under 450 words. Address the agent as 'Dear Agent,' and sign off with 'Sincerely,' followed by AUTHOR NAME. " +
@@ -1321,7 +1345,7 @@ const handleGenerateMaterial = async (key: MaterialKey) => {
       }
 
       const res: any = await runAssistant(
-        baseText,
+        modelInput,
         "improve", // valid op for your backend
         instructions,
         provider
