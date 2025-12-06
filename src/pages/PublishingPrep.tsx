@@ -13,6 +13,7 @@ import {
   Check,
   BookOpen,
 } from "lucide-react";
+import { runPublishingPrep } from "../lib/api"; // ⬅️ NEW IMPORT
 
 /* ---------- Theme ---------- */
 const theme = {
@@ -189,6 +190,10 @@ export default function PublishingPrep(): JSX.Element {
   const [isSaving, setIsSaving] = useState(false);
   const [showSaved, setShowSaved] = useState(false);
 
+  // NEW: AI state for query letter generation
+  const [isGeneratingQuery, setIsGeneratingQuery] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+
   // Load data on mount + keep in sync
   useEffect(() => {
     setProfile(loadProfile());
@@ -310,6 +315,71 @@ export default function PublishingPrep(): JSX.Element {
 
   const synopsisWords = getWordCount(synopsis);
   const queryWords = getWordCount(queryLetter);
+
+  /* ---------- AI: Generate Query Letter ---------- */
+  const handleGenerateQueryFromAI = async () => {
+    if (!activeProject) {
+      alert("No active project selected. Go back to Projects and pick a story.");
+      return;
+    }
+    if (!synopsis.trim()) {
+      alert(
+        "Please add a synopsis first. The query letter generator uses your synopsis as the backbone."
+      );
+      return;
+    }
+
+    setIsGeneratingQuery(true);
+    setAiError(null);
+
+    try {
+      const payload: any = {
+        mode: "query-letter",
+        synopsis,
+        projectTitle: activeProject.title || "",
+        authorName,
+        // Pull in any profile fields you’ve stored
+        authorProfile: {
+          name: authorName,
+          bio: profile?.bio || profile?.about || "",
+          website: profile?.website || "",
+          location: profile?.location || "",
+        },
+        // Optional extras if you have them on the project
+        genre: activeProject.status || "",
+        wordCount: activeProject.wordCount,
+      };
+
+      const result = await runPublishingPrep(payload);
+
+      // Be defensive about the shape of the response
+      const aiText: string =
+        (result &&
+          (result.queryLetter ||
+            result.text ||
+            result.output ||
+            result.content)) ||
+        "";
+
+      if (!aiText.trim()) {
+        throw new Error(
+          (result && (result.error || result.message)) ||
+            "No query letter text returned from the AI."
+        );
+      }
+
+      setQueryLetter(aiText);
+    } catch (err: any) {
+      console.error("Failed to generate query letter:", err);
+      const msg =
+        err?.message ||
+        "The query letter generator failed or timed out. Please try again.";
+      setAiError(msg);
+      alert(msg);
+    } finally {
+      setIsGeneratingQuery(false);
+    }
+  };
 
   /* ---------- Render ---------- */
   return (
@@ -567,25 +637,74 @@ export default function PublishingPrep(): JSX.Element {
 
               {activeTab === "query" && (
                 <>
-                  <h3
+                  <div
                     style={{
-                      margin: "0 0 8px 0",
-                      fontSize: 18,
-                      color: theme.text,
+                      display: "flex",
+                      alignItems: "flex-start",
+                      justifyContent: "space-between",
+                      gap: 12,
+                      marginBottom: 8,
                     }}
                   >
-                    Query Letter
-                  </h3>
-                  <p
-                    style={{
-                      margin: "0 0 12px 0",
-                      fontSize: 13,
-                      color: theme.subtext,
-                    }}
-                  >
-                    Draft your query letter here. Include a strong hook, brief
-                    synopsis, and your author bio.
-                  </p>
+                    <div>
+                      <h3
+                        style={{
+                          margin: "0 0 4px 0",
+                          fontSize: 18,
+                          color: theme.text,
+                        }}
+                      >
+                        Query Letter
+                      </h3>
+                      <p
+                        style={{
+                          margin: 0,
+                          fontSize: 13,
+                          color: theme.subtext,
+                          maxWidth: 420,
+                        }}
+                      >
+                        Draft your query letter here. Include a strong hook,
+                        a brief synopsis, and your author bio.
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleGenerateQueryFromAI}
+                      disabled={isGeneratingQuery || !activeProject}
+                      style={{
+                        borderRadius: 999,
+                        border: "none",
+                        padding: "8px 14px",
+                        fontSize: 12,
+                        fontWeight: 600,
+                        cursor: isGeneratingQuery ? "default" : "pointer",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 6,
+                        background:
+                          "linear-gradient(135deg, #4f46e5, #7c3aed)",
+                        color: "#fff",
+                        boxShadow:
+                          "0 6px 18px rgba(79,70,229,0.35)",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {isGeneratingQuery ? (
+                        <>
+                          <Loader2 size={14} className="animate-spin" />
+                          Generating…
+                        </>
+                      ) : (
+                        <>
+                          <Feather size={14} />
+                          Generate from synopsis
+                        </>
+                      )}
+                    </button>
+                  </div>
+
                   <textarea
                     value={queryLetter}
                     onChange={(e) => setQueryLetter(e.target.value)}
@@ -606,10 +725,17 @@ export default function PublishingPrep(): JSX.Element {
                       marginTop: 6,
                       fontSize: 12,
                       color: theme.subtext,
-                      textAlign: "right",
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
                     }}
                   >
-                    {queryWords} words
+                    <span>{queryWords} words</span>
+                    {aiError && (
+                      <span style={{ color: "#b91c1c" }}>
+                        {aiError}
+                      </span>
+                    )}
                   </div>
                 </>
               )}
