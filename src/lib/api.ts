@@ -302,6 +302,162 @@ export async function generateSynopsis(
     60000 // 60s timeout – synopses can be chunky
   );
 
+
+   // ---------------------- Query / Logline / Blurb (REST) -----------------------
+
+export type QueryLetterRequest = {
+  synopsis: string;
+  authorProfile?: string;   // stringified author info
+  projectTitle?: string;
+  genre?: string;
+  tone?: string;
+  extraDetails?: string;
+};
+
+export type QueryLetterResponse = {
+  queryLetter: string;
+  [key: string]: any;
+};
+
+export async function generateQueryLetter(
+  input: QueryLetterRequest,
+  signal?: AbortSignal
+): Promise<QueryLetterResponse> {
+  const res = await fetchWithTimeout(
+    `${API_BASE}/publishing/query-letter`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        operation: "query-letter",
+        ...input,
+      }),
+      signal,
+    },
+    60000
+  );
+
+  const text = await res.text().catch(() => null);
+  const norm = normalizeResponse(res, text);
+
+  if (!norm.ok) {
+    throw new Error(norm.error || `HTTP ${res.status}`);
+  }
+
+  if (norm.json && (norm.json as any).queryLetter) {
+    return norm.json as QueryLetterResponse;
+  }
+
+  return {
+    queryLetter:
+      (norm.result as string) ||
+      (norm.json as any)?.text ||
+      "",
+    ...(norm.json || {}),
+  };
+}
+
+export type LoglineRequest = {
+  synopsis: string;
+  projectTitle?: string;
+  genre?: string;
+  tone?: string;
+};
+
+export type LoglineResponse = {
+  logline: string;
+  [key: string]: any;
+};
+
+export async function generateLogline(
+  input: LoglineRequest,
+  signal?: AbortSignal
+): Promise<LoglineResponse> {
+  const res = await fetchWithTimeout(
+    `${API_BASE}/publishing/logline`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        operation: "logline",
+        ...input,
+      }),
+      signal,
+    },
+    45000
+  );
+
+  const text = await res.text().catch(() => null);
+  const norm = normalizeResponse(res, text);
+
+  if (!norm.ok) {
+    throw new Error(norm.error || `HTTP ${res.status}`);
+  }
+
+  if (norm.json && (norm.json as any).logline) {
+    return norm.json as LoglineResponse;
+  }
+
+  return {
+    logline:
+      (norm.result as string) ||
+      (norm.json as any)?.text ||
+      "",
+    ...(norm.json || {}),
+  };
+}
+
+export type BackCoverRequest = {
+  synopsis: string;
+  projectTitle?: string;
+  genre?: string;
+  tone?: string;
+  audience?: string;
+};
+
+export type BackCoverResponse = {
+  backCover: string;
+  [key: string]: any;
+};
+
+export async function generateBackCoverBlurb(
+  input: BackCoverRequest,
+  signal?: AbortSignal
+): Promise<BackCoverResponse> {
+  const res = await fetchWithTimeout(
+    `${API_BASE}/publishing/back-cover`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        operation: "back-cover",
+        ...input,
+      }),
+      signal,
+    },
+    60000
+  );
+
+  const text = await res.text().catch(() => null);
+  const norm = normalizeResponse(res, text);
+
+  if (!norm.ok) {
+    throw new Error(norm.error || `HTTP ${res.status}`);
+  }
+
+  if (norm.json && (norm.json as any).backCover) {
+    return norm.json as BackCoverResponse;
+  }
+
+  return {
+    backCover:
+      (norm.result as string) ||
+      (norm.json as any)?.text ||
+      "",
+    ...(norm.json || {}),
+  };
+}
+
   const text = await res.text().catch(() => null);
   const norm = normalizeResponse(res, text);
 
