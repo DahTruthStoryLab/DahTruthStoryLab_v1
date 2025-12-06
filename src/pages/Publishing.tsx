@@ -1256,8 +1256,7 @@ export default function Publishing(): JSX.Element {
     }
   }, [compiledPlain]);
 
- // Story materials state
-  // Story materials state
+   // Story materials state
   const [materialKey, setMaterialKey] =
     useState<MaterialKey>("synopsis-short");
   const [materialOutput, setMaterialOutput] = useState<string>("");
@@ -1275,13 +1274,16 @@ export default function Publishing(): JSX.Element {
     setMaterialBusy(true);
     setMaterialKey(key);
 
+    // Trim the manuscript so we do not hit max tokens
+    const baseText = trimForAI(compiledPlain, 60000);
+
     try {
       let generatedText = "";
 
       // 1) SYNOPSES → dedicated REST endpoint (already working)
       if (key === "synopsis-short" || key === "synopsis-long") {
         const synopsisRes = await generateSynopsis({
-          manuscriptText: trimForAI(compiledPlain, 60000),
+          manuscriptText: baseText,
           title:
             (meta as any)?.title ||
             (meta as any)?.workingTitle ||
@@ -1296,73 +1298,82 @@ export default function Publishing(): JSX.Element {
 
         generatedText = synopsisRes.synopsis || "";
       } else {
-        // 2) OTHER MATERIALS → use a *smaller* context to avoid timeouts
-        let sourceText = "";
+        // 2) OTHER MATERIALS → AI assistant + focused instructions
         let instructions = "";
+        let inputText = baseText; // default input is trimmed manuscript
 
-        if (key === "query-letter") {
-          // For query letters, do NOT send the whole manuscript.
-          // Instead: short synopsis + opening pages + meta.
-          const shortSynRes = await generateSynopsis({
-            manuscriptText: trimForAI(compiledPlain, 30000),
-            title:
-              (meta as any)?.title ||
-              (meta as any)?.workingTitle ||
-              "Untitled Manuscript",
-            genre: (meta as any)?.genre || "",
-            tone: "brief agent-ready synopsis for a query letter",
-            maxWords: 300,
-          });
+        if (key === "back-cover") {
+          instructions =
+            "Using this manuscript, write a compelling back-cover blurb in 2–3 short paragraphs aimed at adult readers. " +
+            "Write in third person, highlight the central conflict and emotional stakes, avoid spoilers, and end with an intriguing hook. " +
+            "Keep it under 350 words. Return ONLY the back-cover copy.";
+        } else if (key === "logline") {
+          instructions =
+            "Write 2–3 single-sentence loglines for this story suitable for pitching to agents and editors. " +
+            "Each logline should clearly state the main character, central conflict, and stakes. " +
+            "Keep each under 60 words. Return ONLY the logline(s), each on its own line.";
+        } else if (key === "query-letter") {
+          // 🔹 For query letter, DO NOT send the whole manuscript.
+          //     Use a generated synopsis + author profile instead to avoid timeouts.
 
-          const shortSynopsis = shortSynRes.synopsis || "";
-          const openingPages = compiledPlain.slice(0, 15000); // first chunk only
+          // 1) Build / expand author profile from matter + meta
+          const authorProfileExpanded =
+            (matter.aboutAuthor || "")
+              .replaceAll("{author}", meta.author || "AUTHOR NAME")
+              .replaceAll("{title}", meta.title || "BOOK TITLE")
+              .replaceAll("{year}", meta.year || "YEAR") ||
+            "AUTHOR NAME writes stories about family, faith, and becoming.";
 
-          sourceText =
-            `Title: ${meta.title}\n` +
-            `Author: ${meta.author}\n` +
-            (wordCount
-              ? `Approximate word count: ${wordCount.toLocaleString()}\n`
-              : "") +
-            (meta.year ? `Year: ${meta.year}\n` : "") +
-            (shortSynopsis
-              ? `\nShort Synopsis:\n${shortSynopsis}\n`
-              : "") +
-            `\nOpening pages:\n${openingPages}`;
+          const genre = (meta as any)?.genre || "novel";
+          const approxWordCount =
+            wordCount > 0
+              ? `${Math.round(wordCount / 1000)}k words`
+              : "approximate length TBD";
+
+          // 2) Generate a concise synopsis JUST for query-letter context
+          let synopsisForQuery = "";
+          try {
+            const synRes = await generateSynopsis({
+              manuscriptText: baseText,
+              title:
+                (meta as any)?.title ||
+                (meta as any)?.workingTitle ||
+                "Untitled Manuscript",
+              genre,
+              tone: "concise query-letter synopsis",
+              maxWords: 350,
+            });
+            synopsisForQuery = synRes.synopsis || "";
+          } catch (synErr) {
+            console.error("[Query Letter] synopsis generation failed, falling back:", synErr);
+            // Fallback: use a heavily trimmed manuscript slice if synopsis fails
+            synopsisForQuery = trimForAI(compiledPlain, 8000);
+          }
+
+          // 3) Build a compact input text just for the query
+          inputText =
+            `BOOK TITLE: ${meta.title || "Untitled"}\n` +
+            `GENRE: ${genre}\n` +
+            `WORD COUNT: ${approxWordCount}\n\n` +
+            `SYNOPSIS:\n${synopsisForQuery}\n\n` +
+            `AUTHOR PROFILE:\n${authorProfileExpanded}`;
 
           instructions =
-            "You are a literary agent and query letter expert. " +
-            "Based on the title, author, short synopsis, and opening pages above, draft a professional query letter. " +
-            "Use this structure: (1) strong opening hook; (2) 1–2 paragraph story summary; " +
-            "(3) short paragraph with genre, approximate word count, and target audience; " +
-            "(4) brief third-person author bio using placeholders like AUTHOR NAME and RELEVANT BACKGROUND. " +
-            "Keep the entire letter under 450 words. Address the agent as 'Dear Agent,' and " +
-            "sign off with 'Sincerely,' followed by AUTHOR NAME. Return ONLY the query letter text.";
-        } else {
-          // Back-cover + logline can use a moderate slice of the manuscript
-          sourceText = trimForAI(compiledPlain, 30000);
-
-          if (key === "back-cover") {
-            instructions =
-              "Using the manuscript above, write a compelling back-cover blurb in 2–3 short paragraphs aimed at adult readers. " +
-              "Write in third person, highlight the central conflict and emotional stakes, avoid spoilers, and end with an intriguing hook. " +
-              "Keep it under 350 words. Return ONLY the back-cover copy.";
-          } else if (key === "logline") {
-            instructions =
-              "Write 2–3 single-sentence loglines for this story suitable for pitching to agents and editors. " +
-              "Each logline should clearly state the main character, central conflict, and stakes. " +
-              "Keep each under 60 words. Return ONLY the logline(s), each on its own line.";
-          }
+            "You are a literary agent and query letter expert. Using the synopsis and author profile above, draft a professional query letter. " +
+            "Use a clear structure: opening hook, 1–2 paragraph story summary (based on the synopsis), brief paragraph with genre, word count, and audience, " +
+            "and a short author bio drawing from the author profile. " +
+            "Keep the entire letter under 450 words. Address the agent as 'Dear Agent,' and sign off with 'Sincerely,' followed by AUTHOR NAME. " +
+            "Return ONLY the query letter text.";
         }
 
         const res: any = await runAssistant(
-          sourceText,
+          inputText,
           "improve", // valid op for your backend
           instructions,
           provider
         );
 
-        generatedText =
-          res?.result || res?.text || res?.output || "";
+        generatedText = res?.result || res?.text || res?.output || "";
       }
 
       if (!generatedText) {
@@ -1386,17 +1397,14 @@ export default function Publishing(): JSX.Element {
       const msg =
         typeof e?.message === "string" ? e.message : String(e);
 
-      if (
-        /maximum context length|max tokens|context length/i.test(msg)
-      ) {
+      if (/maximum context length|max tokens|context length/i.test(msg)) {
         alert(
           "Your manuscript is very large, and the AI hit its context limit. " +
             "We already trim on our side, but if this continues, try generating materials by section or with a shorter working version."
         );
       } else if (/timeout|timed out|request time out/i.test(msg)) {
         alert(
-          "The query letter request took too long and timed out. " +
-            "I have now limited the context size; if it still times out, try again with a shorter working manuscript."
+          "The query took too long and timed out. Because the query letter now uses a short synopsis + author profile, this should be rare. Please try again."
         );
       } else {
         alert(
