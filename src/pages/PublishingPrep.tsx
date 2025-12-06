@@ -14,7 +14,12 @@ import {
   BookOpen,
   Sparkles,
 } from "lucide-react";
-import { runPublishingPrep } from "../lib/api"; // ✅ AI helper
+
+import {
+  generateQueryLetter,
+  generateLogline,
+  generateBackCoverBlurb,
+} from "../lib/api";
 
 /* ---------- Theme ---------- */
 const theme = {
@@ -72,7 +77,7 @@ interface Project {
   synopsis?: string;
   queryLetter?: string;
   backCover?: string;
-  logline?: string; // ✅ NEW
+  logline?: string; // NEW
   publishingChecklist?: PublishingChecklist;
   marketingNotes?: string;
   launchPlan?: string;
@@ -174,7 +179,7 @@ export default function PublishingPrep(): JSX.Element {
   const [currentStory, setCurrentStory] = useState<any | null>(null);
 
   const [activeTab, setActiveTab] = useState<
-    "synopsis" | "query" | "checklist" | "marketing"
+    "synopsis" | "query" | "pitch" | "checklist" | "marketing"
   >("synopsis");
 
   // Use routed-in generated synopsis if we came from Story Materials
@@ -183,7 +188,7 @@ export default function PublishingPrep(): JSX.Element {
   );
   const [queryLetter, setQueryLetter] = useState<string>("");
   const [backCover, setBackCover] = useState<string>("");
-  const [logline, setLogline] = useState<string>(""); // ✅ NEW
+  const [logline, setLogline] = useState<string>("");
 
   const [checklistState, setChecklistState] =
     useState<PublishingChecklist>({});
@@ -193,10 +198,9 @@ export default function PublishingPrep(): JSX.Element {
   const [isSaving, setIsSaving] = useState(false);
   const [showSaved, setShowSaved] = useState(false);
 
-  // AI loading states
   const [isGeneratingQuery, setIsGeneratingQuery] = useState(false);
-  const [isGeneratingBackCover, setIsGeneratingBackCover] = useState(false);
   const [isGeneratingLogline, setIsGeneratingLogline] = useState(false);
+  const [isGeneratingBlurb, setIsGeneratingBlurb] = useState(false);
 
   // Load data on mount + keep in sync
   useEffect(() => {
@@ -237,7 +241,7 @@ export default function PublishingPrep(): JSX.Element {
       setSynopsis("");
       setQueryLetter("");
       setBackCover("");
-      setLogline(""); // ✅ NEW
+      setLogline("");
       setChecklistState({});
       setMarketingNotes("");
       setLaunchPlan("");
@@ -253,7 +257,7 @@ export default function PublishingPrep(): JSX.Element {
 
     setQueryLetter(activeProject.queryLetter || "");
     setBackCover(activeProject.backCover || "");
-    setLogline(activeProject.logline || ""); // ✅ NEW
+    setLogline(activeProject.logline || "");
 
     const storedChecklist = activeProject.publishingChecklist || {};
     const baseState: PublishingChecklist = {};
@@ -278,6 +282,28 @@ export default function PublishingPrep(): JSX.Element {
   const authorName =
     activeProject?.author || profile?.displayName || "New Author";
 
+  // Bundle author + project metadata into helpful strings for the AI
+  const authorProfileText = useMemo(() => {
+    if (!profile && !activeProject) return "";
+    const parts: string[] = [];
+
+    if (authorName) {
+      parts.push(`Author Name: ${authorName}`);
+    }
+    if (activeProject?.title) {
+      parts.push(`Project Title: ${activeProject.title}`);
+    }
+    if (activeProject?.wordCount) {
+      parts.push(`Approx Word Count: ${activeProject.wordCount}`);
+    }
+    if (profile) {
+      parts.push("Author Profile JSON:");
+      parts.push(JSON.stringify(profile, null, 2));
+    }
+
+    return parts.join("\n");
+  }, [profile, activeProject, authorName]);
+
   const handleBackToPublishing = () => {
     navigate("/publishing");
   };
@@ -300,7 +326,7 @@ export default function PublishingPrep(): JSX.Element {
               synopsis: synopsis || "",
               queryLetter: queryLetter || "",
               backCover: backCover || "",
-              logline: logline || "", // ✅ NEW
+              logline: logline || "",
               publishingChecklist: checklistState,
               marketingNotes: marketingNotes || "",
               launchPlan: launchPlan || "",
@@ -322,95 +348,123 @@ export default function PublishingPrep(): JSX.Element {
 
   const synopsisWords = getWordCount(synopsis);
   const queryWords = getWordCount(queryLetter);
-  const loglineWords = getWordCount(logline); // ✅ NEW
+  const loglineWords = getWordCount(logline);
+  const backCoverWords = getWordCount(backCover);
 
-  /* ---------- AI Generators ---------- */
+  /* ---------- AI Handlers ---------- */
 
-  const requireSynopsis = () => {
+  const handleGenerateQueryFromSynopsis = async () => {
     if (!synopsis.trim()) {
-      alert("Please add a synopsis first. The AI needs something to work from.");
-      return false;
-    }
-    return true;
-  };
-
-  const handleGenerateQuery = async () => {
-    if (!activeProject) {
-      alert("No active project selected.");
+      alert("Please add or paste a synopsis first. The query letter is built from it.");
       return;
     }
-    if (!requireSynopsis()) return;
+    if (!activeProject) {
+      alert("No active project found. Go back and select a manuscript first.");
+      return;
+    }
 
-    setIsGeneratingQuery(true);
     try {
-      const result = await runPublishingPrep({
-        mode: "query_letter",
+      setIsGeneratingQuery(true);
+      const res = await generateQueryLetter({
         synopsis,
-        projectTitle: activeProject.title || "Untitled Project",
-        authorName,
-        authorProfile: profile || {},
+        authorProfile: authorProfileText,
+        projectTitle: activeProject.title,
+        genre: (locationState.manuscriptMeta as any)?.genre,
       });
-      if (typeof result === "string") {
-        setQueryLetter(result.trim());
+      const text =
+        res.queryLetter ||
+        (res as any).result ||
+        (res as any).text ||
+        "";
+      if (!text.trim()) {
+        throw new Error("Empty response from query-letter endpoint.");
       }
-    } catch (err) {
-      console.error("Failed to generate query letter:", err);
-      alert("Query letter generation failed. Please try again.");
+      setQueryLetter(text.trim());
+    } catch (err: any) {
+      console.error("Query letter generation failed:", err);
+      alert(
+        `Query letter generation failed: ${
+          err?.message || "Unknown error"
+        }`
+      );
     } finally {
       setIsGeneratingQuery(false);
     }
   };
 
-  const handleGenerateBackCover = async () => {
-    if (!activeProject) {
-      alert("No active project selected.");
+  const handleGenerateLogline = async () => {
+    if (!synopsis.trim()) {
+      alert("Please add or paste a synopsis first. The logline is built from it.");
       return;
     }
-    if (!requireSynopsis()) return;
+    if (!activeProject) {
+      alert("No active project found. Go back and select a manuscript first.");
+      return;
+    }
 
-    setIsGeneratingBackCover(true);
     try {
-      const result = await runPublishingPrep({
-        mode: "back_cover",
+      setIsGeneratingLogline(true);
+      const res = await generateLogline({
         synopsis,
-        projectTitle: activeProject.title || "Untitled Project",
+        projectTitle: activeProject.title,
+        genre: (locationState.manuscriptMeta as any)?.genre,
       });
-      if (typeof result === "string") {
-        setBackCover(result.trim());
-        // Optional: switch to Marketing tab so you can see it
-        setActiveTab("marketing");
+      const text =
+        res.logline ||
+        (res as any).result ||
+        (res as any).text ||
+        "";
+      if (!text.trim()) {
+        throw new Error("Empty response from logline endpoint.");
       }
-    } catch (err) {
-      console.error("Failed to generate back cover:", err);
-      alert("Back-cover blurb generation failed. Please try again.");
+      setLogline(text.trim());
+    } catch (err: any) {
+      console.error("Logline generation failed:", err);
+      alert(
+        `Logline generation failed: ${
+          err?.message || "Unknown error"
+        }`
+      );
     } finally {
-      setIsGeneratingBackCover(false);
+      setIsGeneratingLogline(false);
     }
   };
 
-  const handleGenerateLogline = async () => {
-    if (!activeProject) {
-      alert("No active project selected.");
+  const handleGenerateBackCover = async () => {
+    if (!synopsis.trim()) {
+      alert("Please add or paste a synopsis first. The back cover blurb is built from it.");
       return;
     }
-    if (!requireSynopsis()) return;
+    if (!activeProject) {
+      alert("No active project found. Go back and select a manuscript first.");
+      return;
+    }
 
-    setIsGeneratingLogline(true);
     try {
-      const result = await runPublishingPrep({
-        mode: "logline",
+      setIsGeneratingBlurb(true);
+      const res = await generateBackCoverBlurb({
         synopsis,
-        projectTitle: activeProject.title || "Untitled Project",
+        projectTitle: activeProject.title,
+        genre: (locationState.manuscriptMeta as any)?.genre,
       });
-      if (typeof result === "string") {
-        setLogline(result.trim());
-        setActiveTab("marketing");
+      const text =
+        res.backCover ||
+        (res as any).result ||
+        (res as any).text ||
+        "";
+      if (!text.trim()) {
+        throw new Error("Empty response from back-cover endpoint.");
       }
-    } catch (err) {
-      console.error("Failed to generate logline:", err);
-      alert("Logline generation failed. Please try again.");
+      setBackCover(text.trim());
+    } catch (err: any) {
+      console.error("Back cover blurb generation failed:", err);
+      alert(
+        `Back cover blurb generation failed: ${
+          err?.message || "Unknown error"
+        }`
+      );
     } finally {
-      setIsGeneratingLogline(false);
+      setIsGeneratingBlurb(false);
     }
   };
 
@@ -532,6 +586,11 @@ export default function PublishingPrep(): JSX.Element {
                 id: "query" as const,
                 icon: <FileText size={16} />,
                 label: "Query Letter",
+              },
+              {
+                id: "pitch" as const,
+                icon: <Sparkles size={16} />,
+                label: "Logline & Blurb",
               },
               {
                 id: "checklist" as const,
@@ -691,8 +750,49 @@ export default function PublishingPrep(): JSX.Element {
                     }}
                   >
                     Draft your query letter here. Include a strong hook, brief
-                    synopsis, and your author bio.
+                    synopsis, and your author bio. Use the button below to
+                    generate a first draft from your synopsis and profile.
                   </p>
+
+                  <button
+                    type="button"
+                    onClick={handleGenerateQueryFromSynopsis}
+                    disabled={isGeneratingQuery || !synopsis.trim()}
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 8,
+                      padding: "7px 14px",
+                      marginBottom: 10,
+                      borderRadius: 999,
+                      border: "none",
+                      background:
+                        "linear-gradient(135deg, #6366f1, #a855f7)",
+                      color: "#fff",
+                      fontSize: 13,
+                      fontWeight: 600,
+                      cursor:
+                        isGeneratingQuery || !synopsis.trim()
+                          ? "default"
+                          : "pointer",
+                      opacity:
+                        isGeneratingQuery || !synopsis.trim()
+                          ? 0.7
+                          : 1,
+                      boxShadow:
+                        "0 6px 18px rgba(79,70,229,0.35)",
+                    }}
+                  >
+                    {isGeneratingQuery ? (
+                      <Loader2 size={14} className="animate-spin" />
+                    ) : (
+                      <Sparkles size={14} />
+                    )}
+                    {isGeneratingQuery
+                      ? "Generating query letter..."
+                      : "Generate from synopsis & author profile"}
+                  </button>
+
                   <textarea
                     value={queryLetter}
                     onChange={(e) => setQueryLetter(e.target.value)}
@@ -713,92 +813,194 @@ export default function PublishingPrep(): JSX.Element {
                       marginTop: 6,
                       fontSize: 12,
                       color: theme.subtext,
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      gap: 8,
-                      flexWrap: "wrap",
+                      textAlign: "right",
                     }}
                   >
-                    <span>{queryWords} words</span>
+                    {queryWords} words
+                  </div>
+                </>
+              )}
 
-                    {/* AI Buttons row */}
+              {activeTab === "pitch" && (
+                <>
+                  <h3
+                    style={{
+                      margin: "0 0 8px 0",
+                      fontSize: 18,
+                      color: theme.text,
+                    }}
+                  >
+                    Logline & Back Cover Blurb
+                  </h3>
+                  <p
+                    style={{
+                      margin: "0 0 12px 0",
+                      fontSize: 13,
+                      color: theme.subtext,
+                    }}
+                  >
+                    Craft the short, punchy pieces that sell your book at a
+                    glance: a one–sentence logline and a back cover blurb.
+                    Both are built from your synopsis.
+                  </p>
+
+                  {/* Logline */}
+                  <div style={{ marginBottom: 16 }}>
                     <div
                       style={{
                         display: "flex",
-                        gap: 6,
-                        flexWrap: "wrap",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        marginBottom: 6,
                       }}
                     >
-                      <button
-                        type="button"
-                        onClick={handleGenerateQuery}
-                        disabled={isGeneratingQuery}
+                      <label
                         style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: 6,
-                          padding: "4px 10px",
-                          borderRadius: 999,
-                          border: "none",
-                          background:
-                            "linear-gradient(135deg, #4f46e5, #7c3aed)",
-                          color: "#fff",
-                          fontSize: 11,
+                          fontSize: 13,
                           fontWeight: 600,
-                          cursor: isGeneratingQuery ? "default" : "pointer",
-                          opacity: isGeneratingQuery ? 0.8 : 1,
-                        }}
-                      >
-                        <Sparkles size={14} />
-                        {isGeneratingQuery ? "Generating..." : "Query from AI"}
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={handleGenerateBackCover}
-                        disabled={isGeneratingBackCover}
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: 6,
-                          padding: "4px 10px",
-                          borderRadius: 999,
-                          border: `1px solid ${theme.border}`,
-                          background: theme.white,
                           color: theme.text,
-                          fontSize: 11,
-                          fontWeight: 600,
-                          cursor: isGeneratingBackCover ? "default" : "pointer",
-                          opacity: isGeneratingBackCover ? 0.8 : 1,
                         }}
                       >
-                        <Sparkles size={14} />
-                        {isGeneratingBackCover ? "Working..." : "Cover blurb"}
-                      </button>
-
+                        Logline (1–2 sentence hook)
+                      </label>
                       <button
                         type="button"
                         onClick={handleGenerateLogline}
-                        disabled={isGeneratingLogline}
+                        disabled={isGeneratingLogline || !synopsis.trim()}
                         style={{
                           display: "inline-flex",
                           alignItems: "center",
                           gap: 6,
-                          padding: "4px 10px",
+                          padding: "6px 12px",
                           borderRadius: 999,
-                          border: `1px solid ${theme.border}`,
-                          background: theme.white,
-                          color: theme.text,
-                          fontSize: 11,
+                          border: "none",
+                          background:
+                            "linear-gradient(135deg, #3b82f6, #38bdf8)",
+                          color: "#fff",
+                          fontSize: 12,
                           fontWeight: 600,
-                          cursor: isGeneratingLogline ? "default" : "pointer",
-                          opacity: isGeneratingLogline ? 0.8 : 1,
+                          cursor:
+                            isGeneratingLogline || !synopsis.trim()
+                              ? "default"
+                              : "pointer",
+                          opacity:
+                            isGeneratingLogline || !synopsis.trim()
+                              ? 0.7
+                              : 1,
                         }}
                       >
-                        <Sparkles size={14} />
-                        {isGeneratingLogline ? "Working..." : "Logline"}
+                        {isGeneratingLogline ? (
+                          <Loader2 size={13} className="animate-spin" />
+                        ) : (
+                          <Sparkles size={13} />
+                        )}
+                        {isGeneratingLogline ? "Generating..." : "Generate"}
                       </button>
+                    </div>
+                    <textarea
+                      value={logline}
+                      onChange={(e) => setLogline(e.target.value)}
+                      placeholder="When a..."
+                      style={{
+                        width: "100%",
+                        minHeight: 80,
+                        borderRadius: 12,
+                        border: `1px solid ${theme.border}`,
+                        padding: "10px 12px",
+                        fontSize: 14,
+                        resize: "vertical",
+                        fontFamily: "inherit",
+                      }}
+                    />
+                    <div
+                      style={{
+                        marginTop: 4,
+                        fontSize: 12,
+                        color: theme.subtext,
+                        textAlign: "right",
+                      }}
+                    >
+                      {loglineWords} words
+                    </div>
+                  </div>
+
+                  {/* Back cover blurb */}
+                  <div>
+                    <div
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                        marginBottom: 6,
+                      }}
+                    >
+                      <label
+                        style={{
+                          fontSize: 13,
+                          fontWeight: 600,
+                          color: theme.text,
+                        }}
+                      >
+                        Back Cover Blurb
+                      </label>
+                      <button
+                        type="button"
+                        onClick={handleGenerateBackCover}
+                        disabled={isGeneratingBlurb || !synopsis.trim()}
+                        style={{
+                          display: "inline-flex",
+                          alignItems: "center",
+                          gap: 6,
+                          padding: "6px 12px",
+                          borderRadius: 999,
+                          border: "none",
+                          background:
+                            "linear-gradient(135deg, #10b981, #22c55e)",
+                          color: "#fff",
+                          fontSize: 12,
+                          fontWeight: 600,
+                          cursor:
+                            isGeneratingBlurb || !synopsis.trim()
+                              ? "default"
+                              : "pointer",
+                          opacity:
+                            isGeneratingBlurb || !synopsis.trim()
+                              ? 0.7
+                              : 1,
+                        }}
+                      >
+                        {isGeneratingBlurb ? (
+                          <Loader2 size={13} className="animate-spin" />
+                        ) : (
+                          <Sparkles size={13} />
+                        )}
+                        {isGeneratingBlurb ? "Generating..." : "Generate"}
+                      </button>
+                    </div>
+                    <textarea
+                      value={backCover}
+                      onChange={(e) => setBackCover(e.target.value)}
+                      placeholder="Perfect for readers who love..."
+                      style={{
+                        width: "100%",
+                        minHeight: 160,
+                        borderRadius: 12,
+                        border: `1px solid ${theme.border}`,
+                        padding: "10px 12px",
+                        fontSize: 14,
+                        resize: "vertical",
+                        fontFamily: "inherit",
+                      }}
+                    />
+                    <div
+                      style={{
+                        marginTop: 4,
+                        fontSize: 12,
+                        color: theme.subtext,
+                        textAlign: "right",
+                      }}
+                    >
+                      {backCoverWords} words
                     </div>
                   </div>
                 </>
@@ -825,46 +1027,6 @@ export default function PublishingPrep(): JSX.Element {
                     Sketch out your marketing notes and launch plan. Think about
                     audience, channels, timing, and partnerships.
                   </p>
-
-                  {/* ✅ Logline field */}
-                  <label
-                    style={{
-                      display: "block",
-                      fontSize: 13,
-                      fontWeight: 600,
-                      marginBottom: 6,
-                      color: theme.text,
-                    }}
-                  >
-                    Logline (1–2 sentence hook)
-                  </label>
-                  <textarea
-                    value={logline}
-                    onChange={(e) => setLogline(e.target.value)}
-                    placeholder="A one-sentence hook that captures your protagonist, goal, conflict, and stakes..."
-                    style={{
-                      width: "100%",
-                      minHeight: 70,
-                      borderRadius: 12,
-                      border: `1px solid ${theme.border}`,
-                      padding: "8px 10px",
-                      fontSize: 13,
-                      resize: "vertical",
-                      fontFamily: "inherit",
-                      marginBottom: 4,
-                    }}
-                  />
-                  <div
-                    style={{
-                      marginBottom: 14,
-                      fontSize: 11,
-                      color: theme.subtext,
-                      textAlign: "right",
-                    }}
-                  >
-                    {loglineWords} words
-                  </div>
-
                   <label
                     style={{
                       display: "block",
