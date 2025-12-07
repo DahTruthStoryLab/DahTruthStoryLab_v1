@@ -188,7 +188,11 @@ export default function PublishingPrep(): JSX.Element {
   );
   const [queryLetter, setQueryLetter] = useState<string>("");
   const [backCover, setBackCover] = useState<string>("");
+  
   const [logline, setLogline] = useState<string>("");
+  const [isGeneratingQuery, setIsGeneratingQuery] = useState(false);
+  const [isGeneratingLogline, setIsGeneratingLogline] = useState(false);
+  const [isGeneratingBlurb, setIsGeneratingBlurb] = useState(false);
 
   const [checklistState, setChecklistState] =
     useState<PublishingChecklist>({});
@@ -198,15 +202,13 @@ export default function PublishingPrep(): JSX.Element {
   const [isSaving, setIsSaving] = useState(false);
   const [showSaved, setShowSaved] = useState(false);
 
-  const [isGeneratingQuery, setIsGeneratingQuery] = useState(false);
-  const [isGeneratingLogline, setIsGeneratingLogline] = useState(false);
-  const [isGeneratingBlurb, setIsGeneratingBlurb] = useState(false);
-
-  // Load data on mount + keep in sync
+   // Load data on mount + keep in sync
   useEffect(() => {
     setProfile(loadProfile());
     setProjects(loadProjects());
     setCurrentStory(loadCurrentStory());
+
+    setLogline((activeProject as any).logline || "");
 
     const sync = () => {
       setProfile(loadProfile());
@@ -467,6 +469,101 @@ export default function PublishingPrep(): JSX.Element {
       setIsGeneratingBlurb(false);
     }
   };
+const handleGenerateQueryLetter = async () => {
+  if (!synopsis.trim()) {
+    alert("Please draft or import a synopsis first. The query letter is built from that.");
+    return;
+  }
+  if (!activeProject) {
+    alert("No active project selected.");
+    return;
+  }
+
+  try {
+    setIsGeneratingQuery(true);
+
+    const res = await generateQueryLetter({
+      synopsis,
+      title: activeProject.title,
+      genre: activeProject.status, // or add a proper genre field later
+      authorProfile: profile,
+    });
+
+    const text = res.queryLetter || (res as any).result || "";
+    if (!text) {
+      alert("The server did not return a query letter.");
+      return;
+    }
+    setQueryLetter(text);
+  } catch (err: any) {
+    console.error("Query letter generation failed:", err);
+    alert(
+      `Query letter generation failed: ${
+        err?.message || "Unknown error"
+      }`
+    );
+  } finally {
+    setIsGeneratingQuery(false);
+  }
+};
+
+const handleGenerateLogline = async () => {
+  if (!synopsis.trim()) {
+    alert("Please draft or import a synopsis first. The logline is built from that.");
+    return;
+  }
+  try {
+    setIsGeneratingLogline(true);
+    const res = await generateLogline({
+      synopsis,
+      title: activeProject?.title,
+    });
+    const text = res.logline || (res as any).result || "";
+    if (!text) {
+      alert("The server did not return a logline.");
+      return;
+    }
+    setLogline(text);
+  } catch (err: any) {
+    console.error("Logline generation failed:", err);
+    alert(
+      `Logline generation failed: ${
+        err?.message || "Unknown error"
+      }`
+    );
+  } finally {
+    setIsGeneratingLogline(false);
+  }
+};
+
+const handleGenerateBackCover = async () => {
+  if (!synopsis.trim()) {
+    alert("Please draft or import a synopsis first. The back cover copy is built from that.");
+    return;
+  }
+  try {
+    setIsGeneratingBackCover(true);
+    const res = await generateBackCover({
+      synopsis,
+      title: activeProject?.title,
+    });
+    const text = res.backCover || (res as any).result || "";
+    if (!text) {
+      alert("The server did not return back cover copy.");
+      return;
+    }
+    setBackCover(text);
+  } catch (err: any) {
+    console.error("Back cover generation failed:", err);
+    alert(
+      `Back cover generation failed: ${
+        err?.message || "Unknown error"
+      }`
+    );
+  } finally {
+    setIsGeneratingBackCover(false);
+  }
+};
 
   /* ---------- Render ---------- */
   return (
@@ -731,267 +828,243 @@ export default function PublishingPrep(): JSX.Element {
                 </>
               )}
 
-              {activeTab === "query" && (
-                <>
-                  <h3
-                    style={{
-                      margin: "0 0 8px 0",
-                      fontSize: 18,
-                      color: theme.text,
-                    }}
-                  >
-                    Query Letter
-                  </h3>
-                  <p
-                    style={{
-                      margin: "0 0 12px 0",
-                      fontSize: 13,
-                      color: theme.subtext,
-                    }}
-                  >
-                    Draft your query letter here. Include a strong hook, brief
-                    synopsis, and your author bio. Use the button below to
-                    generate a first draft from your synopsis and profile.
-                  </p>
+             {activeTab === "query" && (
+  <>
+    {/* Query Letter */}
+    <h3
+      style={{
+        margin: "0 0 8px 0",
+        fontSize: 18,
+        color: theme.text,
+      }}
+    >
+      Query Letter
+    </h3>
+    <p
+      style={{
+        margin: "0 0 12px 0",
+        fontSize: 13,
+        color: theme.subtext,
+      }}
+    >
+      Draft your query letter here. Include a strong hook, brief
+      synopsis, and your author bio.
+    </p>
 
-                  <button
-                    type="button"
-                    onClick={handleGenerateQueryFromSynopsis}
-                    disabled={isGeneratingQuery || !synopsis.trim()}
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 8,
-                      padding: "7px 14px",
-                      marginBottom: 10,
-                      borderRadius: 999,
-                      border: "none",
-                      background:
-                        "linear-gradient(135deg, #6366f1, #a855f7)",
-                      color: "#fff",
-                      fontSize: 13,
-                      fontWeight: 600,
-                      cursor:
-                        isGeneratingQuery || !synopsis.trim()
-                          ? "default"
-                          : "pointer",
-                      opacity:
-                        isGeneratingQuery || !synopsis.trim()
-                          ? 0.7
-                          : 1,
-                      boxShadow:
-                        "0 6px 18px rgba(79,70,229,0.35)",
-                    }}
-                  >
-                    {isGeneratingQuery ? (
-                      <Loader2 size={14} className="animate-spin" />
-                    ) : (
-                      <Sparkles size={14} />
-                    )}
-                    {isGeneratingQuery
-                      ? "Generating query letter..."
-                      : "Generate from synopsis & author profile"}
-                  </button>
+    <div
+      style={{
+        display: "flex",
+        justifyContent: "flex-end",
+        marginBottom: 8,
+        gap: 8,
+      }}
+    >
+      <button
+        type="button"
+        onClick={handleGenerateQueryLetter}
+        disabled={isGeneratingQuery || !synopsis.trim()}
+        style={{
+          padding: "6px 12px",
+          borderRadius: 999,
+          border: "none",
+          fontSize: 12,
+          fontWeight: 600,
+          cursor: isGeneratingQuery ? "default" : "pointer",
+          background:
+            "linear-gradient(135deg, #6366f1, #a855f7)",
+          color: "#fff",
+        }}
+      >
+        {isGeneratingQuery ? "AI drafting..." : "AI: Draft from synopsis + profile"}
+      </button>
+    </div>
 
-                  <textarea
-                    value={queryLetter}
-                    onChange={(e) => setQueryLetter(e.target.value)}
-                    placeholder="Dear Agent..."
-                    style={{
-                      width: "100%",
-                      minHeight: 260,
-                      borderRadius: 12,
-                      border: `1px solid ${theme.border}`,
-                      padding: "10px 12px",
-                      fontSize: 14,
-                      resize: "vertical",
-                      fontFamily: "inherit",
-                    }}
-                  />
-                  <div
-                    style={{
-                      marginTop: 6,
-                      fontSize: 12,
-                      color: theme.subtext,
-                      textAlign: "right",
-                    }}
-                  >
-                    {queryWords} words
-                  </div>
-                </>
-              )}
+    <textarea
+      value={queryLetter}
+      onChange={(e) => setQueryLetter(e.target.value)}
+      placeholder="Dear Agent..."
+      style={{
+        width: "100%",
+        minHeight: 220,
+        borderRadius: 12,
+        border: `1px solid ${theme.border}`,
+        padding: "10px 12px",
+        fontSize: 14,
+        resize: "vertical",
+        fontFamily: "inherit",
+      }}
+    />
+    <div
+      style={{
+        marginTop: 6,
+        fontSize: 12,
+        color: theme.subtext,
+        textAlign: "right",
+      }}
+    >
+      {queryWords} words
+    </div>
 
-              {activeTab === "pitch" && (
-                <>
-                  <h3
-                    style={{
-                      margin: "0 0 8px 0",
-                      fontSize: 18,
-                      color: theme.text,
-                    }}
-                  >
-                    Logline & Back Cover Blurb
-                  </h3>
-                  <p
-                    style={{
-                      margin: "0 0 12px 0",
-                      fontSize: 13,
-                      color: theme.subtext,
-                    }}
-                  >
-                    Craft the short, punchy pieces that sell your book at a
-                    glance: a one–sentence logline and a back cover blurb.
-                    Both are built from your synopsis.
-                  </p>
+    <hr
+      style={{
+        margin: "20px 0",
+        border: "none",
+        borderTop: `1px solid ${theme.border}`,
+        opacity: 0.7,
+      }}
+    />
 
-                  {/* Logline */}
-                  <div style={{ marginBottom: 16 }}>
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        marginBottom: 6,
-                      }}
-                    >
-                      <label
-                        style={{
-                          fontSize: 13,
-                          fontWeight: 600,
-                          color: theme.text,
-                        }}
-                      >
-                        Logline (1–2 sentence hook)
-                      </label>
-                      <button
-                        type="button"
-                        onClick={handleGenerateLogline}
-                        disabled={isGeneratingLogline || !synopsis.trim()}
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: 6,
-                          padding: "6px 12px",
-                          borderRadius: 999,
-                          border: "none",
-                          background:
-                            "linear-gradient(135deg, #3b82f6, #38bdf8)",
-                          color: "#fff",
-                          fontSize: 12,
-                          fontWeight: 600,
-                          cursor:
-                            isGeneratingLogline || !synopsis.trim()
-                              ? "default"
-                              : "pointer",
-                          opacity:
-                            isGeneratingLogline || !synopsis.trim()
-                              ? 0.7
-                              : 1,
-                        }}
-                      >
-                        {isGeneratingLogline ? (
-                          <Loader2 size={13} className="animate-spin" />
-                        ) : (
-                          <Sparkles size={13} />
-                        )}
-                        {isGeneratingLogline ? "Generating..." : "Generate"}
-                      </button>
-                    </div>
-                    <textarea
-                      value={logline}
-                      onChange={(e) => setLogline(e.target.value)}
-                      placeholder="When a..."
-                      style={{
-                        width: "100%",
-                        minHeight: 80,
-                        borderRadius: 12,
-                        border: `1px solid ${theme.border}`,
-                        padding: "10px 12px",
-                        fontSize: 14,
-                        resize: "vertical",
-                        fontFamily: "inherit",
-                      }}
-                    />
-                    <div
-                      style={{
-                        marginTop: 4,
-                        fontSize: 12,
-                        color: theme.subtext,
-                        textAlign: "right",
-                      }}
-                    >
-                      {loglineWords} words
-                    </div>
-                  </div>
+    {/* Logline + Back Cover section */}
+    <h3
+      style={{
+        margin: "0 0 8px 0",
+        fontSize: 16,
+        color: theme.text,
+      }}
+    >
+      Logline & Back Cover Copy
+    </h3>
+    <p
+      style={{
+        margin: "0 0 12px 0",
+        fontSize: 13,
+        color: theme.subtext,
+      }}
+    >
+      Use a short logline to pitch the core hook in one sentence, and
+      back cover copy to tease the story for readers or agents.
+    </p>
 
-                  {/* Back cover blurb */}
-                  <div>
-                    <div
-                      style={{
-                        display: "flex",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                        marginBottom: 6,
-                      }}
-                    >
-                      <label
-                        style={{
-                          fontSize: 13,
-                          fontWeight: 600,
-                          color: theme.text,
-                        }}
-                      >
-                        Back Cover Blurb
-                      </label>
-                      <button
-                        type="button"
-                        onClick={handleGenerateBackCover}
-                        disabled={isGeneratingBlurb || !synopsis.trim()}
-                        style={{
-                          display: "inline-flex",
-                          alignItems: "center",
-                          gap: 6,
-                          padding: "6px 12px",
-                          borderRadius: 999,
-                          border: "none",
-                          background:
-                            "linear-gradient(135deg, #10b981, #22c55e)",
-                          color: "#fff",
-                          fontSize: 12,
-                          fontWeight: 600,
-                          cursor:
-                            isGeneratingBlurb || !synopsis.trim()
-                              ? "default"
-                              : "pointer",
-                          opacity:
-                            isGeneratingBlurb || !synopsis.trim()
-                              ? 0.7
-                              : 1,
-                        }}
-                      >
-                        {isGeneratingBlurb ? (
-                          <Loader2 size={13} className="animate-spin" />
-                        ) : (
-                          <Sparkles size={13} />
-                        )}
-                        {isGeneratingBlurb ? "Generating..." : "Generate"}
-                      </button>
-                    </div>
-                    <textarea
-                      value={backCover}
-                      onChange={(e) => setBackCover(e.target.value)}
-                      placeholder="Perfect for readers who love..."
-                      style={{
-                        width: "100%",
-                        minHeight: 160,
-                        borderRadius: 12,
-                        border: `1px solid ${theme.border}`,
-                        padding: "10px 12px",
-                        fontSize: 14,
-                        resize: "vertical",
-                        fontFamily: "inherit",
-                      }}
-                    />
+    {/* Logline */}
+    <label
+      style={{
+        display: "block",
+        fontSize: 13,
+        fontWeight: 600,
+        marginBottom: 6,
+        color: theme.text,
+      }}
+    >
+      Logline
+    </label>
+    <div
+      style={{
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        marginBottom: 6,
+        gap: 8,
+      }}
+    >
+      <span
+        style={{
+          fontSize: 12,
+          color: theme.subtext,
+        }}
+      >
+        1–2 sentences that capture the main character, goal, and stakes.
+      </span>
+      <button
+        type="button"
+        onClick={handleGenerateLogline}
+        disabled={isGeneratingLogline || !synopsis.trim()}
+        style={{
+          padding: "4px 10px",
+          borderRadius: 999,
+          border: "none",
+          fontSize: 11,
+          fontWeight: 600,
+          cursor: isGeneratingLogline ? "default" : "pointer",
+          background:
+            "linear-gradient(135deg, #0ea5e9, #22d3ee)",
+          color: "#0f172a",
+        }}
+      >
+        {isGeneratingLogline ? "AI..." : "AI: Logline from synopsis"}
+      </button>
+    </div>
+    <textarea
+      value={logline}
+      onChange={(e) => setLogline(e.target.value)}
+      placeholder="When ________, a ________ must ________ or else ________."
+      style={{
+        width: "100%",
+        minHeight: 70,
+        borderRadius: 12,
+        border: `1px solid ${theme.border}`,
+        padding: "8px 10px",
+        fontSize: 13,
+        resize: "vertical",
+        fontFamily: "inherit",
+        marginBottom: 16,
+      }}
+    />
+
+    {/* Back Cover */}
+    <label
+      style={{
+        display: "block",
+        fontSize: 13,
+        fontWeight: 600,
+        marginBottom: 6,
+        color: theme.text,
+      }}
+    >
+      Back Cover / Book Blurb
+    </label>
+    <div
+      style={{
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        marginBottom: 6,
+        gap: 8,
+      }}
+    >
+      <span
+        style={{
+          fontSize: 12,
+          color: theme.subtext,
+        }}
+      >
+        The teaser readers will see on the back of the book or online listing.
+      </span>
+      <button
+        type="button"
+        onClick={handleGenerateBackCover}
+        disabled={isGeneratingBackCover || !synopsis.trim()}
+        style={{
+          padding: "4px 10px",
+          borderRadius: 999,
+          border: "none",
+          fontSize: 11,
+          fontWeight: 600,
+          cursor: isGeneratingBackCover ? "default" : "pointer",
+          background:
+            "linear-gradient(135deg, #f97316, #fb923c)",
+          color: "#0f172a",
+        }}
+      >
+        {isGeneratingBackCover ? "AI..." : "AI: Blurb from synopsis"}
+      </button>
+    </div>
+    <textarea
+      value={backCover}
+      onChange={(e) => setBackCover(e.target.value)}
+      placeholder="Back cover copy goes here..."
+      style={{
+        width: "100%",
+        minHeight: 140,
+        borderRadius: 12,
+        border: `1px solid ${theme.border}`,
+        padding: "10px 12px",
+        fontSize: 14,
+        resize: "vertical",
+        fontFamily: "inherit",
+      }}
+    />
+  </>
+)}
                     <div
                       style={{
                         marginTop: 4,
