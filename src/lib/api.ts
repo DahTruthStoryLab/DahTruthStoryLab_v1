@@ -44,11 +44,18 @@ type Normalized = {
 function withTimeout(ms: number, signal?: AbortSignal) {
   const controller = new AbortController();
   const t = setTimeout(() => controller.abort(), ms);
-  if (signal) signal.addEventListener("abort", () => controller.abort(), { once: true });
+  if (signal)
+    signal.addEventListener("abort", () => controller.abort(), {
+      once: true,
+    });
   return { signal: controller.signal, clear: () => clearTimeout(t) };
 }
 
-async function fetchWithTimeout(url: string, init: RequestInit, ms = 20000) {
+async function fetchWithTimeout(
+  url: string,
+  init: RequestInit,
+  ms = 20000
+): Promise<Response> {
   const { signal, clear } = withTimeout(ms, (init as any)?.signal);
   try {
     return await fetch(url, { ...init, signal });
@@ -83,16 +90,18 @@ function normalizeResponse(res: Response, bodyText: string | null): Normalized {
     json,
     result,
     message,
-    error: res.ok ? null : (message || `HTTP ${res.status}`),
+    error: res.ok ? null : message || `HTTP ${res.status}`,
   };
 }
 
 const DEBUG = false;
 const backoff = (attempts = 2) =>
-  Array.from({ length: Math.max(0, attempts) }, (_ , i) => 250 * 2 ** i);
+  Array.from({ length: Math.max(0, attempts) }, (_, i) => 250 * 2 ** i);
 
 function isAnthropicCreditError(msg?: string) {
-  return /credit balance|insufficient funds|billing|purchase|upgrade/i.test(String(msg || ""));
+  return /credit balance|insufficient funds|billing|purchase|upgrade/i.test(
+    String(msg || "")
+  );
 }
 
 /* --------------------------- Core assistant call -------------------------- */
@@ -106,7 +115,11 @@ async function callAssistant(
   operation: string,
   payload: Record<string, any> = {},
   provider: "openai" | "anthropic" = "openai",
-  opts: { retries?: number; timeoutMs?: number; headers?: Record<string, string> } = {}
+  opts: {
+    retries?: number;
+    timeoutMs?: number;
+    headers?: Record<string, string>;
+  } = {}
 ): Promise<any> {
   const url = `${API_BASE}${ROUTES.aiAssistant}`;
   const headers: Record<string, string> = {
@@ -152,7 +165,8 @@ async function callAssistant(
 
         // Anthropic credit fallback → one immediate swap to OpenAI
         if (prov === "anthropic" && isAnthropicCreditError(e?.messageText)) {
-          if (DEBUG) console.warn("[api] Anthropic credit issue — falling back to OpenAI");
+          if (DEBUG)
+            console.warn("[api] Anthropic credit issue — falling back to OpenAI");
           return await attempt("openai");
         }
 
@@ -177,6 +191,7 @@ const ROUTES = {
 } as const;
 
 /* ------------------------------ AI Helpers -------------------------------- */
+
 /** Generic chat/improve endpoint */
 export function runAssistant(
   text: string,
@@ -189,67 +204,64 @@ export function runAssistant(
     op,
     { message: text, text, action, instructions },
     provider,
-    { retries: 2, timeoutMs: 45000 }  // Changed from 30000
+    { retries: 2, timeoutMs: 45000 }
   );
 }
+
 export function runRewrite(
   text: string,
   provider: "anthropic" | "openai" = "openai"
 ) {
-  return callAssistant(
-    "rewrite",
-    { text },
-    provider,
-    { retries: 2, timeoutMs: 60000 }  // Changed from 25000
-  );
+  return callAssistant("rewrite", { text }, provider, {
+    retries: 2,
+    timeoutMs: 60000,
+  });
 }
+
 export function runGrammar(
   text: string,
   provider: "anthropic" | "openai" = "openai"
 ) {
-  return callAssistant(
-    "grammar",
-    { text },
-    provider,
-    { retries: 2, timeoutMs: 60000 }  // Changed from 25000
-  );
+  return callAssistant("grammar", { text }, provider, {
+    retries: 2,
+    timeoutMs: 60000,
+  });
 }
+
 export function runStyle(
   text: string,
   provider: "anthropic" | "openai" = "openai"
 ) {
-  return callAssistant(
-    "style",
-    { text },
-    provider,
-    { retries: 2, timeoutMs: 60000 }  // Changed from 25000
-  );
+  return callAssistant("style", { text }, provider, {
+    retries: 2,
+    timeoutMs: 60000,
+  });
 }
+
 export function runReadability(
   text: string,
   provider: "anthropic" | "openai" = "openai"
 ) {
-  return callAssistant(
-    "readability",
-    { text },
-    provider,
-    { retries: 2, timeoutMs: 60000 }  // Changed from 25000
-  );
+  return callAssistant("readability", { text }, provider, {
+    retries: 2,
+    timeoutMs: 60000,
+  });
 }
+
 export function runPublishingPrep(
   meta: any,
   chapters: any[],
   options: any = {},
   provider: "anthropic" | "openai" = "openai"
 ) {
-  return callAssistant(
-    "publishing-prep",
-    { meta, chapters, options },
-    provider,
-    { retries: 2, timeoutMs: 45000 }  // This one is fine as-is
-  );
+  return callAssistant("publishing-prep", { meta, chapters, options }, provider, {
+    retries: 2,
+    timeoutMs: 45000,
+  });
 }
+
 /* ------------------------- Convenience wrappers --------------------------- */
+
 export const proofread = (
   text: string,
   instructions = "",
@@ -267,8 +279,6 @@ export const rewrite = (
   instructions = "",
   provider: "anthropic" | "openai" = "openai"
 ) => runAssistant(text, "rewrite", instructions, provider);
-
-/* ------------------------- Publishing tools (REST) ------------------------ */
 
 /* ------------------------- Publishing tools (REST) ------------------------ */
 
@@ -301,7 +311,7 @@ export async function generateSynopsis(
       }),
       signal,
     },
-    60000 // 60s timeout – synopses can be chunky
+    60000
   );
 
   const text = await res.text().catch(() => null);
@@ -323,7 +333,7 @@ export async function generateSynopsis(
   };
 }
 
-/* ---------------------- Query / Logline / Blurb (REST) ----------------------- */
+/* ---------------------- Query / Logline / Blurb (REST) -------------------- */
 
 export type QueryLetterRequest = {
   synopsis: string;
@@ -568,6 +578,7 @@ export function filesDelete(params: {
 }
 
 /* --------------------------------- Ping ----------------------------------- */
+
 export async function ping(
   provider: "openai" | "anthropic" = "openai"
 ) {
