@@ -270,6 +270,8 @@ export const rewrite = (
 
 /* ------------------------- Publishing tools (REST) ------------------------ */
 
+/* ------------------------- Publishing tools (REST) ------------------------ */
+
 export type SynopsisRequest = {
   manuscriptText: string;
   title?: string;
@@ -302,12 +304,30 @@ export async function generateSynopsis(
     60000 // 60s timeout – synopses can be chunky
   );
 
+  const text = await res.text().catch(() => null);
+  const norm = normalizeResponse(res, text);
 
-   // ---------------------- Query / Logline / Blurb (REST) -----------------------
+  if (!norm.ok) {
+    throw new Error(norm.error || `HTTP ${res.status}`);
+  }
+
+  // Expecting Lambda to return { synopsis: "..." , ... }
+  if (norm.json && (norm.json as any).synopsis) {
+    return norm.json as SynopsisResponse;
+  }
+
+  // Fallback if Lambda puts text in `result` instead
+  return {
+    synopsis: (norm.result as string) || "",
+    ...(norm.json || {}),
+  };
+}
+
+/* ---------------------- Query / Logline / Blurb (REST) ----------------------- */
 
 export type QueryLetterRequest = {
   synopsis: string;
-  authorProfile?: string;   // stringified author info
+  authorProfile?: string; // stringified author info (optional)
   projectTitle?: string;
   genre?: string;
   tone?: string;
@@ -351,7 +371,7 @@ export async function generateQueryLetter(
   return {
     queryLetter:
       (norm.result as string) ||
-      (norm.json as any)?.text ||
+      ((norm.json as any)?.text as string) ||
       "",
     ...(norm.json || {}),
   };
@@ -401,7 +421,7 @@ export async function generateLogline(
   return {
     logline:
       (norm.result as string) ||
-      (norm.json as any)?.text ||
+      ((norm.json as any)?.text as string) ||
       "",
     ...(norm.json || {}),
   };
@@ -452,27 +472,8 @@ export async function generateBackCoverBlurb(
   return {
     backCover:
       (norm.result as string) ||
-      (norm.json as any)?.text ||
+      ((norm.json as any)?.text as string) ||
       "",
-    ...(norm.json || {}),
-  };
-}
-
-  const text = await res.text().catch(() => null);
-  const norm = normalizeResponse(res, text);
-
-  if (!norm.ok) {
-    throw new Error(norm.error || `HTTP ${res.status}`);
-  }
-
-  // Expecting Lambda to return { synopsis: "..." , ... }
-  if (norm.json && (norm.json as any).synopsis) {
-    return norm.json as SynopsisResponse;
-  }
-
-  // Fallback if Lambda puts text in `result` instead
-  return {
-    synopsis: (norm.result as string) || "",
     ...(norm.json || {}),
   };
 }
@@ -490,7 +491,10 @@ export function filesPresignUpload(params: {
     `${API_BASE}${ROUTES.files}`,
     {
       method: "POST",
-      headers: { "Content-Type": "application/json", "x-operation": "presign-upload" },
+      headers: {
+        "Content-Type": "application/json",
+        "x-operation": "presign-upload",
+      },
       body: JSON.stringify({ operation: "presign-upload", ...params }),
     },
     25000
@@ -522,7 +526,11 @@ export function filesList(params: {
   });
 }
 
-export function filesGet(params: { userId: string; key: string; expiresIn?: number }) {
+export function filesGet(params: {
+  userId: string;
+  key: string;
+  expiresIn?: number;
+}) {
   return fetchWithTimeout(
     `${API_BASE}${ROUTES.files}`,
     {
@@ -538,7 +546,11 @@ export function filesGet(params: { userId: string; key: string; expiresIn?: numb
   });
 }
 
-export function filesDelete(params: { userId: string; manuscriptId?: string; fileKey?: string }) {
+export function filesDelete(params: {
+  userId: string;
+  manuscriptId?: string;
+  fileKey?: string;
+}) {
   return fetchWithTimeout(
     `${API_BASE}${ROUTES.files}`,
     {
@@ -556,9 +568,16 @@ export function filesDelete(params: { userId: string; manuscriptId?: string; fil
 }
 
 /* --------------------------------- Ping ----------------------------------- */
-export async function ping(provider: "openai" | "anthropic" = "openai") {
+export async function ping(
+  provider: "openai" | "anthropic" = "openai"
+) {
   try {
-    const res = await callAssistant("ping", { ts: Date.now() }, provider, { retries: 0, timeoutMs: 8000 });
+    const res = await callAssistant(
+      "ping",
+      { ts: Date.now() },
+      provider,
+      { retries: 0, timeoutMs: 8000 }
+    );
     return { ok: true, res };
   } catch (e: any) {
     return { ok: false, error: e?.message || String(e) };
