@@ -39,7 +39,7 @@ const styles = {
     border: `1px solid ${theme.border}`,
     borderRadius: 16,
     padding: 16,
-    boxShadow: "0 8px 30px rgba(2,20,40,.06)",  // ✅ all double quotes
+    boxShadow: "0 8px 30px rgba(2,20,40,.06)",
   } as React.CSSProperties,
   label: {
     fontSize: 12,
@@ -91,7 +91,7 @@ export default function Format(): JSX.Element {
   const [lineHeight, setLineHeight] = useState<number>(2.0); // double-spaced default
   const [align, setAlign] = useState<Align>("left");
   const [pageWidthPx, setPageWidthPx] = useState<number>(720); // ~5.5–6" visually
-  const [topBottomMargin, setTopBottomMargin] = useState<number>(72); // a bit taller margin
+  const [topBottomMargin, setTopBottomMargin] = useState<number>(72);
   const [sideMargin, setSideMargin] = useState<number>(72);
 
   const [isSavingPrefs, setIsSavingPrefs] = useState(false);
@@ -143,40 +143,31 @@ export default function Format(): JSX.Element {
 
   const paragraphBlocks = useMemo(() => {
     if (!manuscript) return [];
-    // Split on double newlines as rough "paragraphs"
     return manuscript
       .split(/\n{2,}/)
       .map((p) => p.trim())
       .filter(Boolean);
   }, [manuscript]);
 
-  // Very simple text-based pagination: group paragraphs into "pages"
-  // based on approximate character count so it is not one endless scroll.
+  // Group paragraphs into pages by approximate character count
   const pages: string[][] = useMemo(() => {
     if (!paragraphBlocks.length) return [];
 
-    const maxCharsPerPage = 3500; // tune this if needed
+    const maxCharsPerPage = 3500; // tune if needed
     const result: string[][] = [];
     let currentPage: string[] = [];
     let currentCount = 0;
 
-    {paragraphBlocks.map((p, idx) => (
-  <p
-    key={idx}
-    style={{
-      margin: "0 0 1.5em 0",
-      textAlign:
-        align === "center"
-          ? "center"
-          : align === "justify"
-          ? "justify"
-          : "left",
-    }}
-  >
-    {p}
-  </p>
-))}
-
+    for (const para of paragraphBlocks) {
+      const paraLength = para.length + 2;
+      if (currentPage.length > 0 && currentCount + paraLength > maxCharsPerPage) {
+        result.push(currentPage);
+        currentPage = [];
+        currentCount = 0;
+      }
+      currentPage.push(para);
+      currentCount += paraLength;
+    }
 
     if (currentPage.length) {
       result.push(currentPage);
@@ -213,6 +204,7 @@ export default function Format(): JSX.Element {
         background: theme.bg,
         minHeight: "100vh",
       }}
+      title="Format & Styles"
     >
       <div style={styles.outer}>
         {/* HEADER STRIP */}
@@ -301,25 +293,12 @@ export default function Format(): JSX.Element {
           </div>
         </div>
 
-        <p
-          key={idx}
-          style={{
-            margin: "0 0 1em 0",
-            textAlign:
-              align === "center"
-                ? "center"
-                : align === "justify"
-                ? "justify"
-                : "left",
-          }}
-        >
-      
         {/* MAIN CONTENT */}
         <div style={{ ...styles.inner, ...styles.sectionShell }}>
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "minmax(0, 0.9fr) minmax(0, 2.1fr)", // slimmer sidebar, bigger preview
+              gridTemplateColumns: "minmax(0, 0.9fr) minmax(0, 2.1fr)",
               gap: 20,
               alignItems: "flex-start",
             }}
@@ -433,7 +412,13 @@ export default function Format(): JSX.Element {
                     }
                     style={styles.input}
                   />
-                  <div style={{ fontSize: 11, marginTop: 2, color: theme.subtext }}>
+                  <div
+                    style={{
+                      fontSize: 11,
+                      marginTop: 2,
+                      color: theme.subtext,
+                    }}
+                  >
                     2.0 ≈ double-spaced
                   </div>
                 </div>
@@ -537,7 +522,7 @@ export default function Format(): JSX.Element {
                 </div>
               </div>
 
-              {/* Top/bottom margin (optional tweak) */}
+              {/* Top/bottom margin */}
               <div
                 style={{
                   display: "grid",
@@ -661,7 +646,7 @@ export default function Format(): JSX.Element {
                         <p
                           key={idx}
                           style={{
-                            margin: "0 0 1.5em 0", // extra space between paragraphs
+                            margin: "0 0 1.5em 0",
                             textAlign:
                               align === "center"
                                 ? "center"
@@ -697,7 +682,6 @@ export default function Format(): JSX.Element {
       {/* Save toast */}
       {showSaved && (
         <div
-          className="fixed bottom-8 right-8"
           style={{
             position: "fixed",
             right: 24,
