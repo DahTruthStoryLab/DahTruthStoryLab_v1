@@ -39,7 +39,7 @@ const styles = {
     border: `1px solid ${theme.border}`,
     borderRadius: 16,
     padding: 16,
-    boxShadow: "0 8px 30px rgba(2,20,40,.06)",
+    boxShadow: "0 8px 30px rgba(2,20,40,.06)`,
   } as React.CSSProperties,
   label: {
     fontSize: 12,
@@ -57,7 +57,7 @@ const styles = {
 } as const;
 
 const MANUSCRIPT_KEY = "dahtruth_publishing_manuscript";
-const FORMAT_SETTINGS_KEY = "dahtruth_format_settings";
+const FORMAT_PREF_KEY = "dahtruth_format_prefs";
 
 const FONT_OPTIONS = [
   "Times New Roman",
@@ -70,7 +70,7 @@ const FONT_OPTIONS = [
 
 type Align = "left" | "justify" | "center";
 
-interface FormatSettings {
+interface FormatPrefs {
   fontFamily: string;
   fontSizePx: number;
   lineHeight: number;
@@ -80,24 +80,24 @@ interface FormatSettings {
   sideMargin: number;
 }
 
-const PAGE_HEIGHT_PX = 900; // virtual page height used just for splitting
-
 export default function Format(): JSX.Element {
   const navigate = useNavigate();
 
   const [manuscript, setManuscript] = useState<string>("");
+
+  // Default to "manuscript ready" (double spaced + roomy page)
   const [fontFamily, setFontFamily] = useState<string>("Times New Roman");
   const [fontSizePx, setFontSizePx] = useState<number>(16); // ~12 pt
-  const [lineHeight, setLineHeight] = useState<number>(1.6);
+  const [lineHeight, setLineHeight] = useState<number>(2.0); // double-spaced default
   const [align, setAlign] = useState<Align>("left");
   const [pageWidthPx, setPageWidthPx] = useState<number>(720); // ~5.5–6" visually
-  const [topBottomMargin, setTopBottomMargin] = useState<number>(56);
-  const [sideMargin, setSideMargin] = useState<number>(64);
+  const [topBottomMargin, setTopBottomMargin] = useState<number>(72); // a bit taller margin
+  const [sideMargin, setSideMargin] = useState<number>(72);
 
-  const [isSaving, setIsSaving] = useState(false);
+  const [isSavingPrefs, setIsSavingPrefs] = useState(false);
   const [showSaved, setShowSaved] = useState(false);
 
-  // Load compiled manuscript + saved format settings
+  // Load compiled manuscript from Publishing
   useEffect(() => {
     try {
       const raw = localStorage.getItem(MANUSCRIPT_KEY);
@@ -107,26 +107,29 @@ export default function Format(): JSX.Element {
     } catch {
       // ignore
     }
+  }, []);
 
+  // Load any saved formatting preferences
+  useEffect(() => {
     try {
-      const settingsRaw = localStorage.getItem(FORMAT_SETTINGS_KEY);
-      if (settingsRaw) {
-        const parsed = JSON.parse(settingsRaw) as Partial<FormatSettings>;
-        if (parsed.fontFamily) setFontFamily(parsed.fontFamily);
-        if (typeof parsed.fontSizePx === "number")
-          setFontSizePx(parsed.fontSizePx);
-        if (typeof parsed.lineHeight === "number")
-          setLineHeight(parsed.lineHeight);
-        if (parsed.align) setAlign(parsed.align);
-        if (typeof parsed.pageWidthPx === "number")
-          setPageWidthPx(parsed.pageWidthPx);
-        if (typeof parsed.topBottomMargin === "number")
-          setTopBottomMargin(parsed.topBottomMargin);
-        if (typeof parsed.sideMargin === "number")
-          setSideMargin(parsed.sideMargin);
-      }
+      const rawPrefs = localStorage.getItem(FORMAT_PREF_KEY);
+      if (!rawPrefs) return;
+      const parsed = JSON.parse(rawPrefs) as Partial<FormatPrefs>;
+
+      if (parsed.fontFamily) setFontFamily(parsed.fontFamily);
+      if (typeof parsed.fontSizePx === "number")
+        setFontSizePx(parsed.fontSizePx);
+      if (typeof parsed.lineHeight === "number")
+        setLineHeight(parsed.lineHeight);
+      if (parsed.align) setAlign(parsed.align);
+      if (typeof parsed.pageWidthPx === "number")
+        setPageWidthPx(parsed.pageWidthPx);
+      if (typeof parsed.topBottomMargin === "number")
+        setTopBottomMargin(parsed.topBottomMargin);
+      if (typeof parsed.sideMargin === "number")
+        setSideMargin(parsed.sideMargin);
     } catch {
-      // ignore format settings issues
+      // ignore
     }
   }, []);
 
@@ -147,89 +150,54 @@ export default function Format(): JSX.Element {
       .filter(Boolean);
   }, [manuscript]);
 
-  // Approximate pagination into "pages" based on paragraph length and layout
+  // Very simple text-based pagination: group paragraphs into "pages"
+  // based on approximate character count so it is not one endless scroll.
   const pages: string[][] = useMemo(() => {
     if (!paragraphBlocks.length) return [];
 
-    // Rough estimate of how many characters per line and lines per page
-    const approxCharsPerLine = Math.max(
-      40,
-      Math.floor((pageWidthPx - sideMargin * 2) / (fontSizePx * 0.6))
-    );
-
-    const approximateContentHeight =
-      PAGE_HEIGHT_PX - topBottomMargin * 2;
-
-    const approxLineHeightPx = fontSizePx * lineHeight;
-    const approxLinesPerPage = Math.max(
-      20,
-      Math.floor(approximateContentHeight / approxLineHeightPx)
-    );
-
-    const pagesAcc: string[][] = [];
+    const maxCharsPerPage = 3500; // tune this if needed
+    const result: string[][] = [];
     let currentPage: string[] = [];
-    let currentLines = 0;
+    let currentCount = 0;
 
-    paragraphBlocks.forEach((para) => {
-      const estimatedLinesForPara = Math.max(
-        1,
-        Math.ceil(para.length / approxCharsPerLine)
-      );
-
-      if (
-        currentLines + estimatedLinesForPara >
-        approxLinesPerPage
-      ) {
-        // start a new page
-        if (currentPage.length) {
-          pagesAcc.push(currentPage);
-        }
-        currentPage = [para];
-        currentLines = estimatedLinesForPara;
+    paragraphBlocks.forEach((p) => {
+      const len = p.length + 1;
+      if (currentPage.length > 0 && currentCount + len > maxCharsPerPage) {
+        result.push(currentPage);
+        currentPage = [p];
+        currentCount = len;
       } else {
-        currentPage.push(para);
-        currentLines += estimatedLinesForPara;
+        currentPage.push(p);
+        currentCount += len;
       }
     });
 
     if (currentPage.length) {
-      pagesAcc.push(currentPage);
+      result.push(currentPage);
     }
 
-    return pagesAcc;
-  }, [
-    paragraphBlocks,
-    pageWidthPx,
-    sideMargin,
-    fontSizePx,
-    lineHeight,
-    topBottomMargin,
-  ]);
+    return result;
+  }, [paragraphBlocks]);
 
-  const handleSaveSettings = () => {
-    const payload: FormatSettings = {
-      fontFamily,
-      fontSizePx,
-      lineHeight,
-      align,
-      pageWidthPx,
-      topBottomMargin,
-      sideMargin,
-    };
-
+  const handleSavePrefs = () => {
     try {
-      setIsSaving(true);
-      localStorage.setItem(
-        FORMAT_SETTINGS_KEY,
-        JSON.stringify(payload)
-      );
+      setIsSavingPrefs(true);
+      const prefs: FormatPrefs = {
+        fontFamily,
+        fontSizePx,
+        lineHeight,
+        align,
+        pageWidthPx,
+        topBottomMargin,
+        sideMargin,
+      };
+      localStorage.setItem(FORMAT_PREF_KEY, JSON.stringify(prefs));
       setShowSaved(true);
-      setTimeout(() => setShowSaved(false), 2000);
-    } catch (err) {
-      console.error("Failed to save format settings:", err);
-      alert("Could not save format settings. Please try again.");
+      setTimeout(() => setShowSaved(false), 2200);
+    } catch {
+      // ignore
     } finally {
-      setIsSaving(false);
+      setIsSavingPrefs(false);
     }
   };
 
@@ -301,7 +269,7 @@ export default function Format(): JSX.Element {
                   opacity: 0.9,
                 }}
               >
-                Tweak fonts, spacing, and page size for your final manuscript.
+                Double-spaced preview with page-style layout for your manuscript.
               </div>
             </div>
 
@@ -332,53 +300,22 @@ export default function Format(): JSX.Element {
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "minmax(0, 1.1fr) minmax(0, 1.9fr)",
+              gridTemplateColumns: "minmax(0, 0.9fr) minmax(0, 2.1fr)", // slimmer sidebar, bigger preview
               gap: 20,
               alignItems: "flex-start",
             }}
           >
             {/* LEFT: Controls */}
             <div style={styles.glassCard}>
-              <div
+              <h3
                 style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  gap: 8,
-                  marginBottom: 8,
+                  margin: "0 0 10px",
+                  fontSize: 16,
+                  color: theme.text,
                 }}
               >
-                <h3
-                  style={{
-                    margin: 0,
-                    fontSize: 16,
-                    color: theme.text,
-                  }}
-                >
-                  Formatting Controls
-                </h3>
-                <button
-                  type="button"
-                  onClick={handleSaveSettings}
-                  disabled={isSaving}
-                  style={{
-                    border: "none",
-                    borderRadius: 999,
-                    padding: "6px 12px",
-                    fontSize: 11,
-                    fontWeight: 600,
-                    cursor: isSaving ? "default" : "pointer",
-                    background:
-                      "linear-gradient(135deg, #D4AF37, #f5e6b3)",
-                    color: "#1f2937",
-                    boxShadow: "0 4px 12px rgba(180,142,38,0.35)",
-                    opacity: isSaving ? 0.8 : 1,
-                  }}
-                >
-                  {isSaving ? "Saving…" : "Save layout"}
-                </button>
-              </div>
-
+                Formatting Controls
+              </h3>
               <p
                 style={{
                   fontSize: 12,
@@ -473,10 +410,13 @@ export default function Format(): JSX.Element {
                     max={3}
                     value={lineHeight}
                     onChange={(e) =>
-                      setLineHeight(Number(e.target.value) || 1.6)
+                      setLineHeight(Number(e.target.value) || 2.0)
                     }
                     style={styles.input}
                   />
+                  <div style={{ fontSize: 11, marginTop: 2, color: theme.subtext }}>
+                    2.0 ≈ double-spaced
+                  </div>
                 </div>
 
                 <div>
@@ -531,7 +471,7 @@ export default function Format(): JSX.Element {
                   display: "grid",
                   gridTemplateColumns: "1fr 1fr",
                   gap: 10,
-                  marginBottom: 8,
+                  marginBottom: 12,
                 }}
               >
                 <div>
@@ -571,7 +511,39 @@ export default function Format(): JSX.Element {
                     max={120}
                     value={sideMargin}
                     onChange={(e) =>
-                      setSideMargin(Number(e.target.value) || 64)
+                      setSideMargin(Number(e.target.value) || 72)
+                    }
+                    style={styles.input}
+                  />
+                </div>
+              </div>
+
+              {/* Top/bottom margin (optional tweak) */}
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr 1fr",
+                  gap: 10,
+                  marginBottom: 8,
+                }}
+              >
+                <div>
+                  <label
+                    style={{
+                      ...styles.label,
+                      display: "block",
+                      marginBottom: 4,
+                    }}
+                  >
+                    Top / bottom padding (px)
+                  </label>
+                  <input
+                    type="number"
+                    min={40}
+                    max={140}
+                    value={topBottomMargin}
+                    onChange={(e) =>
+                      setTopBottomMargin(Number(e.target.value) || 72)
                     }
                     style={styles.input}
                   />
@@ -580,16 +552,40 @@ export default function Format(): JSX.Element {
 
               <div
                 style={{
-                  marginTop: 6,
+                  marginTop: 10,
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
                   fontSize: 11,
                   color: theme.subtext,
+                  gap: 8,
                 }}
               >
-                <div>Preview only – exporting is handled on the Export tab.</div>
+                <span>
+                  Preview only – exporting is handled on the Export tab.
+                </span>
+                <button
+                  type="button"
+                  onClick={handleSavePrefs}
+                  disabled={isSavingPrefs}
+                  style={{
+                    borderRadius: 999,
+                    border: "none",
+                    padding: "6px 12px",
+                    fontSize: 11,
+                    fontWeight: 600,
+                    cursor: isSavingPrefs ? "default" : "pointer",
+                    background:
+                      "linear-gradient(135deg, #22c55e, #4ade80)",
+                    color: "#0f172a",
+                  }}
+                >
+                  {isSavingPrefs ? "Saving…" : "Save format settings"}
+                </button>
               </div>
             </div>
 
-            {/* RIGHT: Preview */}
+            {/* RIGHT: Paged Preview */}
             <div style={styles.glassCard}>
               <h3
                 style={{
@@ -620,11 +616,11 @@ export default function Format(): JSX.Element {
                       "linear-gradient(180deg, #e5edf5, #f4f5f7)",
                     borderRadius: 10,
                     border: `1px solid ${theme.border}`,
-                    maxHeight: "75vh",
+                    maxHeight: "70vh",
                     overflowY: "auto",
                   }}
                 >
-                  {pages.map((pageParas, pageIndex) => (
+                  {pages.map((page, pageIndex) => (
                     <div
                       key={pageIndex}
                       style={{
@@ -634,8 +630,7 @@ export default function Format(): JSX.Element {
                         color: "#111827",
                         borderRadius: 6,
                         border: "1px solid #e5e7eb",
-                        boxShadow:
-                          "0 8px 30px rgba(15,23,42,0.12)",
+                        boxShadow: "0 8px 30px rgba(15,23,42,0.12)",
                         padding: `${topBottomMargin}px ${sideMargin}px`,
                         fontFamily: fontFamily,
                         fontSize: fontSizePx,
@@ -643,17 +638,19 @@ export default function Format(): JSX.Element {
                         whiteSpace: "pre-wrap",
                       }}
                     >
-                      {pageParas.map((p, idx) => (
+                      {page.map((p, idx) => (
                         <p
                           key={idx}
                           style={{
-                            margin: "0 0 1em 0",
+                            margin: "0 0 1.5em 0", // extra space between paragraphs
                             textAlign:
                               align === "center"
                                 ? "center"
                                 : align === "justify"
                                 ? "justify"
                                 : "left",
+                            textJustify:
+                              align === "justify" ? "inter-word" : "auto",
                           }}
                         >
                           {p}
@@ -661,12 +658,10 @@ export default function Format(): JSX.Element {
                       ))}
                       <div
                         style={{
-                          marginTop: 16,
+                          textAlign: "right",
                           fontSize: 11,
-                          textAlign: "center",
-                          color: "#6b7280",
-                          borderTop: "1px solid #e5e7eb",
-                          paddingTop: 6,
+                          color: "#9ca3af",
+                          marginTop: 12,
                         }}
                       >
                         Page {pageIndex + 1}
@@ -686,22 +681,21 @@ export default function Format(): JSX.Element {
           className="fixed bottom-8 right-8"
           style={{
             position: "fixed",
-            bottom: 24,
             right: 24,
+            bottom: 24,
             display: "flex",
             alignItems: "center",
             gap: 10,
-            padding: "8px 14px",
+            padding: "10px 16px",
             borderRadius: 999,
-            background:
-              "linear-gradient(135deg, #22c55e, #4ade80)",
+            background: "linear-gradient(135deg, #22c55e, #4ade80)",
             color: "#fff",
-            fontSize: 12,
+            fontSize: 13,
             fontWeight: 600,
             boxShadow: "0 8px 24px rgba(22,163,74,0.4)",
           }}
         >
-          Layout settings saved
+          Format settings saved
         </div>
       )}
     </PageShell>
