@@ -160,17 +160,23 @@ export default function Format(): JSX.Element {
     let currentPage: string[] = [];
     let currentCount = 0;
 
-    paragraphBlocks.forEach((p) => {
-      const len = p.length + 1;
-      if (currentPage.length > 0 && currentCount + len > maxCharsPerPage) {
-        result.push(currentPage);
-        currentPage = [p];
-        currentCount = len;
-      } else {
-        currentPage.push(p);
-        currentCount += len;
-      }
-    });
+    {paragraphBlocks.map((p, idx) => (
+  <p
+    key={idx}
+    style={{
+      margin: "0 0 1.5em 0",
+      textAlign:
+        align === "center"
+          ? "center"
+          : align === "justify"
+          ? "justify"
+          : "left",
+    }}
+  >
+    {p}
+  </p>
+))}
+
 
     if (currentPage.length) {
       result.push(currentPage);
@@ -295,6 +301,19 @@ export default function Format(): JSX.Element {
           </div>
         </div>
 
+        <p
+          key={idx}
+          style={{
+            margin: "0 0 1em 0",
+            textAlign:
+              align === "center"
+                ? "center"
+                : align === "justify"
+                ? "justify"
+                : "left",
+          }}
+        >
+      
         {/* MAIN CONTENT */}
         <div style={{ ...styles.inner, ...styles.sectionShell }}>
           <div
