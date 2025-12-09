@@ -57,6 +57,7 @@ const styles = {
 } as const;
 
 const MANUSCRIPT_KEY = "dahtruth_publishing_manuscript";
+const FORMAT_SETTINGS_KEY = "dahtruth_format_settings";
 
 const FONT_OPTIONS = [
   "Times New Roman",
@@ -68,6 +69,18 @@ const FONT_OPTIONS = [
 ];
 
 type Align = "left" | "justify" | "center";
+
+interface FormatSettings {
+  fontFamily: string;
+  fontSizePx: number;
+  lineHeight: number;
+  align: Align;
+  pageWidthPx: number;
+  topBottomMargin: number;
+  sideMargin: number;
+}
+
+const PAGE_HEIGHT_PX = 900; // virtual page height used just for splitting
 
 export default function Format(): JSX.Element {
   const navigate = useNavigate();
@@ -81,7 +94,10 @@ export default function Format(): JSX.Element {
   const [topBottomMargin, setTopBottomMargin] = useState<number>(56);
   const [sideMargin, setSideMargin] = useState<number>(64);
 
-  // Load compiled manuscript from Publishing
+  const [isSaving, setIsSaving] = useState(false);
+  const [showSaved, setShowSaved] = useState(false);
+
+  // Load compiled manuscript + saved format settings
   useEffect(() => {
     try {
       const raw = localStorage.getItem(MANUSCRIPT_KEY);
@@ -90,6 +106,27 @@ export default function Format(): JSX.Element {
       }
     } catch {
       // ignore
+    }
+
+    try {
+      const settingsRaw = localStorage.getItem(FORMAT_SETTINGS_KEY);
+      if (settingsRaw) {
+        const parsed = JSON.parse(settingsRaw) as Partial<FormatSettings>;
+        if (parsed.fontFamily) setFontFamily(parsed.fontFamily);
+        if (typeof parsed.fontSizePx === "number")
+          setFontSizePx(parsed.fontSizePx);
+        if (typeof parsed.lineHeight === "number")
+          setLineHeight(parsed.lineHeight);
+        if (parsed.align) setAlign(parsed.align);
+        if (typeof parsed.pageWidthPx === "number")
+          setPageWidthPx(parsed.pageWidthPx);
+        if (typeof parsed.topBottomMargin === "number")
+          setTopBottomMargin(parsed.topBottomMargin);
+        if (typeof parsed.sideMargin === "number")
+          setSideMargin(parsed.sideMargin);
+      }
+    } catch {
+      // ignore format settings issues
     }
   }, []);
 
@@ -104,8 +141,97 @@ export default function Format(): JSX.Element {
   const paragraphBlocks = useMemo(() => {
     if (!manuscript) return [];
     // Split on double newlines as rough "paragraphs"
-    return manuscript.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
+    return manuscript
+      .split(/\n{2,}/)
+      .map((p) => p.trim())
+      .filter(Boolean);
   }, [manuscript]);
+
+  // Approximate pagination into "pages" based on paragraph length and layout
+  const pages: string[][] = useMemo(() => {
+    if (!paragraphBlocks.length) return [];
+
+    // Rough estimate of how many characters per line and lines per page
+    const approxCharsPerLine = Math.max(
+      40,
+      Math.floor((pageWidthPx - sideMargin * 2) / (fontSizePx * 0.6))
+    );
+
+    const approximateContentHeight =
+      PAGE_HEIGHT_PX - topBottomMargin * 2;
+
+    const approxLineHeightPx = fontSizePx * lineHeight;
+    const approxLinesPerPage = Math.max(
+      20,
+      Math.floor(approximateContentHeight / approxLineHeightPx)
+    );
+
+    const pagesAcc: string[][] = [];
+    let currentPage: string[] = [];
+    let currentLines = 0;
+
+    paragraphBlocks.forEach((para) => {
+      const estimatedLinesForPara = Math.max(
+        1,
+        Math.ceil(para.length / approxCharsPerLine)
+      );
+
+      if (
+        currentLines + estimatedLinesForPara >
+        approxLinesPerPage
+      ) {
+        // start a new page
+        if (currentPage.length) {
+          pagesAcc.push(currentPage);
+        }
+        currentPage = [para];
+        currentLines = estimatedLinesForPara;
+      } else {
+        currentPage.push(para);
+        currentLines += estimatedLinesForPara;
+      }
+    });
+
+    if (currentPage.length) {
+      pagesAcc.push(currentPage);
+    }
+
+    return pagesAcc;
+  }, [
+    paragraphBlocks,
+    pageWidthPx,
+    sideMargin,
+    fontSizePx,
+    lineHeight,
+    topBottomMargin,
+  ]);
+
+  const handleSaveSettings = () => {
+    const payload: FormatSettings = {
+      fontFamily,
+      fontSizePx,
+      lineHeight,
+      align,
+      pageWidthPx,
+      topBottomMargin,
+      sideMargin,
+    };
+
+    try {
+      setIsSaving(true);
+      localStorage.setItem(
+        FORMAT_SETTINGS_KEY,
+        JSON.stringify(payload)
+      );
+      setShowSaved(true);
+      setTimeout(() => setShowSaved(false), 2000);
+    } catch (err) {
+      console.error("Failed to save format settings:", err);
+      alert("Could not save format settings. Please try again.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   return (
     <PageShell
@@ -181,7 +307,7 @@ export default function Format(): JSX.Element {
 
             <div
               style={{
-                minWidth: 160,
+                minWidth: 180,
                 textAlign: "right",
                 fontSize: 11,
               }}
@@ -213,15 +339,46 @@ export default function Format(): JSX.Element {
           >
             {/* LEFT: Controls */}
             <div style={styles.glassCard}>
-              <h3
+              <div
                 style={{
-                  margin: "0 0 10px",
-                  fontSize: 16,
-                  color: theme.text,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  gap: 8,
+                  marginBottom: 8,
                 }}
               >
-                Formatting Controls
-              </h3>
+                <h3
+                  style={{
+                    margin: 0,
+                    fontSize: 16,
+                    color: theme.text,
+                  }}
+                >
+                  Formatting Controls
+                </h3>
+                <button
+                  type="button"
+                  onClick={handleSaveSettings}
+                  disabled={isSaving}
+                  style={{
+                    border: "none",
+                    borderRadius: 999,
+                    padding: "6px 12px",
+                    fontSize: 11,
+                    fontWeight: 600,
+                    cursor: isSaving ? "default" : "pointer",
+                    background:
+                      "linear-gradient(135deg, #D4AF37, #f5e6b3)",
+                    color: "#1f2937",
+                    boxShadow: "0 4px 12px rgba(180,142,38,0.35)",
+                    opacity: isSaving ? 0.8 : 1,
+                  }}
+                >
+                  {isSaving ? "Saving…" : "Save layout"}
+                </button>
+              </div>
+
               <p
                 style={{
                   fontSize: 12,
@@ -283,9 +440,7 @@ export default function Format(): JSX.Element {
                     max={26}
                     value={fontSizePx}
                     onChange={(e) =>
-                      setFontSizePx(
-                        Number(e.target.value) || 16
-                      )
+                      setFontSizePx(Number(e.target.value) || 16)
                     }
                     style={styles.input}
                   />
@@ -318,9 +473,7 @@ export default function Format(): JSX.Element {
                     max={3}
                     value={lineHeight}
                     onChange={(e) =>
-                      setLineHeight(
-                        Number(e.target.value) || 1.6
-                      )
+                      setLineHeight(Number(e.target.value) || 1.6)
                     }
                     style={styles.input}
                   />
@@ -342,36 +495,32 @@ export default function Format(): JSX.Element {
                       gap: 6,
                     }}
                   >
-                    {(["left", "justify", "center"] as Align[]).map(
-                      (a) => (
-                        <button
-                          key={a}
-                          type="button"
-                          onClick={() => setAlign(a)}
-                          style={{
-                            flex: 1,
-                            padding: "6px 8px",
-                            borderRadius: 999,
-                            border:
-                              align === a
-                                ? `1px solid ${theme.accent}`
-                                : `1px solid ${theme.border}`,
-                            background:
-                              align === a
-                                ? theme.highlight
-                                : theme.white,
-                            fontSize: 11,
-                            cursor: "pointer",
-                          }}
-                        >
-                          {a === "left"
-                            ? "Left"
-                            : a === "justify"
-                            ? "Justify"
-                            : "Center"}
-                        </button>
-                      )
-                    )}
+                    {(["left", "justify", "center"] as Align[]).map((a) => (
+                      <button
+                        key={a}
+                        type="button"
+                        onClick={() => setAlign(a)}
+                        style={{
+                          flex: 1,
+                          padding: "6px 8px",
+                          borderRadius: 999,
+                          border:
+                            align === a
+                              ? `1px solid ${theme.accent}`
+                              : `1px solid ${theme.border}`,
+                          background:
+                            align === a ? theme.highlight : theme.white,
+                          fontSize: 11,
+                          cursor: "pointer",
+                        }}
+                      >
+                        {a === "left"
+                          ? "Left"
+                          : a === "justify"
+                          ? "Justify"
+                          : "Center"}
+                      </button>
+                    ))}
                   </div>
                 </div>
               </div>
@@ -382,7 +531,7 @@ export default function Format(): JSX.Element {
                   display: "grid",
                   gridTemplateColumns: "1fr 1fr",
                   gap: 10,
-                  marginBottom: 4,
+                  marginBottom: 8,
                 }}
               >
                 <div>
@@ -401,9 +550,7 @@ export default function Format(): JSX.Element {
                     max={880}
                     value={pageWidthPx}
                     onChange={(e) =>
-                      setPageWidthPx(
-                        Number(e.target.value) || 720
-                      )
+                      setPageWidthPx(Number(e.target.value) || 720)
                     }
                     style={styles.input}
                   />
@@ -424,9 +571,7 @@ export default function Format(): JSX.Element {
                     max={120}
                     value={sideMargin}
                     onChange={(e) =>
-                      setSideMargin(
-                        Number(e.target.value) || 64
-                      )
+                      setSideMargin(Number(e.target.value) || 64)
                     }
                     style={styles.input}
                   />
@@ -435,16 +580,12 @@ export default function Format(): JSX.Element {
 
               <div
                 style={{
-                  marginTop: 10,
-                  display: "flex",
-                  justifyContent: "space-between",
+                  marginTop: 6,
                   fontSize: 11,
                   color: theme.subtext,
                 }}
               >
-                <span>
-                  Preview only – exporting is handled on the Export tab.
-                </span>
+                <div>Preview only – exporting is handled on the Export tab.</div>
               </div>
             </div>
 
@@ -479,54 +620,90 @@ export default function Format(): JSX.Element {
                       "linear-gradient(180deg, #e5edf5, #f4f5f7)",
                     borderRadius: 10,
                     border: `1px solid ${theme.border}`,
+                    maxHeight: "75vh",
+                    overflowY: "auto",
                   }}
                 >
-                  <div
-                    style={{
-                      margin: "0 auto",
-                      maxWidth: pageWidthPx,
-                      background: "#ffffff",
-                      color: "#111827",
-                      borderRadius: 6,
-                      border: "1px solid #e5e7eb",
-                      boxShadow:
-                        "0 8px 30px rgba(15,23,42,0.12)",
-                      padding: `${topBottomMargin}px ${sideMargin}px`,
-                      fontFamily: fontFamily,
-                      fontSize: fontSizePx,
-                      lineHeight: lineHeight,
-                      textAlign:
-                        align === "center" ? "center" : "left",
-                      textJustify:
-                        align === "justify"
-                          ? "inter-word"
-                          : "auto",
-                      whiteSpace: "pre-wrap",
-                    }}
-                  >
-                    {paragraphBlocks.map((p, idx) => (
-                      <p
-                        key={idx}
+                  {pages.map((pageParas, pageIndex) => (
+                    <div
+                      key={pageIndex}
+                      style={{
+                        margin: "0 auto 24px auto",
+                        maxWidth: pageWidthPx,
+                        background: "#ffffff",
+                        color: "#111827",
+                        borderRadius: 6,
+                        border: "1px solid #e5e7eb",
+                        boxShadow:
+                          "0 8px 30px rgba(15,23,42,0.12)",
+                        padding: `${topBottomMargin}px ${sideMargin}px`,
+                        fontFamily: fontFamily,
+                        fontSize: fontSizePx,
+                        lineHeight: lineHeight,
+                        whiteSpace: "pre-wrap",
+                      }}
+                    >
+                      {pageParas.map((p, idx) => (
+                        <p
+                          key={idx}
+                          style={{
+                            margin: "0 0 1em 0",
+                            textAlign:
+                              align === "center"
+                                ? "center"
+                                : align === "justify"
+                                ? "justify"
+                                : "left",
+                          }}
+                        >
+                          {p}
+                        </p>
+                      ))}
+                      <div
                         style={{
-                          margin: "0 0 1em 0",
-                          textAlign:
-                            align === "center"
-                              ? "center"
-                              : align === "justify"
-                              ? "justify"
-                              : "left",
+                          marginTop: 16,
+                          fontSize: 11,
+                          textAlign: "center",
+                          color: "#6b7280",
+                          borderTop: "1px solid #e5e7eb",
+                          paddingTop: 6,
                         }}
                       >
-                        {p}
-                      </p>
-                    ))}
-                  </div>
+                        Page {pageIndex + 1}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
           </div>
         </div>
       </div>
+
+      {/* Save toast */}
+      {showSaved && (
+        <div
+          className="fixed bottom-8 right-8"
+          style={{
+            position: "fixed",
+            bottom: 24,
+            right: 24,
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            padding: "8px 14px",
+            borderRadius: 999,
+            background:
+              "linear-gradient(135deg, #22c55e, #4ade80)",
+            color: "#fff",
+            fontSize: 12,
+            fontWeight: 600,
+            boxShadow: "0 8px 24px rgba(22,163,74,0.4)",
+          }}
+        >
+          Layout settings saved
+        </div>
+      )}
     </PageShell>
   );
 }
