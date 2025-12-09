@@ -285,7 +285,6 @@ export default function App() {
                 path="/story-lab/proof"
                 element={<Navigate to="/proof" replace />}
               />
-              <Route path="/format" element={<Format />} />
               <Route
                 path="/story-lab/format"
                 element={<Navigate to="/format" replace />}
@@ -303,10 +302,6 @@ export default function App() {
               <Route
                 path="/storylab/publishing"
                 element={<Navigate to="/publishing" replace />}
-              />
-              <Route
-                path="/storylab/proof"
-                element={<Navigate to="/proof" replace />}
               />
               <Route
                 path="/storylab/format"
