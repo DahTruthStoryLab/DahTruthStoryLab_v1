@@ -285,6 +285,7 @@ export default function App() {
                 path="/story-lab/proof"
                 element={<Navigate to="/proof" replace />}
               />
+              <Route path="/format" element={<Format />} />
               <Route
                 path="/story-lab/format"
                 element={<Navigate to="/format" replace />}
