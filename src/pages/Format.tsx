@@ -39,7 +39,7 @@ const styles = {
     border: `1px solid ${theme.border}`,
     borderRadius: 16,
     padding: 16,
-    boxShadow: "0 8px 30px rgba(2,20,40,.06)`,
+    boxShadow: "0 8px 30px rgba(2,20,40,.06)",  // ✅ all double quotes
   } as React.CSSProperties,
   label: {
     fontSize: 12,
