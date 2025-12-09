@@ -99,6 +99,7 @@ const StoryLabLayout = lazy(() =>
 const NarrativeArc = lazy(() =>
   import("./components/storylab/NarrativeArc.jsx")
 );
+const Cover = lazy(() => import("./pages/Cover.jsx"));
 
 // =========================
 // Global UI helpers
@@ -265,6 +266,15 @@ export default function App() {
                   </ProtectedRoute>
                 }
               />
+              {/* NEW: top-level Cover route */}
+              <Route
+                path="/cover"
+                element={
+                  <ProtectedRoute>
+                    <Cover />
+                  </ProtectedRoute>
+                }
+              />
 
               {/* Aliases that all point to the top-level publishing routes */}
               <Route
@@ -275,7 +285,10 @@ export default function App() {
                 path="/publishing-suite"
                 element={<Navigate to="/publishing" replace />}
               />
-
+              <Route
+                path="/publishing/cover"
+                element={<Navigate to="/cover" replace />}
+              />
               {/* Legacy Story-Lab URLs → new top-level pages */}
               <Route
                 path="/story-lab/publishing"
