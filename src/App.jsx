@@ -99,7 +99,7 @@ const StoryLabLayout = lazy(() =>
 const NarrativeArc = lazy(() =>
   import("./components/storylab/NarrativeArc.jsx")
 );
-const Cover = lazy(() => import("./pages/Cover.jsx"));
+const Cover = lazy(() => import("./pages/Cover.tsx"));
 
 // =========================
 // Global UI helpers
