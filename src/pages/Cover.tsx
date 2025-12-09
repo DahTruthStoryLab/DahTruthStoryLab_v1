@@ -1,8 +1,25 @@
 // src/pages/Cover.tsx
 import React, { useEffect, useState } from "react";
 import PageShell from "../components/layout/PageShell.tsx";
+import { uploadImage } from "../lib/uploads"; // re-use your existing uploader
+
+const theme = {
+  bg: "var(--brand-bg)",
+  surface: "var(--brand-surface, var(--brand-white))",
+  border: "var(--brand-border)",
+  borderStrong: "var(--brand-border-strong)",
+  text: "var(--brand-text)",
+  subtext: "var(--brand-subtext)",
+  accent: "var(--brand-accent)",
+  highlight: "var(--brand-highlight)",
+  primary: "var(--brand-primary)",
+  white: "var(--brand-white)",
+} as const;
 
 const COVER_PREF_KEY = "dahtruth_cover_prefs";
+
+type TrimSize = "6x9" | "5.5x8.5" | "5x8";
+type BgType = "solid" | "gradient" | "image";
 
 interface CoverPrefs {
   title: string;
@@ -10,8 +27,8 @@ interface CoverPrefs {
   author: string;
   series: string;
   tagline: string;
-  trimSize: "6x9" | "5.5x8.5" | "5x8";
-  bgType: "solid" | "gradient" | "image";
+  trimSize: TrimSize;
+  bgType: BgType;
   bgColor: string;
   bgGradient: string;
   imageUrl: string | null;
@@ -45,8 +62,9 @@ const defaultPrefs: CoverPrefs = {
 export default function Cover(): JSX.Element {
   const [prefs, setPrefs] = useState<CoverPrefs>(defaultPrefs);
   const [showSaved, setShowSaved] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
 
-  // Load saved prefs
+  // Load saved prefs from localStorage
   useEffect(() => {
     try {
       const raw = localStorage.getItem(COVER_PREF_KEY);
@@ -68,15 +86,69 @@ export default function Cover(): JSX.Element {
     }
   };
 
-  // Helper for controlled inputs
+  // Helper for controlled fields
   const update = <K extends keyof CoverPrefs>(key: K, value: CoverPrefs[K]) => {
     setPrefs((prev) => ({ ...prev, [key]: value }));
   };
 
   // Derived: aspect ratio based on trim size
-  const aspect = prefs.trimSize === "6x9" ? 9 / 6 : prefs.trimSize === "5.5x8.5" ? 8.5 / 5.5 : 8 / 5;
+  const aspect =
+    prefs.trimSize === "6x9"
+      ? 9 / 6
+      : prefs.trimSize === "5.5x8.5"
+      ? 8.5 / 5.5
+      : 8 / 5;
   const width = 260;
   const height = width * aspect;
+
+  // Handle image upload for bgType = "image"
+  const handleImageChange = async (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      setIsUploading(true);
+      const url = await uploadImage(file); // assumes this returns a string URL
+      update("imageUrl", url);
+      update("bgType", "image");
+    } catch (err) {
+      console.error("Image upload failed", err);
+      // you could show a toast later
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  // Base cover style + background style
+  const baseCoverStyle: React.CSSProperties = {
+    width,
+    height,
+    borderRadius: 12,
+    boxShadow: "0 18px 40px rgba(15,23,42,0.35)",
+    padding: 22,
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "space-between",
+    color: "#fff",
+    position: "relative",
+    overflow: "hidden",
+  };
+
+  const coverBackgroundStyle: React.CSSProperties =
+    prefs.bgType === "image" && prefs.imageUrl
+      ? {
+          backgroundColor: "#020617",
+          backgroundImage: `url(${prefs.imageUrl})`,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+        }
+      : {
+          background:
+            prefs.bgType === "gradient"
+              ? prefs.bgGradient
+              : prefs.bgColor,
+        };
 
   return (
     <PageShell title="Cover">
@@ -102,8 +174,15 @@ export default function Cover(): JSX.Element {
         >
           <div>
             <h1 style={{ margin: 0, fontSize: 20 }}>Book Cover</h1>
-            <p style={{ margin: "4px 0 0", fontSize: 12, color: "#6b7280" }}>
-              Rough-in your cover before you move to a design tool or your designer.
+            <p
+              style={{
+                margin: "4px 0 0",
+                fontSize: 12,
+                color: "#6b7280",
+              }}
+            >
+              Rough-in your cover inside StoryLab before moving to a
+              design tool or your designer.
             </p>
           </div>
           <button
@@ -132,7 +211,7 @@ export default function Cover(): JSX.Element {
             gap: 20,
           }}
         >
-          {/* LEFT: Fields + controls */}
+          {/* LEFT: Details + Design */}
           <div
             style={{
               display: "grid",
@@ -149,7 +228,9 @@ export default function Cover(): JSX.Element {
                 background: "#f9fafb",
               }}
             >
-              <h3 style={{ margin: "0 0 8px", fontSize: 14 }}>Book details</h3>
+              <h3 style={{ margin: "0 0 8px", fontSize: 14 }}>
+                Book details
+              </h3>
               <div style={{ display: "grid", gap: 8, fontSize: 12 }}>
                 <label>
                   Title
@@ -157,7 +238,12 @@ export default function Cover(): JSX.Element {
                     type="text"
                     value={prefs.title}
                     onChange={(e) => update("title", e.target.value)}
-                    style={{ width: "100%", padding: 6, borderRadius: 6, border: "1px solid #d1d5db" }}
+                    style={{
+                      width: "100%",
+                      padding: 6,
+                      borderRadius: 6,
+                      border: "1px solid #d1d5db",
+                    }}
                   />
                 </label>
                 <label>
@@ -166,7 +252,12 @@ export default function Cover(): JSX.Element {
                     type="text"
                     value={prefs.subtitle}
                     onChange={(e) => update("subtitle", e.target.value)}
-                    style={{ width: "100%", padding: 6, borderRadius: 6, border: "1px solid #d1d5db" }}
+                    style={{
+                      width: "100%",
+                      padding: 6,
+                      borderRadius: 6,
+                      border: "1px solid #d1d5db",
+                    }}
                   />
                 </label>
                 <label>
@@ -175,7 +266,12 @@ export default function Cover(): JSX.Element {
                     type="text"
                     value={prefs.author}
                     onChange={(e) => update("author", e.target.value)}
-                    style={{ width: "100%", padding: 6, borderRadius: 6, border: "1px solid #d1d5db" }}
+                    style={{
+                      width: "100%",
+                      padding: 6,
+                      borderRadius: 6,
+                      border: "1px solid #d1d5db",
+                    }}
                   />
                 </label>
                 <label>
@@ -184,7 +280,12 @@ export default function Cover(): JSX.Element {
                     type="text"
                     value={prefs.series}
                     onChange={(e) => update("series", e.target.value)}
-                    style={{ width: "100%", padding: 6, borderRadius: 6, border: "1px solid #d1d5db" }}
+                    style={{
+                      width: "100%",
+                      padding: 6,
+                      borderRadius: 6,
+                      border: "1px solid #d1d5db",
+                    }}
                   />
                 </label>
                 <label>
@@ -193,7 +294,12 @@ export default function Cover(): JSX.Element {
                     type="text"
                     value={prefs.tagline}
                     onChange={(e) => update("tagline", e.target.value)}
-                    style={{ width: "100%", padding: 6, borderRadius: 6, border: "1px solid #d1d5db" }}
+                    style={{
+                      width: "100%",
+                      padding: 6,
+                      borderRadius: 6,
+                      border: "1px solid #d1d5db",
+                    }}
                   />
                 </label>
               </div>
@@ -208,31 +314,49 @@ export default function Cover(): JSX.Element {
                 background: "#f9fafb",
               }}
             >
-              <h3 style={{ margin: "0 0 8px", fontSize: 14 }}>Design</h3>
+              <h3 style={{ margin: "0 0 8px", fontSize: 14 }}>
+                Design
+              </h3>
               <div style={{ display: "grid", gap: 8, fontSize: 12 }}>
                 <label>
                   Trim size
                   <select
                     value={prefs.trimSize}
                     onChange={(e) =>
-                      update("trimSize", e.target.value as CoverPrefs["trimSize"])
+                      update(
+                        "trimSize",
+                        e.target.value as CoverPrefs["trimSize"]
+                      )
                     }
-                    style={{ width: "100%", padding: 6, borderRadius: 6, border: "1px solid #d1d5db" }}
+                    style={{
+                      width: "100%",
+                      padding: 6,
+                      borderRadius: 6,
+                      border: "1px solid #d1d5db",
+                    }}
                   >
-                    <option value="6x9">6 x 9 in (standard)</option>
-                    <option value="5.5x8.5">5.5 x 8.5 in</option>
-                    <option value="5x8">5 x 8 in</option>
+                    <option value="6x9">6 × 9 in (standard)</option>
+                    <option value="5.5x8.5">5.5 × 8.5 in</option>
+                    <option value="5x8">5 × 8 in</option>
                   </select>
                 </label>
 
                 <label>
-                  Background
+                  Background type
                   <select
                     value={prefs.bgType}
                     onChange={(e) =>
-                      update("bgType", e.target.value as CoverPrefs["bgType"])
+                      update(
+                        "bgType",
+                        e.target.value as CoverPrefs["bgType"]
+                      )
                     }
-                    style={{ width: "100%", padding: 6, borderRadius: 6, border: "1px solid #d1d5db" }}
+                    style={{
+                      width: "100%",
+                      padding: 6,
+                      borderRadius: 6,
+                      border: "1px solid #d1d5db",
+                    }}
                   >
                     <option value="solid">Solid color</option>
                     <option value="gradient">Gradient</option>
@@ -240,7 +364,108 @@ export default function Cover(): JSX.Element {
                   </select>
                 </label>
 
-                {/* You can later add a color picker or upload control here */}
+                {prefs.bgType === "solid" && (
+                  <label>
+                    Background color (hex)
+                    <input
+                      type="text"
+                      value={prefs.bgColor}
+                      onChange={(e) =>
+                        update("bgColor", e.target.value || "#111827")
+                      }
+                      style={{
+                        width: "100%",
+                        padding: 6,
+                        borderRadius: 6,
+                        border: "1px solid #d1d5db",
+                      }}
+                    />
+                  </label>
+                )}
+
+                {prefs.bgType === "gradient" && (
+                  <label>
+                    Gradient CSS
+                    <input
+                      type="text"
+                      value={prefs.bgGradient}
+                      onChange={(e) =>
+                        update(
+                          "bgGradient",
+                          e.target.value || "linear-gradient(135deg,#1f2933,#111827)"
+                        )
+                      }
+                      style={{
+                        width: "100%",
+                        padding: 6,
+                        borderRadius: 6,
+                        border: "1px solid #d1d5db",
+                      }}
+                    />
+                  </label>
+                )}
+
+                {prefs.bgType === "image" && (
+                  <div
+                    style={{
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 6,
+                    }}
+                  >
+                    <label>
+                      Cover image
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageChange}
+                        disabled={isUploading}
+                        style={{
+                          width: "100%",
+                          padding: 4,
+                          fontSize: 12,
+                        }}
+                      />
+                    </label>
+                    {prefs.imageUrl && (
+                      <div
+                        style={{
+                          fontSize: 11,
+                          color: "#6b7280",
+                          display: "flex",
+                          justifyContent: "space-between",
+                          alignItems: "center",
+                        }}
+                      >
+                        <span>Image attached</span>
+                        <button
+                          type="button"
+                          onClick={() => update("imageUrl", null)}
+                          style={{
+                            border: "none",
+                            background: "transparent",
+                            fontSize: 11,
+                            color: "#ef4444",
+                            cursor: "pointer",
+                            textDecoration: "underline",
+                          }}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    )}
+                    {isUploading && (
+                      <div
+                        style={{
+                          fontSize: 11,
+                          color: "#6b7280",
+                        }}
+                      >
+                        Uploading image…
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -264,28 +489,8 @@ export default function Cover(): JSX.Element {
               >
                 Front cover preview
               </div>
-              <div
-                style={{
-                  width,
-                  height,
-                  borderRadius: 12,
-                  boxShadow: "0 18px 40px rgba(15,23,42,0.35)",
-                  padding: 22,
-                  display: "flex",
-                  flexDirection: "column",
-                  justifyContent: "space-between",
-                  background:
-                    prefs.bgType === "gradient"
-                      ? prefs.bgGradient
-                      : prefs.bgType === "solid"
-                      ? prefs.bgColor
-                      : "#111827",
-                  color: "#fff",
-                  position: "relative",
-                  overflow: "hidden",
-                }}
-              >
-                {/* Title + subtitle */}
+              <div style={{ ...baseCoverStyle, ...coverBackgroundStyle }}>
+                {/* Title area */}
                 <div>
                   {prefs.series && (
                     <div
@@ -364,8 +569,8 @@ export default function Cover(): JSX.Element {
                   textAlign: "center",
                 }}
               >
-                This is a visual planning tool. Use these specs when you or your
-                designer build the final print-ready cover.
+                This is a planning tool. Use these specs when you or your
+                designer builds the final print-ready cover.
               </div>
             </div>
           </div>
