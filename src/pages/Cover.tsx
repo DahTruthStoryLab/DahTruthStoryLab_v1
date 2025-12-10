@@ -1,604 +1,645 @@
-// src/pages/Cover.tsx
-import React, { useEffect, useState } from "react";
+// src/pages/Cover.jsx
+import React, { useState } from "react";
 import PageShell from "../components/layout/PageShell.tsx";
-import { uploadImage } from "../lib/uploads"; // re-use your existing uploader
+import { uploadImage } from "../lib/uploads";
 
 const theme = {
-  bg: "var(--brand-bg)",
-  surface: "var(--brand-surface, var(--brand-white))",
-  border: "var(--brand-border)",
-  borderStrong: "var(--brand-border-strong)",
-  text: "var(--brand-text)",
-  subtext: "var(--brand-subtext)",
-  accent: "var(--brand-accent)",
-  highlight: "var(--brand-highlight)",
-  primary: "var(--brand-primary)",
-  white: "var(--brand-white)",
-} as const;
-
-const COVER_PREF_KEY = "dahtruth_cover_prefs";
-
-type TrimSize = "6x9" | "5.5x8.5" | "5x8";
-type BgType = "solid" | "gradient" | "image";
-
-interface CoverPrefs {
-  title: string;
-  subtitle: string;
-  author: string;
-  series: string;
-  tagline: string;
-  trimSize: TrimSize;
-  bgType: BgType;
-  bgColor: string;
-  bgGradient: string;
-  imageUrl: string | null;
-  titleFont: string;
-  subtitleFont: string;
-  authorFont: string;
-  titleColor: string;
-  subtitleColor: string;
-  authorColor: string;
-}
-
-const defaultPrefs: CoverPrefs = {
-  title: "",
-  subtitle: "",
-  author: "",
-  series: "",
-  tagline: "",
-  trimSize: "6x9",
-  bgType: "solid",
-  bgColor: "#111827",
-  bgGradient: "linear-gradient(135deg,#1f2933,#111827)",
-  imageUrl: null,
-  titleFont: '"Merriweather", serif',
-  subtitleFont: '"Inter", system-ui, sans-serif',
-  authorFont: '"Inter", system-ui, sans-serif',
-  titleColor: "#ffffff",
-  subtitleColor: "#e5e7eb",
-  authorColor: "#f9fafb",
+  bg: "var(--brand-bg, #0f172a)",
+  surface: "var(--brand-surface, #ffffff)",
+  border: "var(--brand-border, #e2e8f0)",
+  borderStrong: "var(--brand-border-strong, #cbd5f5)",
+  text: "var(--brand-text, #0f172a)",
+  subtext: "var(--brand-subtext, #64748b)",
+  accent: "var(--brand-accent, #6366f1)",
+  primary: "var(--brand-primary, #111827)",
+  white: "var(--brand-white, #ffffff)",
+  gold: "var(--brand-gold, #facc15)",
 };
 
-export default function Cover(): JSX.Element {
-  const [prefs, setPrefs] = useState<CoverPrefs>(defaultPrefs);
-  const [showSaved, setShowSaved] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
+// Simple genre / mood presets
+const GENRE_PRESETS = [
+  {
+    key: "general",
+    label: "General Fiction",
+    bg: "linear-gradient(145deg, #111827, #1e293b)",
+    titleColor: "#f9fafb",
+    subtitleColor: "#e5e7eb",
+    authorColor: "#e5e7eb",
+    overlay: "rgba(15,23,42,0.5)",
+    fontFamily: "Georgia, 'Times New Roman', serif",
+  },
+  {
+    key: "romance",
+    label: "Romance",
+    bg: "linear-gradient(145deg, #fecaca, #f97373)",
+    titleColor: "#111827",
+    subtitleColor: "#1f2937",
+    authorColor: "#111827",
+    overlay: "rgba(248,250,252,0.2)",
+    fontFamily: "'Playfair Display', Georgia, serif",
+  },
+  {
+    key: "thriller",
+    label: "Thriller / Suspense",
+    bg: "linear-gradient(145deg, #020617, #0f172a)",
+    titleColor: "#f9fafb",
+    subtitleColor: "#e5e7eb",
+    authorColor: "#e5e7eb",
+    overlay: "rgba(15,23,42,0.6)",
+    fontFamily: "'Impact', system-ui, sans-serif",
+  },
+  {
+    key: "memoir",
+    label: "Memoir",
+    bg: "linear-gradient(145deg, #fef9c3, #fde68a)",
+    titleColor: "#111827",
+    subtitleColor: "#1f2937",
+    authorColor: "#111827",
+    overlay: "rgba(249,250,251,0.4)",
+    fontFamily: "Georgia, 'Times New Roman', serif",
+  },
+  {
+    key: "fantasy",
+    label: "Fantasy / YA",
+    bg: "linear-gradient(145deg, #1e293b, #4f46e5)",
+    titleColor: "#e5e7eb",
+    subtitleColor: "#c7d2fe",
+    authorColor: "#f9fafb",
+    overlay: "radial-gradient(circle at top, rgba(96,165,250,0.4), transparent 60%)",
+    fontFamily: "'Garamond', 'Times New Roman', serif",
+  },
+];
 
-  // Load saved prefs from localStorage
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(COVER_PREF_KEY);
-      if (!raw) return;
-      const parsed = JSON.parse(raw);
-      setPrefs({ ...defaultPrefs, ...parsed });
-    } catch {
-      // ignore
-    }
-  }, []);
+const LAYOUTS = [
+  { key: "center", label: "Centered" },
+  { key: "top", label: "Title at Top" },
+  { key: "bottom", label: "Title at Bottom" },
+];
 
-  const savePrefs = () => {
-    try {
-      localStorage.setItem(COVER_PREF_KEY, JSON.stringify(prefs));
-      setShowSaved(true);
-      setTimeout(() => setShowSaved(false), 2000);
-    } catch {
-      // ignore
-    }
-  };
+// Basic styles reused
+const styles = {
+  outer: {
+    maxWidth: 1200,
+    margin: "32px auto",
+    background: "var(--brand-white, #ffffff)",
+    borderRadius: 16,
+    border: "1px solid var(--brand-border-strong, #cbd5f5)",
+    boxShadow: "0 18px 45px rgba(15,23,42,0.18)",
+    overflow: "hidden",
+  },
+  glassCard: {
+    background: "rgba(255,255,255,0.9)",
+    borderRadius: 16,
+    border: "1px solid var(--brand-border, #e2e8f0)",
+    padding: 16,
+    boxShadow: "0 10px 30px rgba(15,23,42,0.08)",
+  },
+  label: {
+    fontSize: 11,
+    textTransform: "uppercase",
+    letterSpacing: 0.08,
+    color: theme.subtext,
+    marginBottom: 4,
+  },
+  input: {
+    borderRadius: 10,
+    border: `1px solid ${theme.border}`,
+    padding: "8px 10px",
+    fontSize: 13,
+    width: "100%",
+    background: theme.white,
+    color: theme.text,
+  },
+  btn: {
+    padding: "7px 11px",
+    fontSize: 12,
+    borderRadius: 999,
+    border: `1px solid ${theme.border}`,
+    background: theme.white,
+    cursor: "pointer",
+  },
+  btnPrimary: {
+    padding: "8px 14px",
+    fontSize: 12,
+    borderRadius: 999,
+    border: "none",
+    background: theme.accent,
+    color: "#ffffff",
+    cursor: "pointer",
+  },
+};
 
-  // Helper for controlled fields
-  const update = <K extends keyof CoverPrefs>(key: K, value: CoverPrefs[K]) => {
-    setPrefs((prev) => ({ ...prev, [key]: value }));
-  };
+export default function Cover() {
+  const [title, setTitle] = useState("Working Title");
+  const [subtitle, setSubtitle] = useState("Optional subtitle");
+  const [author, setAuthor] = useState("Your Name");
+  const [genrePresetKey, setGenrePresetKey] = useState("general");
+  const [layoutKey, setLayoutKey] = useState("center");
+  const [coverImageUrl, setCoverImageUrl] = useState("");
+  const [uploading, setUploading] = useState(false);
 
-  // Derived: aspect ratio based on trim size
-  const aspect =
-    prefs.trimSize === "6x9"
-      ? 9 / 6
-      : prefs.trimSize === "5.5x8.5"
-      ? 8.5 / 5.5
-      : 8 / 5;
-  const width = 260;
-  const height = width * aspect;
+  const selectedPreset =
+    GENRE_PRESETS.find((p) => p.key === genrePresetKey) || GENRE_PRESETS[0];
 
-  // Handle image upload for bgType = "image"
-  const handleImageChange = async (
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => {
+  // Layout positioning for title block
+  let justifyContent = "center";
+  if (layoutKey === "top") justifyContent = "flex-start";
+  if (layoutKey === "bottom") justifyContent = "flex-end";
+
+  const handleImageChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
     try {
-      setIsUploading(true);
-      const url = await uploadImage(file); // assumes this returns a string URL
-      update("imageUrl", url);
-      update("bgType", "image");
+      setUploading(true);
+      const url = await uploadImage(file);
+      setCoverImageUrl(url);
     } catch (err) {
-      console.error("Image upload failed", err);
-      // you could show a toast later
+      console.error("Upload failed:", err);
+      alert(
+        err?.message ||
+          "Sorry, the image upload failed. Please try again or use a smaller file."
+      );
     } finally {
-      setIsUploading(false);
+      setUploading(false);
     }
   };
 
-  // Base cover style + background style
-  const baseCoverStyle: React.CSSProperties = {
-    width,
-    height,
-    borderRadius: 12,
-    boxShadow: "0 18px 40px rgba(15,23,42,0.35)",
-    padding: 22,
-    display: "flex",
-    flexDirection: "column",
-    justifyContent: "space-between",
-    color: "#fff",
-    position: "relative",
-    overflow: "hidden",
-  };
-
-  const coverBackgroundStyle: React.CSSProperties =
-    prefs.bgType === "image" && prefs.imageUrl
-      ? {
-          backgroundColor: "#020617",
-          backgroundImage: `url(${prefs.imageUrl})`,
-          backgroundSize: "cover",
-          backgroundPosition: "center",
-        }
-      : {
-          background:
-            prefs.bgType === "gradient"
-              ? prefs.bgGradient
-              : prefs.bgColor,
-        };
-
   return (
-    <PageShell title="Cover">
-      <div
-        style={{
-          maxWidth: 1300,
-          margin: "32px auto",
-          background: "#ffffff",
-          borderRadius: 16,
-          border: "1px solid rgba(15,23,42,0.1)",
-          boxShadow: "0 12px 38px rgba(15,23,42,0.08)",
-          padding: 20,
-        }}
-      >
+    <PageShell
+      style={{
+        background: theme.bg,
+        minHeight: "100vh",
+        padding: "24px 12px",
+      }}
+    >
+      <div style={styles.outer}>
         {/* HEADER */}
         <div
           style={{
-            display: "flex",
-            justifyContent: "space-between",
-            marginBottom: 16,
-            alignItems: "center",
+            background: "linear-gradient(135deg, #0f172a, #4c1d95)",
+            color: "#ffffff",
+            padding: "16px 24px",
           }}
         >
-          <div>
-            <h1 style={{ margin: 0, fontSize: 20 }}>Book Cover</h1>
-            <p
-              style={{
-                margin: "4px 0 0",
-                fontSize: 12,
-                color: "#6b7280",
-              }}
-            >
-              Rough-in your cover inside StoryLab before moving to a
-              design tool or your designer.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={savePrefs}
+          <div
             style={{
-              borderRadius: 999,
-              border: "none",
-              padding: "6px 14px",
-              fontSize: 12,
-              fontWeight: 600,
-              cursor: "pointer",
-              background: "linear-gradient(135deg,#22c55e,#4ade80)",
-              color: "#0f172a",
+              maxWidth: 1160,
+              margin: "0 auto",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: 16,
+              flexWrap: "wrap",
             }}
           >
-            Save cover settings
-          </button>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <span aria-hidden style={{ fontSize: 26 }}>
+                🎨
+              </span>
+              <div>
+                <h1
+                  style={{
+                    margin: 0,
+                    fontSize: 20,
+                    letterSpacing: 0.4,
+                    fontWeight: 600,
+                    fontFamily: "Garamond, Georgia, serif",
+                  }}
+                >
+                  Cover Designer
+                </h1>
+                <div style={{ fontSize: 11, opacity: 0.9 }}>
+                  Build a story-aware cover with live preview. Save the final
+                  image for your KDP upload.
+                </div>
+              </div>
+            </div>
+
+            <div
+              style={{
+                textAlign: "right",
+                fontSize: 11,
+                opacity: 0.9,
+              }}
+            >
+              <div>
+                Currently editing:{" "}
+                <strong>{title || "Untitled Project"}</strong>
+              </div>
+              <div>Tip: keep it simple, bold, and readable at thumbnail size.</div>
+            </div>
+          </div>
         </div>
 
-        {/* MAIN GRID */}
+        {/* BODY GRID */}
         <div
           style={{
+            padding: "18px 24px 24px",
             display: "grid",
-            gridTemplateColumns: "minmax(0, 1.1fr) minmax(0, 1.3fr)",
+            gridTemplateColumns: "minmax(0, 360px) minmax(0, 1fr)",
             gap: 20,
           }}
         >
-          {/* LEFT: Details + Design */}
-          <div
-            style={{
-              display: "grid",
-              gridTemplateRows: "auto auto",
-              gap: 16,
-            }}
-          >
-            {/* Book info */}
-            <div
-              style={{
-                borderRadius: 14,
-                border: "1px solid #e5e7eb",
-                padding: 12,
-                background: "#f9fafb",
-              }}
-            >
-              <h3 style={{ margin: "0 0 8px", fontSize: 14 }}>
-                Book details
-              </h3>
-              <div style={{ display: "grid", gap: 8, fontSize: 12 }}>
-                <label>
-                  Title
-                  <input
-                    type="text"
-                    value={prefs.title}
-                    onChange={(e) => update("title", e.target.value)}
-                    style={{
-                      width: "100%",
-                      padding: 6,
-                      borderRadius: 6,
-                      border: "1px solid #d1d5db",
-                    }}
-                  />
-                </label>
-                <label>
-                  Subtitle
-                  <input
-                    type="text"
-                    value={prefs.subtitle}
-                    onChange={(e) => update("subtitle", e.target.value)}
-                    style={{
-                      width: "100%",
-                      padding: 6,
-                      borderRadius: 6,
-                      border: "1px solid #d1d5db",
-                    }}
-                  />
-                </label>
-                <label>
-                  Author
-                  <input
-                    type="text"
-                    value={prefs.author}
-                    onChange={(e) => update("author", e.target.value)}
-                    style={{
-                      width: "100%",
-                      padding: 6,
-                      borderRadius: 6,
-                      border: "1px solid #d1d5db",
-                    }}
-                  />
-                </label>
-                <label>
-                  Series / Imprint (optional)
-                  <input
-                    type="text"
-                    value={prefs.series}
-                    onChange={(e) => update("series", e.target.value)}
-                    style={{
-                      width: "100%",
-                      padding: 6,
-                      borderRadius: 6,
-                      border: "1px solid #d1d5db",
-                    }}
-                  />
-                </label>
-                <label>
-                  Tagline (optional)
-                  <input
-                    type="text"
-                    value={prefs.tagline}
-                    onChange={(e) => update("tagline", e.target.value)}
-                    style={{
-                      width: "100%",
-                      padding: 6,
-                      borderRadius: 6,
-                      border: "1px solid #d1d5db",
-                    }}
-                  />
-                </label>
-              </div>
-            </div>
-
-            {/* Design controls */}
-            <div
-              style={{
-                borderRadius: 14,
-                border: "1px solid #e5e7eb",
-                padding: 12,
-                background: "#f9fafb",
-              }}
-            >
-              <h3 style={{ margin: "0 0 8px", fontSize: 14 }}>
-                Design
-              </h3>
-              <div style={{ display: "grid", gap: 8, fontSize: 12 }}>
-                <label>
-                  Trim size
-                  <select
-                    value={prefs.trimSize}
-                    onChange={(e) =>
-                      update(
-                        "trimSize",
-                        e.target.value as CoverPrefs["trimSize"]
-                      )
-                    }
-                    style={{
-                      width: "100%",
-                      padding: 6,
-                      borderRadius: 6,
-                      border: "1px solid #d1d5db",
-                    }}
-                  >
-                    <option value="6x9">6 × 9 in (standard)</option>
-                    <option value="5.5x8.5">5.5 × 8.5 in</option>
-                    <option value="5x8">5 × 8 in</option>
-                  </select>
-                </label>
-
-                <label>
-                  Background type
-                  <select
-                    value={prefs.bgType}
-                    onChange={(e) =>
-                      update(
-                        "bgType",
-                        e.target.value as CoverPrefs["bgType"]
-                      )
-                    }
-                    style={{
-                      width: "100%",
-                      padding: 6,
-                      borderRadius: 6,
-                      border: "1px solid #d1d5db",
-                    }}
-                  >
-                    <option value="solid">Solid color</option>
-                    <option value="gradient">Gradient</option>
-                    <option value="image">Image (uploaded)</option>
-                  </select>
-                </label>
-
-                {prefs.bgType === "solid" && (
-                  <label>
-                    Background color (hex)
-                    <input
-                      type="text"
-                      value={prefs.bgColor}
-                      onChange={(e) =>
-                        update("bgColor", e.target.value || "#111827")
-                      }
-                      style={{
-                        width: "100%",
-                        padding: 6,
-                        borderRadius: 6,
-                        border: "1px solid #d1d5db",
-                      }}
-                    />
-                  </label>
-                )}
-
-                {prefs.bgType === "gradient" && (
-                  <label>
-                    Gradient CSS
-                    <input
-                      type="text"
-                      value={prefs.bgGradient}
-                      onChange={(e) =>
-                        update(
-                          "bgGradient",
-                          e.target.value || "linear-gradient(135deg,#1f2933,#111827)"
-                        )
-                      }
-                      style={{
-                        width: "100%",
-                        padding: 6,
-                        borderRadius: 6,
-                        border: "1px solid #d1d5db",
-                      }}
-                    />
-                  </label>
-                )}
-
-                {prefs.bgType === "image" && (
-                  <div
-                    style={{
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: 6,
-                    }}
-                  >
-                    <label>
-                      Cover image
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleImageChange}
-                        disabled={isUploading}
-                        style={{
-                          width: "100%",
-                          padding: 4,
-                          fontSize: 12,
-                        }}
-                      />
-                    </label>
-                    {prefs.imageUrl && (
-                      <div
-                        style={{
-                          fontSize: 11,
-                          color: "#6b7280",
-                          display: "flex",
-                          justifyContent: "space-between",
-                          alignItems: "center",
-                        }}
-                      >
-                        <span>Image attached</span>
-                        <button
-                          type="button"
-                          onClick={() => update("imageUrl", null)}
-                          style={{
-                            border: "none",
-                            background: "transparent",
-                            fontSize: 11,
-                            color: "#ef4444",
-                            cursor: "pointer",
-                            textDecoration: "underline",
-                          }}
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    )}
-                    {isUploading && (
-                      <div
-                        style={{
-                          fontSize: 11,
-                          color: "#6b7280",
-                        }}
-                      >
-                        Uploading image…
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* RIGHT: Preview */}
-          <div
+          {/* LEFT: CONTROLS */}
+          <aside
             style={{
               display: "flex",
-              justifyContent: "center",
-              alignItems: "flex-start",
-              paddingTop: 8,
+              flexDirection: "column",
+              gap: 14,
             }}
           >
-            <div>
-              <div
+            {/* Text basics */}
+            <div style={styles.glassCard}>
+              <h3
                 style={{
-                  fontSize: 12,
-                  color: "#6b7280",
+                  margin: "0 0 10px",
+                  fontSize: 15,
+                  fontWeight: 600,
+                  color: theme.text,
+                }}
+              >
+                Text & Metadata
+              </h3>
+              <div style={{ display: "grid", gap: 10 }}>
+                <div>
+                  <div style={styles.label}>Title</div>
+                  <input
+                    style={styles.input}
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder="Book title"
+                  />
+                </div>
+                <div>
+                  <div style={styles.label}>Subtitle (optional)</div>
+                  <input
+                    style={styles.input}
+                    value={subtitle}
+                    onChange={(e) => setSubtitle(e.target.value)}
+                    placeholder="Subtitle or tagline"
+                  />
+                </div>
+                <div>
+                  <div style={styles.label}>Author Name</div>
+                  <input
+                    style={styles.input}
+                    value={author}
+                    onChange={(e) => setAuthor(e.target.value)}
+                    placeholder="Your author name"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Presets & layout */}
+            <div style={styles.glassCard}>
+              <h3
+                style={{
+                  margin: "0 0 10px",
+                  fontSize: 15,
+                  fontWeight: 600,
+                  color: theme.text,
+                }}
+              >
+                Mood & Layout
+              </h3>
+              <div style={{ marginBottom: 10 }}>
+                <div style={{ ...styles.label, marginBottom: 6 }}>
+                  Genre / Mood Preset
+                </div>
+                <div
+                  style={{
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: 6,
+                  }}
+                >
+                  {GENRE_PRESETS.map((preset) => (
+                    <button
+                      key={preset.key}
+                      type="button"
+                      onClick={() => setGenrePresetKey(preset.key)}
+                      style={{
+                        ...styles.btn,
+                        fontSize: 11,
+                        borderRadius: 999,
+                        border:
+                          genrePresetKey === preset.key
+                            ? `1px solid ${theme.accent}`
+                            : `1px solid ${theme.border}`,
+                        background:
+                          genrePresetKey === preset.key ? "#eef2ff" : "#ffffff",
+                      }}
+                    >
+                      {preset.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <div style={{ ...styles.label, marginBottom: 6 }}>
+                  Title Block Layout
+                </div>
+                <div style={{ display: "flex", gap: 6 }}>
+                  {LAYOUTS.map((layout) => (
+                    <button
+                      key={layout.key}
+                      type="button"
+                      onClick={() => setLayoutKey(layout.key)}
+                      style={{
+                        ...styles.btn,
+                        flex: 1,
+                        border:
+                          layoutKey === layout.key
+                            ? `1px solid ${theme.accent}`
+                            : `1px solid ${theme.border}`,
+                        background:
+                          layoutKey === layout.key ? "#eef2ff" : "#ffffff",
+                      }}
+                    >
+                      {layout.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Image upload */}
+            <div style={styles.glassCard}>
+              <h3
+                style={{
+                  margin: "0 0 10px",
+                  fontSize: 15,
+                  fontWeight: 600,
+                  color: theme.text,
+                }}
+              >
+                Background Image
+              </h3>
+              <p
+                style={{
+                  fontSize: 11,
+                  color: theme.subtext,
                   marginBottom: 8,
                 }}
               >
-                Front cover preview
-              </div>
-              <div style={{ ...baseCoverStyle, ...coverBackgroundStyle }}>
-                {/* Title area */}
-                <div>
-                  {prefs.series && (
-                    <div
-                      style={{
-                        fontSize: 10,
-                        letterSpacing: 1.5,
-                        textTransform: "uppercase",
-                        marginBottom: 6,
-                        opacity: 0.85,
-                      }}
-                    >
-                      {prefs.series}
-                    </div>
-                  )}
-                  {prefs.title && (
-                    <div
-                      style={{
-                        fontFamily: prefs.titleFont,
-                        fontSize: 24,
-                        lineHeight: 1.1,
-                        fontWeight: 700,
-                        color: prefs.titleColor,
-                        marginBottom: prefs.subtitle ? 8 : 0,
-                      }}
-                    >
-                      {prefs.title}
-                    </div>
-                  )}
-                  {prefs.subtitle && (
-                    <div
-                      style={{
-                        fontFamily: prefs.subtitleFont,
-                        fontSize: 13,
-                        lineHeight: 1.4,
-                        color: prefs.subtitleColor,
-                      }}
-                    >
-                      {prefs.subtitle}
-                    </div>
-                  )}
-                </div>
-
-                {/* Tagline + author */}
-                <div>
-                  {prefs.tagline && (
-                    <div
-                      style={{
-                        fontSize: 11,
-                        marginBottom: 6,
-                        opacity: 0.9,
-                      }}
-                    >
-                      {prefs.tagline}
-                    </div>
-                  )}
-                  {prefs.author && (
-                    <div
-                      style={{
-                        fontFamily: prefs.authorFont,
-                        fontSize: 13,
-                        letterSpacing: 2,
-                        textTransform: "uppercase",
-                        color: prefs.authorColor,
-                      }}
-                    >
-                      {prefs.author}
-                    </div>
-                  )}
-                </div>
-              </div>
-              <div
+                Upload a high-resolution image to use as your cover background,
+                or leave it empty for a clean color-only design.
+              </p>
+              <label
                 style={{
-                  marginTop: 8,
-                  fontSize: 11,
-                  color: "#6b7280",
-                  textAlign: "center",
+                  ...styles.btn,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
                 }}
               >
-                This is a planning tool. Use these specs when you or your
-                designer builds the final print-ready cover.
+                📁 {uploading ? "Uploading…" : "Choose Image"}
+                <input
+                  type="file"
+                  accept="image/*"
+                  style={{ display: "none" }}
+                  onChange={handleImageChange}
+                  disabled={uploading}
+                />
+              </label>
+              {coverImageUrl && (
+                <p
+                  style={{
+                    fontSize: 10,
+                    marginTop: 6,
+                    color: theme.subtext,
+                    wordBreak: "break-all",
+                  }}
+                >
+                  Image set. It will appear behind your text in the preview.
+                </p>
+              )}
+            </div>
+
+            {/* AI button placeholder */}
+            <div style={styles.glassCard}>
+              <h3
+                style={{
+                  margin: "0 0 8px",
+                  fontSize: 15,
+                  fontWeight: 600,
+                  color: theme.text,
+                }}
+              >
+                AI Cover Ideas (Coming Next)
+              </h3>
+              <p
+                style={{
+                  fontSize: 11,
+                  color: theme.subtext,
+                  marginBottom: 10,
+                }}
+              >
+                Soon, StoryLab will read your synopsis or manuscript and suggest
+                2–3 complete cover concepts (colors, layout, imagery). For now,
+                use the presets and image upload to design manually.
+              </p>
+              <button
+                type="button"
+                style={{
+                  ...styles.btnPrimary,
+                  opacity: 0.6,
+                  cursor: "not-allowed",
+                }}
+                disabled
+              >
+                ✨ Generate AI Concepts
+              </button>
+            </div>
+          </aside>
+
+          {/* RIGHT: PREVIEW */}
+          <section
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 12,
+            }}
+          >
+            <div style={styles.glassCard}>
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: 12,
+                  gap: 8,
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: theme.text,
+                  }}
+                >
+                  Live Preview
+                  <span
+                    style={{
+                      display: "inline-block",
+                      marginLeft: 8,
+                      fontSize: 11,
+                      fontWeight: 400,
+                      color: theme.subtext,
+                    }}
+                  >
+                    Approx. 6" × 9" trade paperback ratio
+                  </span>
+                </div>
+                <div
+                  style={{
+                    fontSize: 10,
+                    color: theme.subtext,
+                    textAlign: "right",
+                  }}
+                >
+                  This is a design preview. Final export to PNG/JPEG will come in
+                  the Export panel.
+                </div>
+              </div>
+
+              {/* Cover canvas */}
+              <div
+                style={{
+                  display: "flex",
+                  justifyContent: "center",
+                }}
+              >
+                <div
+                  style={{
+                    width: 320,
+                    height: 500,
+                    borderRadius: 10,
+                    position: "relative",
+                    overflow: "hidden",
+                    border: "1px solid rgba(15,23,42,0.6)",
+                    backgroundImage: coverImageUrl
+                      ? `url(${coverImageUrl})`
+                      : selectedPreset.bg,
+                    backgroundSize: "cover",
+                    backgroundPosition: "center",
+                    boxShadow:
+                      "0 24px 60px rgba(15, 23, 42, 0.6), 0 0 0 1px rgba(15,23,42,0.3)",
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent: justifyContent,
+                    padding: "32px 24px",
+                  }}
+                >
+                  {/* overlay */}
+                  <div
+                    style={{
+                      position: "absolute",
+                      inset: 0,
+                      background: coverImageUrl
+                        ? "linear-gradient(180deg, rgba(15,23,42,0.55), rgba(15,23,42,0.75))"
+                        : selectedPreset.overlay,
+                    }}
+                  />
+
+                  {/* text block */}
+                  <div
+                    style={{
+                      position: "relative",
+                      zIndex: 1,
+                      textAlign: "center",
+                      fontFamily: selectedPreset.fontFamily,
+                      color: selectedPreset.titleColor,
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 8,
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: 24,
+                        letterSpacing: 3,
+                        textTransform: "uppercase",
+                        color: selectedPreset.subtitleColor,
+                      }}
+                    >
+                      A NOVEL
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 30,
+                        lineHeight: 1.05,
+                        fontWeight: 700,
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      {title || "YOUR TITLE HERE"}
+                    </div>
+                    {subtitle && (
+                      <div
+                        style={{
+                          fontSize: 14,
+                          marginTop: 6,
+                          color: selectedPreset.subtitleColor,
+                          maxWidth: 260,
+                          marginInline: "auto",
+                        }}
+                      >
+                        {subtitle}
+                      </div>
+                    )}
+                    <div
+                      style={{
+                        fontSize: 14,
+                        marginTop: 24,
+                        letterSpacing: 3,
+                        textTransform: "uppercase",
+                        color: selectedPreset.authorColor,
+                      }}
+                    >
+                      {author || "AUTHOR NAME"}
+                    </div>
+                  </div>
+
+                  {/* DahTruth badge */}
+                  <div
+                    style={{
+                      position: "absolute",
+                      bottom: 12,
+                      right: 14,
+                      zIndex: 1,
+                      fontSize: 9,
+                      letterSpacing: 1.5,
+                      textTransform: "uppercase",
+                      color: "#e5e7eb",
+                      background: "rgba(15,23,42,0.7)",
+                      padding: "4px 8px",
+                      borderRadius: 999,
+                      border: "1px solid rgba(249,250,251,0.2)",
+                    }}
+                  >
+                    DahTruth StoryLab
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
+
+            <div
+              style={{
+                fontSize: 11,
+                color: theme.subtext,
+                textAlign: "right",
+              }}
+            >
+              Later we can add: export as PNG/JPEG, spine/back design, and AI
+              layout suggestions.
+            </div>
+          </section>
         </div>
       </div>
-
-      {/* Save toast */}
-      {showSaved && (
-        <div
-          style={{
-            position: "fixed",
-            right: 24,
-            bottom: 24,
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-            padding: "10px 16px",
-            borderRadius: 999,
-            background: "linear-gradient(135deg, #22c55e, #4ade80)",
-            color: "#fff",
-            fontSize: 13,
-            fontWeight: 600,
-            boxShadow: "0 8px 24px rgba(22,163,74,0.4)",
-          }}
-        >
-          Cover settings saved
-        </div>
-      )}
     </PageShell>
   );
 }
