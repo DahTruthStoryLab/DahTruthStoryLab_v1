@@ -156,6 +156,7 @@ export default function Cover() {
   if (layoutKey === "top") justifyContent = "flex-start";
   if (layoutKey === "bottom") justifyContent = "flex-end";
 
+  // Image upload handler (uses uploads.ts → S3 presign + PUT)
   const handleCoverFileChange = async (event) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -428,11 +429,7 @@ export default function Cover() {
             </div>
 
             {/* Background Image + AI Design */}
-            <div
-              style={{
-                ...styles.glassCard,
-              }}
-            >
+            <div style={styles.glassCard}>
               <h3
                 style={{
                   margin: "0 0 8px",
