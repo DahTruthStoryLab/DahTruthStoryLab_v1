@@ -65,7 +65,8 @@ const GENRE_PRESETS = [
     titleColor: "#e5e7eb",
     subtitleColor: "#c7d2fe",
     authorColor: "#f9fafb",
-    overlay: "radial-gradient(circle at top, rgba(96,165,250,0.4), transparent 60%)",
+    overlay:
+      "radial-gradient(circle at top, rgba(96,165,250,0.4), transparent 60%)",
     fontFamily: "'Garamond', 'Times New Roman', serif",
   },
 ];
@@ -135,8 +136,17 @@ export default function Cover() {
   const [author, setAuthor] = useState("Your Name");
   const [genrePresetKey, setGenrePresetKey] = useState("general");
   const [layoutKey, setLayoutKey] = useState("center");
+
+  // Background image state
   const [coverImageUrl, setCoverImageUrl] = useState("");
-  const [uploading, setUploading] = useState(false);
+  const [coverImageUploading, setCoverImageUploading] = useState(false);
+  const [coverImageFit, setCoverImageFit] = useState("cover"); // "cover" | "contain"
+  const [coverImageFilter, setCoverImageFilter] = useState("soft-dark"); // "soft-dark" | "none" | "soft-blur"
+
+  // AI design assist state
+  const [designMode, setDesignMode] = useState("upload"); // "upload" | "ai"
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [aiBusy, setAiBusy] = useState(false);
 
   const selectedPreset =
     GENRE_PRESETS.find((p) => p.key === genrePresetKey) || GENRE_PRESETS[0];
@@ -146,24 +156,73 @@ export default function Cover() {
   if (layoutKey === "top") justifyContent = "flex-start";
   if (layoutKey === "bottom") justifyContent = "flex-end";
 
-  const handleImageChange = async (e) => {
-    const file = e.target.files?.[0];
+  const handleCoverFileChange = async (event) => {
+    const file = event.target.files?.[0];
     if (!file) return;
 
     try {
-      setUploading(true);
+      setCoverImageUploading(true);
       const url = await uploadImage(file);
       setCoverImageUrl(url);
     } catch (err) {
-      console.error("Upload failed:", err);
-      alert(
-        err?.message ||
-          "Sorry, the image upload failed. Please try again or use a smaller file."
-      );
+      console.error("[Cover upload error]", err);
+      alert(err?.message || "Image upload failed. Please try again.");
     } finally {
-      setUploading(false);
+      setCoverImageUploading(false);
     }
   };
+
+  const handleClearCoverImage = () => {
+    setCoverImageUrl("");
+  };
+
+  // Lightweight "AI" design assist: picks overlay / layout based on keywords.
+  const handleAiDesignSuggest = () => {
+    if (!aiPrompt.trim()) {
+      alert(
+        "Add a few words about your story (e.g. 'dark historical thriller in Philly')."
+      );
+      return;
+    }
+
+    setAiBusy(true);
+    const prompt = aiPrompt.toLowerCase();
+
+    if (prompt.includes("romance") || prompt.includes("love")) {
+      setGenrePresetKey("romance");
+      setCoverImageFilter("none");
+      setLayoutKey("center");
+    } else if (
+      prompt.includes("thriller") ||
+      prompt.includes("suspense") ||
+      prompt.includes("crime")
+    ) {
+      setGenrePresetKey("thriller");
+      setCoverImageFilter("soft-dark");
+      setLayoutKey("top");
+    } else if (
+      prompt.includes("memoir") ||
+      prompt.includes("quiet") ||
+      prompt.includes("literary")
+    ) {
+      setGenrePresetKey("memoir");
+      setCoverImageFilter("soft-blur");
+      setLayoutKey("center");
+    }
+
+    setTimeout(() => {
+      setAiBusy(false);
+    }, 300);
+  };
+
+  // Overlay for preview depending on background + filter
+  const overlayBackground = coverImageUrl
+    ? coverImageFilter === "soft-dark"
+      ? "linear-gradient(180deg, rgba(15,23,42,0.55), rgba(15,23,42,0.8))"
+      : coverImageFilter === "soft-blur"
+      ? "linear-gradient(180deg, rgba(15,23,42,0.25), rgba(15,23,42,0.6))"
+      : "transparent"
+    : selectedPreset.overlay;
 
   return (
     <PageShell
@@ -227,7 +286,9 @@ export default function Cover() {
                 Currently editing:{" "}
                 <strong>{title || "Untitled Project"}</strong>
               </div>
-              <div>Tip: keep it simple, bold, and readable at thumbnail size.</div>
+              <div>
+                Tip: keep it simple, bold, and readable at thumbnail size.
+              </div>
             </div>
           </div>
         </div>
@@ -366,61 +427,12 @@ export default function Cover() {
               </div>
             </div>
 
-            {/* Image upload */}
-            <div style={styles.glassCard}>
-              <h3
-                style={{
-                  margin: "0 0 10px",
-                  fontSize: 15,
-                  fontWeight: 600,
-                  color: theme.text,
-                }}
-              >
-                Background Image
-              </h3>
-              <p
-                style={{
-                  fontSize: 11,
-                  color: theme.subtext,
-                  marginBottom: 8,
-                }}
-              >
-                Upload a high-resolution image to use as your cover background,
-                or leave it empty for a clean color-only design.
-              </p>
-              <label
-                style={{
-                  ...styles.btn,
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 6,
-                }}
-              >
-                📁 {uploading ? "Uploading…" : "Choose Image"}
-                <input
-                  type="file"
-                  accept="image/*"
-                  style={{ display: "none" }}
-                  onChange={handleImageChange}
-                  disabled={uploading}
-                />
-              </label>
-              {coverImageUrl && (
-                <p
-                  style={{
-                    fontSize: 10,
-                    marginTop: 6,
-                    color: theme.subtext,
-                    wordBreak: "break-all",
-                  }}
-                >
-                  Image set. It will appear behind your text in the preview.
-                </p>
-              )}
-            </div>
-
-            {/* AI button placeholder */}
-            <div style={styles.glassCard}>
+            {/* Background Image + AI Design */}
+            <div
+              style={{
+                ...styles.glassCard,
+              }}
+            >
               <h3
                 style={{
                   margin: "0 0 8px",
@@ -429,30 +441,270 @@ export default function Cover() {
                   color: theme.text,
                 }}
               >
-                AI Cover Ideas (Coming Next)
+                Background Image & AI Design
               </h3>
-              <p
+
+              {/* Tabs */}
+              <div
                 style={{
+                  display: "inline-flex",
+                  borderRadius: 999,
+                  border: `1px solid ${theme.border}`,
+                  overflow: "hidden",
+                  margin: "6px 0 12px",
                   fontSize: 11,
-                  color: theme.subtext,
-                  marginBottom: 10,
                 }}
               >
-                Soon, StoryLab will read your synopsis or manuscript and suggest
-                2–3 complete cover concepts (colors, layout, imagery). For now,
-                use the presets and image upload to design manually.
-              </p>
-              <button
-                type="button"
-                style={{
-                  ...styles.btnPrimary,
-                  opacity: 0.6,
-                  cursor: "not-allowed",
-                }}
-                disabled
-              >
-                ✨ Generate AI Concepts
-              </button>
+                <button
+                  type="button"
+                  onClick={() => setDesignMode("upload")}
+                  style={{
+                    padding: "4px 10px",
+                    border: "none",
+                    cursor: "pointer",
+                    background:
+                      designMode === "upload"
+                        ? "var(--brand-highlight, rgba(148,163,184,0.25))"
+                        : "#fff",
+                    fontWeight: designMode === "upload" ? 600 : 400,
+                  }}
+                >
+                  Upload
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDesignMode("ai")}
+                  style={{
+                    padding: "4px 10px",
+                    border: "none",
+                    cursor: "pointer",
+                    background:
+                      designMode === "ai"
+                        ? "var(--brand-highlight, rgba(148,163,184,0.25))"
+                        : "#fff",
+                    fontWeight: designMode === "ai" ? 600 : 400,
+                  }}
+                >
+                  AI Design Assist
+                </button>
+              </div>
+
+              {/* Upload tab */}
+              {designMode === "upload" && (
+                <div style={{ display: "grid", gap: 10 }}>
+                  <div>
+                    <div style={styles.label}>Cover background image</div>
+                    <label
+                      style={{
+                        ...styles.btn,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 6,
+                        fontSize: 11,
+                      }}
+                    >
+                      📁{" "}
+                      {coverImageUploading ? "Uploading…" : "Choose image file"}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        style={{ display: "none" }}
+                        onChange={handleCoverFileChange}
+                        disabled={coverImageUploading}
+                      />
+                    </label>
+                    {coverImageUrl && (
+                      <p
+                        style={{
+                          fontSize: 10,
+                          marginTop: 6,
+                          color: theme.subtext,
+                          wordBreak: "break-all",
+                        }}
+                      >
+                        Image set. It will appear behind your text in the
+                        preview.
+                      </p>
+                    )}
+                  </div>
+
+                  {coverImageUrl && (
+                    <>
+                      <div>
+                        <div style={{ ...styles.label, marginBottom: 4 }}>
+                          Image fit
+                        </div>
+                        <div style={{ display: "flex", gap: 6 }}>
+                          <button
+                            type="button"
+                            onClick={() => setCoverImageFit("cover")}
+                            style={{
+                              ...styles.btn,
+                              flex: 1,
+                              fontSize: 11,
+                              border:
+                                coverImageFit === "cover"
+                                  ? `1px solid ${theme.accent}`
+                                  : `1px solid ${theme.border}`,
+                              background:
+                                coverImageFit === "cover"
+                                  ? "#eef2ff"
+                                  : "#ffffff",
+                            }}
+                          >
+                            Fill cover
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setCoverImageFit("contain")}
+                            style={{
+                              ...styles.btn,
+                              flex: 1,
+                              fontSize: 11,
+                              border:
+                                coverImageFit === "contain"
+                                  ? `1px solid ${theme.accent}`
+                                  : `1px solid ${theme.border}`,
+                              background:
+                                coverImageFit === "contain"
+                                  ? "#eef2ff"
+                                  : "#ffffff",
+                            }}
+                          >
+                            Fit inside
+                          </button>
+                        </div>
+                      </div>
+
+                      <div>
+                        <div style={{ ...styles.label, marginBottom: 4 }}>
+                          Overlay & readability
+                        </div>
+                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                          <button
+                            type="button"
+                            onClick={() => setCoverImageFilter("soft-dark")}
+                            style={{
+                              ...styles.btn,
+                              fontSize: 11,
+                              border:
+                                coverImageFilter === "soft-dark"
+                                  ? `1px solid ${theme.accent}`
+                                  : `1px solid ${theme.border}`,
+                              background:
+                                coverImageFilter === "soft-dark"
+                                  ? "#eef2ff"
+                                  : "#ffffff",
+                            }}
+                          >
+                            Soft dark overlay
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setCoverImageFilter("soft-blur")}
+                            style={{
+                              ...styles.btn,
+                              fontSize: 11,
+                              border:
+                                coverImageFilter === "soft-blur"
+                                  ? `1px solid ${theme.accent}`
+                                  : `1px solid ${theme.border}`,
+                              background:
+                                coverImageFilter === "soft-blur"
+                                  ? "#eef2ff"
+                                  : "#ffffff",
+                            }}
+                          >
+                            Soft blur
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setCoverImageFilter("none")}
+                            style={{
+                              ...styles.btn,
+                              fontSize: 11,
+                              border:
+                                coverImageFilter === "none"
+                                  ? `1px solid ${theme.accent}`
+                                  : `1px solid ${theme.border}`,
+                              background:
+                                coverImageFilter === "none"
+                                  ? "#eef2ff"
+                                  : "#ffffff",
+                            }}
+                          >
+                            No overlay
+                          </button>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={handleClearCoverImage}
+                        style={{
+                          marginTop: 4,
+                          fontSize: 11,
+                          padding: "4px 8px",
+                          borderRadius: 999,
+                          border: "1px solid #ef4444",
+                          color: "#b91c1c",
+                          background: "#fef2f2",
+                          cursor: "pointer",
+                        }}
+                      >
+                        Remove image
+                      </button>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* AI Design tab */}
+              {designMode === "ai" && (
+                <div style={{ display: "grid", gap: 8 }}>
+                  <div style={styles.label}>Tell the AI about your story</div>
+                  <textarea
+                    rows={3}
+                    value={aiPrompt}
+                    onChange={(e) => setAiPrompt(e.target.value)}
+                    placeholder="Example: Dark, moody historical thriller in South Philadelphia with family secrets."
+                    style={{
+                      resize: "vertical",
+                      padding: 8,
+                      fontSize: 11,
+                      borderRadius: 8,
+                      border: `1px solid ${theme.border}`,
+                      fontFamily:
+                        "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+                    }}
+                  />
+                  <button
+                    type="button"
+                    disabled={aiBusy}
+                    onClick={handleAiDesignSuggest}
+                    style={{
+                      ...styles.btnPrimary,
+                      fontSize: 12,
+                      padding: "7px 12px",
+                      opacity: aiBusy ? 0.7 : 1,
+                      cursor: aiBusy ? "wait" : "pointer",
+                    }}
+                  >
+                    {aiBusy ? "Thinking…" : "Suggest palette & layout"}
+                  </button>
+                  <p
+                    style={{
+                      margin: 0,
+                      fontSize: 10,
+                      color: theme.subtext,
+                    }}
+                  >
+                    Today this assistant adjusts your mood preset, overlay, and
+                    layout based on your description. Later, we can connect it
+                    to real AI-generated artwork.
+                  </p>
+                </div>
+              )}
             </div>
           </aside>
 
@@ -524,8 +776,13 @@ export default function Cover() {
                     backgroundImage: coverImageUrl
                       ? `url(${coverImageUrl})`
                       : selectedPreset.bg,
-                    backgroundSize: "cover",
+                    backgroundSize: coverImageUrl
+                      ? coverImageFit === "cover"
+                        ? "cover"
+                        : "contain"
+                      : "cover",
                     backgroundPosition: "center",
+                    backgroundRepeat: "no-repeat",
                     boxShadow:
                       "0 24px 60px rgba(15, 23, 42, 0.6), 0 0 0 1px rgba(15,23,42,0.3)",
                     display: "flex",
@@ -539,9 +796,7 @@ export default function Cover() {
                     style={{
                       position: "absolute",
                       inset: 0,
-                      background: coverImageUrl
-                        ? "linear-gradient(180deg, rgba(15,23,42,0.55), rgba(15,23,42,0.75))"
-                        : selectedPreset.overlay,
+                      background: overlayBackground,
                     }}
                   />
 
@@ -634,8 +889,8 @@ export default function Cover() {
                 textAlign: "right",
               }}
             >
-              Later we can add: export as PNG/JPEG, spine/back design, and AI
-              layout suggestions.
+              Later we can add: export as PNG/JPEG, spine/back design, and
+              full AI cover concepts.
             </div>
           </section>
         </div>
