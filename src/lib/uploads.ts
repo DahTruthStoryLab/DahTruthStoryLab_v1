@@ -1,52 +1,41 @@
 // src/lib/uploads.ts
+import { presignUpload, uploadToS3 } from "./uploader";
 
 const PRESIGN_URL: string =
   import.meta.env.VITE_UPLOAD_URL || "";
 // Example: "https://t9xv0aicog.execute-api.us-east-1.amazonaws.com/dev/presign"
 
 /**
- * Upload an image file to S3 using a presigned URL from your backend
- * and return the final public URL.
+ * Upload an image file using your existing presign + S3 POST flow
+ * and return the final public URL that you can store in your content.
+ *
+ * userId is optional for now; later you can wire it to Cognito.
  */
-export async function uploadImage(file: File): Promise<string> {
+export async function uploadImage(
+  file: File,
+  userId: string = "local-user"
+): Promise<string> {
   if (!PRESIGN_URL) {
     throw new Error("Missing VITE_UPLOAD_URL for image uploads");
   }
 
-  // 1. Ask your backend (Lambda/API Gateway) for a presigned URL + final file URL
-  const presignRes = await fetch(PRESIGN_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      fileName: file.name,
-      fileType: file.type,
-      folder: "images", // adjust or remove if your Lambda does not expect this
-    }),
+  // 1️⃣ Ask backend for presigned POST data
+  //    This should return something like: { url, fields }
+  const { url, fields } = await presignUpload(PRESIGN_URL, {
+    userId,
+    file,
   });
 
-  if (!presignRes.ok) {
-    throw new Error("Failed to get upload URL");
+  // 2️⃣ Upload file to S3 using POST
+  await uploadToS3(url, fields, file);
+
+  // 3️⃣ Build the final public URL
+  const key = (fields as any).key || (fields as any).Key;
+  const finalUrl = key ? `${url}/${key}` : url;
+
+  if (!finalUrl) {
+    throw new Error("No final URL returned from upload");
   }
 
-  const data = await presignRes.json();
-  const uploadUrl: string = data.uploadUrl;
-  const fileUrl: string = data.fileUrl; // public URL to save in your chapter content
-
-  if (!uploadUrl || !fileUrl) {
-    throw new Error("Presign response missing uploadUrl/fileUrl");
-  }
-
-  // 2. PUT the file to S3 using the presigned URL
-  const putRes = await fetch(uploadUrl, {
-    method: "PUT",
-    headers: { "Content-Type": file.type || "application/octet-stream" },
-    body: file,
-  });
-
-  if (!putRes.ok) {
-    throw new Error("Image upload failed");
-  }
-
-  // 3. Return the final URL so the editor can insert it into your content
-  return fileUrl;
+  return finalUrl;
 }
