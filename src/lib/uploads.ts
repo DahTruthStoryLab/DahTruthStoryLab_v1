@@ -1,12 +1,9 @@
 // src/lib/uploads.ts
 
-const PRESIGN_URL: string =
-  import.meta.env.VITE_UPLOAD_URL || "";
-// Example: "https://t9xv0aicog.execute-api.us-east-1.amazonaws.com/dev/presign"
+// Single source of truth for your presign endpoint
+const PRESIGN_URL: string = import.meta.env.VITE_UPLOAD_URL || "";
 
-const PRESIGN_URL: string =
-  import.meta.env.VITE_UPLOAD_URL || "";
-
+// Helpful in the browser console to confirm what the app is using
 console.log("[uploads] PRESIGN_URL =", PRESIGN_URL);
 
 /**
@@ -18,14 +15,14 @@ export async function uploadImage(file: File): Promise<string> {
     throw new Error("Missing VITE_UPLOAD_URL for image uploads");
   }
 
-  // 1. Ask your backend (Lambda/API Gateway) for a presigned URL + final file URL
+  // 1. Ask your backend (Lambda / API Gateway) for a presigned URL + final file URL
   const presignRes = await fetch(PRESIGN_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       fileName: file.name,
-      fileType: file.type,
-      folder: "images", // adjust or remove if your Lambda does not expect this
+      fileType: file.type || "application/octet-stream",
+      folder: "images", // adjust/remove if your Lambda does not expect this
     }),
   });
 
@@ -33,9 +30,13 @@ export async function uploadImage(file: File): Promise<string> {
     throw new Error("Failed to get upload URL");
   }
 
-  const data = await presignRes.json();
-  const uploadUrl: string = data.uploadUrl;
-  const fileUrl: string = data.fileUrl; // public URL to save in your chapter content
+  const data = await presignRes.json() as {
+    uploadUrl?: string;
+    fileUrl?: string;
+  };
+
+  const uploadUrl = data.uploadUrl;
+  const fileUrl = data.fileUrl; // public URL to save in your chapter content
 
   if (!uploadUrl || !fileUrl) {
     throw new Error("Presign response missing uploadUrl/fileUrl");
