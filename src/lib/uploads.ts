@@ -4,6 +4,11 @@ const PRESIGN_URL: string =
   import.meta.env.VITE_UPLOAD_URL || "";
 // Example: "https://t9xv0aicog.execute-api.us-east-1.amazonaws.com/dev/presign"
 
+const PRESIGN_URL: string =
+  import.meta.env.VITE_UPLOAD_URL || "";
+
+console.log("[uploads] PRESIGN_URL =", PRESIGN_URL);
+
 /**
  * Upload an image file to S3 using a presigned URL from your backend
  * and return the final public URL.
