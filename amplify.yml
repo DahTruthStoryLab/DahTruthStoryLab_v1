@@ -10,17 +10,15 @@ frontend:
       commands:
         - |
           if [ "$AMPLIFY_BRANCH" = "main" ] || [ "$AMPLIFY_BRANCH" = "prod" ]; then
+            # 👉 PROD / main branch
             echo "VITE_API_BASE=https://nh462913aa.execute-api.us-east-1.amazonaws.com/prod" > .env.production
             echo "VITE_AI_URL=https://nh462913aa.execute-api.us-east-1.amazonaws.com/prod/ai/rewrite" >> .env.production
-            # 👇 presign endpoint for uploads (prod)
-           echo "VITE_UPLOAD_URL=https://nh462913aa.execute-api.us-east-1.amazonaws.com/prod/files/presign-upload" >> .env.production
-
+            echo "VITE_UPLOAD_URL=https://nh462913aa.execute-api.us-east-1.amazonaws.com/prod/files/presign-upload" >> .env.production
           else
-            # dev / preview branches
-            echo "VITE_API_BASE=https://nh462913aa.execute-api.us-east-1.amazonaws.com/dev" > .env.production
-            echo "VITE_AI_URL=https://nh462913aa.execute-api.us-east-1.amazonaws.com/dev/ai/rewrite" >> .env.production
-            # 👇 presign endpoint for uploads (dev)
-           echo "VITE_UPLOAD_URL=https://nh462913aa.execute-api.us-east-1.amazonaws.com/prod/files/presign-upload" >> .env.production
+            # 👉 Other branches (for now, point to the same prod API)
+            echo "VITE_API_BASE=https://nh462913aa.execute-api.us-east-1.amazonaws.com/prod" > .env.production
+            echo "VITE_AI_URL=https://nh462913aa.execute-api.us-east-1.amazonaws.com/prod/ai/rewrite" >> .env.production
+            echo "VITE_UPLOAD_URL=https://nh462913aa.execute-api.us-east-1.amazonaws.com/prod/files/presign-upload" >> .env.production
           fi
         - echo "VITE_MSAL_CLIENT_ID=${VITE_MSAL_CLIENT_ID}" >> .env.production
         - cat .env.production
