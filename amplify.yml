@@ -10,16 +10,16 @@ frontend:
       commands:
         - |
           if [ "$AMPLIFY_BRANCH" = "main" ] || [ "$AMPLIFY_BRANCH" = "prod" ]; then
-            echo "VITE_API_BASE=https://t9xv0aicog.execute-api.us-east-1.amazonaws.com/prod" > .env.production
-            echo "VITE_AI_URL=https://t9xv0aicog.execute-api.us-east-1.amazonaws.com/prod/ai/rewrite" >> .env.production
-            # 👇 add the presign endpoint for uploads (prod)
-            echo "VITE_UPLOAD_URL=https://t9xv0aicog.execute-api.us-east-1.amazonaws.com/prod/presign" >> .env.production
+            # ✅ PROD: new API (nh462913aa)
+            echo "VITE_API_BASE=https://nh462913aa.execute-api.us-east-1.amazonaws.com/prod" > .env.production
+            echo "VITE_AI_URL=https://nh462913aa.execute-api.us-east-1.amazonaws.com/prod/ai/rewrite" >> .env.production
+            # Uploads route from your env-vars screenshot
+            echo "VITE_UPLOAD_URL=https://nh462913aa.execute-api.us-east-1.amazonaws.com/prod/files/presign-upload" >> .env.production
           else
-            # dev / preview branches
-            echo "VITE_API_BASE=https://t9xv0aicog.execute-api.us-east-1.amazonaws.com/dev" > .env.production
-            echo "VITE_AI_URL=https://t9xv0aicog.execute-api.us-east-1.amazonaws.com/dev/ai/rewrite" >> .env.production
-            # 👇 add the presign endpoint for uploads (dev)
-            echo "VITE_UPLOAD_URL=https://t9xv0aicog.execute-api.us-east-1.amazonaws.com/dev/presign" >> .env.production
+            # ✅ Dev / preview: for now, also point to prod stage of new API
+            echo "VITE_API_BASE=https://nh462913aa.execute-api.us-east-1.amazonaws.com/prod" > .env.production
+            echo "VITE_AI_URL=https://nh462913aa.execute-api.us-east-1.amazonaws.com/prod/ai/rewrite" >> .env.production
+            echo "VITE_UPLOAD_URL=https://nh462913aa.execute-api.us-east-1.amazonaws.com/prod/files/presign-upload" >> .env.production
           fi
         - echo "VITE_MSAL_CLIENT_ID=${VITE_MSAL_CLIENT_ID}" >> .env.production
         - cat .env.production
@@ -31,4 +31,3 @@ frontend:
   cache:
     paths:
       - node_modules/**/*
-
