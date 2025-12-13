@@ -1,5 +1,5 @@
 // src/pages/Cover.jsx
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import PageShell from "../components/layout/PageShell.tsx";
 import { uploadImage } from "../lib/uploads";
 
@@ -16,7 +16,6 @@ const theme = {
   gold: "var(--brand-gold, #facc15)",
 };
 
-// Simple genre / mood presets
 const GENRE_PRESETS = [
   {
     key: "general",
@@ -77,7 +76,6 @@ const LAYOUTS = [
   { key: "bottom", label: "Title at Bottom" },
 ];
 
-// Basic styles reused
 const styles = {
   outer: {
     maxWidth: 1200,
@@ -137,34 +135,70 @@ export default function Cover() {
   const [genrePresetKey, setGenrePresetKey] = useState("general");
   const [layoutKey, setLayoutKey] = useState("center");
 
-  // Background image state
   const [coverImageUrl, setCoverImageUrl] = useState("");
   const [coverImageUploading, setCoverImageUploading] = useState(false);
-  const [coverImageFit, setCoverImageFit] = useState("cover"); // "cover" | "contain"
-  const [coverImageFilter, setCoverImageFilter] = useState("soft-dark"); // "soft-dark" | "none" | "soft-blur"
+  const [coverImageFit, setCoverImageFit] = useState("cover");
+  const [coverImageFilter, setCoverImageFilter] = useState("soft-dark");
 
-  // AI design assist state
-  const [designMode, setDesignMode] = useState("upload"); // "upload" | "ai"
+  const [designMode, setDesignMode] = useState("upload");
   const [aiPrompt, setAiPrompt] = useState("");
   const [aiBusy, setAiBusy] = useState(false);
+  const [coverLoaded, setCoverLoaded] = useState(false);
+
+  const COVER_IMAGE_URL_KEY = "dahtruth_cover_image_url";
+  const COVER_IMAGE_META_KEY = "dahtruth_cover_image_meta";
 
   const selectedPreset =
     GENRE_PRESETS.find((p) => p.key === genrePresetKey) || GENRE_PRESETS[0];
 
-  // Layout positioning for title block
   let justifyContent = "center";
   if (layoutKey === "top") justifyContent = "flex-start";
   if (layoutKey === "bottom") justifyContent = "flex-end";
 
-  // Image upload handler (uses uploads.ts → S3 presign + PUT)
+  useEffect(() => {
+    try {
+      const savedUrl = localStorage.getItem(COVER_IMAGE_URL_KEY);
+      if (savedUrl) setCoverImageUrl(savedUrl);
+
+      const savedMeta = localStorage.getItem(COVER_IMAGE_META_KEY);
+      if (savedMeta) {
+        const meta = JSON.parse(savedMeta);
+        if (meta?.fit) setCoverImageFit(meta.fit);
+        if (meta?.filter) setCoverImageFilter(meta.filter);
+      }
+    } catch {
+      // ignore
+    } finally {
+      setCoverLoaded(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!coverLoaded) return;
+
+    try {
+      if (coverImageUrl) localStorage.setItem(COVER_IMAGE_URL_KEY, coverImageUrl);
+      else localStorage.removeItem(COVER_IMAGE_URL_KEY);
+
+      localStorage.setItem(
+        COVER_IMAGE_META_KEY,
+        JSON.stringify({ fit: coverImageFit, filter: coverImageFilter })
+      );
+    } catch {
+      // ignore
+    }
+  }, [coverLoaded, coverImageUrl, coverImageFit, coverImageFilter]);
+
   const handleCoverFileChange = async (event) => {
-    const file = event.target.files?.[0];
+    const input = event.target;
+    const file = input.files?.[0];
     if (!file) return;
 
     try {
       setCoverImageUploading(true);
       const url = await uploadImage(file);
       setCoverImageUrl(url);
+      input.value = "";
     } catch (err) {
       console.error("[Cover upload error]", err);
       alert(err?.message || "Image upload failed. Please try again.");
@@ -175,9 +209,13 @@ export default function Cover() {
 
   const handleClearCoverImage = () => {
     setCoverImageUrl("");
+    try {
+      localStorage.removeItem(COVER_IMAGE_URL_KEY);
+    } catch {
+      // ignore
+    }
   };
 
-  // Lightweight "AI" design assist: picks overlay / layout based on keywords.
   const handleAiDesignSuggest = () => {
     if (!aiPrompt.trim()) {
       alert(
@@ -216,7 +254,6 @@ export default function Cover() {
     }, 300);
   };
 
-  // Overlay for preview depending on background + filter
   const overlayBackground = coverImageUrl
     ? coverImageFilter === "soft-dark"
       ? "linear-gradient(180deg, rgba(15,23,42,0.55), rgba(15,23,42,0.8))"
@@ -287,9 +324,7 @@ export default function Cover() {
                 Currently editing:{" "}
                 <strong>{title || "Untitled Project"}</strong>
               </div>
-              <div>
-                Tip: keep it simple, bold, and readable at thumbnail size.
-              </div>
+              <div>Tip: keep it simple, bold, and readable at thumbnail size.</div>
             </div>
           </div>
         </div>
@@ -301,16 +336,11 @@ export default function Cover() {
             display: "grid",
             gridTemplateColumns: "minmax(0, 360px) minmax(0, 1fr)",
             gap: 20,
+            alignItems: "start",
           }}
         >
           {/* LEFT: CONTROLS */}
-          <aside
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: 14,
-            }}
-          >
+          <aside style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             {/* Text basics */}
             <div style={styles.glassCard}>
               <h3
@@ -323,6 +353,7 @@ export default function Cover() {
               >
                 Text & Metadata
               </h3>
+
               <div style={{ display: "grid", gap: 10 }}>
                 <div>
                   <div style={styles.label}>Title</div>
@@ -333,6 +364,7 @@ export default function Cover() {
                     placeholder="Book title"
                   />
                 </div>
+
                 <div>
                   <div style={styles.label}>Subtitle (optional)</div>
                   <input
@@ -342,6 +374,7 @@ export default function Cover() {
                     placeholder="Subtitle or tagline"
                   />
                 </div>
+
                 <div>
                   <div style={styles.label}>Author Name</div>
                   <input
@@ -366,17 +399,13 @@ export default function Cover() {
               >
                 Mood & Layout
               </h3>
+
               <div style={{ marginBottom: 10 }}>
                 <div style={{ ...styles.label, marginBottom: 6 }}>
                   Genre / Mood Preset
                 </div>
-                <div
-                  style={{
-                    display: "flex",
-                    flexWrap: "wrap",
-                    gap: 6,
-                  }}
-                >
+
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                   {GENRE_PRESETS.map((preset) => (
                     <button
                       key={preset.key}
@@ -404,6 +433,7 @@ export default function Cover() {
                 <div style={{ ...styles.label, marginBottom: 6 }}>
                   Title Block Layout
                 </div>
+
                 <div style={{ display: "flex", gap: 6 }}>
                   {LAYOUTS.map((layout) => (
                     <button
@@ -468,6 +498,7 @@ export default function Cover() {
                 >
                   Upload
                 </button>
+
                 <button
                   type="button"
                   onClick={() => setDesignMode("ai")}
@@ -500,8 +531,7 @@ export default function Cover() {
                         fontSize: 11,
                       }}
                     >
-                      📁{" "}
-                      {coverImageUploading ? "Uploading…" : "Choose image file"}
+                      📁 {coverImageUploading ? "Uploading…" : "Choose image file"}
                       <input
                         type="file"
                         accept="image/*"
@@ -510,6 +540,7 @@ export default function Cover() {
                         disabled={coverImageUploading}
                       />
                     </label>
+
                     {coverImageUrl && (
                       <p
                         style={{
@@ -519,8 +550,7 @@ export default function Cover() {
                           wordBreak: "break-all",
                         }}
                       >
-                        Image set. It will appear behind your text in the
-                        preview.
+                        Image set. It will appear behind your text in the preview.
                       </p>
                     )}
                   </div>
@@ -544,13 +574,12 @@ export default function Cover() {
                                   ? `1px solid ${theme.accent}`
                                   : `1px solid ${theme.border}`,
                               background:
-                                coverImageFit === "cover"
-                                  ? "#eef2ff"
-                                  : "#ffffff",
+                                coverImageFit === "cover" ? "#eef2ff" : "#ffffff",
                             }}
                           >
                             Fill cover
                           </button>
+
                           <button
                             type="button"
                             onClick={() => setCoverImageFit("contain")}
@@ -596,6 +625,7 @@ export default function Cover() {
                           >
                             Soft dark overlay
                           </button>
+
                           <button
                             type="button"
                             onClick={() => setCoverImageFilter("soft-blur")}
@@ -614,6 +644,7 @@ export default function Cover() {
                           >
                             Soft blur
                           </button>
+
                           <button
                             type="button"
                             onClick={() => setCoverImageFilter("none")}
@@ -625,9 +656,7 @@ export default function Cover() {
                                   ? `1px solid ${theme.accent}`
                                   : `1px solid ${theme.border}`,
                               background:
-                                coverImageFilter === "none"
-                                  ? "#eef2ff"
-                                  : "#ffffff",
+                                coverImageFilter === "none" ? "#eef2ff" : "#ffffff",
                             }}
                           >
                             No overlay
@@ -689,16 +718,10 @@ export default function Cover() {
                   >
                     {aiBusy ? "Thinking…" : "Suggest palette & layout"}
                   </button>
-                  <p
-                    style={{
-                      margin: 0,
-                      fontSize: 10,
-                      color: theme.subtext,
-                    }}
-                  >
+                  <p style={{ margin: 0, fontSize: 10, color: theme.subtext }}>
                     Today this assistant adjusts your mood preset, overlay, and
-                    layout based on your description. Later, we can connect it
-                    to real AI-generated artwork.
+                    layout based on your description. Later, we can connect it to
+                    real AI-generated artwork.
                   </p>
                 </div>
               )}
@@ -706,13 +729,7 @@ export default function Cover() {
           </aside>
 
           {/* RIGHT: PREVIEW */}
-          <section
-            style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: 12,
-            }}
-          >
+          <section style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             <div style={styles.glassCard}>
               <div
                 style={{
@@ -723,13 +740,7 @@ export default function Cover() {
                   gap: 8,
                 }}
               >
-                <div
-                  style={{
-                    fontSize: 13,
-                    fontWeight: 600,
-                    color: theme.text,
-                  }}
-                >
+                <div style={{ fontSize: 13, fontWeight: 600, color: theme.text }}>
                   Live Preview
                   <span
                     style={{
@@ -740,28 +751,17 @@ export default function Cover() {
                       color: theme.subtext,
                     }}
                   >
-                    Approx. 6" × 9" trade paperback ratio
+                    Approx. 6&quot; × 9&quot; trade paperback ratio
                   </span>
                 </div>
-                <div
-                  style={{
-                    fontSize: 10,
-                    color: theme.subtext,
-                    textAlign: "right",
-                  }}
-                >
-                  This is a design preview. Final export to PNG/JPEG will come in
-                  the Export panel.
+
+                <div style={{ fontSize: 10, color: theme.subtext, textAlign: "right" }}>
+                  This is a design preview. Final export to PNG/JPEG will come in the
+                  Export panel.
                 </div>
               </div>
 
-              {/* Cover canvas */}
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "center",
-                }}
-              >
+              <div style={{ display: "flex", justifyContent: "center" }}>
                 <div
                   style={{
                     width: 320,
@@ -770,9 +770,7 @@ export default function Cover() {
                     position: "relative",
                     overflow: "hidden",
                     border: "1px solid rgba(15,23,42,0.6)",
-                    backgroundImage: coverImageUrl
-                      ? `url(${coverImageUrl})`
-                      : selectedPreset.bg,
+                    backgroundImage: coverImageUrl ? `url(${coverImageUrl})` : selectedPreset.bg,
                     backgroundSize: coverImageUrl
                       ? coverImageFit === "cover"
                         ? "cover"
@@ -784,11 +782,10 @@ export default function Cover() {
                       "0 24px 60px rgba(15, 23, 42, 0.6), 0 0 0 1px rgba(15,23,42,0.3)",
                     display: "flex",
                     flexDirection: "column",
-                    justifyContent: justifyContent,
+                    justifyContent,
                     padding: "32px 24px",
                   }}
                 >
-                  {/* overlay */}
                   <div
                     style={{
                       position: "absolute",
@@ -797,7 +794,6 @@ export default function Cover() {
                     }}
                   />
 
-                  {/* text block */}
                   <div
                     style={{
                       position: "relative",
@@ -820,6 +816,7 @@ export default function Cover() {
                     >
                       A NOVEL
                     </div>
+
                     <div
                       style={{
                         fontSize: 30,
@@ -830,6 +827,7 @@ export default function Cover() {
                     >
                       {title || "YOUR TITLE HERE"}
                     </div>
+
                     {subtitle && (
                       <div
                         style={{
@@ -843,6 +841,7 @@ export default function Cover() {
                         {subtitle}
                       </div>
                     )}
+
                     <div
                       style={{
                         fontSize: 14,
@@ -856,7 +855,6 @@ export default function Cover() {
                     </div>
                   </div>
 
-                  {/* DahTruth badge */}
                   <div
                     style={{
                       position: "absolute",
@@ -879,15 +877,8 @@ export default function Cover() {
               </div>
             </div>
 
-            <div
-              style={{
-                fontSize: 11,
-                color: theme.subtext,
-                textAlign: "right",
-              }}
-            >
-              Later we can add: export as PNG/JPEG, spine/back design, and
-              full AI cover concepts.
+            <div style={{ fontSize: 11, color: theme.subtext, textAlign: "right" }}>
+              Later we can add: export as PNG/JPEG, spine/back design, and full AI cover concepts.
             </div>
           </section>
         </div>
@@ -895,3 +886,4 @@ export default function Cover() {
     </PageShell>
   );
 }
+
