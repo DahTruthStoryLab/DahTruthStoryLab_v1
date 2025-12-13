@@ -196,8 +196,8 @@ export default function Cover() {
 
     try {
       setCoverImageUploading(true);
-      const url = await uploadImage(file);
-      setCoverImageUrl(url);
+      const result = await uploadImage(file);
+      setCoverImageUrl(result.viewUrl);
       input.value = "";
     } catch (err) {
       console.error("[Cover upload error]", err);
