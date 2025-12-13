@@ -1,23 +1,43 @@
 // src/lib/uploads.ts
 
-// Single source of truth for your presign endpoint
 const PRESIGN_URL: string = import.meta.env.VITE_UPLOAD_URL || "";
+const VIEW_URL: string =
+  (import.meta.env.VITE_API_BASE || "") + "/files/view"; // uses your API base
 
-// Helpful in the browser console to confirm what the app is using
-console.log("[uploads] PRESIGN_URL =", PRESIGN_URL);
+export async function uploadImage(file: File): Promise<{ key: string; viewUrl: string }> {
+  if (!PRESIGN_URL) throw new Error("Missing VITE_UPLOAD_URL for image uploads");
 
-/**
- * Upload an image file to S3 using a presigned URL from your backend
- * and return a VIEWABLE URL for immediate preview.
- *
- * Supports BOTH backend responses:
- *   - { uploadUrl, viewUrl, key }  ✅ preferred (private bucket)
- *   - { uploadUrl, fileUrl, key }  ✅ legacy/public style
- */
-export async function uploadImage(file: File): Promise<string> {
-  if (!PRESIGN_URL) {
-    throw new Error("Missing VITE_UPLOAD_URL for image uploads");
-  }
+  const presignRes = await fetch(PRESIGN_URL, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ fileName: file.name, fileType: file.type || "application/octet-stream", folder: "images" }),
+  });
+
+  if (!presignRes.ok) throw new Error(`Presign failed: ${presignRes.status} ${await presignRes.text()}`);
+
+  const data = (await presignRes.json()) as { uploadUrl?: string; viewUrl?: string; key?: string };
+  if (!data.uploadUrl || !data.key) throw new Error("Presign missing uploadUrl/key");
+
+  const putRes = await fetch(data.uploadUrl, {
+    method: "PUT",
+    headers: { "Content-Type": file.type || "application/octet-stream" },
+    body: file,
+  });
+
+  if (!putRes.ok) throw new Error(`Upload PUT failed: ${putRes.status} ${await putRes.text()}`);
+
+  // return key + a viewUrl (if provided) for immediate preview
+  return { key: data.key, viewUrl: data.viewUrl || "" };
+}
+
+export async function getViewUrl(key: string): Promise<string> {
+  if (!VIEW_URL) throw new Error("Missing VITE_API_BASE for view URLs");
+  const res = await fetch(`${VIEW_URL}?key=${encodeURIComponent(key)}`);
+  if (!res.ok) throw new Error(`ViewUrl failed: ${res.status} ${await res.text()}`);
+  const data = (await res.json()) as { viewUrl?: string };
+  if (!data.viewUrl) throw new Error("No viewUrl returned");
+  return data.viewUrl;
+}
 
   // 1) Ask backend for presigned PUT + view URL
   const presignRes = await fetch(PRESIGN_URL, {
