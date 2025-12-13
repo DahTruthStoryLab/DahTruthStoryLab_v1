@@ -8,17 +8,18 @@ console.log("[uploads] PRESIGN_URL =", PRESIGN_URL);
 
 /**
  * Upload an image file to S3 using a presigned URL from your backend
- * and return a VIEWABLE URL (signed GET) for immediate preview.
+ * and return a VIEWABLE URL for immediate preview.
  *
- * NOTE: This assumes your Lambda now returns:
- *   { uploadUrl, viewUrl, key }
+ * Supports BOTH backend responses:
+ *   - { uploadUrl, viewUrl, key }  ✅ preferred (private bucket)
+ *   - { uploadUrl, fileUrl, key }  ✅ legacy/public style
  */
 export async function uploadImage(file: File): Promise<string> {
   if (!PRESIGN_URL) {
     throw new Error("Missing VITE_UPLOAD_URL for image uploads");
   }
 
-  // 1) Ask backend for presigned PUT + signed GET (viewUrl)
+  // 1) Ask backend for presigned PUT + view URL
   const presignRes = await fetch(PRESIGN_URL, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -34,18 +35,30 @@ export async function uploadImage(file: File): Promise<string> {
     throw new Error(`Failed to get upload URL: ${presignRes.status} ${msg}`);
   }
 
-  const data = (await presignRes.json()) as {
+  // Read text first so we can log/debug if JSON is weird
+  const presignText = await presignRes.text();
+
+  let data: {
     uploadUrl?: string;
-    viewUrl?: string; // ✅ signed GET for preview
+    viewUrl?: string; // ✅ signed GET (private bucket)
+    fileUrl?: string; // ✅ legacy/public style
     key?: string;
-    fileUrl?: string; // optional legacy
-  };
+  } = {};
+
+  try {
+    data = JSON.parse(presignText);
+  } catch {
+    console.error("[uploads] presign returned non-JSON:", presignText);
+    throw new Error("Presign returned non-JSON response");
+  }
+
+  console.log("[uploads] presign response =", data);
 
   const uploadUrl = data.uploadUrl;
-  const viewUrl = data.viewUrl;
+  const displayUrl = data.viewUrl || data.fileUrl; // ✅ fallback
 
-  if (!uploadUrl || !viewUrl) {
-    throw new Error("Presign response missing uploadUrl/viewUrl");
+  if (!uploadUrl || !displayUrl) {
+    throw new Error("Presign response missing uploadUrl and/or display URL (viewUrl/fileUrl)");
   }
 
   // 2) PUT the file to S3 using the presigned URL
@@ -61,7 +74,7 @@ export async function uploadImage(file: File): Promise<string> {
   }
 
   // 3) Return the VIEWABLE URL for the UI to display immediately
-  return viewUrl;
+  return displayUrl;
 }
 
 async function safeText(res: Response): Promise<string> {
