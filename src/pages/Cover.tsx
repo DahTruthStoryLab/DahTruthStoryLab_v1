@@ -216,16 +216,93 @@ export default function Cover() {
     }
   };
 
-  const handleAiDesignSuggest = () => {
-    if (!aiPrompt.trim()) {
-      alert(
-        "Add a few words about your story (e.g. 'dark historical thriller in Philly')."
-      );
-      return;
+ const handleAiDesignSuggest = async () => {
+  if (!aiPrompt.trim()) {
+    alert("Add a few words about your story (e.g. 'dark historical thriller in Philly').");
+    return;
+  }
+
+  setAiBusy(true);
+
+  try {
+    const response = await fetch(
+      `${import.meta.env.VITE_API_BASE_URL}/ai-assistant`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          text: aiPrompt,
+          operation: "chat",
+          instructions: `You are a book cover design assistant. Based on the story description, suggest the best cover design settings.
+
+You MUST respond with ONLY a valid JSON object (no markdown, no explanation) in this exact format:
+{
+  "genre": "general" | "romance" | "thriller" | "memoir" | "fantasy",
+  "layout": "center" | "top" | "bottom",
+  "filter": "soft-dark" | "soft-blur" | "none",
+  "reasoning": "Brief explanation of why these choices fit the story"
+}
+
+Choose based on:
+- "romance" for love stories, relationships
+- "thriller" for suspense, crime, dark themes
+- "memoir" for literary fiction, quiet stories, personal narratives
+- "fantasy" for magical, young adult, epic adventures
+- "general" for everything else
+
+Story description: ${aiPrompt}`,
+        }),
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
     }
 
-    setAiBusy(true);
-    const prompt = aiPrompt.toLowerCase();
+    const data = await response.json();
+    
+    if (data.ok && data.result) {
+      // Try to parse the AI's JSON response
+      try {
+        // Clean up the response in case it has markdown code blocks
+        let jsonStr = data.result.trim();
+        if (jsonStr.startsWith("```")) {
+          jsonStr = jsonStr.replace(/```json?\n?/g, "").replace(/```/g, "").trim();
+        }
+        
+        const suggestions = JSON.parse(jsonStr);
+
+        // Apply the suggestions
+        if (suggestions.genre && GENRE_PRESETS.find(p => p.key === suggestions.genre)) {
+          setGenrePresetKey(suggestions.genre);
+        }
+        if (suggestions.layout && LAYOUTS.find(l => l.key === suggestions.layout)) {
+          setLayoutKey(suggestions.layout);
+        }
+        if (suggestions.filter && ["soft-dark", "soft-blur", "none"].includes(suggestions.filter)) {
+          setCoverImageFilter(suggestions.filter);
+        }
+
+        // Optionally show the reasoning
+        if (suggestions.reasoning) {
+          console.log("AI reasoning:", suggestions.reasoning);
+        }
+      } catch (parseErr) {
+        console.error("Failed to parse AI response:", parseErr, data.result);
+        alert("AI responded but couldn't parse suggestions. Check console for details.");
+      }
+    } else {
+      throw new Error(data.error || "Unknown error from AI");
+    }
+  } catch (err) {
+    console.error("[AI Design Assist error]", err);
+    alert(err?.message || "AI design suggestion failed. Please try again.");
+  } finally {
+    setAiBusy(false);
+  }
+};
 
     if (prompt.includes("romance") || prompt.includes("love")) {
       setGenrePresetKey("romance");
