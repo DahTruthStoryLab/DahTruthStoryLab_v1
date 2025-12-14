@@ -278,7 +278,8 @@ Story description: ${aiPrompt}`,
           jsonStr = jsonMatch[0];
         }
         
-       const suggestions = JSON.parse(jsonStr);
+      const suggestions = JSON.parse(jsonStr);
+      console.log("Parsed suggestions:", suggestions);  // Add this line
 
         // Apply the suggestions
         if (suggestions.genre && GENRE_PRESETS.find(p => p.key === suggestions.genre)) {
