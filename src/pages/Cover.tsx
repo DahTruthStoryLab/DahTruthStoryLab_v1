@@ -304,33 +304,7 @@ Story description: ${aiPrompt}`,
   }
 };
 
-    if (prompt.includes("romance") || prompt.includes("love")) {
-      setGenrePresetKey("romance");
-      setCoverImageFilter("none");
-      setLayoutKey("center");
-    } else if (
-      prompt.includes("thriller") ||
-      prompt.includes("suspense") ||
-      prompt.includes("crime")
-    ) {
-      setGenrePresetKey("thriller");
-      setCoverImageFilter("soft-dark");
-      setLayoutKey("top");
-    } else if (
-      prompt.includes("memoir") ||
-      prompt.includes("quiet") ||
-      prompt.includes("literary")
-    ) {
-      setGenrePresetKey("memoir");
-      setCoverImageFilter("soft-blur");
-      setLayoutKey("center");
-    }
-
-    setTimeout(() => {
-      setAiBusy(false);
-    }, 300);
-  };
-
+   
   const overlayBackground = coverImageUrl
     ? coverImageFilter === "soft-dark"
       ? "linear-gradient(180deg, rgba(15,23,42,0.55), rgba(15,23,42,0.8))"
