@@ -7,6 +7,8 @@ import ChapterGrid from "./Writing/ChapterGrid";
 import ChapterSidebar from "./Writing/ChapterSidebar";
 import EditorToolbar from "./Editor/EditorToolbar";
 import TrashDock from "./Writing/TrashDock";
+import SearchPanel from "./Writing/SearchPanel";
+import PaginatedView from "./Writing/PaginatedView";
 
 import { useChapterManager } from "../hooks/useChapterManager";
 import { GoldButton, WritingCrumb } from "./UI/UIComponents";
@@ -15,7 +17,7 @@ import { documentParser } from "../utils/documentParser";
 import { rateLimiter } from "../utils/rateLimiter";
 
 import { runAssistant } from "../lib/api";
-import { Sparkles } from "lucide-react";
+import { Sparkles, Search, FileText } from "lucide-react";
 
 import {
   computeWordsFromChapters,
@@ -40,8 +42,8 @@ function stripSpacerParagraphs(html = "") {
   if (!html) return "";
   return html.replace(/<p>(?:&nbsp;|\s|<br\s*\/?>)*<\/p>/gi, "");
 }
+
 // Helper: normalize to "double spaced" paragraphs on import / AI
-// ✅ Only touch plain text. If it's already HTML, leave it alone.
 const applyDoubleSpacing = (text = "") => {
   if (!text) return "";
 
@@ -96,7 +98,7 @@ function upsertUserProject({ title, ...rest }) {
       status: "Draft",
       source: "Project",
       updatedAt: new Date().toISOString(),
-      ...rest, // wordCount, chapterCount, characterCount, etc
+      ...rest,
     };
 
     if (index >= 0) {
@@ -125,7 +127,6 @@ function htmlToPlainText(html = "") {
   const tmp = document.createElement("div");
   tmp.innerHTML = html;
   let text = tmp.textContent || tmp.innerText || "";
-  // Normalize whitespace a bit
   return text.replace(/\r\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
 }
 
@@ -175,6 +176,12 @@ export default function ComposePage() {
   // View state
   const [view, setView] = useState("grid");
 
+  // 🔹 NEW: Search panel visibility
+  const [showSearch, setShowSearch] = useState(false);
+
+  // 🔹 NEW: View mode for editor vs paginated pages
+  const [editorViewMode, setEditorViewMode] = useState("editor"); // "editor" | "pages"
+
   // Editor state
   const [title, setTitle] = useState(selectedChapter?.title ?? "");
   const [html, setHtml] = useState(selectedChapter?.content ?? "");
@@ -194,10 +201,10 @@ export default function ComposePage() {
   const [queueLength, setQueueLength] = useState(0);
 
   // Save status for the toolbar
-  const [saveStatus, setSaveStatus] = useState("idle"); // "idle" | "saving" | "saved"
+  const [saveStatus, setSaveStatus] = useState("idle");
 
   // TOC headings for the current chapter
-  const [headings, setHeadings] = useState([]); // [{level, text, id}]
+  const [headings, setHeadings] = useState([]);
 
   // Remember which AI tab/mode is active across sessions
   const [activeAiTab, setActiveAiTab] = useState("proofread");
@@ -335,20 +342,17 @@ export default function ComposePage() {
     setSaveStatus("saving");
 
     try {
-      // Update the selected chapter content
       updateChapter(selectedId, {
         title: title || selectedChapter?.title || "",
         content: html,
       });
 
-      // Compute aggregate stats across all chapters
       const totalWords = computeWordsFromChapters(chapters || []);
       const chapterCount = Array.isArray(chapters) ? chapters.length : 0;
 
       const { characterCount: computedCharacterCount } =
         computeCharactersFromChapters(chapters || []);
 
-      // Persist book meta + stats via the chapter manager
       await Promise.resolve(
         saveProject({
           book: { ...book, title: bookTitle },
@@ -365,10 +369,8 @@ export default function ComposePage() {
         (book?.title && book.title.trim()) ||
         "Untitled Book";
 
-      // Snapshot for Dashboard & cross-page sync
       saveCurrentStorySnapshot({ title: safeTitle });
 
-      // Update the projects list entry so ProjectPage shows correct stats
       upsertUserProject({
         title: safeTitle,
         wordCount: totalWords,
@@ -376,10 +378,9 @@ export default function ComposePage() {
         characterCount: computedCharacterCount,
       });
 
-      // Keep central currentStory + userProjects in sync
       syncProjectForCurrentStory({
         wordCount: totalWords,
-        targetWords: 50000, // adjust later
+        targetWords: 50000,
         characterCount: computedCharacterCount,
       });
 
@@ -428,7 +429,6 @@ export default function ComposePage() {
     const editorEl = document.querySelector(".ql-editor");
     const selection = window.getSelection();
 
-    // Ensure the selection is inside the editor and not collapsed
     if (
       !editorEl ||
       !selection ||
@@ -444,7 +444,6 @@ export default function ComposePage() {
 
     const range = selection.getRangeAt(0);
 
-    // Clone the selected HTML (this is what we'll replace later)
     const container = document.createElement("div");
     container.appendChild(range.cloneContents());
     const selectedHtml = container.innerHTML.trim();
@@ -456,7 +455,6 @@ export default function ComposePage() {
       return;
     }
 
-    // Convert selected HTML → plain text for AI
     const selectedPlain = selectedHtml
       .replace(/<[^>]*>/g, " ")
       .replace(/\s+/g, " ")
@@ -472,21 +470,14 @@ export default function ComposePage() {
     const MAX_CHARS = 3000;
     const targetText = selectedPlain.slice(0, MAX_CHARS);
 
-    // Helper: wrap AI result into simple <p> HTML
     const wrapAsHtml = (text) => {
-      // 1) Normalize to string
       let cleaned = String(text || "");
-
-      // 2) If the AI happened to return raw <p> tags, strip them out
       cleaned = cleaned.replace(/<\/?p>/gi, "");
-
-      // 3) Escape any remaining HTML
       const safe = cleaned
         .replace(/&/g, "&amp;")
         .replace(/</g, "&lt;")
         .replace(/>/g, "&gt;");
 
-      // 4) Split on blank lines into paragraphs
       const parts = safe
         .split(/\n{2,}/)
         .map((p) => p.trim())
@@ -519,33 +510,26 @@ export default function ComposePage() {
         return;
       }
 
-      // Optional: keep your double-spacing logic for the TEXT
       const processedText = applyDoubleSpacing(resultTextRaw);
-
-      // Turn the AI text into paragraph HTML
       const replacementHtml = wrapAsHtml(processedText);
 
       const fullHtml = (html || "").toString();
 
       if (!fullHtml.includes(selectedHtml)) {
-        // Fallback: don't touch anything if we can't find the exact match
         alert(
           "I couldn't safely locate that selection in the chapter. No changes were made."
         );
         return;
       }
 
-      // Replace ONLY the selected HTML once
       const updatedHtml = fullHtml.replace(selectedHtml, replacementHtml);
 
-      // Update editor + chapter
       setHtml(updatedHtml);
       updateChapter(selectedId, {
         title: title || selectedChapter?.title || "",
         content: updatedHtml,
       });
 
-      // Optionally add a message to the Assistant so you can see the result too
       setChatMessages((prev) => [
         ...prev,
         {
@@ -675,7 +659,6 @@ export default function ComposePage() {
 
       const existing = Array.isArray(chapters) ? chapters : [];
 
-      // 🔹 Detect the single blank starter chapter (no title, no content)
       const isSingleBlank =
         existing.length === 1 &&
         !stripHtml(existing[0].content || "").trim() &&
@@ -691,7 +674,6 @@ export default function ComposePage() {
           const doubleSpacedContent = applyDoubleSpacing(c.content || "");
 
           if (isSingleBlank && index === 0) {
-            // 🔹 Reuse the initial blank chapter for the first imported one
             const firstId = existing[0].id;
             updateChapter(firstId, {
               title: c.title || "Untitled Chapter",
@@ -699,7 +681,6 @@ export default function ComposePage() {
             });
             setSelectedId(firstId);
           } else {
-            // 🔹 Create new chapter for the rest
             const newId = addChapter();
             updateChapter(newId, {
               title: c.title || "Untitled Chapter",
@@ -724,7 +705,6 @@ export default function ComposePage() {
         const fullContent = applyDoubleSpacing(fullContentRaw);
 
         if (isSingleBlank) {
-          // Reuse the existing starter chapter
           const firstId = existing[0].id;
           updateChapter(firstId, {
             title: parsed.title || "Imported Manuscript",
@@ -732,7 +712,6 @@ export default function ComposePage() {
           });
           setSelectedId(firstId);
         } else if (hasChapter) {
-          // Overwrite current selection
           setHtml(fullContent);
           updateChapter(selectedId, {
             title:
@@ -743,7 +722,6 @@ export default function ComposePage() {
             content: fullContent,
           });
         } else {
-          // No chapters yet → create one
           const newId = addChapter();
           updateChapter(newId, {
             title: parsed.title || "Imported Manuscript",
@@ -758,7 +736,6 @@ export default function ComposePage() {
         );
       }
 
-      // Save book meta
       saveProject({
         book: { ...book, title: parsed.title || bookTitle },
       });
@@ -777,23 +754,16 @@ export default function ComposePage() {
 
   /**
    * SEND TO PUBLISHING
-   * 1) Save latest changes (best effort)
-   * 2) Strip @char: tags and spacer <p>&nbsp;</p>
-   * 3) Write clean chapter list to `dahtruth_chapters` for Publishing.tsx
-   * 4) Also store richer snapshot under `publishingDraft`
-   * 5) Navigate to /publishing
    */
-   const handleSendToPublishing = async () => {
+  const handleSendToPublishing = async () => {
     if (!Array.isArray(chapters) || chapters.length === 0) {
       alert("You need at least one chapter before sending to Publishing.");
       return;
     }
 
-    // 1) Make sure the latest changes are saved
     await handleSave();
 
     try {
-      // 2) Strip @char: tags and spacer paragraphs for Publishing version
       const cleanedChapters = chapters.map((ch, idx) => {
         const raw = ch.content || ch.body || ch.text || "";
         const noChars = stripCharacterTags(raw);
@@ -804,29 +774,22 @@ export default function ComposePage() {
 
         return {
           ...ch,
-          // canonical HTML content for Publishing
           content: safeHtml,
-          // used for AI + combined manuscript text
           _plainForPublishing: plain,
-          // used for formatted preview in Publishing page
           textHTML: safeHtml,
           _index: idx,
         };
       });
 
-      // 3) Normalized structure for Publishing.tsx (dahtruth_chapters)
-        const normalizedForPublishing = cleanedChapters.map((ch, index) => {
+      const normalizedForPublishing = cleanedChapters.map((ch, index) => {
         const htmlForPublishing = ch.content || "";
         const plainForPublishing = stripHtml(htmlForPublishing).trim();
 
         return {
           id: ch.id || `c_${index + 1}`,
           title: ch.title || `Chapter ${index + 1}`,
-          included:
-            typeof ch.included === "boolean" ? ch.included : true,
-          // Plain text version (no HTML tags)
+          included: typeof ch.included === "boolean" ? ch.included : true,
           text: plainForPublishing,
-          // Full HTML version so Publishing can keep your formatting
           textHTML: htmlForPublishing || undefined,
         };
       });
@@ -836,7 +799,6 @@ export default function ComposePage() {
         JSON.stringify(normalizedForPublishing)
       );
 
-      // Optional: project meta for Publishing header
       const safeBookTitle =
         (bookTitle && bookTitle.trim()) ||
         (book?.title && book.title.trim()) ||
@@ -851,7 +813,6 @@ export default function ComposePage() {
 
       localStorage.setItem("dahtruth_project_meta", JSON.stringify(meta));
 
-      // 4) Richer payload under publishingDraft for future extensions
       const payload = {
         book: {
           ...book,
@@ -862,18 +823,16 @@ export default function ComposePage() {
         chapters: cleanedChapters.map((ch) => ({
           id: ch.id,
           title: ch.title,
-          content: ch.content, // cleaned HTML
+          content: ch.content,
         })),
       };
 
       localStorage.setItem(PUBLISHING_DRAFT_KEY, JSON.stringify(payload));
 
-      // Also update the project list status
       upsertUserProject({
         title: safeBookTitle,
       });
 
-      // 5) Go to Publishing page
       navigate("/publishing");
     } catch (err) {
       console.error("Failed to send manuscript to publishing:", err);
@@ -982,6 +941,40 @@ export default function ComposePage() {
             {selectMode ? "✓ Select" : "Select"}
           </button>
 
+          {/* 🔹 NEW: Search toggle */}
+          <button
+            onClick={() => setShowSearch((s) => !s)}
+            className={[
+              "inline-flex items-center gap-2 rounded-md border px-2.5 py-1 text-[13px]",
+              showSearch
+                ? "bg-amber-100 border-amber-300"
+                : "bg-white hover:bg-slate-50",
+            ].join(" ")}
+            title="Search manuscript (Ctrl+F)"
+          >
+            <Search className="w-4 h-4" />
+            Search
+          </button>
+
+          {/* 🔹 NEW: Page view toggle */}
+          {view === "editor" && (
+            <button
+              onClick={() =>
+                setEditorViewMode((m) => (m === "pages" ? "editor" : "pages"))
+              }
+              className={[
+                "inline-flex items-center gap-2 rounded-md border px-2.5 py-1 text-[13px]",
+                editorViewMode === "pages"
+                  ? "bg-blue-100 border-blue-300"
+                  : "bg-white hover:bg-slate-50",
+              ].join(" ")}
+              title="Toggle page view (8.5 x 11)"
+            >
+              <FileText className="w-4 h-4" />
+              {editorViewMode === "pages" ? "Editor" : "Pages"}
+            </button>
+          )}
+
           {/* Quick AI run button (uses current active tab) */}
           <button
             onClick={() => handleAI(activeAiTab || "proofread")}
@@ -1060,6 +1053,21 @@ export default function ComposePage() {
       {/* GRID VIEW */}
       {view === "grid" && (
         <>
+          {/* 🔹 Search Panel in Grid View */}
+          {showSearch && (
+            <div className="max-w-7xl mx-auto px-4 pt-4">
+              <SearchPanel
+                chapters={chapters}
+                onSelectChapter={(id) => {
+                  setSelectedId(id);
+                  setView("editor");
+                  setShowSearch(false);
+                }}
+                onClose={() => setShowSearch(false)}
+              />
+            </div>
+          )}
+
           <ChapterGrid
             chapters={chapters}
             selectedId={selectedId}
@@ -1081,7 +1089,6 @@ export default function ComposePage() {
             onRangeSelect={(idx) => rangeSelect(idx)}
             lastClickedIndexRef={lastClickedIndexRef}
           />
-          {/* ✅ TrashDock ONLY in grid mode */}
           <TrashDock onDelete={handleDeleteMultiple} />
         </>
       )}
@@ -1099,6 +1106,18 @@ export default function ComposePage() {
         >
           {/* Left Sidebar */}
           <aside className="sticky top-16 space-y-3" style={{ zIndex: 10 }}>
+            {/* 🔹 Search Panel in Editor View */}
+            {showSearch && (
+              <SearchPanel
+                chapters={chapters}
+                onSelectChapter={(id) => {
+                  setSelectedId(id);
+                  setShowSearch(false);
+                }}
+                onClose={() => setShowSearch(false)}
+              />
+            )}
+
             <ChapterSidebar
               chapters={chapters}
               selectedId={selectedId}
@@ -1176,18 +1195,30 @@ export default function ComposePage() {
             </div>
           </aside>
 
-          {/* Main Editor */}
-          <EditorPane
-            title={title}
-            setTitle={setTitle}
-            html={html}
-            setHtml={setHtml}
-            onSave={handleSave}
-            onAI={handleAI}
-            aiBusy={aiBusy || chatBusy}
-            pageWidth={1000}
-            onHeadingsChange={setHeadings}
-          />
+          {/* 🔹 Main Editor OR Paginated View */}
+          {editorViewMode === "pages" ? (
+            <PaginatedView
+              html={html}
+              title={title}
+              author={author}
+              chapterNumber={
+                chapters.findIndex((c) => c.id === selectedId) + 1
+              }
+              onEdit={() => setEditorViewMode("editor")}
+            />
+          ) : (
+            <EditorPane
+              title={title}
+              setTitle={setTitle}
+              html={html}
+              setHtml={setHtml}
+              onSave={handleSave}
+              onAI={handleAI}
+              aiBusy={aiBusy || chatBusy}
+              pageWidth={1000}
+              onHeadingsChange={setHeadings}
+            />
+          )}
 
           {/* 🔹 Right-hand AI Assistant chat panel */}
           {showAssistant && (
@@ -1218,11 +1249,11 @@ export default function ComposePage() {
                   <p className="text-[12px] text-slate-500 mt-2">
                     Example questions:
                     <br />
-                    • “Help me tighten this opening paragraph.”
+                    • "Help me tighten this opening paragraph."
                     <br />
-                    • “Is this dialogue too on the nose?”
+                    • "Is this dialogue too on the nose?"
                     <br />
-                    • “Suggest a stronger closing sentence.”
+                    • "Suggest a stronger closing sentence."
                   </p>
                 )}
 
@@ -1300,3 +1331,4 @@ export default function ComposePage() {
     </div>
   );
 }
+
