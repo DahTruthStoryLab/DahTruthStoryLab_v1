@@ -266,13 +266,19 @@ Story description: ${aiPrompt}`,
     if (data.ok && data.result) {
       // Try to parse the AI's JSON response
       try {
-        // Clean up the response in case it has markdown code blocks
+       // Clean up the response in case it has markdown code blocks or extra text
         let jsonStr = data.result.trim();
-        if (jsonStr.startsWith("```")) {
-          jsonStr = jsonStr.replace(/```json?\n?/g, "").replace(/```/g, "").trim();
+        
+        // Remove markdown code blocks
+        jsonStr = jsonStr.replace(/```json?\n?/g, "").replace(/```/g, "").trim();
+        
+        // Try to extract JSON object if there's extra text
+        const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          jsonStr = jsonMatch[0];
         }
         
-        const suggestions = JSON.parse(jsonStr);
+       const suggestions = JSON.parse(jsonStr);
 
         // Apply the suggestions
         if (suggestions.genre && GENRE_PRESETS.find(p => p.key === suggestions.genre)) {
