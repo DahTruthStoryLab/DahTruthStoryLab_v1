@@ -226,7 +226,7 @@ export default function Cover() {
 
   try {
     const response = await fetch(
-      `${import.meta.env.VITE_API_BASE_URL}/ai-assistant`,
+      `${import.meta.env.VITE_API_BASE}/ai-assistant`,
       {
         method: "POST",
         headers: {
