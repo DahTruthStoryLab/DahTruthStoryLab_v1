@@ -18,6 +18,12 @@ import {
   generateSynopsis,
 } from "../lib/api";
 
+import {
+  ensureSelectedProject,
+  getSelectedProjectId,
+  chaptersKeyForProject,
+} from "../lib/projectsSync";
+
 /* ---------- Theme via CSS variables (from your brand.css) ---------- */
 const theme = {
   bg: "var(--brand-bg)",
@@ -36,11 +42,30 @@ const theme = {
 const STORAGE_KEY = "dahtruth_chapters";
 const META_KEY = "dahtruth_project_meta";
 
-// Publishing-specific keys
+// Publishing-specific keys (legacy)
 const PUBLISHING_DRAFT_KEY = "dt_publishing_draft";
 const PUBLISHING_CHAPTERS_KEY = "dt_publishing_chapters";
 const PUBLISHING_MATTER_KEY = "dt_publishing_matter";
 const PUBLISHING_META_KEY = "dt_publishing_meta";
+
+// Project-aware keys (per manuscript)
+const publishingDraftKeyForProject = (projectId: string) =>
+  `publishingDraft_${projectId}`;
+
+const publishingChaptersKeyForProject = (projectId: string) =>
+  `dt_publishing_chapters_${projectId}`;
+
+const publishingMatterKeyForProject = (projectId: string) =>
+  `dt_publishing_matter_${projectId}`;
+
+const publishingMetaKeyForProject = (projectId: string) =>
+  `dt_publishing_meta_${projectId}`;
+
+const publishingManuscriptKeyForProject = (projectId: string) =>
+  `dahtruth_publishing_manuscript_${projectId}`;
+
+const projectMetaKeyForProject = (projectId: string) =>
+  `dahtruth_project_meta_${projectId}`;
 
 const GOOGLE_PALETTE = {
   primary: "#1a73e8",
@@ -238,21 +263,21 @@ const PLATFORM_PRESETS: Record<
     pageNumbers: true,
     showTOCInEbook: false,
   },
- KDP_Paperback_7x10: {
-  label: "KDP Paperback – 7 x 10 in",
-  trim: { widthInch: 7, heightInch: 10 },
-  margins: {
-    top: 0.75,
-    bottom: 0.75,
-    left: 0.75,
-    right: 0.5,
-    gutter: 0.375,
+  KDP_Paperback_7x10: {
+    label: "KDP Paperback – 7 x 10 in",
+    trim: { widthInch: 7, heightInch: 10 },
+    margins: {
+      top: 0.75,
+      bottom: 0.75,
+      left: 0.75,
+      right: 0.5,
+      gutter: 0.375,
+    },
+    headers: true,
+    footers: true,
+    pageNumbers: true,
+    showTOCInEbook: false,
   },
-  headers: true,
-  footers: true,
-  pageNumbers: true,
-  showTOCInEbook: false,
-},
   KDP_Paperback_8x10: {
     label: "KDP Paperback – 8 x 10 in",
     trim: { widthInch: 8, heightInch: 10 },
@@ -630,6 +655,20 @@ export default function Publishing(): JSX.Element {
   const [working, setWorking] = useState<AIKey | null>(null);
   const navigate = useNavigate();
 
+  // ✅ NEW: Project ID state
+  const [projectId, setProjectId] = useState<string>("");
+
+  // ✅ Initialize selected project on mount
+  useEffect(() => {
+    try {
+      const p = ensureSelectedProject();
+      const id = p?.id || getSelectedProjectId() || "";
+      setProjectId(id);
+    } catch (e) {
+      console.error("Failed to init selected project in Publishing:", e);
+    }
+  }, []);
+
   // ---------- Meta (shared with Writing) ----------
   const [meta, setMeta] = useState<Meta>({
     title: "Working Title",
@@ -638,11 +677,15 @@ export default function Publishing(): JSX.Element {
     authorLast: "YourLastName",
   });
 
-  // Load meta from localStorage (Writing / legacy)
+  // ✅ Load meta from localStorage (project-scoped first, then legacy)
   useEffect(() => {
+    if (!projectId) return;
+
     try {
-      // Prefer publishing meta if present
-      const pubMetaRaw = localStorage.getItem(PUBLISHING_META_KEY);
+      // 1) Prefer project-scoped publishing meta
+      const pubMetaRaw = localStorage.getItem(
+        publishingMetaKeyForProject(projectId)
+      );
       if (pubMetaRaw) {
         const parsed = JSON.parse(pubMetaRaw);
         if (parsed && typeof parsed === "object") {
@@ -651,54 +694,78 @@ export default function Publishing(): JSX.Element {
         }
       }
 
-      const saved = localStorage.getItem(META_KEY);
-      if (!saved) return;
-      const parsed = JSON.parse(saved);
+      // 2) Fall back to project-scoped project meta (from Compose)
+      const projMetaRaw = localStorage.getItem(projectMetaKeyForProject(projectId));
+      if (projMetaRaw) {
+        const parsed = JSON.parse(projMetaRaw);
+        if (parsed && typeof parsed === "object") {
+          setMeta((prev) => ({ ...prev, ...parsed }));
+          return;
+        }
+      }
+
+      // 3) Legacy fallbacks (old behavior)
+      const legacyPub = localStorage.getItem(PUBLISHING_META_KEY);
+      if (legacyPub) {
+        const parsed = JSON.parse(legacyPub);
+        if (parsed && typeof parsed === "object") {
+          setMeta((prev) => ({ ...prev, ...parsed }));
+          return;
+        }
+      }
+
+      const legacy = localStorage.getItem(META_KEY);
+      if (!legacy) return;
+      const parsed = JSON.parse(legacy);
       if (parsed && typeof parsed === "object") {
         setMeta((prev) => ({ ...prev, ...parsed }));
       }
     } catch {
       // ignore bad JSON
     }
-  }, []);
+  }, [projectId]);
 
-  // Persist meta to both keys
+  // ✅ Persist meta to project-scoped keys (and legacy for backwards compatibility)
   useEffect(() => {
+    if (!projectId) return;
+
     try {
+      // Project-scoped
+      localStorage.setItem(projectMetaKeyForProject(projectId), JSON.stringify(meta));
+      localStorage.setItem(publishingMetaKeyForProject(projectId), JSON.stringify(meta));
+
+      // Legacy (optional for backwards compatibility)
       localStorage.setItem(META_KEY, JSON.stringify(meta));
       localStorage.setItem(PUBLISHING_META_KEY, JSON.stringify(meta));
     } catch {
       // ignore storage errors
     }
-  }, [meta]);
+  }, [meta, projectId]);
 
   // ---------- Chapters + active chapter ----------
 
   const [chapters, setChapters] = useState<Chapter[]>([]);
   const [activeChapterId, setActiveChapterId] = useState<string>("");
 
-  // Load chapters saved by Writing / Compose
+  // ✅ Load chapters saved by Writing / Compose (project-scoped first)
   useEffect(() => {
+    if (!projectId) return;
+
     try {
-      // --- Prefer structured publishingDraft from ComposePage ---
-      const draftRaw = localStorage.getItem(PUBLISHING_DRAFT_KEY);
+      // 1) Prefer per-project publishingDraft saved by ComposePage
+      const draftRaw = localStorage.getItem(publishingDraftKeyForProject(projectId));
 
       if (draftRaw) {
         const parsed = JSON.parse(draftRaw) as { book?: any; chapters?: any[] };
 
-        // hydrate meta title from the book object if present
         if (parsed.book?.title) {
-          setMeta((prev) => ({
-            ...prev,
-            title: parsed.book.title || prev.title,
-          }));
+          setMeta((prev) => ({ ...prev, title: parsed.book.title || prev.title }));
         }
 
         const rawChapters = Array.isArray(parsed.chapters) ? parsed.chapters : [];
 
         if (rawChapters.length > 0) {
           const normalized: Chapter[] = rawChapters.map((c: any, idx: number) => {
-            // Whatever Compose saved: textHTML, content, or text
             const rawHtml =
               typeof c.textHTML === "string"
                 ? c.textHTML
@@ -708,28 +775,49 @@ export default function Publishing(): JSX.Element {
                 ? c.text
                 : "";
 
-            // 🔹 Strip any internal markers / spacer paragraphs
             const cleanedHtml = stripSpacerParagraphs(stripCharacterTags(rawHtml));
 
             return {
               id: c.id || `c_${idx + 1}`,
               title: c.title || `Chapter ${idx + 1}`,
               included: typeof c.included === "boolean" ? c.included : true,
-              // plain text used for compiled manuscript
               text: stripHtml(cleanedHtml),
-              // keep cleaned HTML for the editor
               textHTML: cleanedHtml || undefined,
             };
           });
 
           setChapters(normalized);
           setActiveChapterId(normalized[0].id);
-
-          return; // ✅ Done, no need to fall back
+          return;
         }
       }
 
-      // --- Fallback: legacy dahtruth_chapters behavior ---
+      // 2) Fall back to per-project chapters key written by Compose send-to-publishing
+      const perProjectChaptersRaw = localStorage.getItem(
+        chaptersKeyForProject(projectId)
+      );
+      if (perProjectChaptersRaw) {
+        const parsedCh = JSON.parse(perProjectChaptersRaw) as any[];
+        if (Array.isArray(parsedCh) && parsedCh.length > 0) {
+          const normalized: Chapter[] = parsedCh.map((c: any, idx: number) => {
+            const rawHtml = c.textHTML || c.content || c.text || "";
+            const cleanedHtml = stripSpacerParagraphs(stripCharacterTags(rawHtml));
+            return {
+              id: c.id || `c_${idx + 1}`,
+              title: c.title || `Chapter ${idx + 1}`,
+              included: typeof c.included === "boolean" ? c.included : true,
+              text: stripHtml(cleanedHtml),
+              textHTML: cleanedHtml,
+            };
+          });
+
+          setChapters(normalized);
+          setActiveChapterId(normalized[0].id);
+          return;
+        }
+      }
+
+      // 3) Legacy fallback
       const saved = localStorage.getItem(STORAGE_KEY);
       if (!saved) return;
 
@@ -755,18 +843,28 @@ export default function Publishing(): JSX.Element {
     } catch (err) {
       console.error("Failed to load chapters for Publishing:", err);
     }
-  }, []);
+  }, [projectId]);
 
-  // Persist chapters when edited in Publishing
+  // ✅ Persist chapters when edited in Publishing (project-scoped + legacy)
   useEffect(() => {
+    if (!projectId) return;
+
     try {
       if (!chapters.length) return;
+
+      // project-scoped
+      localStorage.setItem(
+        publishingChaptersKeyForProject(projectId),
+        JSON.stringify(chapters)
+      );
+
+      // legacy (optional)
       localStorage.setItem(STORAGE_KEY, JSON.stringify(chapters));
       localStorage.setItem(PUBLISHING_CHAPTERS_KEY, JSON.stringify(chapters));
     } catch (err) {
       console.error("Failed to persist chapters from Publishing:", err);
     }
-  }, [chapters]);
+  }, [chapters, projectId]);
 
   // ---------- AI + layout state ----------
 
@@ -784,10 +882,12 @@ export default function Publishing(): JSX.Element {
     tocFromHeadings: true,
   });
 
-  // Load matter for Publishing (for Proof tab)
+  // ✅ Load matter for Publishing (project-scoped first)
   useEffect(() => {
+    if (!projectId) return;
+
     try {
-      const raw = localStorage.getItem(PUBLISHING_MATTER_KEY);
+      const raw = localStorage.getItem(publishingMatterKeyForProject(projectId));
       if (!raw) return;
       const parsed = JSON.parse(raw);
       if (parsed && typeof parsed === "object") {
@@ -796,16 +896,24 @@ export default function Publishing(): JSX.Element {
     } catch (err) {
       console.error("Failed to load publishing matter:", err);
     }
-  }, []);
+  }, [projectId]);
 
-  // Persist matter to storage
+  // ✅ Persist matter to storage (project-scoped + legacy)
   useEffect(() => {
+    if (!projectId) return;
+
     try {
+      localStorage.setItem(
+        publishingMatterKeyForProject(projectId),
+        JSON.stringify(matter)
+      );
+
+      // legacy optional
       localStorage.setItem(PUBLISHING_MATTER_KEY, JSON.stringify(matter));
     } catch {
       /* ignore */
     }
-  }, [matter]);
+  }, [matter, projectId]);
 
   const [manuscriptPreset, setManuscriptPreset] =
     useState<ManuscriptPresetKey>("Agents_Standard_12pt_TNR_Double");
@@ -1105,16 +1213,20 @@ export default function Publishing(): JSX.Element {
     [compiledPlain]
   );
 
-  // Save compiled manuscript text for other tabs (proof/format/export)
+  // ✅ Save compiled manuscript text for other tabs (project-scoped + legacy)
   useEffect(() => {
+    if (!projectId) return;
+
     try {
       if (compiledPlain) {
+        localStorage.setItem(publishingManuscriptKeyForProject(projectId), compiledPlain);
+        // legacy optional:
         localStorage.setItem("dahtruth_publishing_manuscript", compiledPlain);
       }
     } catch {
       /* ignore */
     }
-  }, [compiledPlain]);
+  }, [compiledPlain, projectId]);
 
   // Story materials state
   const [materialKey, setMaterialKey] = useState<MaterialKey>("synopsis-short");
@@ -1223,7 +1335,7 @@ export default function Publishing(): JSX.Element {
     }
   };
 
-  // Clear Publishing manuscript and local state (without touching Writing)
+  // ✅ Clear Publishing manuscript and local state (project-scoped + legacy)
   const handleClearPublishingDraft = () => {
     const confirmed = window.confirm(
       "Clear the current Publishing manuscript? This will NOT delete your chapters in Compose."
@@ -1231,6 +1343,15 @@ export default function Publishing(): JSX.Element {
     if (!confirmed) return;
 
     try {
+      if (projectId) {
+        localStorage.removeItem(publishingDraftKeyForProject(projectId));
+        localStorage.removeItem(publishingChaptersKeyForProject(projectId));
+        localStorage.removeItem(publishingMetaKeyForProject(projectId));
+        localStorage.removeItem(publishingMatterKeyForProject(projectId));
+        localStorage.removeItem(publishingManuscriptKeyForProject(projectId));
+      }
+
+      // legacy optional
       localStorage.removeItem(PUBLISHING_DRAFT_KEY);
       localStorage.removeItem(PUBLISHING_CHAPTERS_KEY);
       localStorage.removeItem(PUBLISHING_META_KEY);
@@ -2355,3 +2476,4 @@ export default function Publishing(): JSX.Element {
     </PageShell>
   );
 }
+
