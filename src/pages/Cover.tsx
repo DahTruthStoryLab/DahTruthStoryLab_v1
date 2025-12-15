@@ -1,7 +1,8 @@
 // src/pages/Cover.jsx
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import PageShell from "../components/layout/PageShell.tsx";
 import { uploadImage } from "../lib/uploads";
+import { toPng } from "html-to-image";
 
 const theme = {
   bg: "var(--brand-bg, #0f172a)",
@@ -129,6 +130,9 @@ const styles = {
 };
 
 export default function Cover() {
+  // ✅ MUST be inside the component
+  const coverRef = useRef(null);
+
   const [title, setTitle] = useState("Working Title");
   const [subtitle, setSubtitle] = useState("Optional subtitle");
   const [author, setAuthor] = useState("Your Name");
@@ -216,22 +220,38 @@ export default function Cover() {
     }
   };
 
- const handleAiDesignSuggest = async () => {
-  if (!aiPrompt.trim()) {
-    alert("Add a few words about your story (e.g. 'dark historical thriller in Philly').");
-    return;
-  }
+  // ✅ Export PNG (safe, no extra deps beyond html-to-image)
+  const handleExportPng = async () => {
+    if (!coverRef.current) return;
+    try {
+      const dataUrl = await toPng(coverRef.current, {
+        cacheBust: true,
+        pixelRatio: 2,
+      });
+      const a = document.createElement("a");
+      a.href = dataUrl;
+      a.download = `${(title || "cover").replace(/[^\w\-]+/g, "_")}.png`;
+      a.click();
+    } catch (e) {
+      console.error("[Export PNG error]", e);
+      alert("Export failed. Check console for details.");
+    }
+  };
 
-  setAiBusy(true);
+  const handleAiDesignSuggest = async () => {
+    if (!aiPrompt.trim()) {
+      alert(
+        "Add a few words about your story (e.g. 'dark historical thriller in Philly')."
+      );
+      return;
+    }
 
-  try {
-    const response = await fetch(
-      `${import.meta.env.VITE_API_BASE}/ai-assistant`,
-      {
+    setAiBusy(true);
+
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_BASE}/ai-assistant`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           text: aiPrompt,
           operation: "chat",
@@ -245,73 +265,46 @@ You MUST respond with ONLY a valid JSON object (no markdown, no explanation) in 
   "reasoning": "Brief explanation of why these choices fit the story"
 }
 
-Choose based on:
-- "romance" for love stories, relationships
-- "thriller" for suspense, crime, dark themes
-- "memoir" for literary fiction, quiet stories, personal narratives
-- "fantasy" for magical, young adult, epic adventures
-- "general" for everything else
-
 Story description: ${aiPrompt}`,
         }),
-      }
-    );
+      });
 
-    if (!response.ok) {
-      throw new Error(`API error: ${response.status}`);
-    }
+      if (!response.ok) throw new Error(`API error: ${response.status}`);
 
-    const data = await response.json();
-    
-    if (data.ok && data.result) {
-      // Try to parse the AI's JSON response
-      try {
-       // Clean up the response in case it has markdown code blocks or extra text
-        let jsonStr = data.result.trim();
-        
-        // Remove markdown code blocks
+      const data = await response.json();
+
+      if (data.ok && data.result) {
+        let jsonStr = String(data.result).trim();
         jsonStr = jsonStr.replace(/```json?\n?/g, "").replace(/```/g, "").trim();
-        
-        // Try to extract JSON object if there's extra text
-        const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
-        if (jsonMatch) {
-          jsonStr = jsonMatch[0];
-        }
-        
-      const suggestions = JSON.parse(jsonStr);
-      console.log("Parsed suggestions:", suggestions);  // Add this line
 
-        // Apply the suggestions
-        if (suggestions.genre && GENRE_PRESETS.find(p => p.key === suggestions.genre)) {
+        const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
+        if (jsonMatch) jsonStr = jsonMatch[0];
+
+        const suggestions = JSON.parse(jsonStr);
+
+        if (suggestions.genre && GENRE_PRESETS.find((p) => p.key === suggestions.genre)) {
           setGenrePresetKey(suggestions.genre);
         }
-        if (suggestions.layout && LAYOUTS.find(l => l.key === suggestions.layout)) {
+        if (suggestions.layout && LAYOUTS.find((l) => l.key === suggestions.layout)) {
           setLayoutKey(suggestions.layout);
         }
-        if (suggestions.filter && ["soft-dark", "soft-blur", "none"].includes(suggestions.filter)) {
+        if (
+          suggestions.filter &&
+          ["soft-dark", "soft-blur", "none"].includes(suggestions.filter)
+        ) {
           setCoverImageFilter(suggestions.filter);
         }
-
-        // Optionally show the reasoning
-        if (suggestions.reasoning) {
-          console.log("AI reasoning:", suggestions.reasoning);
-        }
-      } catch (parseErr) {
-        console.error("Failed to parse AI response:", parseErr, data.result);
-        alert("AI responded but couldn't parse suggestions. Check console for details.");
+      } else {
+        throw new Error(data.error || "Unknown error from AI");
       }
-    } else {
-      throw new Error(data.error || "Unknown error from AI");
+    } catch (err) {
+      console.error("[AI Design Assist error]", err);
+      alert(err?.message || "AI design suggestion failed. Please try again.");
+    } finally {
+      setAiBusy(false);
     }
-  } catch (err) {
-    console.error("[AI Design Assist error]", err);
-    alert(err?.message || "AI design suggestion failed. Please try again.");
-  } finally {
-    setAiBusy(false);
-  }
-};
+  };
 
-   
   const overlayBackground = coverImageUrl
     ? coverImageFilter === "soft-dark"
       ? "linear-gradient(180deg, rgba(15,23,42,0.55), rgba(15,23,42,0.8))"
@@ -365,24 +358,28 @@ Story description: ${aiPrompt}`,
                   Cover Designer
                 </h1>
                 <div style={{ fontSize: 11, opacity: 0.9 }}>
-                  Build a story-aware cover with live preview. Save the final
-                  image for your KDP upload.
+                  Build a story-aware cover with live preview. Save the final image
+                  for your KDP upload.
                 </div>
               </div>
             </div>
 
-            <div
-              style={{
-                textAlign: "right",
-                fontSize: 11,
-                opacity: 0.9,
-              }}
-            >
-              <div>
-                Currently editing:{" "}
-                <strong>{title || "Untitled Project"}</strong>
+            <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+              <button type="button" onClick={handleExportPng} style={styles.btnPrimary}>
+                Export PNG
+              </button>
+              <div
+                style={{
+                  textAlign: "right",
+                  fontSize: 11,
+                  opacity: 0.9,
+                }}
+              >
+                <div>
+                  Currently editing: <strong>{title || "Untitled Project"}</strong>
+                </div>
+                <div>Tip: keep it simple, bold, and readable at thumbnail size.</div>
               </div>
-              <div>Tip: keep it simple, bold, and readable at thumbnail size.</div>
             </div>
           </div>
         </div>
@@ -401,14 +398,7 @@ Story description: ${aiPrompt}`,
           <aside style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             {/* Text basics */}
             <div style={styles.glassCard}>
-              <h3
-                style={{
-                  margin: "0 0 10px",
-                  fontSize: 15,
-                  fontWeight: 600,
-                  color: theme.text,
-                }}
-              >
+              <h3 style={{ margin: "0 0 10px", fontSize: 15, fontWeight: 600, color: theme.text }}>
                 Text & Metadata
               </h3>
 
@@ -447,21 +437,12 @@ Story description: ${aiPrompt}`,
 
             {/* Presets & layout */}
             <div style={styles.glassCard}>
-              <h3
-                style={{
-                  margin: "0 0 10px",
-                  fontSize: 15,
-                  fontWeight: 600,
-                  color: theme.text,
-                }}
-              >
+              <h3 style={{ margin: "0 0 10px", fontSize: 15, fontWeight: 600, color: theme.text }}>
                 Mood & Layout
               </h3>
 
               <div style={{ marginBottom: 10 }}>
-                <div style={{ ...styles.label, marginBottom: 6 }}>
-                  Genre / Mood Preset
-                </div>
+                <div style={{ ...styles.label, marginBottom: 6 }}>Genre / Mood Preset</div>
 
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                   {GENRE_PRESETS.map((preset) => (
@@ -477,8 +458,7 @@ Story description: ${aiPrompt}`,
                           genrePresetKey === preset.key
                             ? `1px solid ${theme.accent}`
                             : `1px solid ${theme.border}`,
-                        background:
-                          genrePresetKey === preset.key ? "#eef2ff" : "#ffffff",
+                        background: genrePresetKey === preset.key ? "#eef2ff" : "#ffffff",
                       }}
                     >
                       {preset.label}
@@ -488,9 +468,7 @@ Story description: ${aiPrompt}`,
               </div>
 
               <div>
-                <div style={{ ...styles.label, marginBottom: 6 }}>
-                  Title Block Layout
-                </div>
+                <div style={{ ...styles.label, marginBottom: 6 }}>Title Block Layout</div>
 
                 <div style={{ display: "flex", gap: 6 }}>
                   {LAYOUTS.map((layout) => (
@@ -505,8 +483,7 @@ Story description: ${aiPrompt}`,
                           layoutKey === layout.key
                             ? `1px solid ${theme.accent}`
                             : `1px solid ${theme.border}`,
-                        background:
-                          layoutKey === layout.key ? "#eef2ff" : "#ffffff",
+                        background: layoutKey === layout.key ? "#eef2ff" : "#ffffff",
                       }}
                     >
                       {layout.label}
@@ -518,14 +495,7 @@ Story description: ${aiPrompt}`,
 
             {/* Background Image + AI Design */}
             <div style={styles.glassCard}>
-              <h3
-                style={{
-                  margin: "0 0 8px",
-                  fontSize: 15,
-                  fontWeight: 600,
-                  color: theme.text,
-                }}
-              >
+              <h3 style={{ margin: "0 0 8px", fontSize: 15, fontWeight: 600, color: theme.text }}>
                 Background Image & AI Design
               </h3>
 
@@ -616,9 +586,7 @@ Story description: ${aiPrompt}`,
                   {coverImageUrl && (
                     <>
                       <div>
-                        <div style={{ ...styles.label, marginBottom: 4 }}>
-                          Image fit
-                        </div>
+                        <div style={{ ...styles.label, marginBottom: 4 }}>Image fit</div>
                         <div style={{ display: "flex", gap: 6 }}>
                           <button
                             type="button"
@@ -631,8 +599,7 @@ Story description: ${aiPrompt}`,
                                 coverImageFit === "cover"
                                   ? `1px solid ${theme.accent}`
                                   : `1px solid ${theme.border}`,
-                              background:
-                                coverImageFit === "cover" ? "#eef2ff" : "#ffffff",
+                              background: coverImageFit === "cover" ? "#eef2ff" : "#ffffff",
                             }}
                           >
                             Fill cover
@@ -649,10 +616,7 @@ Story description: ${aiPrompt}`,
                                 coverImageFit === "contain"
                                   ? `1px solid ${theme.accent}`
                                   : `1px solid ${theme.border}`,
-                              background:
-                                coverImageFit === "contain"
-                                  ? "#eef2ff"
-                                  : "#ffffff",
+                              background: coverImageFit === "contain" ? "#eef2ff" : "#ffffff",
                             }}
                           >
                             Fit inside
@@ -675,10 +639,7 @@ Story description: ${aiPrompt}`,
                                 coverImageFilter === "soft-dark"
                                   ? `1px solid ${theme.accent}`
                                   : `1px solid ${theme.border}`,
-                              background:
-                                coverImageFilter === "soft-dark"
-                                  ? "#eef2ff"
-                                  : "#ffffff",
+                              background: coverImageFilter === "soft-dark" ? "#eef2ff" : "#ffffff",
                             }}
                           >
                             Soft dark overlay
@@ -694,10 +655,7 @@ Story description: ${aiPrompt}`,
                                 coverImageFilter === "soft-blur"
                                   ? `1px solid ${theme.accent}`
                                   : `1px solid ${theme.border}`,
-                              background:
-                                coverImageFilter === "soft-blur"
-                                  ? "#eef2ff"
-                                  : "#ffffff",
+                              background: coverImageFilter === "soft-blur" ? "#eef2ff" : "#ffffff",
                             }}
                           >
                             Soft blur
@@ -713,8 +671,7 @@ Story description: ${aiPrompt}`,
                                 coverImageFilter === "none"
                                   ? `1px solid ${theme.accent}`
                                   : `1px solid ${theme.border}`,
-                              background:
-                                coverImageFilter === "none" ? "#eef2ff" : "#ffffff",
+                              background: coverImageFilter === "none" ? "#eef2ff" : "#ffffff",
                             }}
                           >
                             No overlay
@@ -777,9 +734,8 @@ Story description: ${aiPrompt}`,
                     {aiBusy ? "Thinking…" : "Suggest palette & layout"}
                   </button>
                   <p style={{ margin: 0, fontSize: 10, color: theme.subtext }}>
-                    Today this assistant adjusts your mood preset, overlay, and
-                    layout based on your description. Later, we can connect it to
-                    real AI-generated artwork.
+                    Today this assistant adjusts your mood preset, overlay, and layout based on your
+                    description. Later, we can connect it to real AI-generated artwork.
                   </p>
                 </div>
               )}
@@ -814,13 +770,14 @@ Story description: ${aiPrompt}`,
                 </div>
 
                 <div style={{ fontSize: 10, color: theme.subtext, textAlign: "right" }}>
-                  This is a design preview. Final export to PNG/JPEG will come in the
-                  Export panel.
+                  Click <strong>Export PNG</strong> to download this cover.
                 </div>
               </div>
 
               <div style={{ display: "flex", justifyContent: "center" }}>
+                {/* ✅ attach ref to the actual cover */}
                 <div
+                  ref={coverRef}
                   style={{
                     width: 320,
                     height: 500,
@@ -828,7 +785,9 @@ Story description: ${aiPrompt}`,
                     position: "relative",
                     overflow: "hidden",
                     border: "1px solid rgba(15,23,42,0.6)",
-                    backgroundImage: coverImageUrl ? `url(${coverImageUrl})` : selectedPreset.bg,
+                    backgroundImage: coverImageUrl
+                      ? `url(${coverImageUrl})`
+                      : selectedPreset.bg,
                     backgroundSize: coverImageUrl
                       ? coverImageFit === "cover"
                         ? "cover"
@@ -944,4 +903,3 @@ Story description: ${aiPrompt}`,
     </PageShell>
   );
 }
-
