@@ -17,6 +17,7 @@
     "file-saver": "^2.0.5",
     "framer-motion": "^11.0.0",
     "heic2any": "^0.0.4",
+    "html-to-image": "^1.11.13",
     "jszip": "^3.10.1",
     "lucide-react": "^0.420.0",
     "mammoth": "^1.11.0",
