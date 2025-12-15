@@ -83,6 +83,27 @@ const TRIM_PRESETS = [
   { key: "8.5x11", label: '8.5" × 11"', wIn: 8.5, hIn: 11 },
 ];
 
+// Design save/load helpers
+const COVER_DESIGNS_KEY = "dahtruth_cover_designs_v1";
+
+function safeJsonParse(value, fallback) {
+  try {
+    return JSON.parse(value);
+  } catch {
+    return fallback;
+  }
+}
+
+function loadDesigns() {
+  if (typeof window === "undefined") return [];
+  return safeJsonParse(localStorage.getItem(COVER_DESIGNS_KEY), []);
+}
+
+function saveDesigns(designs) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(COVER_DESIGNS_KEY, JSON.stringify(designs));
+}
+
 const styles = {
   outer: {
     maxWidth: 1200,
@@ -159,6 +180,11 @@ export default function Cover() {
   const [trimKey, setTrimKey] = useState("6x9");
   const [dpi, setDpi] = useState(300);
 
+  // ✅ NEW: Save/Load designs
+  const [designs, setDesigns] = useState([]);
+  const [selectedDesignId, setSelectedDesignId] = useState("");
+  const [designName, setDesignName] = useState("");
+
   const COVER_IMAGE_URL_KEY = "dahtruth_cover_image_url";
   const COVER_IMAGE_META_KEY = "dahtruth_cover_image_meta";
 
@@ -205,6 +231,12 @@ export default function Cover() {
     }
   }, [coverLoaded, coverImageUrl, coverImageFit, coverImageFilter]);
 
+  // ✅ Load saved designs on page load
+  useEffect(() => {
+    const saved = loadDesigns();
+    setDesigns(Array.isArray(saved) ? saved : []);
+  }, []);
+
   const handleCoverFileChange = async (event) => {
     const input = event.target;
     const file = input.files?.[0];
@@ -230,6 +262,62 @@ export default function Cover() {
     } catch {
       // ignore
     }
+  };
+
+  // ✅ Design save/load functions
+  const buildCurrentDesign = () => {
+    return {
+      id: crypto?.randomUUID ? crypto.randomUUID() : String(Date.now()),
+      name: (designName || title || "Untitled").trim(),
+      createdAt: new Date().toISOString(),
+
+      // cover fields
+      title,
+      subtitle,
+      author,
+      genrePresetKey,
+      layoutKey,
+
+      coverImageUrl,
+      coverImageFit,
+      coverImageFilter,
+    };
+  };
+
+  const applyDesign = (d) => {
+    if (!d) return;
+    setTitle(d.title ?? "Working Title");
+    setSubtitle(d.subtitle ?? "");
+    setAuthor(d.author ?? "Your Name");
+    setGenrePresetKey(d.genrePresetKey ?? "general");
+    setLayoutKey(d.layoutKey ?? "center");
+
+    setCoverImageUrl(d.coverImageUrl ?? "");
+    setCoverImageFit(d.coverImageFit ?? "cover");
+    setCoverImageFilter(d.coverImageFilter ?? "soft-dark");
+  };
+
+  const handleSaveDesign = () => {
+    const next = buildCurrentDesign();
+    const updated = [next, ...designs];
+    setDesigns(updated);
+    saveDesigns(updated);
+    setSelectedDesignId(next.id);
+    setDesignName("");
+  };
+
+  const handleLoadDesign = (id) => {
+    setSelectedDesignId(id);
+    const found = designs.find((d) => d.id === id);
+    if (found) applyDesign(found);
+  };
+
+  const handleDeleteDesign = () => {
+    if (!selectedDesignId) return;
+    const updated = designs.filter((d) => d.id !== selectedDesignId);
+    setDesigns(updated);
+    saveDesigns(updated);
+    setSelectedDesignId("");
   };
 
   // ✅ UPDATED: Print-sized export (inches × DPI)
@@ -429,6 +517,65 @@ Story description: ${aiPrompt}`,
         >
           {/* LEFT: CONTROLS */}
           <aside style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            {/* Save / Load Designs */}
+            <div style={styles.glassCard}>
+              <h3 style={{ margin: "0 0 10px", fontSize: 15, fontWeight: 600, color: theme.text }}>
+                Save & Load
+              </h3>
+
+              <div style={{ display: "grid", gap: 10 }}>
+                <div>
+                  <div style={styles.label}>Design name (optional)</div>
+                  <input
+                    style={styles.input}
+                    value={designName}
+                    onChange={(e) => setDesignName(e.target.value)}
+                    placeholder="e.g., Thriller v2 / Romance alt"
+                  />
+                </div>
+
+                <button type="button" onClick={handleSaveDesign} style={styles.btnPrimary}>
+                  Save this design
+                </button>
+
+                <div>
+                  <div style={styles.label}>Load a saved design</div>
+                  <select
+                    style={styles.input}
+                    value={selectedDesignId}
+                    onChange={(e) => handleLoadDesign(e.target.value)}
+                  >
+                    <option value="">— Select —</option>
+                    {designs.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.name} ({new Date(d.createdAt).toLocaleDateString()})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleDeleteDesign}
+                  disabled={!selectedDesignId}
+                  style={{
+                    ...styles.btn,
+                    border: "1px solid #ef4444",
+                    color: "#b91c1c",
+                    background: "#fef2f2",
+                    opacity: !selectedDesignId ? 0.6 : 1,
+                    cursor: !selectedDesignId ? "not-allowed" : "pointer",
+                  }}
+                >
+                  Delete selected design
+                </button>
+
+                <div style={{ fontSize: 10, color: theme.subtext }}>
+                  Saved locally in this browser (no public links, no S3 needed yet).
+                </div>
+              </div>
+            </div>
+
             {/* Text basics */}
             <div style={styles.glassCard}>
               <h3 style={{ margin: "0 0 10px", fontSize: 15, fontWeight: 600, color: theme.text }}>
