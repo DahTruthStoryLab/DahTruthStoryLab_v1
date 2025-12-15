@@ -77,6 +77,12 @@ const LAYOUTS = [
   { key: "bottom", label: "Title at Bottom" },
 ];
 
+const TRIM_PRESETS = [
+  { key: "6x9", label: '6" × 9" (most common)', wIn: 6, hIn: 9 },
+  { key: "5x8", label: '5" × 8"', wIn: 5, hIn: 8 },
+  { key: "8.5x11", label: '8.5" × 11"', wIn: 8.5, hIn: 11 },
+];
+
 const styles = {
   outer: {
     maxWidth: 1200,
@@ -149,11 +155,17 @@ export default function Cover() {
   const [aiBusy, setAiBusy] = useState(false);
   const [coverLoaded, setCoverLoaded] = useState(false);
 
+  // ✅ NEW: Trim size and DPI for print-ready export
+  const [trimKey, setTrimKey] = useState("6x9");
+  const [dpi, setDpi] = useState(300);
+
   const COVER_IMAGE_URL_KEY = "dahtruth_cover_image_url";
   const COVER_IMAGE_META_KEY = "dahtruth_cover_image_meta";
 
   const selectedPreset =
     GENRE_PRESETS.find((p) => p.key === genrePresetKey) || GENRE_PRESETS[0];
+
+  const selectedTrim = TRIM_PRESETS.find((t) => t.key === trimKey) || TRIM_PRESETS[0];
 
   let justifyContent = "center";
   if (layoutKey === "top") justifyContent = "flex-start";
@@ -220,21 +232,31 @@ export default function Cover() {
     }
   };
 
-  // ✅ Export PNG (safe, no extra deps beyond html-to-image)
-  const handleExportPng = async () => {
+  // ✅ UPDATED: Print-sized export (inches × DPI)
+  const handleExportPNG = async () => {
     if (!coverRef.current) return;
+
+    const targetW = Math.round(selectedTrim.wIn * dpi);
+    const targetH = Math.round(selectedTrim.hIn * dpi);
+
     try {
       const dataUrl = await toPng(coverRef.current, {
         cacheBust: true,
-        pixelRatio: 2,
+        width: targetW,
+        height: targetH,
+        style: {
+          transform: "scale(1)",
+          transformOrigin: "top left",
+        },
       });
-      const a = document.createElement("a");
-      a.href = dataUrl;
-      a.download = `${(title || "cover").replace(/[^\w\-]+/g, "_")}.png`;
-      a.click();
-    } catch (e) {
-      console.error("[Export PNG error]", e);
-      alert("Export failed. Check console for details.");
+
+      const link = document.createElement("a");
+      link.download = `${(title || "cover").replace(/[^\w\-]+/g, "_")}_${trimKey}_${dpi}dpi.png`;
+      link.href = dataUrl;
+      link.click();
+    } catch (err) {
+      console.error("Export failed", err);
+      alert("Failed to export image. Check console for details.");
     }
   };
 
@@ -358,28 +380,23 @@ Story description: ${aiPrompt}`,
                   Cover Designer
                 </h1>
                 <div style={{ fontSize: 11, opacity: 0.9 }}>
-                  Build a story-aware cover with live preview. Save the final image
-                  for your KDP upload.
+                  Build a story-aware cover with live preview. Export print-ready
+                  images for your KDP upload.
                 </div>
               </div>
             </div>
 
-            <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
-              <button type="button" onClick={handleExportPng} style={styles.btnPrimary}>
-                Export PNG
-              </button>
-              <div
-                style={{
-                  textAlign: "right",
-                  fontSize: 11,
-                  opacity: 0.9,
-                }}
-              >
-                <div>
-                  Currently editing: <strong>{title || "Untitled Project"}</strong>
-                </div>
-                <div>Tip: keep it simple, bold, and readable at thumbnail size.</div>
+            <div
+              style={{
+                textAlign: "right",
+                fontSize: 11,
+                opacity: 0.9,
+              }}
+            >
+              <div>
+                Currently editing: <strong>{title || "Untitled Project"}</strong>
               </div>
+              <div>Tip: keep it simple, bold, and readable at thumbnail size.</div>
             </div>
           </div>
         </div>
@@ -740,6 +757,50 @@ Story description: ${aiPrompt}`,
                 </div>
               )}
             </div>
+
+            {/* ✅ NEW: Export Settings */}
+            <div style={styles.glassCard}>
+              <h3 style={{ margin: "0 0 10px", fontSize: 15, fontWeight: 600, color: theme.text }}>
+                Export Settings
+              </h3>
+
+              <div style={{ display: "grid", gap: 10 }}>
+                <div>
+                  <div style={styles.label}>Trim size</div>
+                  <select
+                    style={styles.input}
+                    value={trimKey}
+                    onChange={(e) => setTrimKey(e.target.value)}
+                  >
+                    {TRIM_PRESETS.map((t) => (
+                      <option key={t.key} value={t.key}>
+                        {t.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <div style={styles.label}>DPI</div>
+                  <select
+                    style={styles.input}
+                    value={dpi}
+                    onChange={(e) => setDpi(Number(e.target.value))}
+                  >
+                    <option value={150}>150 (draft)</option>
+                    <option value={300}>300 (print)</option>
+                  </select>
+                </div>
+
+                <button type="button" onClick={handleExportPNG} style={styles.btnPrimary}>
+                  Export PNG ({Math.round(selectedTrim.wIn * dpi)} × {Math.round(selectedTrim.hIn * dpi)})
+                </button>
+
+                <p style={{ margin: 0, fontSize: 10, color: theme.subtext }}>
+                  KDP requires 300 DPI for print. Use 150 DPI for quick drafts.
+                </p>
+              </div>
+            </div>
           </aside>
 
           {/* RIGHT: PREVIEW */}
@@ -765,12 +826,12 @@ Story description: ${aiPrompt}`,
                       color: theme.subtext,
                     }}
                   >
-                    Approx. 6&quot; × 9&quot; trade paperback ratio
+                    {selectedTrim.label} ratio
                   </span>
                 </div>
 
                 <div style={{ fontSize: 10, color: theme.subtext, textAlign: "right" }}>
-                  Click <strong>Export PNG</strong> to download this cover.
+                  Use <strong>Export Settings</strong> below to download print-ready PNG.
                 </div>
               </div>
 
@@ -780,7 +841,7 @@ Story description: ${aiPrompt}`,
                   ref={coverRef}
                   style={{
                     width: 320,
-                    height: 500,
+                    height: Math.round(320 * (selectedTrim.hIn / selectedTrim.wIn)),
                     borderRadius: 10,
                     position: "relative",
                     overflow: "hidden",
@@ -895,7 +956,7 @@ Story description: ${aiPrompt}`,
             </div>
 
             <div style={{ fontSize: 11, color: theme.subtext, textAlign: "right" }}>
-              Later we can add: export as PNG/JPEG, spine/back design, and full AI cover concepts.
+              Coming soon: spine/back design and full AI cover concepts.
             </div>
           </section>
         </div>
@@ -903,3 +964,4 @@ Story description: ${aiPrompt}`,
     </PageShell>
   );
 }
+
