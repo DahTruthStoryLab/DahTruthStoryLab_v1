@@ -1,8 +1,14 @@
 // src/pages/Proof.tsx
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import PageShell from "../components/layout/PageShell.tsx";
 import { API_BASE } from "../lib/api"; // ✅ use the shared API base
+
+import {
+  ensureSelectedProject,
+  getSelectedProjectId,
+  chaptersKeyForProject,
+} from "../lib/projectsSync";
 
 /* ---------- API endpoint for AI proof ---------- */
 /**
@@ -25,6 +31,19 @@ const theme = {
   primary: "var(--brand-primary)",
   white: "var(--brand-white)",
 } as const;
+
+/* ---------- Project-aware key helpers ---------- */
+const publishingChaptersKeyForProject = (projectId: string) =>
+  `dt_publishing_chapters_${projectId}`;
+
+const publishingMatterKeyForProject = (projectId: string) =>
+  `dt_publishing_matter_${projectId}`;
+
+const publishingMetaKeyForProject = (projectId: string) =>
+  `dt_publishing_meta_${projectId}`;
+
+const projectMetaKeyForProject = (projectId: string) =>
+  `dahtruth_project_meta_${projectId}`;
 
 /* ---------- Styles ---------- */
 const styles = {
@@ -103,25 +122,84 @@ export default function Proof(): JSX.Element {
   const [scope, setScope] = useState<"all" | "chapter">("all");
   const [selectedChapterId, setSelectedChapterId] = useState<string>("");
 
-  // Load manuscript + chapters saved by Publishing.tsx
+  // ✅ NEW: Project ID state
+  const [projectId, setProjectId] = useState<string>("");
+
+  // ✅ Initialize selected project on mount
+  useEffect(() => {
+    try {
+      const p = ensureSelectedProject();
+      const id = p?.id || getSelectedProjectId() || "";
+      setProjectId(id);
+    } catch (e) {
+      console.error("Failed to init selected project in Proof:", e);
+    }
+  }, []);
+
+  // ✅ Load manuscript + chapters (project-scoped first, then legacy fallbacks)
   const { manuscriptText, meta, chapters } = useMemo(() => {
     let chapters: ChapterLocal[] = [];
     let matter: MatterLocal = {};
     let meta: MetaLocal = {};
 
+    if (!projectId) {
+      return { manuscriptText: "", meta: {}, chapters: [] };
+    }
+
     try {
+      // 1) Prefer project-scoped Publishing outputs
       chapters = JSON.parse(
-        localStorage.getItem("dt_publishing_chapters") || "[]"
+        localStorage.getItem(publishingChaptersKeyForProject(projectId)) || "[]"
       );
     } catch {}
+
+    // If Publishing hasn't saved yet, fall back to per-project chapters from Compose
+    if (!Array.isArray(chapters) || chapters.length === 0) {
+      try {
+        chapters = JSON.parse(
+          localStorage.getItem(chaptersKeyForProject(projectId)) || "[]"
+        );
+      } catch {}
+    }
+
     try {
       matter = JSON.parse(
-        localStorage.getItem("dt_publishing_matter") || "{}"
+        localStorage.getItem(publishingMatterKeyForProject(projectId)) || "{}"
       );
     } catch {}
+
     try {
-      meta = JSON.parse(localStorage.getItem("dt_publishing_meta") || "{}");
+      meta = JSON.parse(
+        localStorage.getItem(publishingMetaKeyForProject(projectId)) || "{}"
+      );
     } catch {}
+
+    // If meta is empty, fall back to project meta from Compose
+    if (!meta || (!meta.title && !meta.author && !meta.year)) {
+      try {
+        const projMeta = JSON.parse(
+          localStorage.getItem(projectMetaKeyForProject(projectId)) || "{}"
+        );
+        meta = { ...projMeta, ...meta };
+      } catch {}
+    }
+
+    // Legacy fallbacks (optional, keeps old behavior working)
+    if (!Array.isArray(chapters) || chapters.length === 0) {
+      try {
+        chapters = JSON.parse(localStorage.getItem("dt_publishing_chapters") || "[]");
+      } catch {}
+    }
+    if (!matter || Object.keys(matter).length === 0) {
+      try {
+        matter = JSON.parse(localStorage.getItem("dt_publishing_matter") || "{}");
+      } catch {}
+    }
+    if (!meta || Object.keys(meta).length === 0) {
+      try {
+        meta = JSON.parse(localStorage.getItem("dt_publishing_meta") || "{}");
+      } catch {}
+    }
 
     const included = (chapters || []).filter((c) => c.included !== false);
     const pieces: string[] = [];
@@ -150,7 +228,18 @@ export default function Proof(): JSX.Element {
 
     const manuscriptText = pieces.join("\n\n").trim();
     return { manuscriptText, meta, chapters: included };
-  }, []);
+  }, [projectId]);
+
+  // ✅ Reset chapter scope when manuscript changes
+  useEffect(() => {
+    if (chapters.length && !selectedChapterId) {
+      setSelectedChapterId(chapters[0].id);
+    }
+    if (!chapters.length) {
+      setSelectedChapterId("");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chapters.length, projectId]);
 
   const wordCount = useMemo(
     () =>
@@ -204,7 +293,7 @@ export default function Proof(): JSX.Element {
 
     if (compiled.match(/ {2,}/))
       issues.push("Multiple consecutive spaces found.");
-    if (/[“”]/.test(compiled) && !/[‘’]/.test(compiled))
+    if (/[""]/.test(compiled) && !/['']/.test(compiled))
       issues.push("Smart quotes present; ensure curly quotes are consistent.");
     if (/--/.test(compiled))
       issues.push("Double hyphen found; consider an em dash (—) or a period.");
@@ -281,7 +370,7 @@ export default function Proof(): JSX.Element {
     } catch (e: any) {
       const msg =
         typeof e?.message === "string" && e.message.includes("429")
-          ? "AI Proof hit the provider’s rate limit. Try again a bit later, or run checks on shorter sections."
+          ? "AI Proof hit the provider's rate limit. Try again a bit later, or run checks on shorter sections."
           : `AI check failed: ${e.message}. Try again or check API logs.`;
       setProofResults([msg]);
     } finally {
@@ -718,3 +807,4 @@ export default function Proof(): JSX.Element {
     </PageShell>
   );
 }
+
