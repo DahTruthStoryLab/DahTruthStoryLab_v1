@@ -368,6 +368,22 @@ Story description: ${aiPrompt}`,
                 🎨
               </span>
               <div>
+                <a
+                  href="/publishing"
+                  style={{
+                    fontSize: 10,
+                    color: "rgba(255,255,255,0.8)",
+                    textDecoration: "none",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 4,
+                    marginBottom: 2,
+                  }}
+                  onMouseOver={(e) => (e.currentTarget.style.color = "#ffffff")}
+                  onMouseOut={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.8)")}
+                >
+                  ← Back to Publishing Suite
+                </a>
                 <h1
                   style={{
                     margin: 0,
@@ -408,7 +424,7 @@ Story description: ${aiPrompt}`,
             display: "grid",
             gridTemplateColumns: "minmax(0, 360px) minmax(0, 1fr)",
             gap: 20,
-            alignItems: "start",
+            alignItems: "stretch",
           }}
         >
           {/* LEFT: CONTROLS */}
@@ -805,7 +821,7 @@ Story description: ${aiPrompt}`,
 
           {/* RIGHT: PREVIEW */}
           <section style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            <div style={styles.glassCard}>
+            <div style={{ ...styles.glassCard, flex: 1, display: "flex", flexDirection: "column" }}>
               <div
                 style={{
                   display: "flex",
@@ -835,7 +851,7 @@ Story description: ${aiPrompt}`,
                 </div>
               </div>
 
-              <div style={{ display: "flex", justifyContent: "center" }}>
+              <div style={{ display: "flex", justifyContent: "center", alignItems: "center", flex: 1 }}>
                 {/* ✅ attach ref to the actual cover */}
                 <div
                   ref={coverRef}
