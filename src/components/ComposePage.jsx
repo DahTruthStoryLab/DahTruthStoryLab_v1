@@ -23,6 +23,11 @@ import {
   computeWordsFromChapters,
   syncProjectForCurrentStory,
   computeCharactersFromChapters,
+  ensureSelectedProject,
+  upsertProjectMeta,
+  chaptersKeyForProject,
+  setSelectedProjectId,
+  getSelectedProjectId,
 } from "../lib/projectsSync";
 
 const CURRENT_STORY_KEY = "currentStory";
@@ -60,11 +65,11 @@ const applyDoubleSpacing = (text = "") => {
 };
 
 // Save a simple "current story" snapshot for ProjectPage to read
-function saveCurrentStorySnapshot({ title }) {
+function saveCurrentStorySnapshot({ id, title }) {
   if (!title) return;
   try {
     const snapshot = {
-      id: "main",
+      id: id || getSelectedProjectId() || "unknown",
       title: title.trim(),
       status: "Draft",
       updatedAt: new Date().toISOString(),
@@ -132,6 +137,26 @@ function htmlToPlainText(html = "") {
 
 export default function ComposePage() {
   const navigate = useNavigate();
+
+  // ✅ NEW: Active project state
+  const [activeProject, setActiveProject] = useState(null);
+
+  // ✅ Initialize selected project on mount
+  useEffect(() => {
+    try {
+      const p = ensureSelectedProject(); // creates one if none exists
+      if (p?.id) {
+        setActiveProject(p);
+        setSelectedProjectId(p.id);
+
+        // Align bookTitle/author defaults with project meta
+        if (p.title && p.title !== bookTitle) setBookTitle(p.title);
+      }
+    } catch (e) {
+      console.error("Failed to ensure selected project:", e);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Chapter management
   const {
@@ -369,12 +394,17 @@ export default function ComposePage() {
         (book?.title && book.title.trim()) ||
         "Untitled Book";
 
-      saveCurrentStorySnapshot({ title: safeTitle });
+      // ✅ NEW: Use real project ID
+      const projectId =
+        activeProject?.id || getSelectedProjectId() || book?.id || "unknown";
 
-      upsertUserProject({
+      saveCurrentStorySnapshot({ id: projectId, title: safeTitle });
+
+      upsertProjectMeta({
+        id: projectId,
         title: safeTitle,
         wordCount: totalWords,
-        chapterCount,
+        targetWords: 50000,
         characterCount: computedCharacterCount,
       });
 
@@ -794,11 +824,6 @@ export default function ComposePage() {
         };
       });
 
-      localStorage.setItem(
-        "dahtruth_chapters",
-        JSON.stringify(normalizedForPublishing)
-      );
-
       const safeBookTitle =
         (bookTitle && bookTitle.trim()) ||
         (book?.title && book.title.trim()) ||
@@ -810,8 +835,6 @@ export default function ComposePage() {
         year: new Date().getFullYear().toString(),
         authorLast: (author || "").split(" ").slice(-1)[0] || "Author",
       };
-
-      localStorage.setItem("dahtruth_project_meta", JSON.stringify(meta));
 
       const payload = {
         book: {
@@ -827,6 +850,21 @@ export default function ComposePage() {
         })),
       };
 
+      // ✅ NEW: Per-project keys
+      const projectId =
+        activeProject?.id || getSelectedProjectId() || book?.id || "unknown";
+
+      const chaptersKey = chaptersKeyForProject(projectId);
+      const metaKey = `dahtruth_project_meta_${projectId}`;
+      const draftKey = `publishingDraft_${projectId}`;
+
+      localStorage.setItem(chaptersKey, JSON.stringify(normalizedForPublishing));
+      localStorage.setItem(metaKey, JSON.stringify(meta));
+      localStorage.setItem(draftKey, JSON.stringify(payload));
+
+      // TEMP: keep legacy keys so your current Publishing page still works today
+      localStorage.setItem("dahtruth_chapters", JSON.stringify(normalizedForPublishing));
+      localStorage.setItem("dahtruth_project_meta", JSON.stringify(meta));
       localStorage.setItem(PUBLISHING_DRAFT_KEY, JSON.stringify(payload));
 
       upsertUserProject({
