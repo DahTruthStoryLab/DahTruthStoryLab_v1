@@ -2,21 +2,13 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import PageShell from "../components/layout/PageShell.tsx";
-import { API_BASE } from "../lib/api"; // ✅ use the shared API base
+import { runAssistant } from "../lib/api"; // ✅ use the unified AI assistant
 
 import {
   ensureSelectedProject,
   getSelectedProjectId,
   chaptersKeyForProject,
 } from "../lib/projectsSync";
-
-/* ---------- API endpoint for AI proof ---------- */
-/**
- * Make sure you have a matching route in API Gateway, e.g.:
- *   POST {API_BASE}/ai/proof
- * that accepts { text: string } and returns { suggestions: string[] }
- */
-const PROOF_ENDPOINT = `${API_BASE}/ai/proof`;
 
 /* ---------- Theme ---------- */
 const theme = {
@@ -309,7 +301,7 @@ export default function Proof(): JSX.Element {
     setProofResults(issues.length ? issues : ["No basic issues found."]);
   }
 
-  /* ---------- AI checks (calls your API) ---------- */
+  /* ---------- AI checks (uses unified /ai-assistant) ---------- */
   async function runAIChecks() {
     setAiBusy(true);
     const { text: compiled, label } = getScopedText();
@@ -336,14 +328,12 @@ export default function Proof(): JSX.Element {
         : "";
 
     try {
-      const res = await fetch(PROOF_ENDPOINT, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: sampleText }),
-      });
-
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json(); // expected: { suggestions: string[] }
+      const res = await runAssistant(
+        sampleText,
+        "proofread",
+        "Return a concise list of grammar, spelling, clarity, and consistency issues found in this text. Be specific about locations and suggested fixes.",
+        "openai"
+      );
 
       const local: string[] = [];
       local.push(`Scope: ${scopeLabel}.`);
@@ -354,9 +344,19 @@ export default function Proof(): JSX.Element {
           "Double hyphen found; consider an em dash (—) or a period."
         );
 
-      const apiSuggestions: string[] = Array.isArray(data?.suggestions)
-        ? data.suggestions
-        : [];
+      // Parse AI response - could be string or array
+      let apiSuggestions: string[] = [];
+      if (res?.result) {
+        if (Array.isArray(res.result)) {
+          apiSuggestions = res.result;
+        } else if (typeof res.result === "string") {
+          // Split by newlines if it's a string list
+          apiSuggestions = res.result
+            .split(/\n+/)
+            .map((s: string) => s.trim())
+            .filter((s: string) => s.length > 0);
+        }
+      }
 
       const combined = [
         ...(sampleNote ? [sampleNote] : []),
