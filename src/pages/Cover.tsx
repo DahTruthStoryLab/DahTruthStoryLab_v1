@@ -106,7 +106,7 @@ function saveDesigns(designs) {
 
 const styles = {
   outer: {
-    maxWidth: 1200,
+    maxWidth: 1300,
     margin: "32px auto",
     background: "var(--brand-white, #ffffff)",
     borderRadius: 16,
@@ -423,6 +423,10 @@ Story description: ${aiPrompt}`,
       : "transparent"
     : selectedPreset.overlay;
 
+  // Calculate cover preview size - larger to fill space better
+  const COVER_PREVIEW_WIDTH = 420;
+  const coverPreviewHeight = Math.round(COVER_PREVIEW_WIDTH * (selectedTrim.hIn / selectedTrim.wIn));
+
   return (
     <PageShell
       style={{
@@ -442,7 +446,7 @@ Story description: ${aiPrompt}`,
         >
           <div
             style={{
-              maxWidth: 1160,
+              maxWidth: 1260,
               margin: "0 auto",
               display: "flex",
               alignItems: "center",
@@ -505,17 +509,17 @@ Story description: ${aiPrompt}`,
           </div>
         </div>
 
-        {/* BODY GRID */}
+        {/* BODY GRID - adjusted for larger preview */}
         <div
           style={{
             padding: "18px 24px 24px",
             display: "grid",
-            gridTemplateColumns: "minmax(0, 360px) minmax(0, 1fr)",
-            gap: 20,
-            alignItems: "stretch",
+            gridTemplateColumns: "320px minmax(0, 1fr)",
+            gap: 24,
+            alignItems: "start",
           }}
         >
-          {/* LEFT: CONTROLS */}
+          {/* LEFT: CONTROLS - narrower */}
           <aside style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             {/* Save / Load Designs */}
             <div style={styles.glassCard}>
@@ -966,25 +970,25 @@ Story description: ${aiPrompt}`,
             </div>
           </aside>
 
-          {/* RIGHT: PREVIEW */}
+          {/* RIGHT: PREVIEW - larger */}
           <section style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            <div style={{ ...styles.glassCard, flex: 1, display: "flex", flexDirection: "column" }}>
+            <div style={{ ...styles.glassCard, flex: 1, display: "flex", flexDirection: "column", minHeight: 700 }}>
               <div
                 style={{
                   display: "flex",
                   justifyContent: "space-between",
                   alignItems: "center",
-                  marginBottom: 12,
+                  marginBottom: 16,
                   gap: 8,
                 }}
               >
-                <div style={{ fontSize: 13, fontWeight: 600, color: theme.text }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: theme.text }}>
                   Live Preview
                   <span
                     style={{
                       display: "inline-block",
                       marginLeft: 8,
-                      fontSize: 11,
+                      fontSize: 12,
                       fontWeight: 400,
                       color: theme.subtext,
                     }}
@@ -993,19 +997,19 @@ Story description: ${aiPrompt}`,
                   </span>
                 </div>
 
-                <div style={{ fontSize: 10, color: theme.subtext, textAlign: "right" }}>
-                  Use <strong>Export Settings</strong> below to download print-ready PNG.
+                <div style={{ fontSize: 11, color: theme.subtext, textAlign: "right" }}>
+                  Use <strong>Export Settings</strong> to download print-ready PNG.
                 </div>
               </div>
 
-              <div style={{ display: "flex", justifyContent: "center", alignItems: "center", flex: 1 }}>
-                {/* ✅ attach ref to the actual cover */}
+              <div style={{ display: "flex", justifyContent: "center", alignItems: "center", flex: 1, padding: "20px 0" }}>
+                {/* ✅ attach ref to the actual cover - LARGER SIZE */}
                 <div
                   ref={coverRef}
                   style={{
-                    width: 320,
-                    height: Math.round(320 * (selectedTrim.hIn / selectedTrim.wIn)),
-                    borderRadius: 10,
+                    width: COVER_PREVIEW_WIDTH,
+                    height: coverPreviewHeight,
+                    borderRadius: 12,
                     position: "relative",
                     overflow: "hidden",
                     border: "1px solid rgba(15,23,42,0.6)",
@@ -1020,11 +1024,11 @@ Story description: ${aiPrompt}`,
                     backgroundPosition: "center",
                     backgroundRepeat: "no-repeat",
                     boxShadow:
-                      "0 24px 60px rgba(15, 23, 42, 0.6), 0 0 0 1px rgba(15,23,42,0.3)",
+                      "0 30px 80px rgba(15, 23, 42, 0.5), 0 0 0 1px rgba(15,23,42,0.3)",
                     display: "flex",
                     flexDirection: "column",
                     justifyContent,
-                    padding: "32px 24px",
+                    padding: "40px 32px",
                   }}
                 >
                   <div
@@ -1044,13 +1048,13 @@ Story description: ${aiPrompt}`,
                       color: selectedPreset.titleColor,
                       display: "flex",
                       flexDirection: "column",
-                      gap: 8,
+                      gap: 10,
                     }}
                   >
                     <div
                       style={{
-                        fontSize: 24,
-                        letterSpacing: 3,
+                        fontSize: 20,
+                        letterSpacing: 4,
                         textTransform: "uppercase",
                         color: selectedPreset.subtitleColor,
                       }}
@@ -1060,8 +1064,8 @@ Story description: ${aiPrompt}`,
 
                     <div
                       style={{
-                        fontSize: 30,
-                        lineHeight: 1.05,
+                        fontSize: 38,
+                        lineHeight: 1.1,
                         fontWeight: 700,
                         textTransform: "uppercase",
                       }}
@@ -1072,10 +1076,10 @@ Story description: ${aiPrompt}`,
                     {subtitle && (
                       <div
                         style={{
-                          fontSize: 14,
-                          marginTop: 6,
+                          fontSize: 16,
+                          marginTop: 8,
                           color: selectedPreset.subtitleColor,
-                          maxWidth: 260,
+                          maxWidth: 320,
                           marginInline: "auto",
                         }}
                       >
@@ -1085,9 +1089,9 @@ Story description: ${aiPrompt}`,
 
                     <div
                       style={{
-                        fontSize: 14,
-                        marginTop: 24,
-                        letterSpacing: 3,
+                        fontSize: 16,
+                        marginTop: 32,
+                        letterSpacing: 4,
                         textTransform: "uppercase",
                         color: selectedPreset.authorColor,
                       }}
@@ -1099,15 +1103,15 @@ Story description: ${aiPrompt}`,
                   <div
                     style={{
                       position: "absolute",
-                      bottom: 12,
-                      right: 14,
+                      bottom: 14,
+                      right: 16,
                       zIndex: 1,
-                      fontSize: 9,
+                      fontSize: 10,
                       letterSpacing: 1.5,
                       textTransform: "uppercase",
                       color: "#e5e7eb",
                       background: "rgba(15,23,42,0.7)",
-                      padding: "4px 8px",
+                      padding: "5px 10px",
                       borderRadius: 999,
                       border: "1px solid rgba(249,250,251,0.2)",
                     }}
