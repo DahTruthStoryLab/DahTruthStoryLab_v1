@@ -807,4 +807,3 @@ export default function Proof(): JSX.Element {
     </PageShell>
   );
 }
-
