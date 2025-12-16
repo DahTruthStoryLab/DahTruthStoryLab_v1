@@ -17,13 +17,39 @@ import {
   Calendar,
   Trophy,
   Edit3,
+  Key,
+  Eye,
+  EyeOff,
+  Settings,
+  Check,
+  AlertCircle,
+  Cloud,
+  CloudOff,
 } from "lucide-react";
 import heic2any from "heic2any";
 
-// -------------------- Storage helpers --------------------
+// Import the new project system
+import {
+  getLocalAuthorProfile,
+  setLocalAuthorProfile,
+  completeAuthorSetup,
+  isAuthorSetupComplete,
+} from "../lib/authorService";
+import {
+  listProjects,
+  createProject,
+  deleteProject as deleteProjectService,
+  loadProject,
+  saveProject,
+  getCurrentProject,
+  setCurrentProject,
+} from "../lib/projectsService";
+import { migrateLegacyData, needsMigration } from "../lib/projectSystem";
+
+// -------------------- Storage helpers (legacy, for backward compat) --------------------
 const PROJECTS_KEY = "userProjects";
 
-function loadProjects() {
+function loadLegacyProjects() {
   try {
     const raw = localStorage.getItem(PROJECTS_KEY);
     if (!raw) return [];
@@ -34,7 +60,7 @@ function loadProjects() {
   }
 }
 
-function saveProjects(projects) {
+function saveLegacyProjects(projects) {
   try {
     localStorage.setItem(PROJECTS_KEY, JSON.stringify(projects));
     window.dispatchEvent(new Event("project:change"));
@@ -43,55 +69,26 @@ function saveProjects(projects) {
   }
 }
 
-// -------------------- Profile helper --------------------
-function readAuthorProfile() {
-  let name = "New Author";
-  let avatarUrl = "";
+// -------------------- API Key helpers --------------------
+const API_KEYS_KEY = "dahtruth_api_keys";
 
+function loadApiKeys() {
   try {
-    const keys = [
-      "dahtruth_project_meta",
-      "dt_profile",
-      "userProfile",
-      "profile",
-      "currentUser",
-    ];
-    for (const key of keys) {
-      const raw = localStorage.getItem(key);
-      if (!raw) continue;
-      const obj = JSON.parse(raw);
-
-      if (obj.avatarUrl && !avatarUrl) {
-        avatarUrl = obj.avatarUrl;
-      }
-
-      if (obj.author) {
-        name = obj.author;
-        break;
-      }
-
-      if (obj.displayName) {
-        name = obj.displayName;
-        break;
-      }
-
-      const fn = obj.firstName || obj.given_name;
-      const ln = obj.lastName || obj.family_name;
-      if (fn || ln) {
-        name = [fn, ln].filter(Boolean).join(" ");
-        break;
-      }
-
-      if (obj.username) {
-        name = obj.username;
-        break;
-      }
-    }
+    const raw = localStorage.getItem(API_KEYS_KEY);
+    if (!raw) return { openai: "", anthropic: "" };
+    return JSON.parse(raw);
   } catch {
-    // ignore and fall back to defaults
+    return { openai: "", anthropic: "" };
   }
+}
 
-  return { name, avatarUrl };
+function saveApiKeys(keys) {
+  try {
+    localStorage.setItem(API_KEYS_KEY, JSON.stringify(keys));
+    window.dispatchEvent(new Event("apikeys:updated"));
+  } catch (err) {
+    console.error("Failed to save API keys:", err);
+  }
 }
 
 // -------------------- Image helpers --------------------
@@ -174,30 +171,480 @@ const getStatusStyle = (status) => {
   };
 };
 
+// -------------------- API Settings Panel --------------------
+function ApiSettingsPanel({ isOpen, onClose }) {
+  const [keys, setKeys] = useState({ openai: "", anthropic: "" });
+  const [showOpenAI, setShowOpenAI] = useState(false);
+  const [showAnthropic, setShowAnthropic] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [testingOpenAI, setTestingOpenAI] = useState(false);
+  const [testingAnthropic, setTestingAnthropic] = useState(false);
+  const [openAIStatus, setOpenAIStatus] = useState(null); // null, 'valid', 'invalid'
+  const [anthropicStatus, setAnthropicStatus] = useState(null);
+
+  useEffect(() => {
+    setKeys(loadApiKeys());
+  }, [isOpen]);
+
+  const handleSave = () => {
+    saveApiKeys(keys);
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  const testOpenAIKey = async () => {
+    if (!keys.openai) return;
+    setTestingOpenAI(true);
+    setOpenAIStatus(null);
+    
+    try {
+      // Simple test: list models endpoint
+      const res = await fetch("https://api.openai.com/v1/models", {
+        headers: { Authorization: `Bearer ${keys.openai}` },
+      });
+      setOpenAIStatus(res.ok ? "valid" : "invalid");
+    } catch {
+      setOpenAIStatus("invalid");
+    } finally {
+      setTestingOpenAI(false);
+    }
+  };
+
+  const testAnthropicKey = async () => {
+    if (!keys.anthropic) return;
+    setTestingAnthropic(true);
+    setAnthropicStatus(null);
+    
+    try {
+      // Anthropic doesn't have a simple test endpoint, so we'll just validate format
+      // Keys should start with "sk-ant-"
+      const isValidFormat = keys.anthropic.startsWith("sk-ant-");
+      setAnthropicStatus(isValidFormat ? "valid" : "invalid");
+    } catch {
+      setAnthropicStatus("invalid");
+    } finally {
+      setTestingAnthropic(false);
+    }
+  };
+
+  const maskKey = (key) => {
+    if (!key || key.length < 12) return key;
+    return key.slice(0, 7) + "•".repeat(Math.min(key.length - 11, 20)) + key.slice(-4);
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: "rgba(15, 23, 42, 0.6)", backdropFilter: "blur(4px)" }}
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-lg rounded-3xl overflow-hidden"
+        style={{
+          background: "#fff",
+          boxShadow: "0 25px 80px rgba(15, 23, 42, 0.25)",
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div
+          className="px-6 py-5"
+          style={{
+            background: "linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%)",
+          }}
+        >
+          <div className="flex items-center gap-3">
+            <div
+              className="w-10 h-10 rounded-xl flex items-center justify-center"
+              style={{ background: "rgba(255,255,255,0.15)" }}
+            >
+              <Key size={20} className="text-white" />
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-white">API Settings</h2>
+              <p className="text-xs text-white/70">
+                Configure your AI provider keys for writing assistance
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Body */}
+        <div className="p-6 space-y-6">
+          {/* Info Banner */}
+          <div
+            className="p-4 rounded-xl flex items-start gap-3"
+            style={{ background: "rgba(99, 102, 241, 0.08)", border: "1px solid rgba(99, 102, 241, 0.2)" }}
+          >
+            <AlertCircle size={18} className="text-indigo-600 mt-0.5 flex-shrink-0" />
+            <div className="text-sm text-gray-600">
+              <strong className="text-gray-800">Your keys are stored locally</strong> on this device only. 
+              They are never sent to our servers. You can get API keys from{" "}
+              <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" className="text-indigo-600 underline">
+                OpenAI
+              </a>{" "}
+              or{" "}
+              <a href="https://console.anthropic.com/" target="_blank" rel="noopener noreferrer" className="text-indigo-600 underline">
+                Anthropic
+              </a>.
+            </div>
+          </div>
+
+          {/* OpenAI Key */}
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+              OpenAI API Key
+            </label>
+            <div className="flex gap-2">
+              <div className="flex-1 relative">
+                <input
+                  type={showOpenAI ? "text" : "password"}
+                  value={keys.openai}
+                  onChange={(e) => setKeys({ ...keys, openai: e.target.value })}
+                  placeholder="sk-..."
+                  className="w-full px-4 py-3 pr-10 rounded-xl border border-gray-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition-all text-sm font-mono"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowOpenAI(!showOpenAI)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  {showOpenAI ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+              <button
+                onClick={testOpenAIKey}
+                disabled={!keys.openai || testingOpenAI}
+                className="px-4 py-2 rounded-xl text-sm font-medium transition-all disabled:opacity-50"
+                style={{
+                  background: openAIStatus === "valid" ? "rgba(34, 197, 94, 0.1)" : "rgba(99, 102, 241, 0.1)",
+                  color: openAIStatus === "valid" ? "#16a34a" : "#6366f1",
+                  border: `1px solid ${openAIStatus === "valid" ? "rgba(34, 197, 94, 0.3)" : "rgba(99, 102, 241, 0.3)"}`,
+                }}
+              >
+                {testingOpenAI ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : openAIStatus === "valid" ? (
+                  <Check size={16} />
+                ) : (
+                  "Test"
+                )}
+              </button>
+            </div>
+            {openAIStatus === "invalid" && (
+              <p className="mt-2 text-xs text-red-600">Invalid API key. Please check and try again.</p>
+            )}
+            {openAIStatus === "valid" && (
+              <p className="mt-2 text-xs text-green-600">✓ Key is valid and working</p>
+            )}
+          </div>
+
+          {/* Anthropic Key */}
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+              Anthropic (Claude) API Key
+            </label>
+            <div className="flex gap-2">
+              <div className="flex-1 relative">
+                <input
+                  type={showAnthropic ? "text" : "password"}
+                  value={keys.anthropic}
+                  onChange={(e) => setKeys({ ...keys, anthropic: e.target.value })}
+                  placeholder="sk-ant-..."
+                  className="w-full px-4 py-3 pr-10 rounded-xl border border-gray-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition-all text-sm font-mono"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowAnthropic(!showAnthropic)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  {showAnthropic ? <EyeOff size={18} /> : <Eye size={18} />}
+                </button>
+              </div>
+              <button
+                onClick={testAnthropicKey}
+                disabled={!keys.anthropic || testingAnthropic}
+                className="px-4 py-2 rounded-xl text-sm font-medium transition-all disabled:opacity-50"
+                style={{
+                  background: anthropicStatus === "valid" ? "rgba(34, 197, 94, 0.1)" : "rgba(99, 102, 241, 0.1)",
+                  color: anthropicStatus === "valid" ? "#16a34a" : "#6366f1",
+                  border: `1px solid ${anthropicStatus === "valid" ? "rgba(34, 197, 94, 0.3)" : "rgba(99, 102, 241, 0.3)"}`,
+                }}
+              >
+                {testingAnthropic ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : anthropicStatus === "valid" ? (
+                  <Check size={16} />
+                ) : (
+                  "Test"
+                )}
+              </button>
+            </div>
+            {anthropicStatus === "invalid" && (
+              <p className="mt-2 text-xs text-red-600">Invalid key format. Claude keys start with "sk-ant-"</p>
+            )}
+            {anthropicStatus === "valid" && (
+              <p className="mt-2 text-xs text-green-600">✓ Key format is valid</p>
+            )}
+          </div>
+
+          {/* Default Provider */}
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+              Preferred AI Provider
+            </label>
+            <div className="flex gap-3">
+              {[
+                { id: "openai", label: "OpenAI (GPT-4)", icon: "🤖" },
+                { id: "anthropic", label: "Anthropic (Claude)", icon: "🧠" },
+              ].map((provider) => {
+                const isSelected = loadApiKeys().preferred === provider.id || 
+                  (!loadApiKeys().preferred && provider.id === "openai");
+                return (
+                  <button
+                    key={provider.id}
+                    onClick={() => {
+                      const updated = { ...keys, preferred: provider.id };
+                      setKeys(updated);
+                      saveApiKeys(updated);
+                    }}
+                    className="flex-1 p-4 rounded-xl text-left transition-all"
+                    style={{
+                      background: isSelected ? "rgba(99, 102, 241, 0.1)" : "rgba(248, 250, 252, 0.9)",
+                      border: `2px solid ${isSelected ? "#6366f1" : "rgba(148, 163, 184, 0.3)"}`,
+                    }}
+                  >
+                    <div className="flex items-center gap-2">
+                      <span className="text-xl">{provider.icon}</span>
+                      <span className="text-sm font-medium text-gray-800">{provider.label}</span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div
+          className="px-6 py-4 flex justify-end gap-3"
+          style={{ background: "rgba(248, 250, 252, 0.9)", borderTop: "1px solid rgba(148, 163, 184, 0.2)" }}
+        >
+          <button
+            onClick={onClose}
+            className="px-5 py-2.5 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-100 transition-all"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => {
+              handleSave();
+              setTimeout(onClose, 500);
+            }}
+            className="px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-all hover:scale-105"
+            style={{
+              background: saved ? "linear-gradient(135deg, #22c55e, #16a34a)" : "linear-gradient(135deg, #6366f1, #4f46e5)",
+              boxShadow: "0 4px 14px rgba(99, 102, 241, 0.4)",
+            }}
+          >
+            {saved ? (
+              <span className="flex items-center gap-2">
+                <Check size={16} /> Saved!
+              </span>
+            ) : (
+              "Save Settings"
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// -------------------- Author Setup Modal --------------------
+function AuthorSetupModal({ isOpen, onComplete }) {
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+
+  if (!isOpen) return null;
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!name.trim()) return;
+
+    setIsLoading(true);
+    try {
+      await onComplete(name.trim(), email.trim() || undefined);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: "rgba(15, 23, 42, 0.6)", backdropFilter: "blur(4px)" }}
+    >
+      <div
+        className="w-full max-w-md rounded-3xl overflow-hidden"
+        style={{
+          background: "#fff",
+          boxShadow: "0 25px 80px rgba(15, 23, 42, 0.25)",
+        }}
+      >
+        {/* Header */}
+        <div
+          className="px-6 py-8 text-center"
+          style={{
+            background: "linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%)",
+          }}
+        >
+          <div className="text-5xl mb-3">✍️</div>
+          <h2 className="text-2xl font-semibold text-white">Welcome to DahTruth StoryLab</h2>
+          <p className="text-sm text-white/70 mt-2">
+            Let's set up your author profile to get started
+          </p>
+        </div>
+
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="p-6 space-y-5">
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+              Your Name / Pen Name *
+            </label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="How you want to be known as an author"
+              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition-all"
+              autoFocus
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+              Email (optional, for cross-device access)
+            </label>
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="your@email.com"
+              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition-all"
+            />
+            <p className="mt-2 text-xs text-gray-500">
+              Add your email to access your projects from any device
+            </p>
+          </div>
+
+          <button
+            type="submit"
+            disabled={isLoading || !name.trim()}
+            className="w-full py-3.5 rounded-xl text-base font-semibold text-white transition-all hover:scale-[1.02] disabled:opacity-50"
+            style={{
+              background: "linear-gradient(135deg, #6366f1, #4f46e5)",
+              boxShadow: "0 4px 14px rgba(99, 102, 241, 0.4)",
+            }}
+          >
+            {isLoading ? "Setting up..." : "Start Writing →"}
+          </button>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 // -------------------- Main Component --------------------
 export default function ProjectPage() {
   const navigate = useNavigate();
   const [projects, setProjects] = useState([]);
   const [coverUploadId, setCoverUploadId] = useState(null);
-  const [viewMode, setViewMode] = useState("grid"); // "grid" or "list"
+  const [viewMode, setViewMode] = useState("grid");
   const [authorName, setAuthorName] = useState("New Author");
   const [authorAvatar, setAuthorAvatar] = useState("");
+  const [showApiSettings, setShowApiSettings] = useState(false);
+  const [showAuthorSetup, setShowAuthorSetup] = useState(false);
+  const [syncStatus, setSyncStatus] = useState("idle"); // idle, syncing, synced, error
 
+  // Initialize
   useEffect(() => {
-    setProjects(loadProjects());
-    const profile = readAuthorProfile();
-    setAuthorName(profile.name);
-    setAuthorAvatar(profile.avatarUrl);
+    // Check if author setup is needed
+    const profile = getLocalAuthorProfile();
+    if (!profile) {
+      setShowAuthorSetup(true);
+    } else {
+      setAuthorName(profile.name);
+    }
+
+    // Check for legacy migration
+    if (needsMigration()) {
+      console.log("[ProjectPage] Migrating legacy data...");
+      migrateLegacyData();
+    }
+
+    // Load projects
+    loadProjectsList();
   }, []);
 
-  // Keep in sync if other tabs / parts of app modify projects or profile
+  const loadProjectsList = async () => {
+    setSyncStatus("syncing");
+    try {
+      // Load from new system
+      const entries = await listProjects({ refreshFromCloud: true });
+      
+      // Also load legacy projects for backward compat
+      const legacy = loadLegacyProjects();
+      
+      // Merge: convert legacy to new format if needed
+      const mergedProjects = [...entries];
+      
+      // Add legacy projects not in new system
+      for (const lp of legacy) {
+        if (!mergedProjects.find((p) => p.id === lp.id)) {
+          mergedProjects.push({
+            id: lp.id,
+            title: lp.title || "Untitled",
+            author: lp.author || authorName,
+            status: lp.status || "draft",
+            wordCount: lp.wordCount || 0,
+            chapterCount: lp.chapterCount || 0,
+            updatedAt: lp.lastModified || new Date().toISOString(),
+            createdAt: lp.createdAt || new Date().toISOString(),
+            // Keep legacy fields
+            _legacy: lp,
+          });
+        }
+      }
+
+      setProjects(mergedProjects);
+      setSyncStatus("synced");
+    } catch (err) {
+      console.error("[ProjectPage] Failed to load projects:", err);
+      // Fall back to legacy
+      const legacy = loadLegacyProjects();
+      setProjects(legacy.map((lp) => ({
+        id: lp.id,
+        title: lp.title || "Untitled",
+        author: lp.author || authorName,
+        status: lp.status || "draft",
+        wordCount: lp.wordCount || 0,
+        chapterCount: lp.chapterCount || 0,
+        updatedAt: lp.lastModified || new Date().toISOString(),
+        createdAt: lp.createdAt || new Date().toISOString(),
+        _legacy: lp,
+      })));
+      setSyncStatus("error");
+    }
+  };
+
+  // Sync listener
   useEffect(() => {
-    const sync = () => {
-      setProjects(loadProjects());
-      const profile = readAuthorProfile();
-      setAuthorName(profile.name);
-      setAuthorAvatar(profile.avatarUrl);
-    };
+    const sync = () => loadProjectsList();
     window.addEventListener("storage", sync);
     window.addEventListener("project:change", sync);
     window.addEventListener("profile:updated", sync);
@@ -206,7 +653,7 @@ export default function ProjectPage() {
       window.removeEventListener("project:change", sync);
       window.removeEventListener("profile:updated", sync);
     };
-  }, []);
+  }, [authorName]);
 
   const handleGoBack = () => {
     if (window.history.length > 1) {
@@ -216,44 +663,76 @@ export default function ProjectPage() {
     }
   };
 
-  // -------- Author name: source of truth here --------
+  const handleAuthorSetupComplete = async (name, email) => {
+    const profile = completeAuthorSetup(name, email);
+    setAuthorName(profile.name);
+    setShowAuthorSetup(false);
+  };
+
   const handleAuthorNameSave = (newName) => {
     const trimmed = (newName || "").trim() || "New Author";
-
     setAuthorName(trimmed);
 
-    // 1) Update all projects' author field
+    // Update author profile
+    const profile = getLocalAuthorProfile();
+    if (profile) {
+      profile.name = trimmed;
+      profile.updatedAt = new Date().toISOString();
+      setLocalAuthorProfile(profile);
+    }
+
+    // Update all projects' author field
     setProjects((prev) => {
       const updated = prev.map((p) => ({
         ...p,
         author: trimmed,
       }));
-      saveProjects(updated);
+      // Save legacy format too
+      saveLegacyProjects(updated.map((p) => p._legacy || p));
       return updated;
     });
 
-    // 2) Save to a profile object so Dashboard can read it
-    try {
-      const existingProfileRaw = localStorage.getItem("profile");
-      const existingProfile = existingProfileRaw
-        ? JSON.parse(existingProfileRaw)
-        : {};
-      const profileToSave = {
-        ...existingProfile,
-        displayName: trimmed,
-        avatarUrl: authorAvatar || existingProfile.avatarUrl || "",
-      };
-      localStorage.setItem("profile", JSON.stringify(profileToSave));
-      window.dispatchEvent(new Event("profile:updated"));
-    } catch (err) {
-      console.error("Failed to save profile from ProjectPage:", err);
-    }
+    window.dispatchEvent(new Event("profile:updated"));
   };
 
-  const addProject = () => {
+  const addProject = async () => {
     const now = new Date().toISOString();
-    setProjects((prev) => {
-      const newProject = {
+    const profile = getLocalAuthorProfile();
+    
+    try {
+      // Create in new system
+      const project = await createProject("Untitled Project", {
+        authorName: profile?.name || authorName,
+        saveToCloud: true,
+      });
+
+      // Also add to legacy for backward compat
+      const legacyProject = {
+        id: project.id,
+        title: project.title,
+        author: project.author,
+        logline: "",
+        synopsis: "",
+        genre: [],
+        status: "Draft",
+        targetWords: 50000,
+        wordCount: 0,
+        chapterCount: 0,
+        characterCount: 0,
+        cover: "",
+        createdAt: now,
+        lastModified: now,
+      };
+
+      const legacy = loadLegacyProjects();
+      saveLegacyProjects([legacyProject, ...legacy]);
+
+      // Refresh list
+      loadProjectsList();
+    } catch (err) {
+      console.error("[ProjectPage] Failed to create project:", err);
+      // Fall back to legacy-only creation
+      const legacyProject = {
         id: Date.now().toString(),
         title: "Untitled Project",
         author: authorName,
@@ -269,48 +748,82 @@ export default function ProjectPage() {
         createdAt: now,
         lastModified: now,
       };
-      const updated = [newProject, ...prev];
-      saveProjects(updated);
-      return updated;
-    });
+      const legacy = loadLegacyProjects();
+      saveLegacyProjects([legacyProject, ...legacy]);
+      loadProjectsList();
+    }
   };
 
   const updateProject = (id, patch) => {
     setProjects((prev) => {
       const now = new Date().toISOString();
       const updated = prev.map((p) =>
-        p.id === id ? { ...p, ...patch, lastModified: now } : p
+        p.id === id ? { ...p, ...patch, updatedAt: now } : p
       );
-      saveProjects(updated);
+      // Save to legacy
+      const legacyUpdated = updated.map((p) => ({
+        ...(p._legacy || {}),
+        ...p,
+        lastModified: p.updatedAt,
+      }));
+      saveLegacyProjects(legacyUpdated);
       return updated;
     });
   };
 
-  const deleteProject = (id) => {
+  const handleDeleteProject = async (id) => {
     if (!window.confirm("Delete this project? This cannot be undone.")) return;
-    setProjects((prev) => {
-      const updated = prev.filter((p) => p.id !== id);
-      saveProjects(updated);
-      return updated;
-    });
+
+    try {
+      await deleteProjectService(id);
+    } catch (err) {
+      console.error("[ProjectPage] Cloud delete failed:", err);
+    }
+
+    // Remove from legacy
+    const legacy = loadLegacyProjects();
+    saveLegacyProjects(legacy.filter((p) => p.id !== id));
+
+    // Refresh list
+    loadProjectsList();
   };
 
-  const openInWriter = (project) => {
-    const snapshot = {
-      id: project.id,
-      title: project.title,
-      wordCount: project.wordCount || 0,
-      lastModified: project.lastModified || new Date().toISOString(),
-      status: project.status || "Draft",
-      targetWords: project.targetWords || 50000,
-    };
+  const openInWriter = async (project) => {
     try {
-      localStorage.setItem("currentStory", JSON.stringify(snapshot));
+      // Try to load from new system first
+      const loaded = await loadProject(project.id);
+      
+      if (loaded) {
+        setCurrentProject(loaded);
+      } else {
+        // Fall back to legacy snapshot
+        const snapshot = {
+          id: project.id,
+          title: project.title || project._legacy?.title || "Untitled",
+          wordCount: project.wordCount || project._legacy?.wordCount || 0,
+          lastModified: project.updatedAt || new Date().toISOString(),
+          status: project.status || "Draft",
+          targetWords: project.targetWords || project._legacy?.targetWords || 50000,
+        };
+        localStorage.setItem("currentStory", JSON.stringify(snapshot));
+      }
+      
       window.dispatchEvent(new Event("project:change"));
     } catch (err) {
-      console.error("Failed to set currentStory:", err);
+      console.error("[ProjectPage] Failed to load project:", err);
+      // Use legacy snapshot
+      const snapshot = {
+        id: project.id,
+        title: project.title,
+        wordCount: project.wordCount || 0,
+        lastModified: project.updatedAt || new Date().toISOString(),
+        status: project.status || "Draft",
+        targetWords: project.targetWords || 50000,
+      };
+      localStorage.setItem("currentStory", JSON.stringify(snapshot));
+      window.dispatchEvent(new Event("project:change"));
     }
-    // 🔹 Use /compose so it lands in your new ComposePage
+
     navigate("/compose");
   };
 
@@ -357,60 +870,14 @@ export default function ProjectPage() {
     }
   };
 
-  // Handle import - redirects to compose after creating the project
-  const handleImport = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    const now = new Date().toISOString();
-    const newProject = {
-      id: Date.now().toString(),
-      title: file.name.replace(/\.[^/.]+$/, ""),
-      author: authorName,
-      logline: "",
-      synopsis: "",
-      genre: [],
-      status: "Draft",
-      targetWords: 50000,
-      wordCount: 0,
-      chapterCount: 0,
-      characterCount: 0,
-      cover: "",
-      createdAt: now,
-      lastModified: now,
-      imported: true,
-    };
-
-    const updated = [newProject, ...projects];
-    saveProjects(updated);
-    setProjects(updated);
-
-    localStorage.setItem(
-      "currentStory",
-      JSON.stringify({
-        id: newProject.id,
-        title: newProject.title,
-        wordCount: 0,
-        lastModified: now,
-        status: "Draft",
-        targetWords: 50000,
-      })
-    );
-    window.dispatchEvent(new Event("project:change"));
-    navigate("/compose");
-
-    e.target.value = "";
-  };
-
   // Calculate totals
-  const totalWords = projects.reduce(
-    (sum, p) => sum + (p.wordCount || 0),
-    0
-  );
+  const totalWords = projects.reduce((sum, p) => sum + (p.wordCount || 0), 0);
   const inProgress = projects.filter(
-    (p) => !["Published", "Idea"].includes(p.status)
+    (p) => !["Published", "Idea", "published", "completed", "archived"].includes(p.status)
   ).length;
-  const published = projects.filter((p) => p.status === "Published").length;
+  const published = projects.filter(
+    (p) => p.status === "Published" || p.status === "published" || p.status === "completed"
+  ).length;
 
   const formatDate = (dateStr) => {
     if (!dateStr) return "—";
@@ -428,6 +895,10 @@ export default function ProjectPage() {
     });
   };
 
+  // Check if API keys are configured
+  const apiKeys = loadApiKeys();
+  const hasApiKeys = !!(apiKeys.openai || apiKeys.anthropic);
+
   return (
     <div
       className="min-h-screen text-gray-800"
@@ -436,13 +907,25 @@ export default function ProjectPage() {
           "linear-gradient(135deg, #fef5ff 0%, #f8e8ff 50%, #fff5f7 100%)",
       }}
     >
+      {/* Author Setup Modal */}
+      <AuthorSetupModal
+        isOpen={showAuthorSetup}
+        onComplete={handleAuthorSetupComplete}
+      />
+
+      {/* API Settings Modal */}
+      <ApiSettingsPanel
+        isOpen={showApiSettings}
+        onClose={() => setShowApiSettings(false)}
+      />
+
       <div className="mx-auto max-w-7xl px-6 py-8">
         {/* Dashboard Button */}
         <button
           onClick={handleGoBack}
           className="mb-6 inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all hover:scale-105"
           style={{
-            background: "linear-gradient(135deg, #D4AF37, #f5e6b3)", // gold gradient
+            background: "linear-gradient(135deg, #D4AF37, #f5e6b3)",
             color: "#1f2937",
             border: "1px solid rgba(180,142,38,0.9)",
             boxShadow: "0 6px 18px rgba(180,142,38,0.35)",
@@ -486,18 +969,12 @@ export default function ProjectPage() {
 
                 <p className="text-sm text-gray-500">
                   Author{" "}
-                  <span className="font-medium text-gray-800">
-                    {authorName}
-                  </span>
+                  <span className="font-medium text-gray-800">{authorName}</span>
                   <button
                     type="button"
                     onClick={() => {
-                      const current =
-                        authorName === "New Author" ? "" : authorName;
-                      const next = window.prompt(
-                        "Update author / pen name:",
-                        current
-                      );
+                      const current = authorName === "New Author" ? "" : authorName;
+                      const next = window.prompt("Update author / pen name:", current);
                       if (next !== null) {
                         handleAuthorNameSave(next);
                       }
@@ -509,14 +986,67 @@ export default function ProjectPage() {
                   </button>
                 </p>
 
-                <p className="text-xs text-gray-500 mt-1">
-                  {projects.length} projects •{" "}
-                  {totalWords.toLocaleString()} total words
+                <p className="text-xs text-gray-500 mt-1 flex items-center gap-2">
+                  {projects.length} projects • {totalWords.toLocaleString()} total words
+                  {/* Sync status indicator */}
+                  <span
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium"
+                    style={{
+                      background:
+                        syncStatus === "synced"
+                          ? "rgba(34, 197, 94, 0.1)"
+                          : syncStatus === "syncing"
+                          ? "rgba(59, 130, 246, 0.1)"
+                          : syncStatus === "error"
+                          ? "rgba(239, 68, 68, 0.1)"
+                          : "rgba(148, 163, 184, 0.1)",
+                      color:
+                        syncStatus === "synced"
+                          ? "#16a34a"
+                          : syncStatus === "syncing"
+                          ? "#3b82f6"
+                          : syncStatus === "error"
+                          ? "#dc2626"
+                          : "#64748b",
+                    }}
+                  >
+                    {syncStatus === "synced" ? (
+                      <>
+                        <Cloud size={10} /> Synced
+                      </>
+                    ) : syncStatus === "syncing" ? (
+                      <>
+                        <Loader2 size={10} className="animate-spin" /> Syncing...
+                      </>
+                    ) : syncStatus === "error" ? (
+                      <>
+                        <CloudOff size={10} /> Offline
+                      </>
+                    ) : (
+                      "Ready"
+                    )}
+                  </span>
                 </p>
               </div>
             </div>
 
             <div className="flex items-center gap-3 flex-wrap">
+              {/* API Settings Button */}
+              <button
+                onClick={() => setShowApiSettings(true)}
+                className="inline-flex items-center gap-2 px-4 py-3 rounded-2xl text-sm font-medium transition-all hover:scale-105"
+                style={{
+                  background: hasApiKeys
+                    ? "rgba(34, 197, 94, 0.08)"
+                    : "rgba(251, 191, 36, 0.1)",
+                  border: `1px solid ${hasApiKeys ? "rgba(34, 197, 94, 0.3)" : "rgba(251, 191, 36, 0.4)"}`,
+                  color: hasApiKeys ? "#16a34a" : "#92400e",
+                }}
+              >
+                <Key size={16} />
+                {hasApiKeys ? "API Keys ✓" : "Add API Keys"}
+              </button>
+
               {/* View Toggle */}
               <div
                 className="flex rounded-xl p-1"
@@ -549,10 +1079,10 @@ export default function ProjectPage() {
                 </button>
               </div>
 
-            {/* Import Button – now just opens Writer, where the real import happens */}
+              {/* Import Button */}
               <button
                 type="button"
-                onClick={() => navigate("/writer")}  // or "/compose" if that’s your route
+                onClick={() => navigate("/compose")}
                 className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl text-sm font-semibold transition-all hover:scale-105"
                 style={{
                   background: "rgba(255,255,255,0.9)",
@@ -578,6 +1108,40 @@ export default function ProjectPage() {
             </div>
           </div>
         </div>
+
+        {/* API Keys Warning Banner */}
+        {!hasApiKeys && (
+          <div
+            className="rounded-2xl p-5 mb-8 flex items-center gap-4"
+            style={{
+              background: "linear-gradient(135deg, rgba(251, 191, 36, 0.12), rgba(251, 146, 60, 0.08))",
+              border: "1px solid rgba(251, 191, 36, 0.35)",
+            }}
+          >
+            <div
+              className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
+              style={{ background: "rgba(251, 191, 36, 0.2)" }}
+            >
+              <Key size={24} className="text-amber-600" />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-semibold text-gray-800 mb-1">Set Up AI Features</h3>
+              <p className="text-sm text-gray-600">
+                Add your OpenAI or Claude API key to enable AI-powered writing assistance, grammar checking, and story analysis.
+              </p>
+            </div>
+            <button
+              onClick={() => setShowApiSettings(true)}
+              className="px-5 py-2.5 rounded-xl text-sm font-semibold text-white flex-shrink-0 transition-all hover:scale-105"
+              style={{
+                background: "linear-gradient(135deg, #f59e0b, #d97706)",
+                boxShadow: "0 4px 14px rgba(245, 158, 11, 0.4)",
+              }}
+            >
+              Add API Keys
+            </button>
+          </div>
+        )}
 
         {/* Stats Row */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
@@ -680,8 +1244,9 @@ export default function ProjectPage() {
           /* Grid View */
           <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-2">
             {projects.map((project) => {
-              const wordCount = project.wordCount || 0;
-              const targetWords = project.targetWords || 50000;
+              const legacyData = project._legacy || project;
+              const wordCount = project.wordCount || legacyData.wordCount || 0;
+              const targetWords = legacyData.targetWords || 50000;
               const pct = progressPct(wordCount, targetWords);
               const readTime = getReadingTime(wordCount);
 
@@ -701,8 +1266,7 @@ export default function ProjectPage() {
                     <div
                       className="w-40 flex-shrink-0 relative"
                       style={{
-                        background:
-                          "linear-gradient(135deg, #e8dff5, #f5e6ff)",
+                        background: "linear-gradient(135deg, #e8dff5, #f5e6ff)",
                       }}
                     >
                       {coverUploadId === project.id ? (
@@ -715,18 +1279,15 @@ export default function ProjectPage() {
                             Processing...
                           </span>
                         </div>
-                      ) : project.cover ? (
+                      ) : legacyData.cover ? (
                         <img
-                          src={project.cover}
+                          src={legacyData.cover}
                           alt={`${project.title} cover`}
                           className="w-full h-full min-h-[280px] object-cover"
                         />
                       ) : (
                         <div className="w-full h-full min-h-[280px] flex flex-col items-center justify-center p-4">
-                          <ImageIcon
-                            size={40}
-                            className="text-purple-300 mb-3"
-                          />
+                          <ImageIcon size={40} className="text-purple-300 mb-3" />
                           <span className="text-xs text-gray-400 text-center">
                             Add book cover
                           </span>
@@ -742,7 +1303,7 @@ export default function ProjectPage() {
                         }}
                       >
                         <Upload size={12} />
-                        {project.cover ? "Change" : "Upload"}
+                        {legacyData.cover ? "Change" : "Upload"}
                         <input
                           type="file"
                           accept="image/*,.heic,.heif"
@@ -787,14 +1348,14 @@ export default function ProjectPage() {
                           </div>
                         </div>
                         <select
-                          value={project.status || "Draft"}
+                          value={legacyData.status || "Draft"}
                           onChange={(e) =>
                             updateProject(project.id, {
                               status: e.target.value,
                             })
                           }
                           className="ml-3 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide rounded-full cursor-pointer outline-none"
-                          style={getStatusStyle(project.status || "Draft")}
+                          style={getStatusStyle(legacyData.status || "Draft")}
                         >
                           {[
                             "Idea",
@@ -813,10 +1374,11 @@ export default function ProjectPage() {
 
                       {/* Logline */}
                       <input
-                        value={project.logline || ""}
+                        value={legacyData.logline || ""}
                         onChange={(e) =>
                           updateProject(project.id, {
                             logline: e.target.value,
+                            _legacy: { ...legacyData, logline: e.target.value },
                           })
                         }
                         placeholder="One-sentence logline describing your story..."
@@ -865,17 +1427,17 @@ export default function ProjectPage() {
                         {[
                           {
                             icon: <FileText size={16} />,
-                            value: project.chapterCount || 0,
+                            value: project.chapterCount || legacyData.chapterCount || 0,
                             label: "Chapters",
                           },
                           {
                             icon: <Users size={16} />,
-                            value: project.characterCount || 0,
+                            value: legacyData.characterCount || 0,
                             label: "Characters",
                           },
                           {
                             icon: <Calendar size={16} />,
-                            value: formatDate(project.lastModified),
+                            value: formatDate(project.updatedAt || legacyData.lastModified),
                             label: "Last Edit",
                           },
                         ].map((stat, i) => (
@@ -917,7 +1479,7 @@ export default function ProjectPage() {
                           <Edit3 size={16} /> Write
                         </button>
                         <button
-                          onClick={() => deleteProject(project.id)}
+                          onClick={() => handleDeleteProject(project.id)}
                           className="px-4 py-3 rounded-xl text-sm transition-all hover:scale-105"
                           style={{
                             background: "rgba(239,68,68,0.06)",
@@ -947,8 +1509,7 @@ export default function ProjectPage() {
               <div
                 className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl text-white mb-4"
                 style={{
-                  background:
-                    "linear-gradient(135deg, #9b7bc9, #D4AF37)",
+                  background: "linear-gradient(135deg, #9b7bc9, #D4AF37)",
                 }}
               >
                 +
@@ -999,8 +1560,9 @@ export default function ProjectPage() {
 
             {/* List Rows */}
             {projects.map((project) => {
-              const wordCount = project.wordCount || 0;
-              const targetWords = project.targetWords || 50000;
+              const legacyData = project._legacy || project;
+              const wordCount = project.wordCount || legacyData.wordCount || 0;
+              const targetWords = legacyData.targetWords || 50000;
               const pct = progressPct(wordCount, targetWords);
 
               return (
@@ -1017,13 +1579,12 @@ export default function ProjectPage() {
                   <div
                     className="w-12 h-16 rounded-lg flex items-center justify-center text-xl overflow-hidden"
                     style={{
-                      background:
-                        "linear-gradient(135deg, #e8dff5, #f5e6ff)",
+                      background: "linear-gradient(135deg, #e8dff5, #f5e6ff)",
                     }}
                   >
-                    {project.cover ? (
+                    {legacyData.cover ? (
                       <img
-                        src={project.cover}
+                        src={legacyData.cover}
                         alt=""
                         className="w-full h-full object-cover"
                       />
@@ -1050,7 +1611,7 @@ export default function ProjectPage() {
 
                   {/* Genre */}
                   <div className="text-sm text-gray-600">
-                    {project.genre?.join(", ") || "—"}
+                    {legacyData.genre?.join(", ") || "—"}
                   </div>
 
                   {/* Words */}
@@ -1060,12 +1621,12 @@ export default function ProjectPage() {
 
                   {/* Chapters */}
                   <div className="text-gray-600">
-                    {project.chapterCount || 0}
+                    {project.chapterCount || legacyData.chapterCount || 0}
                   </div>
 
                   {/* Last Edit */}
                   <div className="text-sm text-gray-500">
-                    {formatDate(project.lastModified)}
+                    {formatDate(project.updatedAt || legacyData.lastModified)}
                   </div>
 
                   {/* Progress */}
@@ -1086,7 +1647,7 @@ export default function ProjectPage() {
                       />
                     </div>
                     <div className="text-[10px] text-gray-400">
-                      {Math.round(pct)}% • {project.status || "Draft"}
+                      {Math.round(pct)}% • {legacyData.status || "Draft"}
                     </div>
                   </div>
 
@@ -1112,3 +1673,4 @@ export default function ProjectPage() {
     </div>
   );
 }
+
