@@ -1605,6 +1605,7 @@ export default function Publishing(): JSX.Element {
                 <span aria-hidden>🧭</span>
                 Publishing Tools
               </h3>
+
               <p
                 style={{
                   fontSize: 11,
@@ -1614,6 +1615,7 @@ export default function Publishing(): JSX.Element {
               >
                 Quick routes into deeper tools when you are ready.
               </p>
+
               <div
                 style={{
                   display: "grid",
@@ -1632,57 +1634,14 @@ export default function Publishing(): JSX.Element {
                 >
                   <span style={{ fontSize: 18 }}>✅</span>
                   <div>
-                    <div
-                      style={{
-                        fontSize: 13,
-                        fontWeight: 600,
-                      }}
-                    >
-                      Proof & Consistency
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 11,
-                        color: theme.subtext,
-                      }}
-                    >
+                    <div style={{ fontSize: 13, fontWeight: 600 }}>Proof & Consistency</div>
+                    <div style={{ fontSize: 11, color: theme.subtext }}>
                       Grammar, style, timeline
                     </div>
                   </div>
                 </button>
 
-                <button
-                  style={{
-                    ...styles.btn,
-                    textAlign: "left",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                  }}
-                  onClick={() => navigate("/format")}
-                >
-                  <span style={{ fontSize: 18 }}>🎨</span>
-                  <div>
-                    <div
-                      style={{
-                        fontSize: 13,
-                        fontWeight: 600,
-                      }}
-                    >
-                      Format & Styles
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 11,
-                        color: theme.subtext,
-                      }}
-                    >
-                      Fonts, spacing, margins
-                    </div>
-                  </div>
-                </button>
-
-                {/* 👇 NEW: Cover Design route */}
+                {/* Cover Design route */}
                 <button
                   style={{
                     ...styles.btn,
@@ -1695,25 +1654,12 @@ export default function Publishing(): JSX.Element {
                 >
                   <span style={{ fontSize: 18 }}>📕</span>
                   <div>
-                    <div
-                      style={{
-                        fontSize: 13,
-                        fontWeight: 600,
-                      }}
-                    >
-                      Cover Design
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 11,
-                        color: theme.subtext,
-                      }}
-                    >
+                    <div style={{ fontSize: 13, fontWeight: 600 }}>Cover Design</div>
+                    <div style={{ fontSize: 11, color: theme.subtext }}>
                       Upload art, layout front & back
                     </div>
                   </div>
                 </button>
-                {/* 👆 END Cover Design */}
 
                 <button
                   style={{
@@ -1727,20 +1673,8 @@ export default function Publishing(): JSX.Element {
                 >
                   <span style={{ fontSize: 18 }}>📦</span>
                   <div>
-                    <div
-                      style={{
-                        fontSize: 13,
-                        fontWeight: 600,
-                      }}
-                    >
-                      Export
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 11,
-                        color: theme.subtext,
-                      }}
-                    >
+                    <div style={{ fontSize: 13, fontWeight: 600 }}>Export</div>
+                    <div style={{ fontSize: 11, color: theme.subtext }}>
                       PDF, DOCX, EPUB
                     </div>
                   </div>
@@ -1758,20 +1692,8 @@ export default function Publishing(): JSX.Element {
                 >
                   <span style={{ fontSize: 18 }}>🚀</span>
                   <div>
-                    <div
-                      style={{
-                        fontSize: 13,
-                        fontWeight: 600,
-                      }}
-                    >
-                      Publishing Prep
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 11,
-                        color: theme.subtext,
-                      }}
-                    >
+                    <div style={{ fontSize: 13, fontWeight: 600 }}>Publishing Prep</div>
+                    <div style={{ fontSize: 11, color: theme.subtext }}>
                       Query, synopsis, marketing
                     </div>
                   </div>
