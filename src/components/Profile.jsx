@@ -1,4 +1,6 @@
 // src/components/ProfilePage.jsx
+// Author profile page - integrated with authorService for unified data management
+
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -16,59 +18,24 @@ import {
   PenSquare,
   Link2,
   Settings,
+  Key,
+  Cloud,
+  CloudOff,
+  Check,
 } from "lucide-react";
 import heic2any from "heic2any";
 
-// -------------------- Storage Keys --------------------
-const PROFILE_KEY = "profile";
-const PROJECTS_KEY = "userProjects";
+// Import the unified author service
+import {
+  getLocalAuthorProfile,
+  setLocalAuthorProfile,
+  updateAuthorProfile,
+  saveAuthorProfileToCloud,
+  clearLocalAuthorProfile,
+} from "../lib/authorService";
 
-// -------------------- Load/Save Helpers --------------------
-function getDefaultProfile() {
-  return {
-    displayName: "New Author",
-    tagline: "",
-    bio: "",
-    avatarUrl: "",
-    genres: [],
-    website: "",
-    instagram: "",
-    twitter: "",
-    facebook: "",
-    email: "",
-    memberSince: new Date().toISOString(),
-  };
-}
-
-function loadProfile() {
-  try {
-    const raw = localStorage.getItem(PROFILE_KEY);
-    if (!raw) return getDefaultProfile();
-    return { ...getDefaultProfile(), ...JSON.parse(raw) };
-  } catch {
-    return getDefaultProfile();
-  }
-}
-
-function saveProfile(profile) {
-  try {
-    localStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
-    window.dispatchEvent(new Event("profile:updated"));
-  } catch (err) {
-    console.error("Failed to save profile:", err);
-  }
-}
-
-function loadProjects() {
-  try {
-    const raw = localStorage.getItem(PROJECTS_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
-}
+// Import API keys helper
+import { getApiKeys } from "../lib/apiKeys";
 
 // -------------------- Image Helpers (HEIC/iPhone support) --------------------
 async function heicArrayBufferToJpegDataUrl(arrayBuffer, quality = 0.9) {
@@ -124,21 +91,53 @@ const GENRE_OPTIONS = [
 // -------------------- Main Component --------------------
 export default function ProfilePage() {
   const navigate = useNavigate();
-  const [profile, setProfile] = useState(getDefaultProfile());
+  const [profile, setProfile] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [showSaved, setShowSaved] = useState(false);
+  const [syncStatus, setSyncStatus] = useState("idle"); // idle, syncing, synced, error
+  const [hasChanges, setHasChanges] = useState(false);
 
   // Load profile on mount
   useEffect(() => {
-    const loadedProfile = loadProfile();
-    setProfile(loadedProfile);
+    const loadedProfile = getLocalAuthorProfile();
+    if (loadedProfile) {
+      setProfile(loadedProfile);
+    } else {
+      // No profile - redirect to setup or create default
+      setProfile({
+        id: "",
+        name: "New Author",
+        email: "",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        tagline: "",
+        bio: "",
+        avatarUrl: "",
+        genres: [],
+        website: "",
+        instagram: "",
+        twitter: "",
+        facebook: "",
+        preferences: {
+          defaultGenre: "fiction",
+          defaultTargetWords: 50000,
+          theme: "light",
+          aiProvider: "openai",
+          autoSaveEnabled: true,
+          autoSaveIntervalMs: 3000,
+        },
+      });
+    }
   }, []);
 
   // Listen for external profile changes
   useEffect(() => {
     const sync = () => {
-      setProfile(loadProfile());
+      const loadedProfile = getLocalAuthorProfile();
+      if (loadedProfile) {
+        setProfile(loadedProfile);
+      }
     };
     window.addEventListener("storage", sync);
     window.addEventListener("profile:updated", sync);
@@ -149,6 +148,11 @@ export default function ProfilePage() {
   }, []);
 
   const handleGoBack = () => {
+    if (hasChanges) {
+      if (!window.confirm("You have unsaved changes. Leave anyway?")) {
+        return;
+      }
+    }
     if (window.history.length > 1) {
       navigate(-1);
     } else {
@@ -156,8 +160,9 @@ export default function ProfilePage() {
     }
   };
 
-  const updateProfile = (field, value) => {
+  const updateProfileField = (field, value) => {
     setProfile((prev) => ({ ...prev, [field]: value }));
+    setHasChanges(true);
   };
 
   const toggleGenre = (genre) => {
@@ -169,6 +174,7 @@ export default function ProfilePage() {
         return { ...prev, genres: [...genres, genre] };
       }
     });
+    setHasChanges(true);
   };
 
   const handleAvatarChange = async (e) => {
@@ -204,7 +210,7 @@ export default function ProfilePage() {
         dataUrl = await downscaleDataUrl(String(dataUrl), 800, 0.9);
       }
 
-      updateProfile("avatarUrl", dataUrl);
+      updateProfileField("avatarUrl", dataUrl);
     } catch (err) {
       console.error("Error uploading avatar:", err);
       alert("Failed to upload image. Please try again or use a different image.");
@@ -215,25 +221,64 @@ export default function ProfilePage() {
   };
 
   const handleSave = async () => {
+    if (!profile) return;
+    
     setIsSaving(true);
+    setSyncStatus("syncing");
+    
     try {
-      saveProfile(profile);
+      // Update the profile with new timestamp
+      const updatedProfile = updateAuthorProfile(profile, {
+        name: profile.name,
+        tagline: profile.tagline,
+        bio: profile.bio,
+        avatarUrl: profile.avatarUrl,
+        genres: profile.genres,
+        website: profile.website,
+        instagram: profile.instagram,
+        twitter: profile.twitter,
+        facebook: profile.facebook,
+        email: profile.email,
+      });
+      
+      // Save locally (this also updates legacy format)
+      setLocalAuthorProfile(updatedProfile);
+      setProfile(updatedProfile);
+      
+      // Try to sync to cloud
+      try {
+        await saveAuthorProfileToCloud(updatedProfile);
+        setSyncStatus("synced");
+      } catch (cloudErr) {
+        console.warn("[ProfilePage] Cloud sync failed:", cloudErr);
+        setSyncStatus("error");
+        // Don't fail the save - local save succeeded
+      }
 
-      // Also update author name in all projects
-      const projects = loadProjects();
-      if (projects.length > 0) {
-        const updatedProjects = projects.map((p) => ({
-          ...p,
-          author: profile.displayName,
-        }));
-        localStorage.setItem(PROJECTS_KEY, JSON.stringify(updatedProjects));
-        window.dispatchEvent(new Event("project:change"));
+      // Update author name in all projects
+      try {
+        const projectsRaw = localStorage.getItem("userProjects");
+        if (projectsRaw) {
+          const projects = JSON.parse(projectsRaw);
+          if (Array.isArray(projects) && projects.length > 0) {
+            const updatedProjects = projects.map((p) => ({
+              ...p,
+              author: profile.name,
+            }));
+            localStorage.setItem("userProjects", JSON.stringify(updatedProjects));
+            window.dispatchEvent(new Event("project:change"));
+          }
+        }
+      } catch (projErr) {
+        console.warn("[ProfilePage] Failed to update projects:", projErr);
       }
 
       setShowSaved(true);
+      setHasChanges(false);
       setTimeout(() => setShowSaved(false), 3000);
     } catch (err) {
       console.error("Failed to save:", err);
+      setSyncStatus("error");
       alert("Failed to save profile. Please try again.");
     } finally {
       setIsSaving(false);
@@ -241,21 +286,34 @@ export default function ProfilePage() {
   };
 
   const handleSignOut = () => {
-    if (window.confirm("Are you sure you want to sign out?")) {
+    if (window.confirm("Are you sure you want to sign out? Your data will remain saved locally.")) {
+      clearLocalAuthorProfile();
       navigate("/");
     }
   };
 
   const getInitials = () => {
-    const name = profile.displayName || "A";
+    const name = profile?.name || "A";
     return name.charAt(0).toUpperCase();
   };
 
   const formatMemberSince = () => {
-    if (!profile.memberSince) return "—";
-    const date = new Date(profile.memberSince);
+    if (!profile?.createdAt) return "—";
+    const date = new Date(profile.createdAt);
     return date.toLocaleDateString("en-US", { month: "long", year: "numeric" });
   };
+
+  // Check API keys status
+  const apiKeys = getApiKeys();
+  const hasApiKeys = !!(apiKeys?.openai || apiKeys?.anthropic);
+
+  if (!profile) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ background: "linear-gradient(135deg, #fef5ff 0%, #f8e8ff 50%, #fff5f7 100%)" }}>
+        <Loader2 size={32} className="animate-spin text-purple-500" />
+      </div>
+    );
+  }
 
   return (
     <div
@@ -292,11 +350,46 @@ export default function ProfilePage() {
         >
           {/* Header gradient banner */}
           <div
-            className="h-28"
+            className="h-28 relative"
             style={{
               background: "linear-gradient(135deg, #b897d6, #e3c8ff, #f5e6ff)",
             }}
-          />
+          >
+            {/* Sync status badge */}
+            <div
+              className="absolute top-4 right-4 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium"
+              style={{
+                background: "rgba(255,255,255,0.9)",
+                backdropFilter: "blur(10px)",
+                color:
+                  syncStatus === "synced"
+                    ? "#16a34a"
+                    : syncStatus === "syncing"
+                    ? "#3b82f6"
+                    : syncStatus === "error"
+                    ? "#dc2626"
+                    : "#64748b",
+              }}
+            >
+              {syncStatus === "synced" ? (
+                <>
+                  <Cloud size={12} /> Synced
+                </>
+              ) : syncStatus === "syncing" ? (
+                <>
+                  <Loader2 size={12} className="animate-spin" /> Syncing...
+                </>
+              ) : syncStatus === "error" ? (
+                <>
+                  <CloudOff size={12} /> Local only
+                </>
+              ) : (
+                <>
+                  <Cloud size={12} /> Ready
+                </>
+              )}
+            </div>
+          </div>
 
           <div className="px-8 pb-8 -mt-16 text-center">
             {/* Avatar */}
@@ -359,8 +452,8 @@ export default function ProfilePage() {
             {/* Name input */}
             <input
               type="text"
-              value={profile.displayName || ""}
-              onChange={(e) => updateProfile("displayName", e.target.value)}
+              value={profile.name || ""}
+              onChange={(e) => updateProfileField("name", e.target.value)}
               placeholder="Your name or pen name..."
               className="w-full max-w-md mx-auto text-center text-3xl font-semibold bg-transparent outline-none border-b-2 border-transparent hover:border-purple-200 focus:border-purple-400 transition-colors pb-1"
               style={{
@@ -373,7 +466,7 @@ export default function ProfilePage() {
             <input
               type="text"
               value={profile.tagline || ""}
-              onChange={(e) => updateProfile("tagline", e.target.value)}
+              onChange={(e) => updateProfileField("tagline", e.target.value)}
               placeholder="Add a tagline... (e.g., 'Urban fiction author & storyteller')"
               className="mt-3 w-full max-w-lg mx-auto text-center text-base bg-transparent outline-none italic"
               style={{ color: "rgba(31,41,55,0.6)" }}
@@ -413,7 +506,7 @@ export default function ProfilePage() {
             value={profile.bio || ""}
             onChange={(e) => {
               if (e.target.value.length <= 500) {
-                updateProfile("bio", e.target.value);
+                updateProfileField("bio", e.target.value);
               }
             }}
             placeholder="Tell readers about yourself... What inspires your writing? What genres do you love? Share your story."
@@ -555,7 +648,7 @@ export default function ProfilePage() {
                 <input
                   type="text"
                   value={profile[item.field] || ""}
-                  onChange={(e) => updateProfile(item.field, e.target.value)}
+                  onChange={(e) => updateProfileField(item.field, e.target.value)}
                   placeholder={item.placeholder}
                   className="flex-1 px-4 py-3 rounded-xl text-sm outline-none transition-colors"
                   style={{
@@ -586,8 +679,6 @@ export default function ProfilePage() {
             >
               <Settings size={18} className="text-slate-600" />
             </div>
-         
-
             <h2
               className="text-xl font-semibold"
               style={{
@@ -600,32 +691,70 @@ export default function ProfilePage() {
           </div>
 
           <div className="space-y-3">
-            {[
-              { label: "Email", value: profile.email || "—" },
-              { label: "Member Since", value: formatMemberSince() },
-              {
-                label: "Plan",
-                value: "Premium Author",
-                highlight: true,
-              },
-            ].map((item, i) => (
-              <div
-                key={i}
-                className="flex justify-between items-center p-4 rounded-xl"
-                style={{ background: "rgba(248,250,252,0.8)" }}
-              >
-                <span className="text-sm text-gray-500">{item.label}</span>
-                <span
-                  className="text-sm font-medium"
-                  style={{
-                    color: item.highlight ? "#D4AF37" : "#1f2937",
-                    fontWeight: item.highlight ? 600 : 500,
-                  }}
-                >
-                  {item.value}
-                </span>
+            {/* Email field - editable */}
+            <div
+              className="flex justify-between items-center p-4 rounded-xl"
+              style={{ background: "rgba(248,250,252,0.8)" }}
+            >
+              <span className="text-sm text-gray-500">Email</span>
+              <input
+                type="email"
+                value={profile.email || ""}
+                onChange={(e) => updateProfileField("email", e.target.value)}
+                placeholder="your@email.com"
+                className="text-right text-sm font-medium bg-transparent outline-none"
+                style={{ color: "#1f2937", maxWidth: "200px" }}
+              />
+            </div>
+
+            {/* Member Since - read only */}
+            <div
+              className="flex justify-between items-center p-4 rounded-xl"
+              style={{ background: "rgba(248,250,252,0.8)" }}
+            >
+              <span className="text-sm text-gray-500">Member Since</span>
+              <span className="text-sm font-medium" style={{ color: "#1f2937" }}>
+                {formatMemberSince()}
+              </span>
+            </div>
+
+            {/* API Keys Status */}
+            <div
+              className="flex justify-between items-center p-4 rounded-xl cursor-pointer hover:bg-slate-100 transition-colors"
+              style={{ background: "rgba(248,250,252,0.8)" }}
+              onClick={() => navigate("/projects")}
+            >
+              <div className="flex items-center gap-2">
+                <Key size={14} className="text-gray-400" />
+                <span className="text-sm text-gray-500">AI API Keys</span>
               </div>
-            ))}
+              <span
+                className="text-sm font-medium flex items-center gap-1.5"
+                style={{ color: hasApiKeys ? "#16a34a" : "#f59e0b" }}
+              >
+                {hasApiKeys ? (
+                  <>
+                    <Check size={14} /> Configured
+                  </>
+                ) : (
+                  "Not Set"
+                )}
+              </span>
+            </div>
+
+            {/* Plan */}
+            <div
+              className="flex justify-between items-center p-4 rounded-xl"
+              style={{ background: "rgba(248,250,252,0.8)" }}
+            >
+              <span className="text-sm text-gray-500">Plan</span>
+              <span
+                className="text-sm font-semibold"
+                style={{ color: "#D4AF37" }}
+              >
+                Premium Author
+              </span>
+            </div>
           </div>
 
           <button
@@ -661,8 +790,12 @@ export default function ProfilePage() {
             disabled={isSaving}
             className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-semibold text-white transition-all hover:scale-105 disabled:opacity-70"
             style={{
-              background: "linear-gradient(135deg, #9b7bc9, #b897d6)",
-              boxShadow: "0 4px 16px rgba(155,123,201,0.4)",
+              background: hasChanges
+                ? "linear-gradient(135deg, #9b7bc9, #b897d6)"
+                : "linear-gradient(135deg, #94a3b8, #cbd5e1)",
+              boxShadow: hasChanges
+                ? "0 4px 16px rgba(155,123,201,0.4)"
+                : "none",
             }}
           >
             {isSaving ? (
@@ -670,7 +803,7 @@ export default function ProfilePage() {
             ) : (
               <Save size={16} />
             )}
-            {isSaving ? "Saving..." : "Save Profile"}
+            {isSaving ? "Saving..." : hasChanges ? "Save Profile" : "Saved"}
           </button>
         </div>
       </div>
@@ -691,3 +824,4 @@ export default function ProfilePage() {
     </div>
   );
 }
+
