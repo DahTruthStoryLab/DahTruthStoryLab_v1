@@ -1,20 +1,23 @@
 import React, { useState, useEffect, useMemo } from "react";
 import {
   Copy, Check, Filter, Timer, User, TrendingUp, Feather, Globe, Star, X, Pin, Edit3,
-  Lightbulb, Save, Trash2, Send, FileText, Shuffle, ChevronDown
+  Lightbulb, Save, Trash2, Send, FileText, Shuffle, ChevronDown, Sparkles, RefreshCw, Loader2
 } from "lucide-react";
 
 import BackToLanding, { BackToLandingFab } from "../../components/storylab/BackToLanding";
+
+// Import the AI runner
+import { runAssistant } from "../../lib/api";
 
 /* =========================================================
    STORAGE HELPERS - Read from ComposePage's storage
 ========================================================= */
 
-// Keys that ComposePage uses
 const LEGACY_CHAPTERS_KEY = "dahtruth_chapters";
 const LEGACY_META_KEY = "dahtruth_project_meta";
 const CURRENT_PROJECT_KEY = "dahtruth_current_project";
 const STORYLAB_KEY = "dahtruth-story-lab-toc-v3";
+const AI_PROMPTS_CACHE_KEY = "dahtruth_ai_prompts_cache";
 
 /** Load chapters from ComposePage's storage */
 function loadChaptersFromStorage() {
@@ -83,7 +86,6 @@ function loadProjectMeta() {
 /** Save/update a chapter back to ComposePage's storage */
 function updateChapterInStorage(chapterId, updater) {
   try {
-    // Update dahtruth_chapters
     const chaptersRaw = localStorage.getItem(LEGACY_CHAPTERS_KEY);
     if (chaptersRaw) {
       const chapters = JSON.parse(chaptersRaw);
@@ -98,7 +100,6 @@ function updateChapterInStorage(chapterId, updater) {
       }
     }
 
-    // Also update unified project if it exists
     const currentProjectRaw = localStorage.getItem(CURRENT_PROJECT_KEY);
     if (currentProjectRaw) {
       const project = JSON.parse(currentProjectRaw);
@@ -114,7 +115,6 @@ function updateChapterInStorage(chapterId, updater) {
       }
     }
 
-    // Notify other components
     window.dispatchEvent(new Event("project:change"));
   } catch (err) {
     console.error("[StoryPrompts] Failed to update chapter:", err);
@@ -129,8 +129,38 @@ function saveStoryLabData(chapterId, storyLabData) {
   }));
 }
 
+/** Cache AI prompts */
+function saveAIPromptsCache(prompts, storyHash) {
+  try {
+    localStorage.setItem(AI_PROMPTS_CACHE_KEY, JSON.stringify({
+      prompts,
+      storyHash,
+      timestamp: Date.now(),
+    }));
+  } catch {}
+}
+
+function loadAIPromptsCache() {
+  try {
+    const raw = localStorage.getItem(AI_PROMPTS_CACHE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return null;
+}
+
+/** Simple hash for cache invalidation */
+function hashStory(chapters) {
+  const text = chapters.map(c => c.text || c.content || "").join("");
+  let hash = 0;
+  for (let i = 0; i < Math.min(text.length, 1000); i++) {
+    hash = ((hash << 5) - hash) + text.charCodeAt(i);
+    hash |= 0;
+  }
+  return hash.toString();
+}
+
 /* =========================================================
-   NLP HELPERS
+   NLP HELPERS (for local prompts)
 ========================================================= */
 const splitSentences = (txt) =>
   (txt || "").replace(/\s+/g, " ").match(/[^.!?]+[.!?]?/g) || [];
@@ -140,7 +170,7 @@ function guessCharacters(text) {
   const tokens =
     (text || "").match(/\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2}\b/g) || [];
   tokens.forEach((t) => {
-    if (!["I", "The", "A", "And", "But", "Then", "Now", "When", "Where"].includes(t)) {
+    if (!["I", "The", "A", "And", "But", "Then", "Now", "When", "Where", "What", "How", "Why", "She", "He", "They", "It", "This", "That"].includes(t)) {
       names.add(t.trim());
     }
   });
@@ -192,13 +222,14 @@ function analyzeStoryStructure(chapters, selectedChapter) {
 ========================================================= */
 const PROMPT_CATEGORIES = {
   sprint: { label: "Quick Sprints", icon: Timer, color: "emerald", time: "5–15 min" },
-  character: { label: "Character Deep Dive", icon: User, color: "blue", time: "20–30 min" },
-  plot: { label: "Plot Development", icon: TrendingUp, color: "purple", time: "15–45 min" },
-  craft: { label: "Writing Craft", icon: Feather, color: "orange", time: "10–20 min" },
-  worldbuilding: { label: "World Building", icon: Globe, color: "teal", time: "20–40 min" },
+  character: { label: "Character", icon: User, color: "blue", time: "20–30 min" },
+  plot: { label: "Plot", icon: TrendingUp, color: "purple", time: "15–45 min" },
+  craft: { label: "Craft", icon: Feather, color: "orange", time: "10–20 min" },
+  worldbuilding: { label: "World", icon: Globe, color: "teal", time: "20–40 min" },
+  ai: { label: "AI Generated", icon: Sparkles, color: "amber", time: "varies" },
 };
 
-function generateEnhancedPrompts(chapters, characters, selectedChapter) {
+function generateLocalPrompts(chapters, characters, selectedChapter) {
   const fullText = chapters.map((c) => c.text || c.content || "").join("\n\n");
   const selectedText = selectedChapter?.text || selectedChapter?.content || fullText;
   const structure = analyzeStoryStructure(chapters, selectedChapter);
@@ -257,7 +288,7 @@ function generateEnhancedPrompts(chapters, characters, selectedChapter) {
     { category: "worldbuilding", text: "Design a place where your characters go to feel safe. What makes it special?", difficulty: 2 }
   );
 
-  // Contextual: emotions from your story
+  // Contextual: emotions
   emotions.forEach(({ sentences }) => {
     if (sentences[0]) {
       prompts.push({
@@ -269,7 +300,7 @@ function generateEnhancedPrompts(chapters, characters, selectedChapter) {
     }
   });
 
-  // Contextual: conflicts from your story
+  // Contextual: conflicts
   conflicts.slice(0, 2).forEach((conflict) => {
     prompts.push({
       category: "plot",
@@ -279,14 +310,103 @@ function generateEnhancedPrompts(chapters, characters, selectedChapter) {
     });
   });
 
-  return prompts.map((p, i) => ({ ...p, id: i }));
+  return prompts.map((p, i) => ({ ...p, id: `local_${i}`, source: "local" }));
+}
+
+/* =========================================================
+   AI PROMPT GENERATION
+========================================================= */
+
+async function generateAIPrompts(chapters, projectMeta, provider = "anthropic") {
+  // Build story summary for AI
+  const chapterSummaries = chapters.slice(0, 10).map((ch, idx) => {
+    const text = (ch.text || ch.content || "").replace(/<[^>]*>/g, " ").trim();
+    const preview = text.slice(0, 500);
+    return `Chapter ${idx + 1}: "${ch.title || 'Untitled'}"\n${preview}${text.length > 500 ? "..." : ""}`;
+  }).join("\n\n---\n\n");
+
+  const fullText = chapters.map(c => (c.text || c.content || "").replace(/<[^>]*>/g, " ")).join(" ");
+  const wordCount = fullText.split(/\s+/).filter(Boolean).length;
+
+  const systemPrompt = `You are a creative writing coach analyzing a manuscript to generate personalized writing prompts.
+
+The story is titled "${projectMeta.title || 'Untitled'}" by ${projectMeta.author || 'the author'}.
+It currently has ${chapters.length} chapters and approximately ${wordCount.toLocaleString()} words.
+
+Based on the content provided, generate 12-15 specific, actionable writing prompts that will help the author:
+1. Deepen their characters
+2. Strengthen their plot
+3. Improve pacing and tension
+4. Enhance world-building
+5. Refine their craft
+
+Each prompt should reference SPECIFIC elements from their story (character names, plot points, settings, themes).
+
+Return your response as a JSON array with this exact format:
+[
+  {
+    "text": "The specific prompt text",
+    "category": "character|plot|craft|worldbuilding|sprint",
+    "difficulty": 1-4,
+    "reason": "Brief explanation of why this prompt is relevant to their story"
+  }
+]
+
+Only return the JSON array, no other text.`;
+
+  const userMessage = `Here is the manuscript to analyze:
+
+${chapterSummaries}
+
+Generate personalized writing prompts based on this story's characters, plot, themes, and areas that could be developed further.`;
+
+  try {
+    const result = await runAssistant(userMessage, "clarify", systemPrompt, provider);
+    
+    const responseText = result?.result || result?.text || result?.output || result || "";
+    
+    // Parse JSON from response
+    let prompts = [];
+    try {
+      // Try to find JSON array in response
+      const jsonMatch = responseText.match(/\[[\s\S]*\]/);
+      if (jsonMatch) {
+        prompts = JSON.parse(jsonMatch[0]);
+      }
+    } catch (parseError) {
+      console.error("[AI Prompts] Failed to parse JSON:", parseError);
+      // Try line-by-line parsing as fallback
+      const lines = responseText.split("\n").filter(l => l.trim());
+      prompts = lines.slice(0, 15).map((line, i) => ({
+        text: line.replace(/^\d+\.\s*/, "").replace(/^[-•]\s*/, "").trim(),
+        category: "ai",
+        difficulty: 2,
+        reason: "AI-generated prompt",
+      }));
+    }
+
+    // Validate and normalize prompts
+    return prompts
+      .filter(p => p && p.text && p.text.length > 10)
+      .map((p, i) => ({
+        id: `ai_${i}`,
+        text: p.text,
+        category: p.category || "ai",
+        difficulty: Math.min(4, Math.max(1, p.difficulty || 2)),
+        reason: p.reason || "",
+        source: "ai",
+        contextual: true,
+      }));
+  } catch (error) {
+    console.error("[AI Prompts] Generation failed:", error);
+    throw error;
+  }
 }
 
 /* =========================================================
    MODALS
 ========================================================= */
 
-// Enhanced Scratchpad with chapter selector
 function Scratchpad({ 
   isOpen, 
   onClose, 
@@ -299,7 +419,7 @@ function Scratchpad({
   selectedChapterId,
   onChapterSelect 
 }) {
-  const [insertPosition, setInsertPosition] = useState("top"); // "top" or "bottom"
+  const [insertPosition, setInsertPosition] = useState("top");
 
   if (!isOpen) return null;
 
@@ -329,7 +449,6 @@ function Scratchpad({
           <div className="flex items-center gap-3 flex-wrap">
             <span className="text-sm text-slate-600 font-medium">Send to:</span>
             
-            {/* Chapter Selector */}
             <div className="relative">
               <select
                 value={selectedChapterId || ""}
@@ -337,16 +456,15 @@ function Scratchpad({
                 className="appearance-none pl-3 pr-8 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-400 cursor-pointer min-w-[200px]"
               >
                 <option value="">Select a chapter...</option>
-                {chapters.map((ch) => (
+                {chapters.map((ch, idx) => (
                   <option key={ch.id} value={ch.id}>
-                    {ch.title || `Chapter ${chapters.indexOf(ch) + 1}`}
+                    {ch.title || `Chapter ${idx + 1}`}
                   </option>
                 ))}
               </select>
               <ChevronDown size={16} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
             </div>
 
-            {/* Position Selector */}
             <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-lg p-1">
               <button
                 onClick={() => setInsertPosition("top")}
@@ -370,7 +488,6 @@ function Scratchpad({
               </button>
             </div>
 
-            {/* Send Button */}
             <button
               onClick={() => onSendToChapter(insertPosition)}
               disabled={!selectedChapterId || !content.trim()}
@@ -466,7 +583,7 @@ function SavedPromptsMenu({ savedPrompts, isOpen, onClose, onLoadPrompt }) {
    PROMPT CARD
 ========================================================= */
 function PromptCard({ prompt, onPin, onUnpin, onUse, onMarkTried, isPinned, status }) {
-  const cat = PROMPT_CATEGORIES[prompt.category];
+  const cat = PROMPT_CATEGORIES[prompt.category] || PROMPT_CATEGORIES.ai;
   const CatIcon = cat?.icon;
 
   const chipByColor = {
@@ -475,6 +592,7 @@ function PromptCard({ prompt, onPin, onUnpin, onUse, onMarkTried, isPinned, stat
     purple: "border-purple-300 bg-purple-50 text-purple-800",
     orange: "border-orange-300 bg-orange-50 text-orange-800",
     teal: "border-teal-300 bg-teal-50 text-teal-800",
+    amber: "border-amber-300 bg-amber-50 text-amber-800",
   };
 
   const statusIcons = {
@@ -485,14 +603,21 @@ function PromptCard({ prompt, onPin, onUnpin, onUse, onMarkTried, isPinned, stat
   const StatusIcon = status ? statusIcons[status]?.icon : null;
 
   return (
-    <div className="bg-white rounded-xl p-4 border border-slate-200 hover:border-slate-300 hover:shadow-md transition-all">
+    <div className={`bg-white rounded-xl p-4 border hover:shadow-md transition-all ${
+      prompt.source === "ai" ? "border-amber-200 ring-1 ring-amber-100" : "border-slate-200 hover:border-slate-300"
+    }`}>
       {/* Header */}
       <div className="flex items-start justify-between mb-3">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <div className={`px-2 py-1 rounded-md text-xs border ${cat ? chipByColor[cat.color] : "border-slate-200 bg-slate-50 text-slate-700"}`}>
             {CatIcon ? <CatIcon size={12} className="inline mr-1" /> : null}
             {cat?.label || "Prompt"}
           </div>
+          {prompt.source === "ai" && (
+            <span className="px-2 py-0.5 rounded-full text-[10px] bg-gradient-to-r from-amber-400 to-orange-400 text-white font-medium">
+              AI
+            </span>
+          )}
           {prompt.difficulty ? (
             <div className="flex gap-0.5">
               {Array.from({ length: 4 }, (_, i) => (
@@ -500,7 +625,6 @@ function PromptCard({ prompt, onPin, onUnpin, onUse, onMarkTried, isPinned, stat
               ))}
             </div>
           ) : null}
-          {cat?.time ? <span className="text-xs text-slate-500">{cat.time}</span> : null}
         </div>
         {status && StatusIcon ? (
           <div className={`flex items-center gap-1 text-xs ${statusIcons[status].color}`}>
@@ -511,12 +635,19 @@ function PromptCard({ prompt, onPin, onUnpin, onUse, onMarkTried, isPinned, stat
       </div>
 
       {/* Prompt text */}
-      <div className="text-slate-700 text-sm leading-relaxed mb-4">{prompt.text}</div>
+      <div className="text-slate-700 text-sm leading-relaxed mb-3">{prompt.text}</div>
+
+      {/* AI reason */}
+      {prompt.reason && prompt.source === "ai" && (
+        <div className="mb-3 text-xs text-amber-700 bg-amber-50 px-2 py-1.5 rounded-md border border-amber-100">
+          💡 {prompt.reason}
+        </div>
+      )}
 
       {/* Contextual badge */}
-      {prompt.contextual && (
+      {prompt.contextual && prompt.source !== "ai" && (
         <div className="mb-3">
-          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-amber-50 text-amber-700 border border-amber-200">
+          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-blue-50 text-blue-700 border border-blue-200">
             <Lightbulb size={12} />
             From your story
           </span>
@@ -560,7 +691,7 @@ function PromptCard({ prompt, onPin, onUnpin, onUse, onMarkTried, isPinned, stat
               title="Add to Session Pack"
             >
               <Pin size={12} />
-              Add to Pack
+              Pack
             </button>
           )}
         </div>
@@ -586,7 +717,7 @@ function PromptCard({ prompt, onPin, onUnpin, onUse, onMarkTried, isPinned, stat
               <button
                 onClick={() => onMarkTried(prompt.id, "skip")}
                 className="p-1.5 rounded hover:bg-slate-50 text-slate-400 transition-all"
-                title="Skip this prompt"
+                title="Skip"
               >
                 <X size={14} />
               </button>
@@ -609,6 +740,13 @@ export default function StoryPromptsWorkshop() {
   const [activeCategory, setActiveCategory] = useState("all");
   const [difficultyFilter, setDifficultyFilter] = useState("all");
   const [showContextual, setShowContextual] = useState(true);
+  const [promptSource, setPromptSource] = useState("all"); // "all" | "local" | "ai"
+
+  // AI state
+  const [aiPrompts, setAiPrompts] = useState([]);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState("");
+  const [aiProvider, setAiProvider] = useState("anthropic");
 
   // Enhanced state
   const [pinned, setPinned] = useState([]);
@@ -636,6 +774,15 @@ export default function StoryPromptsWorkshop() {
       setTargetChapterId(loaded[0].id);
       const allText = loaded.map((c) => c.text || c.content || "").join("\n\n");
       setCharacters(guessCharacters(allText));
+    }
+
+    // Load cached AI prompts
+    const cache = loadAIPromptsCache();
+    if (cache && cache.prompts && loaded.length > 0) {
+      const currentHash = hashStory(loaded);
+      if (cache.storyHash === currentHash) {
+        setAiPrompts(cache.prompts);
+      }
     }
   }, []);
 
@@ -679,6 +826,33 @@ export default function StoryPromptsWorkshop() {
     });
   }, [pinned, promptStatuses, scratchpadContent, savedPrompts, selectedChapter]);
 
+  // Generate AI prompts
+  const handleGenerateAIPrompts = async () => {
+    if (chapters.length === 0) {
+      showToast("No chapters to analyze. Write some content first!");
+      return;
+    }
+
+    setAiLoading(true);
+    setAiError("");
+
+    try {
+      const prompts = await generateAIPrompts(chapters, projectMeta, aiProvider);
+      setAiPrompts(prompts);
+      
+      // Cache the results
+      saveAIPromptsCache(prompts, hashStory(chapters));
+      
+      showToast(`✨ Generated ${prompts.length} AI prompts!`);
+    } catch (error) {
+      console.error("[AI Prompts] Error:", error);
+      setAiError("Failed to generate AI prompts. Please check your API key and try again.");
+      showToast("Failed to generate prompts");
+    } finally {
+      setAiLoading(false);
+    }
+  };
+
   // Actions
   const pinPrompt = (text) => setPinned((p) => (p.includes(text) ? p : [...p, text]));
   const unpinPrompt = (text) => setPinned((p) => p.filter((t) => t !== text));
@@ -712,7 +886,6 @@ export default function StoryPromptsWorkshop() {
     showToast("Work saved!");
   };
 
-  // Send to chapter - now with position control
   const sendToChapter = (position = "top") => {
     if (!targetChapterId || !scratchpadContent.trim()) {
       showToast("Please select a chapter and add some content");
@@ -725,7 +898,6 @@ export default function StoryPromptsWorkshop() {
       return;
     }
 
-    // Format the content with a highlight wrapper
     const timestamp = new Date().toLocaleString();
     const block = `<div class="storylab-insertion" style="background: linear-gradient(135deg, #fef3c7, #fde68a); padding: 16px; border-radius: 8px; margin: 16px 0; border-left: 4px solid #f59e0b;">
 <div style="font-size: 11px; color: #92400e; margin-bottom: 8px; font-weight: 600;">📝 WRITING PROMPT WORK — ${timestamp}</div>
@@ -737,7 +909,6 @@ export default function StoryPromptsWorkshop() {
       const existing = ch.content || ch.text || ch.textHTML || "";
       
       if (position === "top") {
-        // Insert at top
         return {
           ...ch,
           content: block + "\n\n" + existing,
@@ -745,7 +916,6 @@ export default function StoryPromptsWorkshop() {
           textHTML: block + "\n\n" + existing,
         };
       } else {
-        // Insert at bottom
         const sep = existing && !existing.endsWith("\n") ? "\n\n" : "";
         return {
           ...ch,
@@ -773,23 +943,39 @@ export default function StoryPromptsWorkshop() {
   };
 
   // Generate + filter prompts
-  const allPrompts = useMemo(
-    () => generateEnhancedPrompts(chapters, characters, selectedChapter),
+  const localPrompts = useMemo(
+    () => generateLocalPrompts(chapters, characters, selectedChapter),
     [chapters, characters, selectedChapter]
   );
 
+  const allPrompts = useMemo(() => {
+    return [...localPrompts, ...aiPrompts];
+  }, [localPrompts, aiPrompts]);
+
   const filteredPrompts = useMemo(() => {
     return allPrompts.filter((prompt) => {
+      // Source filter
+      if (promptSource === "local" && prompt.source === "ai") return false;
+      if (promptSource === "ai" && prompt.source !== "ai") return false;
+
+      // Category filter
       if (activeCategory !== "all" && prompt.category !== activeCategory) return false;
+      
+      // Difficulty filter
       if (difficultyFilter !== "all") {
         const d = parseInt(difficultyFilter, 10);
         if (prompt.difficulty !== d) return false;
       }
-      if (!showContextual && prompt.contextual) return false;
+      
+      // Contextual filter
+      if (!showContextual && prompt.contextual && prompt.source !== "ai") return false;
+      
+      // Skip filter
       if (promptStatuses[prompt.id] === "skip") return false;
+      
       return true;
     });
-  }, [allPrompts, activeCategory, difficultyFilter, showContextual, promptStatuses]);
+  }, [allPrompts, activeCategory, difficultyFilter, showContextual, promptStatuses, promptSource]);
 
   // Stats
   const stats = useMemo(() => {
@@ -797,8 +983,9 @@ export default function StoryPromptsWorkshop() {
     const tried = Object.values(promptStatuses).filter((s) => s === "tried").length;
     const helpful = Object.values(promptStatuses).filter((s) => s === "helpful").length;
     const skipped = Object.values(promptStatuses).filter((s) => s === "skip").length;
-    return { total, tried, helpful, skipped };
-  }, [allPrompts, promptStatuses]);
+    const aiCount = aiPrompts.length;
+    return { total, tried, helpful, skipped, aiCount };
+  }, [allPrompts, promptStatuses, aiPrompts]);
 
   // Session pack helpers
   const shufflePack = (count = 12) => {
@@ -847,23 +1034,73 @@ export default function StoryPromptsWorkshop() {
         </div>
       )}
 
-      {/* Story Info Banner */}
+      {/* Story Info Banner + AI Generate Button */}
       {chapters.length > 0 && (
         <div className="max-w-7xl mx-auto px-6 pt-6">
-          <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm flex items-center justify-between">
-            <div>
-              <div className="text-sm text-slate-500">Working on</div>
-              <div className="text-lg font-semibold text-slate-800">
-                {projectMeta.title || "Your Story"}
+          <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
+            <div className="flex items-center justify-between flex-wrap gap-4">
+              <div>
+                <div className="text-sm text-slate-500">Working on</div>
+                <div className="text-lg font-semibold text-slate-800">
+                  {projectMeta.title || "Your Story"}
+                </div>
+                <div className="text-sm text-slate-500">
+                  {chapters.length} chapter{chapters.length !== 1 ? "s" : ""} • {characters.length} characters detected
+                </div>
               </div>
-              <div className="text-sm text-slate-500">
-                {chapters.length} chapter{chapters.length !== 1 ? "s" : ""} • {characters.length} characters detected
+              
+              {/* AI Generate Section */}
+              <div className="flex items-center gap-3">
+                <select
+                  value={aiProvider}
+                  onChange={(e) => setAiProvider(e.target.value)}
+                  className="px-3 py-2 text-sm border border-slate-200 rounded-lg bg-white"
+                >
+                  <option value="anthropic">Claude</option>
+                  <option value="openai">GPT-4</option>
+                </select>
+                
+                <button
+                  onClick={handleGenerateAIPrompts}
+                  disabled={aiLoading}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-xl font-medium hover:from-amber-600 hover:to-orange-600 transition-all disabled:opacity-50 shadow-md"
+                >
+                  {aiLoading ? (
+                    <>
+                      <Loader2 size={18} className="animate-spin" />
+                      Analyzing Story...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles size={18} />
+                      Generate AI Prompts
+                    </>
+                  )}
+                </button>
               </div>
             </div>
-            <div className="text-right">
-              <div className="text-2xl font-bold text-amber-600">{allPrompts.length}</div>
-              <div className="text-xs text-slate-500">prompts generated</div>
-            </div>
+            
+            {aiError && (
+              <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                {aiError}
+              </div>
+            )}
+            
+            {stats.aiCount > 0 && (
+              <div className="mt-3 flex items-center gap-2 text-sm">
+                <span className="px-2 py-1 bg-amber-100 text-amber-800 rounded-md font-medium">
+                  ✨ {stats.aiCount} AI prompts generated
+                </span>
+                <button
+                  onClick={handleGenerateAIPrompts}
+                  disabled={aiLoading}
+                  className="text-amber-600 hover:text-amber-700 flex items-center gap-1"
+                >
+                  <RefreshCw size={14} />
+                  Regenerate
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -963,7 +1200,7 @@ export default function StoryPromptsWorkshop() {
               { value: stats.tried, label: "Tried", color: "text-emerald-600" },
               { value: stats.helpful, label: "Helpful", color: "text-amber-600" },
               { value: pinned.length, label: "In Pack", color: "text-blue-600" },
-              { value: stats.total - stats.tried - stats.helpful - stats.skipped, label: "New", color: "text-slate-600" },
+              { value: stats.aiCount, label: "AI", color: "text-orange-600" },
             ].map((stat, i) => (
               <div key={i} className="text-center p-3 rounded-lg bg-white border border-slate-200">
                 <div className={`text-lg font-bold ${stat.color}`}>{stat.value}</div>
@@ -977,6 +1214,30 @@ export default function StoryPromptsWorkshop() {
             <div className="flex items-center gap-2 mb-3">
               <Filter size={16} className="text-slate-500" />
               <span className="text-sm font-medium text-slate-700">Filters</span>
+            </div>
+
+            {/* Source filter */}
+            <div className="mb-3">
+              <label className="block text-xs font-medium text-slate-600 mb-1">Source</label>
+              <div className="flex gap-1">
+                {[
+                  { value: "all", label: "All" },
+                  { value: "local", label: "Quick" },
+                  { value: "ai", label: "AI ✨" },
+                ].map((opt) => (
+                  <button
+                    key={opt.value}
+                    onClick={() => setPromptSource(opt.value)}
+                    className={`flex-1 px-2 py-1.5 rounded-md text-xs font-medium border transition-all ${
+                      promptSource === opt.value
+                        ? "bg-slate-800 text-white border-slate-800"
+                        : "bg-white border-slate-200 hover:bg-slate-50 text-slate-600"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div className="flex flex-wrap gap-2 mb-3">
@@ -1033,7 +1294,7 @@ export default function StoryPromptsWorkshop() {
                 onChange={(e) => setShowContextual(e.target.checked)}
                 className="accent-amber-500 w-4 h-4"
               />
-              Show prompts from your story
+              Show story-specific prompts
             </label>
           </div>
         </aside>
@@ -1046,7 +1307,12 @@ export default function StoryPromptsWorkshop() {
               <div>
                 <h1 className="text-2xl font-bold text-slate-800">Interactive Story Prompts</h1>
                 <p className="text-sm text-slate-500 mt-1">
-                  Smart prompts that adapt to your chapters, characters, and story structure.
+                  {promptSource === "ai" 
+                    ? "AI-generated prompts based on your story's characters, plot, and themes."
+                    : promptSource === "local"
+                    ? "Quick template-based prompts to spark your creativity."
+                    : "Smart prompts that adapt to your chapters, characters, and story structure."
+                  }
                 </p>
               </div>
               <div className="text-right">
@@ -1092,12 +1358,42 @@ export default function StoryPromptsWorkshop() {
             </div>
           )}
 
+          {/* AI Loading State */}
+          {aiLoading && (
+            <div className="bg-gradient-to-r from-amber-50 to-orange-50 rounded-xl p-8 border border-amber-200 mb-6 text-center">
+              <Loader2 size={40} className="mx-auto mb-4 text-amber-500 animate-spin" />
+              <div className="text-lg font-semibold text-amber-800 mb-2">Analyzing Your Story...</div>
+              <div className="text-sm text-amber-600">
+                The AI is reading your chapters to generate personalized writing prompts.
+              </div>
+            </div>
+          )}
+
           {/* Prompts grid */}
-          {filteredPrompts.length === 0 ? (
+          {filteredPrompts.length === 0 && !aiLoading ? (
             <div className="text-center py-16 bg-white rounded-2xl border border-slate-200">
               <Lightbulb size={48} className="mx-auto mb-4 text-slate-300" />
-              <div className="text-lg font-semibold mb-2 text-slate-700">No prompts match your filters</div>
-              <div className="text-slate-500">Adjust filters or add more chapters for personalized prompts.</div>
+              <div className="text-lg font-semibold mb-2 text-slate-700">
+                {promptSource === "ai" && stats.aiCount === 0 
+                  ? "No AI prompts yet" 
+                  : "No prompts match your filters"
+                }
+              </div>
+              <div className="text-slate-500 mb-4">
+                {promptSource === "ai" && stats.aiCount === 0 
+                  ? "Click 'Generate AI Prompts' to have the AI analyze your story."
+                  : "Adjust filters or add more chapters for personalized prompts."
+                }
+              </div>
+              {promptSource === "ai" && stats.aiCount === 0 && (
+                <button
+                  onClick={handleGenerateAIPrompts}
+                  disabled={aiLoading}
+                  className="px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors font-medium"
+                >
+                  Generate AI Prompts
+                </button>
+              )}
             </div>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
