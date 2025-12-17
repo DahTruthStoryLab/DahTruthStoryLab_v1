@@ -6,8 +6,8 @@ import {
 
 import BackToLanding, { BackToLandingFab } from "../../components/storylab/BackToLanding";
 
-// Import the AI runner
-import { runAssistant } from "../../lib/api";
+// Import the AI runner - adjust path if file is in lib/storylab/
+import { runAssistant } from "../api";
 
 /* =========================================================
    STORAGE HELPERS - Read from ComposePage's storage
@@ -1441,4 +1441,3 @@ export default function StoryPromptsWorkshop() {
     </div>
   );
 }
-
