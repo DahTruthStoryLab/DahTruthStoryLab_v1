@@ -277,4 +277,4 @@ export function refreshProject() {
 export function hasStoryData() {
   const project = loadProject();
   return project && Array.isArray(project.chapters) && project.chapters.length > 0;
-} 
+}
