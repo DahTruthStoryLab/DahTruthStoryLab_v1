@@ -11,6 +11,7 @@ import SearchPanel from "./Writing/SearchPanel";
 import PaginatedView from "./Writing/PaginatedView";
 
 import { useChapterManager } from "../hooks/useChapterManager";
+import { GoldButton, WritingCrumb } from "./UI/UIComponents";
 
 import { documentParser } from "../utils/documentParser";
 import { rateLimiter } from "../utils/rateLimiter";
@@ -35,6 +36,7 @@ import {
   Send,
   ArrowLeft,
   PenLine,
+  Trash2,
 } from "lucide-react";
 
 import {
@@ -73,17 +75,16 @@ const applyDoubleSpacing = (text = "") => {
 
   // If it already looks like HTML, convert paragraph breaks
   if (/<\/p>/i.test(text)) {
-    // Add extra spacing between paragraphs in HTML
     return text
-      .replace(/<\/p>\s*<p>/gi, "</p>\n\n\n\n<p>") // 3 blank lines between paragraphs
-      .replace(/(<p>)/gi, "$1"); // Keep paragraph tags
+      .replace(/<\/p>\s*<p>/gi, "</p>\n\n\n\n<p>")
+      .replace(/(<p>)/gi, "$1");
   }
 
   // Plain text → use 3 blank lines between paragraphs
   return text
     .replace(/\r\n/g, "\n")
-    .replace(/\n{2,}/g, "\n\n\n\n") // Convert any multi-newlines to 4 (3 blank lines)
-    .replace(/\n{5,}/g, "\n\n\n\n") // Cap at 4 newlines max
+    .replace(/\n{2,}/g, "\n\n\n\n")
+    .replace(/\n{5,}/g, "\n\n\n\n")
     .trim();
 };
 
@@ -165,7 +166,6 @@ function DropdownMenu({ label, icon: Icon, children, disabled = false }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
-  // Close on outside click
   useEffect(() => {
     const handleClick = (e) => {
       if (ref.current && !ref.current.contains(e.target)) {
@@ -198,9 +198,7 @@ function DropdownMenu({ label, icon: Icon, children, disabled = false }) {
       {open && (
         <div className="absolute top-full left-0 mt-1 min-w-[180px] bg-white border border-slate-200 rounded-lg shadow-lg z-50 py-1">
           {React.Children.map(children, (child) =>
-            React.cloneElement(child, {
-              onClickCapture: () => setOpen(false),
-            })
+            child ? React.cloneElement(child, { onClickCapture: () => setOpen(false) }) : null
           )}
         </div>
       )}
@@ -240,10 +238,8 @@ function DropdownDivider() {
 export default function ComposePage() {
   const navigate = useNavigate();
 
-  // Active project state
   const [activeProject, setActiveProject] = useState(null);
 
-  // Initialize selected project on mount
   useEffect(() => {
     try {
       const p = ensureSelectedProject();
@@ -255,10 +251,8 @@ export default function ComposePage() {
     } catch (e) {
       console.error("Failed to ensure selected project:", e);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Chapter management
   const {
     book,
     chapters: rawChapters = [],
@@ -272,94 +266,63 @@ export default function ComposePage() {
     saveProject,
   } = useChapterManager();
 
-  // Guard + normalize chapters
   const chapters = useMemo(
-    () =>
-      Array.isArray(rawChapters)
-        ? rawChapters.filter((c) => c && c.id != null)
-        : [],
+    () => Array.isArray(rawChapters) ? rawChapters.filter((c) => c && c.id != null) : [],
     [rawChapters]
   );
 
-  // Characters detected from @char: tags
   const { characters, characterCount } = useMemo(
     () => computeCharactersFromChapters(chapters || []),
     [chapters]
   );
 
-  // Total word count
   const totalWordCount = useMemo(
     () => computeWordsFromChapters(chapters || []),
     [chapters]
   );
 
-  // Current chapter index
   const currentChapterIndex = useMemo(() => {
     if (!selectedId) return 0;
     const idx = chapters.findIndex((c) => c.id === selectedId);
     return idx >= 0 ? idx + 1 : 0;
   }, [chapters, selectedId]);
 
-  // LOCAL AI STATE
   const [aiBusy, setAiBusy] = useState(false);
   const [provider, setProvider] = useState("openai");
   const [instructions, setInstructions] = useState("");
 
-  // Right-hand AI assistant chat state
   const [showAssistant, setShowAssistant] = useState(false);
   const [chatMessages, setChatMessages] = useState([]);
   const [chatInput, setChatInput] = useState("");
   const [chatBusy, setChatBusy] = useState(false);
 
-  // View state
   const [view, setView] = useState("grid");
   const [showSearch, setShowSearch] = useState(false);
   const [editorViewMode, setEditorViewMode] = useState("editor");
 
-  // Editor state
   const [title, setTitle] = useState(selectedChapter?.title ?? "");
   const [html, setHtml] = useState(selectedChapter?.content ?? "");
 
-  // Book metadata
   const [author, setAuthor] = useState("Jacqueline Session Ausby");
   const [bookTitle, setBookTitle] = useState(book?.title || "Untitled Story");
 
-  // Selection state
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [selectMode, setSelectMode] = useState(false);
   const lastClickedIndexRef = useRef(null);
 
-  // Import + rate limiter indicators
   const [isImporting, setIsImporting] = useState(false);
   const [importProgress, setImportProgress] = useState("");
   const [queueLength, setQueueLength] = useState(0);
 
-  // Save status
   const [saveStatus, setSaveStatus] = useState("idle");
-
-  // TOC headings
   const [headings, setHeadings] = useState([]);
-
-  // Active AI tab
   const [activeAiTab, setActiveAiTab] = useState("proofread");
 
   const hasChapter = !!selectedId && !!selectedChapter;
   const hasAnyChapters = Array.isArray(chapters) && chapters.length > 0;
 
-  // File input ref for import
   const fileInputRef = useRef(null);
 
-  // Get chapters with current editor state
-  const getChaptersWithCurrent = () => {
-    if (!hasChapter) return chapters || [];
-    return (chapters || []).map((ch) =>
-      ch.id === selectedId
-        ? { ...ch, title: title || selectedChapter?.title || "", content: html }
-        : ch
-    );
-  };
-
-  // Plain text for AI context
   const chapterPlainText = useMemo(() => {
     if (!html) return "";
     const tmp = document.createElement("div");
@@ -367,7 +330,6 @@ export default function ComposePage() {
     return tmp.textContent || tmp.innerText || "";
   }, [html]);
 
-  // Monitor rate limiter queue
   useEffect(() => {
     const interval = setInterval(() => {
       setQueueLength(rateLimiter.getQueueLength());
@@ -375,7 +337,6 @@ export default function ComposePage() {
     return () => clearInterval(interval);
   }, []);
 
-  // Load/save active AI tab
   useEffect(() => {
     try {
       const stored = localStorage.getItem("dt_activeAiTab");
@@ -389,7 +350,6 @@ export default function ComposePage() {
     } catch {}
   }, [activeAiTab]);
 
-  // Selection helpers
   const clearSelection = () => setSelectedIds(new Set());
 
   function toggleSelect(id, { additive = false } = {}) {
@@ -434,23 +394,18 @@ export default function ComposePage() {
     });
   }
 
-  // Keyboard shortcuts
   useEffect(() => {
     const onKey = (e) => {
       const tag = (e.target && e.target.tagName) || "";
       if (/input|textarea|select/i.test(tag)) return;
-      
-      // Delete selected chapters
       if ((e.key === "Delete" || e.key === "Backspace") && selectedIds.size) {
         e.preventDefault();
         handleDeleteMultiple(Array.from(selectedIds));
       }
-      // Ctrl+F for search
       if ((e.ctrlKey || e.metaKey) && e.key === "f") {
         e.preventDefault();
         setShowSearch(true);
       }
-      // Ctrl+S for save
       if ((e.ctrlKey || e.metaKey) && e.key === "s") {
         e.preventDefault();
         handleSave();
@@ -460,7 +415,6 @@ export default function ComposePage() {
     return () => window.removeEventListener("keydown", onKey, { capture: true });
   }, [selectedIds]);
 
-  // Sync editor with selected chapter
   useEffect(() => {
     if (selectedChapter) {
       setTitle(selectedChapter.title || "");
@@ -469,7 +423,6 @@ export default function ComposePage() {
     setHeadings([]);
   }, [selectedId, selectedChapter]);
 
-  // Save with visual feedback
   const handleSave = async () => {
     if (!hasChapter) return;
     if (saveStatus === "saving") return;
@@ -518,7 +471,6 @@ export default function ComposePage() {
     }
   };
 
-  // Rename a chapter
   const handleRenameChapter = (chapterId, newTitle) => {
     if (!chapterId || !newTitle) return;
     updateChapter(chapterId, { title: newTitle });
@@ -540,7 +492,6 @@ export default function ComposePage() {
     }
   };
 
-  // AI Handler
   const handleAI = async (mode) => {
     if (!hasChapter) return;
 
@@ -635,7 +586,6 @@ export default function ComposePage() {
     }
   };
 
-  // Chat: send a message to the AI assistant
   const handleAssistantSend = async () => {
     const text = chatInput.trim();
     if (!text) return;
@@ -688,7 +638,6 @@ export default function ComposePage() {
     }
   };
 
-  // Import using documentParser
   const handleImport = async (file, options = {}) => {
     if (!file) return;
 
@@ -714,10 +663,6 @@ export default function ComposePage() {
         return;
       }
 
-      if (DEBUG_IMPORT) {
-        console.log("Parsed document:", { title: parsed.title, chapters: parsed.chapters?.length, totalWordCount: parsed.totalWordCount });
-      }
-
       if (parsed.title && parsed.title !== bookTitle) {
         setBookTitle(parsed.title);
       }
@@ -728,7 +673,6 @@ export default function ComposePage() {
         !stripHtml(existing[0].content || "").trim() &&
         !(existing[0].title || "").trim();
 
-      // MULTI-CHAPTER IMPORT
       if (splitByHeadings && parsed.chapters && parsed.chapters.length > 0) {
         setImportProgress(`Creating ${parsed.chapters.length} chapter(s) from "${file.name}"...`);
 
@@ -747,7 +691,6 @@ export default function ComposePage() {
 
         alert(`✅ Imported ${parsed.chapters.length} chapter(s) from "${file.name}".`);
       } else {
-        // SINGLE-CHAPTER IMPORT
         setImportProgress("Importing manuscript into a single chapter...");
 
         const fullContentRaw =
@@ -788,7 +731,6 @@ export default function ComposePage() {
     }
   };
 
-  // Trigger file input
   const triggerImport = () => {
     fileInputRef.current?.click();
   };
@@ -799,7 +741,6 @@ export default function ComposePage() {
     e.target.value = "";
   };
 
-  // SEND TO PUBLISHING
   const handleSendToPublishing = async () => {
     if (!Array.isArray(chapters) || chapters.length === 0) {
       alert("You need at least one chapter before sending to Publishing.");
@@ -871,7 +812,6 @@ export default function ComposePage() {
       localStorage.setItem(metaKey, JSON.stringify(meta));
       localStorage.setItem(draftKey, JSON.stringify(payload));
 
-      // Legacy keys
       localStorage.setItem("dahtruth_chapters", JSON.stringify(normalizedForPublishing));
       localStorage.setItem("dahtruth_project_meta", JSON.stringify(meta));
       localStorage.setItem(PUBLISHING_DRAFT_KEY, JSON.stringify(payload));
@@ -884,7 +824,6 @@ export default function ComposePage() {
     }
   };
 
-  // Export current chapter as HTML
   const handleExport = () => {
     const cleanHtml = stripCharacterTags(html);
     const blob = new Blob([cleanHtml], { type: "text/html" });
@@ -896,7 +835,6 @@ export default function ComposePage() {
     URL.revokeObjectURL(url);
   };
 
-  // Delete single chapter
   const handleDeleteCurrent = () => {
     if (!hasChapter) return;
     if (window.confirm(`Delete "${title || selectedChapter.title}"?\n\nThis cannot be undone.`)) {
@@ -905,7 +843,6 @@ export default function ComposePage() {
     }
   };
 
-  // Bulk delete
   const handleDeleteMultiple = (ids) => {
     if (!ids?.length) return;
     if (!window.confirm(`Delete ${ids.length} chapter(s)? This cannot be undone.`)) return;
@@ -919,7 +856,6 @@ export default function ComposePage() {
 
   const goBack = () => navigate("/dashboard");
 
-  // Simple guard
   if (!Array.isArray(chapters)) {
     return (
       <div className="min-h-screen bg-[rgb(244,247,250)] flex items-center justify-center">
@@ -928,7 +864,6 @@ export default function ComposePage() {
     );
   }
 
-  // Render
   return (
     <div className="min-h-screen bg-[rgb(244,247,250)] text-slate-900">
       {/* Hidden file input for import */}
@@ -941,49 +876,52 @@ export default function ComposePage() {
       />
 
       {/* ═══════════════════════════════════════════════════════════════
-          BANNER
+          BANNER - StoryLab Gradient
       ═══════════════════════════════════════════════════════════════ */}
-      <div className="bg-gradient-to-r from-slate-800 to-slate-900 text-white">
-        <div className="max-w-7xl mx-auto px-4 py-3">
-          <div className="flex items-center justify-between">
+      <div 
+        className="text-white"
+        style={{ background: "linear-gradient(135deg, #1e3a5f 0%, #2d4a6f 40%, #9b7bc9 100%)" }}
+      >
+        <div className="max-w-[1800px] mx-auto px-4 py-3">
+          <div className="flex items-center justify-between flex-wrap gap-3">
             {/* Left: Title */}
             <div className="flex items-center gap-3">
-              <PenLine size={24} className="text-amber-400" />
+              <PenLine size={24} className="text-amber-300" />
               <h1 className="text-xl font-bold">Compose</h1>
             </div>
 
             {/* Center: Story Info */}
-            <div className="flex items-center gap-6 text-sm">
+            <div className="flex items-center gap-4 md:gap-6 text-sm flex-wrap">
               <div className="flex items-center gap-2">
-                <span className="text-slate-400">Story:</span>
+                <span className="text-white/70">Story:</span>
                 <span className="font-semibold text-amber-300">{bookTitle || "Untitled"}</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-slate-400">Chapter:</span>
+                <span className="text-white/70">Chapter:</span>
                 <span className="font-medium">
                   {currentChapterIndex > 0 ? `${currentChapterIndex} / ${chapters.length}` : `${chapters.length} total`}
                 </span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-slate-400">Words:</span>
+                <span className="text-white/70">Words:</span>
                 <span className="font-medium">{totalWordCount.toLocaleString()}</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-slate-400">Characters:</span>
+                <span className="text-white/70">Characters:</span>
                 <span className="font-medium">{characterCount}</span>
               </div>
             </div>
 
             {/* Right: Provider selector */}
             <div className="flex items-center gap-2">
-              <label className="text-xs text-slate-400">AI:</label>
+              <label className="text-xs text-white/70">AI:</label>
               <select
-                className="bg-slate-700 border border-slate-600 rounded px-2 py-1 text-xs text-white"
+                className="bg-white/20 border border-white/30 rounded px-2 py-1 text-xs text-white"
                 value={provider}
                 onChange={(e) => setProvider(e.target.value)}
               >
-                <option value="anthropic">Claude</option>
-                <option value="openai">GPT-4</option>
+                <option value="anthropic" className="text-slate-800">Claude</option>
+                <option value="openai" className="text-slate-800">GPT-4</option>
               </select>
             </div>
           </div>
@@ -994,11 +932,11 @@ export default function ComposePage() {
           TOOLBAR
       ═══════════════════════════════════════════════════════════════ */}
       <div className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-slate-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 py-2 flex items-center gap-3">
+        <div className="max-w-[1800px] mx-auto px-4 py-2 flex items-center gap-3 overflow-x-auto">
           {/* Dashboard Button (Gold) */}
           <button
             onClick={goBack}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white transition-all hover:scale-105"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white transition-all hover:scale-105 flex-shrink-0"
             style={{ background: "linear-gradient(135deg, #D4AF37, #B8960C)" }}
           >
             <ArrowLeft size={16} />
@@ -1016,6 +954,13 @@ export default function ComposePage() {
               onClick={handleSave}
               disabled={!hasChapter || saveStatus === "saving"}
               shortcut="Ctrl+S"
+            />
+            <DropdownDivider />
+            <DropdownItem
+              icon={Trash2}
+              label="Delete Chapter"
+              onClick={handleDeleteCurrent}
+              disabled={!hasChapter}
             />
           </DropdownMenu>
 
@@ -1088,7 +1033,7 @@ export default function ComposePage() {
             onClick={() => setShowSearch((s) => !s)}
             className={`
               inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium
-              border transition-all
+              border transition-all flex-shrink-0
               ${showSearch
                 ? "bg-amber-100 border-amber-300 text-amber-800"
                 : "bg-white border-slate-200 hover:bg-slate-50 text-slate-700"
@@ -1105,7 +1050,7 @@ export default function ComposePage() {
 
           {/* Status indicators */}
           {queueLength > 0 && (
-            <div className="flex items-center gap-1 px-2 py-1 bg-blue-50 rounded border border-blue-200">
+            <div className="flex items-center gap-1 px-2 py-1 bg-blue-50 rounded border border-blue-200 flex-shrink-0">
               <span className="text-xs text-blue-700">
                 ⏳ {queueLength} AI request{queueLength !== 1 ? "s" : ""} queued
               </span>
@@ -1113,7 +1058,7 @@ export default function ComposePage() {
           )}
 
           {isImporting && (
-            <div className="flex items-center gap-2 px-3 py-1 bg-amber-50 rounded border border-amber-200">
+            <div className="flex items-center gap-2 px-3 py-1 bg-amber-50 rounded border border-amber-200 flex-shrink-0">
               <div className="w-3 h-3 border-2 border-amber-600 border-t-transparent rounded-full animate-spin" />
               <span className="text-xs text-amber-700">{importProgress}</span>
             </div>
@@ -1124,7 +1069,7 @@ export default function ComposePage() {
             type="button"
             onClick={handleSendToPublishing}
             disabled={!hasAnyChapters || saveStatus === "saving"}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
             style={{ background: "linear-gradient(135deg, #D4AF37, #B8960C)" }}
           >
             <Send size={16} />
@@ -1139,7 +1084,7 @@ export default function ComposePage() {
       {view === "grid" && (
         <>
           {showSearch && (
-            <div className="max-w-7xl mx-auto px-4 pt-4">
+            <div className="max-w-[1800px] mx-auto px-4 pt-4">
               <SearchPanel
                 chapters={chapters}
                 onSelectChapter={(id) => {
@@ -1181,203 +1126,193 @@ export default function ComposePage() {
           EDITOR VIEW
       ═══════════════════════════════════════════════════════════════ */}
       {view === "editor" && (
-        <div
-          className="max-w-7xl mx-auto px-4 py-6 grid gap-6"
-          style={{
-            gridTemplateColumns: showAssistant
-              ? "280px minmax(0, 1fr) 320px"
-              : "280px minmax(0, 1fr)",
-            minWidth: showAssistant ? 1280 : 1024,
-          }}
-        >
-          {/* Left Sidebar */}
-          <aside className="sticky top-24 space-y-3" style={{ zIndex: 10 }}>
-            {showSearch && (
-              <SearchPanel
+        <div className="max-w-[1800px] mx-auto px-4 py-6">
+          {/* Editor Formatting Toolbar */}
+          <div className="mb-4">
+            <EditorToolbar
+              onAI={handleAI}
+              onSave={handleSave}
+              onImport={handleImport}
+              onExport={handleExport}
+              onDelete={handleDeleteCurrent}
+              aiBusy={aiBusy || isImporting || chatBusy}
+              saveStatus={saveStatus}
+              activeAiTab={activeAiTab}
+              setActiveAiTab={setActiveAiTab}
+              onToggleAssistant={() => setShowAssistant((prev) => !prev)}
+              assistantOpen={showAssistant}
+            />
+          </div>
+
+          <div
+            className="grid gap-6"
+            style={{
+              gridTemplateColumns: showAssistant
+                ? "220px minmax(0, 1fr) 320px"
+                : "220px minmax(0, 1fr)",
+            }}
+          >
+            {/* Left Sidebar */}
+            <aside className="space-y-3">
+              {showSearch && (
+                <SearchPanel
+                  chapters={chapters}
+                  onSelectChapter={(id) => {
+                    setSelectedId(id);
+                    setShowSearch(false);
+                  }}
+                  onClose={() => setShowSearch(false)}
+                />
+              )}
+
+              <ChapterSidebar
                 chapters={chapters}
-                onSelectChapter={(id) => {
-                  setSelectedId(id);
-                  setShowSearch(false);
-                }}
-                onClose={() => setShowSearch(false)}
+                selectedId={selectedId}
+                onSelectChapter={setSelectedId}
+                onAddChapter={addChapter}
+                onDeleteMultiple={handleDeleteMultiple}
+                selectMode={selectMode}
+                selectedIds={selectedIds}
+                onToggleSelect={toggleSelect}
+                onRangeSelect={(idx) => rangeSelect(idx)}
+                lastClickedIndexRef={lastClickedIndexRef}
+                onRenameChapter={handleRenameChapter}
+              />
+
+              {headings.length > 0 && (
+                <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+                  <div className="text-xs font-semibold text-slate-700 mb-2">Table of Contents</div>
+                  <ul className="space-y-1 max-h-64 overflow-auto text-xs">
+                    {headings.map((h, idx) => (
+                      <li key={`${h.level}-${idx}-${h.text}`} className="text-slate-700">
+                        <span className={h.level === "h1" ? "font-semibold" : h.level === "h2" ? "ml-2" : "ml-4 text-slate-500"}>
+                          {h.text}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+                <div className="text-xs font-semibold text-slate-700 mb-2 flex items-center justify-between">
+                  <span>Characters</span>
+                  <span className="text-[11px] text-slate-500">{characterCount} tagged</span>
+                </div>
+
+                {characterCount === 0 ? (
+                  <p className="text-[11px] text-slate-500 leading-snug">
+                    No characters tagged yet.
+                    <br />
+                    Introduce a character as{" "}
+                    <span className="font-mono text-[11px] bg-slate-100 px-1 py-0.5 rounded">@char: John Smith</span>
+                  </p>
+                ) : (
+                  <ul className="space-y-1 max-h-40 overflow-auto text-xs">
+                    {characters.map((name) => (
+                      <li key={name} className="text-slate-700 truncate">{name}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            </aside>
+
+            {/* Main Editor OR Paginated View */}
+            {editorViewMode === "pages" ? (
+              <PaginatedView
+                html={html}
+                title={title}
+                author={author}
+                chapterNumber={chapters.findIndex((c) => c.id === selectedId) + 1}
+                onEdit={() => setEditorViewMode("editor")}
+              />
+            ) : (
+              <EditorPane
+                title={title}
+                setTitle={setTitle}
+                html={html}
+                setHtml={setHtml}
+                onSave={handleSave}
+                onAI={handleAI}
+                aiBusy={aiBusy || chatBusy}
+                pageWidth={1200}
+                onHeadingsChange={setHeadings}
               />
             )}
 
-            <ChapterSidebar
-              chapters={chapters}
-              selectedId={selectedId}
-              onSelectChapter={setSelectedId}
-              onAddChapter={addChapter}
-              onDeleteMultiple={handleDeleteMultiple}
-              selectMode={selectMode}
-              selectedIds={selectedIds}
-              onToggleSelect={toggleSelect}
-              onRangeSelect={(idx) => rangeSelect(idx)}
-              lastClickedIndexRef={lastClickedIndexRef}
-              onRenameChapter={handleRenameChapter}
-            />
-
-            {/* TOC */}
-            {headings.length > 0 && (
-              <div className="mt-3 rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
-                <div className="text-xs font-semibold text-slate-700 mb-2">Table of Contents</div>
-                <ul className="space-y-1 max-h-64 overflow-auto text-xs">
-                  {headings.map((h, idx) => (
-                    <li key={`${h.level}-${idx}-${h.text}`} className="text-slate-700">
-                      <span
-                        className={
-                          h.level === "h1" ? "font-semibold" : h.level === "h2" ? "ml-2" : "ml-4 text-slate-500"
-                        }
-                      >
-                        {h.text}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {/* Character Manager */}
-            <div className="mt-3 rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
-              <div className="text-xs font-semibold text-slate-700 mb-2 flex items-center justify-between">
-                <span>Characters</span>
-                <span className="text-[11px] text-slate-500">{characterCount} tagged</span>
-              </div>
-
-              {characterCount === 0 ? (
-                <p className="text-[11px] text-slate-500 leading-snug">
-                  No characters tagged yet.
-                  <br />
-                  Introduce a character in your manuscript as{" "}
-                  <span className="font-mono text-[11px] bg-slate-100 px-1 py-0.5 rounded">@char: John Smith</span>{" "}
-                  the first time they appear.
-                </p>
-              ) : (
-                <ul className="space-y-1 max-h-40 overflow-auto text-xs">
-                  {characters.map((name) => (
-                    <li key={name} className="flex items-center justify-between text-slate-700">
-                      <span className="truncate">{name}</span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          </aside>
-
-          {/* Main Editor OR Paginated View */}
-          {editorViewMode === "pages" ? (
-            <PaginatedView
-              html={html}
-              title={title}
-              author={author}
-              chapterNumber={chapters.findIndex((c) => c.id === selectedId) + 1}
-              onEdit={() => setEditorViewMode("editor")}
-            />
-          ) : (
-            <EditorPane
-              title={title}
-              setTitle={setTitle}
-              html={html}
-              setHtml={setHtml}
-              onSave={handleSave}
-              onAI={handleAI}
-              aiBusy={aiBusy || chatBusy}
-              pageWidth={1000}
-              onHeadingsChange={setHeadings}
-            />
-          )}
-
-          {/* Right-hand AI Assistant */}
-          {showAssistant && (
-            <section className="flex flex-col bg-white border border-slate-200 rounded-xl shadow-sm h-[calc(100vh-10rem)]">
-              <div className="px-3 py-2 border-b border-slate-200 flex items-center justify-between">
-                <div>
-                  <div className="text-xs font-semibold text-slate-800">AI Assistant</div>
-                  <div className="text-[11px] text-slate-500">
-                    Ask questions about your chapter. Copy any suggestions you like into the editor.
+            {/* Right-hand AI Assistant */}
+            {showAssistant && (
+              <section className="flex flex-col bg-white border border-slate-200 rounded-xl shadow-sm h-[calc(100vh-12rem)]">
+                <div className="px-3 py-2 border-b border-slate-200 flex items-center justify-between">
+                  <div>
+                    <div className="text-xs font-semibold text-slate-800">AI Assistant</div>
+                    <div className="text-[11px] text-slate-500">Ask questions, get suggestions</div>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowAssistant(false)}
+                    className="text-[11px] px-2 py-1 rounded border border-slate-200 hover:bg-slate-50"
+                  >
+                    Close
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setShowAssistant(false)}
-                  className="text-[11px] px-2 py-1 rounded border border-slate-200 hover:bg-slate-50"
-                >
-                  Close
-                </button>
-              </div>
 
-              <div className="flex-1 overflow-y-auto px-3 py-2 space-y-2 text-sm">
-                {chatMessages.length === 0 && (
-                  <p className="text-[12px] text-slate-500 mt-2">
-                    Example questions:
-                    <br />• "Help me tighten this opening paragraph."
-                    <br />• "Is this dialogue too on the nose?"
-                    <br />• "Suggest a stronger closing sentence."
-                  </p>
-                )}
+                <div className="flex-1 overflow-y-auto px-3 py-2 space-y-2 text-sm">
+                  {chatMessages.length === 0 && (
+                    <p className="text-[12px] text-slate-500 mt-2">
+                      Example questions:
+                      <br />• "Help me tighten this opening."
+                      <br />• "Is this dialogue natural?"
+                      <br />• "Suggest a stronger ending."
+                    </p>
+                  )}
 
-                {chatMessages.map((msg) => (
-                  <div
-                    key={msg.id}
-                    className={
-                      msg.role === "user"
+                  {chatMessages.map((msg) => (
+                    <div
+                      key={msg.id}
+                      className={msg.role === "user"
                         ? "self-end max-w-[80%] rounded-lg bg-indigo-50 px-3 py-2 text-xs"
                         : "self-start max-w-[80%] rounded-lg bg-slate-50 px-3 py-2 text-xs"
-                    }
-                  >
-                    <div className="whitespace-pre-wrap text-slate-800">{msg.content}</div>
-
-                    {msg.role === "assistant" && (
-                      <div className="mt-1 flex gap-2 text-[10px] text-slate-500">
+                      }
+                    >
+                      <div className="whitespace-pre-wrap text-slate-800">{msg.content}</div>
+                      {msg.role === "assistant" && (
                         <button
                           type="button"
-                          onClick={async () => {
-                            try {
-                              await navigator.clipboard.writeText(msg.content);
-                              alert("Copied to clipboard");
-                            } catch (e) {
-                              alert("Could not copy. You can still select and copy manually.");
-                            }
-                          }}
-                          className="px-2 py-0.5 rounded border border-slate-200 bg-white hover:bg-slate-100"
+                          onClick={() => navigator.clipboard.writeText(msg.content)}
+                          className="mt-1 text-[10px] px-2 py-0.5 rounded border border-slate-200 bg-white hover:bg-slate-100"
                         >
                           Copy
                         </button>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  handleAssistantSend();
-                }}
-                className="border-t border-slate-200 p-2 space-y-2"
-              >
-                <textarea
-                  rows={3}
-                  className="w-full resize-none rounded-md border border-slate-300 px-2 py-1 text-[13px] focus:outline-none focus:ring-2 focus:ring-amber-400"
-                  placeholder="Ask the assistant a question about your scene, character, or sentence..."
-                  value={chatInput}
-                  onChange={(e) => setChatInput(e.target.value)}
-                  onKeyDown={handleAssistantKeyDown}
-                  disabled={chatBusy}
-                />
-                <div className="flex items-center justify-between">
-                  <div className="text-[11px] text-slate-500">Press Enter to send, Shift+Enter for a new line.</div>
-                  <button
-                    type="submit"
-                    disabled={!chatInput.trim() || chatBusy}
-                    className="text-[13px] px-3 py-1.5 rounded-md bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {chatBusy ? "Thinking…" : "Send"}
-                  </button>
+                      )}
+                    </div>
+                  ))}
                 </div>
-              </form>
-            </section>
-          )}
+
+                <form onSubmit={(e) => { e.preventDefault(); handleAssistantSend(); }} className="border-t border-slate-200 p-2 space-y-2">
+                  <textarea
+                    rows={3}
+                    className="w-full resize-none rounded-md border border-slate-300 px-2 py-1 text-[13px] focus:outline-none focus:ring-2 focus:ring-amber-400"
+                    placeholder="Ask a question..."
+                    value={chatInput}
+                    onChange={(e) => setChatInput(e.target.value)}
+                    onKeyDown={handleAssistantKeyDown}
+                    disabled={chatBusy}
+                  />
+                  <div className="flex items-center justify-between">
+                    <div className="text-[11px] text-slate-500">Enter to send</div>
+                    <button
+                      type="submit"
+                      disabled={!chatInput.trim() || chatBusy}
+                      className="text-[13px] px-3 py-1.5 rounded-md bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-50"
+                    >
+                      {chatBusy ? "Thinking…" : "Send"}
+                    </button>
+                  </div>
+                </form>
+              </section>
+            )}
+          </div>
         </div>
       )}
     </div>
