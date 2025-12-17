@@ -165,16 +165,73 @@ function hashStory(chapters) {
 const splitSentences = (txt) =>
   (txt || "").replace(/\s+/g, " ").match(/[^.!?]+[.!?]?/g) || [];
 
-function guessCharacters(text) {
-  const names = new Set();
-  const tokens =
-    (text || "").match(/\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2}\b/g) || [];
-  tokens.forEach((t) => {
-    if (!["I", "The", "A", "And", "But", "Then", "Now", "When", "Where", "What", "How", "Why", "She", "He", "They", "It", "This", "That"].includes(t)) {
-      names.add(t.trim());
+/**
+ * Extract characters from @char: tags in the manuscript
+ * Example: "@char: Marcus Johnson" or "@char:Sarah"
+ * Returns deduplicated, normalized character names
+ */
+function extractCharactersFromTags(text) {
+  if (!text) return [];
+  
+  // Match @char: followed by the character name (until end of line or next tag)
+  const pattern = /@char:\s*([A-Za-z][A-Za-z'\-\s]{0,50}?)(?=\s*[@<\n]|$)/gi;
+  const matches = text.matchAll(pattern);
+  
+  const seen = new Map(); // lowercase -> original casing
+  
+  for (const match of matches) {
+    const name = (match[1] || "").trim();
+    if (name && name.length > 1) {
+      const key = name.toLowerCase();
+      // Keep the first occurrence's casing
+      if (!seen.has(key)) {
+        seen.set(key, name);
+      }
     }
+  }
+  
+  return Array.from(seen.values());
+}
+
+/**
+ * Fallback: guess characters from capitalized names
+ * Only used if no @char: tags found
+ */
+function guessCharactersFromText(text) {
+  const names = new Set();
+  const skipWords = new Set([
+    "I", "The", "A", "An", "And", "But", "Then", "Now", "When", "Where", 
+    "What", "How", "Why", "She", "He", "They", "It", "This", "That",
+    "My", "Your", "Our", "His", "Her", "Its", "Their", "Who", "Which",
+    "There", "Here", "Just", "Only", "Even", "Still", "Also", "Very",
+    "Chapter", "Part", "Book", "Section", "Scene", "Act", "Note"
+  ]);
+  
+  const tokens = (text || "").match(/\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,2}\b/g) || [];
+  
+  tokens.forEach((t) => {
+    const parts = t.split(/\s+/);
+    // Skip if any part is a common word
+    if (parts.some(p => skipWords.has(p))) return;
+    names.add(t.trim());
   });
-  return Array.from(names).slice(0, 50);
+  
+  return Array.from(names).slice(0, 20);
+}
+
+/**
+ * Get characters - prefers @char: tags, falls back to guessing
+ */
+function getCharacters(text) {
+  // First try @char: tags
+  const taggedChars = extractCharactersFromTags(text);
+  if (taggedChars.length > 0) {
+    return { characters: taggedChars, source: "tagged" };
+  }
+  
+  // Fall back to guessing
+  const guessedChars = guessCharactersFromText(text);
+  return { characters: guessedChars, source: "guessed" };
 }
 
 function extractKeywordSentences(text, keyword) {
@@ -237,74 +294,119 @@ function generateLocalPrompts(chapters, characters, selectedChapter) {
   const conflicts = extractConflicts(selectedText);
 
   const prompts = [];
+  const usedPromptKeys = new Set(); // Track used prompts to avoid duplicates
 
-  // Sprint prompts
-  prompts.push(
-    { category: "sprint", text: "Write a 100-word scene showing (don't tell) your protagonist's biggest fear.", difficulty: 1 },
-    { category: "sprint", text: "Describe your current setting through the five senses in exactly 50 words.", difficulty: 1 },
-    { category: "sprint", text: "Write dialogue that reveals a secret without stating it directly.", difficulty: 2 }
-  );
+  // Helper to add prompt only if not duplicate
+  const addPrompt = (prompt) => {
+    const key = prompt.text.toLowerCase().trim();
+    if (!usedPromptKeys.has(key)) {
+      usedPromptKeys.add(key);
+      prompts.push(prompt);
+    }
+  };
 
-  // Character prompts from current story
-  const storyCharacters = guessCharacters(selectedText);
-  const charPool = storyCharacters.length ? storyCharacters : characters;
-  charPool.slice(0, 5).forEach((char) => {
-    prompts.push(
-      { category: "character", text: `Write ${char}'s origin story in 200 words. What shaped them?`, difficulty: 2, contextual: true },
-      { category: "character", text: `What does ${char} want most in this scene? Write a moment where they almost get it.`, difficulty: 3, contextual: true },
-      { category: "character", text: `Give ${char} a quirky habit that reveals their inner state. Show it in action.`, difficulty: 1, contextual: true }
-    );
+  // Sprint prompts (generic)
+  addPrompt({ category: "sprint", text: "Write a 100-word scene showing (don't tell) your protagonist's biggest fear.", difficulty: 1 });
+  addPrompt({ category: "sprint", text: "Describe your current setting through the five senses in exactly 50 words.", difficulty: 1 });
+  addPrompt({ category: "sprint", text: "Write dialogue that reveals a secret without stating it directly.", difficulty: 2 });
+  addPrompt({ category: "sprint", text: "Write a scene where two characters want opposite things.", difficulty: 2 });
+  addPrompt({ category: "sprint", text: "Describe an object that holds emotional significance to your main character.", difficulty: 1 });
+
+  // Character prompts - use @char: tagged characters
+  // Different prompt templates to rotate through (one per character)
+  const characterPromptTemplates = [
+    { template: (name) => `What secret is ${name} keeping from everyone? Write the moment they almost reveal it.`, difficulty: 3 },
+    { template: (name) => `Write ${name}'s internal monologue during a moment of decision.`, difficulty: 2 },
+    { template: (name) => `What does ${name} want more than anything? Show them pursuing it.`, difficulty: 2 },
+    { template: (name) => `Write a scene showing ${name}'s relationship with their family or past.`, difficulty: 3 },
+    { template: (name) => `Give ${name} an unexpected moment of vulnerability. How do they handle it?`, difficulty: 2 },
+    { template: (name) => `What would ${name} never forgive? Write a scene that tests this.`, difficulty: 3 },
+    { template: (name) => `Show ${name} in a moment of joy. What brings them happiness?`, difficulty: 1 },
+    { template: (name) => `Write ${name} confronting someone who wronged them.`, difficulty: 3 },
+    { template: (name) => `What lie does ${name} tell themselves? Show it in action.`, difficulty: 3 },
+    { template: (name) => `Describe ${name}'s morning routine. What does it reveal about them?`, difficulty: 1 },
+  ];
+
+  // Assign ONE unique prompt to each character
+  characters.forEach((charName, idx) => {
+    const templateIdx = idx % characterPromptTemplates.length;
+    const { template, difficulty } = characterPromptTemplates[templateIdx];
+    addPrompt({
+      category: "character",
+      text: template(charName),
+      difficulty,
+      contextual: true,
+      characterName: charName,
+    });
   });
+
+  // If we have multiple characters, add relationship prompts
+  if (characters.length >= 2) {
+    const [char1, char2] = characters;
+    addPrompt({
+      category: "character",
+      text: `Write a scene where ${char1} and ${char2} disagree about something important.`,
+      difficulty: 2,
+      contextual: true,
+    });
+    
+    if (characters.length >= 3) {
+      const char3 = characters[2];
+      addPrompt({
+        category: "character",
+        text: `How does ${char3} view the relationship between ${char1} and ${char2}? Show their perspective.`,
+        difficulty: 3,
+        contextual: true,
+      });
+    }
+  }
 
   // Plot by structure
   if (structure.phase === "beginning") {
-    prompts.push(
-      { category: "plot", text: "Introduce a problem that will drive your entire story in the next scene.", difficulty: 3 },
-      { category: "plot", text: "Write the moment when ordinary life ends and the adventure begins.", difficulty: 3 }
-    );
+    addPrompt({ category: "plot", text: "Introduce a problem that will drive your entire story in the next scene.", difficulty: 3 });
+    addPrompt({ category: "plot", text: "Write the moment when ordinary life ends and the adventure begins.", difficulty: 3 });
+    addPrompt({ category: "plot", text: "Plant a detail now that will pay off later in the story.", difficulty: 2 });
   } else if (structure.phase === "middle") {
-    prompts.push(
-      { category: "plot", text: "Write a scene where everything goes wrong at the worst possible moment.", difficulty: 3 },
-      { category: "plot", text: "Introduce a complication that makes your protagonist's goal seem impossible.", difficulty: 3 }
-    );
+    addPrompt({ category: "plot", text: "Write a scene where everything goes wrong at the worst possible moment.", difficulty: 3 });
+    addPrompt({ category: "plot", text: "Introduce a complication that makes your protagonist's goal seem impossible.", difficulty: 3 });
+    addPrompt({ category: "plot", text: "Write a moment where your protagonist must choose between two bad options.", difficulty: 3 });
+    addPrompt({ category: "plot", text: "Add a twist that changes how the reader sees a previous scene.", difficulty: 4 });
   } else {
-    prompts.push(
-      { category: "plot", text: "Write the confrontation scene where your protagonist faces their greatest fear.", difficulty: 4 },
-      { category: "plot", text: "Show how your protagonist has changed since the beginning.", difficulty: 3 }
-    );
+    addPrompt({ category: "plot", text: "Write the confrontation scene where your protagonist faces their greatest fear.", difficulty: 4 });
+    addPrompt({ category: "plot", text: "Show how your protagonist has changed since the beginning.", difficulty: 3 });
+    addPrompt({ category: "plot", text: "Write the moment of truth where everything comes together.", difficulty: 4 });
   }
 
-  // Craft
-  prompts.push(
-    { category: "craft", text: "Rewrite your last dialogue scene using only subtext—characters say everything except what they mean.", difficulty: 3 },
-    { category: "craft", text: "Write a paragraph of pure action with no adjectives or adverbs.", difficulty: 2 },
-    { category: "craft", text: "Describe an emotional moment using only physical sensations and actions.", difficulty: 2 }
-  );
+  // Craft prompts
+  addPrompt({ category: "craft", text: "Rewrite your last dialogue scene using only subtext—characters say everything except what they mean.", difficulty: 3 });
+  addPrompt({ category: "craft", text: "Write a paragraph of pure action with no adjectives or adverbs.", difficulty: 2 });
+  addPrompt({ category: "craft", text: "Describe an emotional moment using only physical sensations and actions.", difficulty: 2 });
+  addPrompt({ category: "craft", text: "Write a scene where the weather reflects the emotional state of the characters.", difficulty: 2 });
+  addPrompt({ category: "craft", text: "Take a slow scene and rewrite it with urgency and tension.", difficulty: 3 });
 
-  // Worldbuilding
-  prompts.push(
-    { category: "worldbuilding", text: "Create a location that reflects your protagonist's internal state.", difficulty: 2 },
-    { category: "worldbuilding", text: "Write about a cultural tradition or rule that creates conflict in your story.", difficulty: 3 },
-    { category: "worldbuilding", text: "Design a place where your characters go to feel safe. What makes it special?", difficulty: 2 }
-  );
+  // Worldbuilding prompts
+  addPrompt({ category: "worldbuilding", text: "Create a location that reflects your protagonist's internal state.", difficulty: 2 });
+  addPrompt({ category: "worldbuilding", text: "Write about a cultural tradition or rule that creates conflict in your story.", difficulty: 3 });
+  addPrompt({ category: "worldbuilding", text: "Design a place where your characters go to feel safe. What makes it special?", difficulty: 2 });
+  addPrompt({ category: "worldbuilding", text: "What does money, power, or status look like in your story's world?", difficulty: 2 });
 
-  // Contextual: emotions
-  emotions.forEach(({ sentences }) => {
+  // Contextual: emotions from your story (limit to 2)
+  emotions.slice(0, 2).forEach(({ emotion, sentences }) => {
     if (sentences[0]) {
-      prompts.push({
+      addPrompt({
         category: "character",
-        text: `Expand on this emotion: "${sentences[0].slice(0, 140)}${sentences[0].length > 140 ? "…" : ""}"`,
+        text: `Expand on this ${emotion}: "${sentences[0].slice(0, 100)}${sentences[0].length > 100 ? "…" : ""}"`,
         difficulty: 2,
         contextual: true,
       });
     }
   });
 
-  // Contextual: conflicts
+  // Contextual: conflicts from your story (limit to 2)
   conflicts.slice(0, 2).forEach((conflict) => {
-    prompts.push({
+    addPrompt({
       category: "plot",
-      text: `Escalate this conflict: "${conflict.slice(0, 140)}${conflict.length > 140 ? "…" : ""}". What's the next step?`,
+      text: `Escalate this conflict: "${conflict.slice(0, 100)}${conflict.length > 100 ? "…" : ""}"`,
       difficulty: 3,
       contextual: true,
     });
@@ -317,7 +419,7 @@ function generateLocalPrompts(chapters, characters, selectedChapter) {
    AI PROMPT GENERATION
 ========================================================= */
 
-async function generateAIPrompts(chapters, projectMeta, provider = "anthropic") {
+async function generateAIPrompts(chapters, projectMeta, characters, provider = "anthropic") {
   // Build story summary for AI
   const chapterSummaries = chapters.slice(0, 10).map((ch, idx) => {
     const text = (ch.text || ch.content || "").replace(/<[^>]*>/g, " ").trim();
@@ -328,19 +430,29 @@ async function generateAIPrompts(chapters, projectMeta, provider = "anthropic") 
   const fullText = chapters.map(c => (c.text || c.content || "").replace(/<[^>]*>/g, " ")).join(" ");
   const wordCount = fullText.split(/\s+/).filter(Boolean).length;
 
+  // Include character list if available
+  const characterInfo = characters.length > 0 
+    ? `\n\nKnown characters in this story: ${characters.join(", ")}`
+    : "";
+
   const systemPrompt = `You are a creative writing coach analyzing a manuscript to generate personalized writing prompts.
 
 The story is titled "${projectMeta.title || 'Untitled'}" by ${projectMeta.author || 'the author'}.
-It currently has ${chapters.length} chapters and approximately ${wordCount.toLocaleString()} words.
+It currently has ${chapters.length} chapters and approximately ${wordCount.toLocaleString()} words.${characterInfo}
 
 Based on the content provided, generate 12-15 specific, actionable writing prompts that will help the author:
-1. Deepen their characters
+1. Deepen their characters (use the actual character names from the story)
 2. Strengthen their plot
 3. Improve pacing and tension
 4. Enhance world-building
 5. Refine their craft
 
-Each prompt should reference SPECIFIC elements from their story (character names, plot points, settings, themes).
+IMPORTANT RULES:
+- Each prompt should reference SPECIFIC elements from their story (character names, plot points, settings, themes)
+- Use the actual character names provided - do NOT make up character names
+- Each prompt should be UNIQUE - do not repeat similar prompts
+- Give each character at most ONE prompt focused on them
+- Mix up the categories (character, plot, craft, worldbuilding, sprint)
 
 Return your response as a JSON array with this exact format:
 [
@@ -737,6 +849,7 @@ export default function StoryPromptsWorkshop() {
   const [projectMeta, setProjectMeta] = useState({ title: "", author: "" });
   const [selectedChapter, setSelectedChapter] = useState(null);
   const [characters, setCharacters] = useState([]);
+  const [characterSource, setCharacterSource] = useState("none"); // "tagged" | "guessed" | "none"
   const [activeCategory, setActiveCategory] = useState("all");
   const [difficultyFilter, setDifficultyFilter] = useState("all");
   const [showContextual, setShowContextual] = useState(true);
@@ -772,8 +885,13 @@ export default function StoryPromptsWorkshop() {
     if (loaded.length > 0) {
       setSelectedChapter(loaded[0]);
       setTargetChapterId(loaded[0].id);
+      
+      // Extract characters using @char: tags
       const allText = loaded.map((c) => c.text || c.content || "").join("\n\n");
-      setCharacters(guessCharacters(allText));
+      const { characters: foundChars, source } = getCharacters(allText);
+      console.log(`[StoryPrompts] Found ${foundChars.length} characters via ${source}:`, foundChars);
+      setCharacters(foundChars);
+      setCharacterSource(source);
     }
 
     // Load cached AI prompts
@@ -837,7 +955,7 @@ export default function StoryPromptsWorkshop() {
     setAiError("");
 
     try {
-      const prompts = await generateAIPrompts(chapters, projectMeta, aiProvider);
+      const prompts = await generateAIPrompts(chapters, projectMeta, characters, aiProvider);
       setAiPrompts(prompts);
       
       // Cache the results
@@ -1045,7 +1163,9 @@ export default function StoryPromptsWorkshop() {
                   {projectMeta.title || "Your Story"}
                 </div>
                 <div className="text-sm text-slate-500">
-                  {chapters.length} chapter{chapters.length !== 1 ? "s" : ""} • {characters.length} characters detected
+                  {chapters.length} chapter{chapters.length !== 1 ? "s" : ""} • {characters.length} character{characters.length !== 1 ? "s" : ""} 
+                  {characterSource === "tagged" && <span className="text-emerald-600 ml-1">(from @char: tags)</span>}
+                  {characterSource === "guessed" && <span className="text-amber-600 ml-1">(detected)</span>}
                 </div>
               </div>
               
