@@ -1,49 +1,131 @@
 import React, { useState, useEffect, useMemo } from "react";
-// NOTE: useNavigate removed (not used anymore after adding BackToLanding)
 import {
   Copy, Check, Filter, Timer, User, TrendingUp, Feather, Globe, Star, X, Pin, Edit3,
-  Lightbulb, Save, Trash2, Send, FileText, Shuffle
+  Lightbulb, Save, Trash2, Send, FileText, Shuffle, ChevronDown
 } from "lucide-react";
 
 import BackToLanding, { BackToLandingFab } from "../../components/storylab/BackToLanding";
 
 /* =========================================================
-   STORAGE HELPERS (using shared store)
+   STORAGE HELPERS - Read from ComposePage's storage
 ========================================================= */
-import {
-  loadProject as getProject,
-  saveProject as setProject,
-  ensureWorkshopFields
-} from "../../lib/storylab/projectStore";
 
-/** Update a chapter by id, using the shared store */
-function updateChapterById(id, updater) {
-  const proj = ensureWorkshopFields(getProject());
-  if (!proj || !Array.isArray(proj.chapters)) return;
-  const i = proj.chapters.findIndex((c) => c.id === id);
-  if (i === -1) return;
-  // Normalize the text field so all views see the same content
-  const current = proj.chapters[i] || {};
-  const normalized = {
-    ...current,
-    text: current.text ?? current.content ?? current.body ?? ""
-  };
-  const next = updater(normalized) || normalized;
-  // Always write to `text` (single source of truth)
-  proj.chapters[i] = { ...next, text: next.text ?? "" };
-  setProject(proj);
-  try { window.dispatchEvent(new Event("project:change")); } catch {}
+// Keys that ComposePage uses
+const LEGACY_CHAPTERS_KEY = "dahtruth_chapters";
+const LEGACY_META_KEY = "dahtruth_project_meta";
+const CURRENT_PROJECT_KEY = "dahtruth_current_project";
+const STORYLAB_KEY = "dahtruth-story-lab-toc-v3";
+
+/** Load chapters from ComposePage's storage */
+function loadChaptersFromStorage() {
+  try {
+    // 1. Try unified project system first
+    const currentProjectRaw = localStorage.getItem(CURRENT_PROJECT_KEY);
+    if (currentProjectRaw) {
+      const project = JSON.parse(currentProjectRaw);
+      if (project?.compose?.chapters && Array.isArray(project.compose.chapters)) {
+        return project.compose.chapters.map((c, idx) => ({
+          id: c.id ?? idx,
+          title: c.title ?? `Chapter ${idx + 1}`,
+          text: c.text ?? c.textHTML ?? c.content ?? "",
+          content: c.content ?? c.text ?? c.textHTML ?? "",
+          storyLab: c.storyLab || {},
+        }));
+      }
+    }
+
+    // 2. Try dahtruth_chapters (ComposePage writes here)
+    const chaptersRaw = localStorage.getItem(LEGACY_CHAPTERS_KEY);
+    if (chaptersRaw) {
+      const chapters = JSON.parse(chaptersRaw);
+      if (Array.isArray(chapters) && chapters.length > 0) {
+        return chapters.map((c, idx) => ({
+          id: c.id ?? idx,
+          title: c.title ?? `Chapter ${idx + 1}`,
+          text: c.text ?? c.textHTML ?? c.content ?? "",
+          content: c.content ?? c.text ?? c.textHTML ?? "",
+          storyLab: c.storyLab || {},
+        }));
+      }
+    }
+
+    // 3. Fallback to StoryLab's own key
+    const storyLabRaw = localStorage.getItem(STORYLAB_KEY);
+    if (storyLabRaw) {
+      const project = JSON.parse(storyLabRaw);
+      if (project?.chapters && Array.isArray(project.chapters)) {
+        return project.chapters.map((c, idx) => ({
+          id: c.id ?? idx,
+          title: c.title ?? `Chapter ${idx + 1}`,
+          text: c.text ?? c.content ?? c.body ?? "",
+          content: c.content ?? c.text ?? "",
+          storyLab: c.storyLab || {},
+        }));
+      }
+    }
+
+    return [];
+  } catch (err) {
+    console.error("[StoryPrompts] Failed to load chapters:", err);
+    return [];
+  }
 }
 
-function loadChaptersFromLocalStorage() {
-  const proj = ensureWorkshopFields(getProject());
-  if (!proj) return [];
-  const list = proj?.chapters ?? [];
-  return list.map((c, idx) => ({
-    id: c.id ?? idx,
-    title: c.title ?? `Chapter ${idx + 1}`,
-    text: c.text ?? c.content ?? c.body ?? "",
-    storyLab: c.storyLab || {},
+/** Load project metadata */
+function loadProjectMeta() {
+  try {
+    const metaRaw = localStorage.getItem(LEGACY_META_KEY);
+    if (metaRaw) return JSON.parse(metaRaw);
+  } catch {}
+  return { title: "My Story", author: "Author" };
+}
+
+/** Save/update a chapter back to ComposePage's storage */
+function updateChapterInStorage(chapterId, updater) {
+  try {
+    // Update dahtruth_chapters
+    const chaptersRaw = localStorage.getItem(LEGACY_CHAPTERS_KEY);
+    if (chaptersRaw) {
+      const chapters = JSON.parse(chaptersRaw);
+      if (Array.isArray(chapters)) {
+        const idx = chapters.findIndex((c) => String(c.id) === String(chapterId));
+        if (idx !== -1) {
+          const current = chapters[idx];
+          const updated = updater(current);
+          chapters[idx] = { ...current, ...updated };
+          localStorage.setItem(LEGACY_CHAPTERS_KEY, JSON.stringify(chapters));
+        }
+      }
+    }
+
+    // Also update unified project if it exists
+    const currentProjectRaw = localStorage.getItem(CURRENT_PROJECT_KEY);
+    if (currentProjectRaw) {
+      const project = JSON.parse(currentProjectRaw);
+      if (project?.compose?.chapters) {
+        const idx = project.compose.chapters.findIndex((c) => String(c.id) === String(chapterId));
+        if (idx !== -1) {
+          const current = project.compose.chapters[idx];
+          const updated = updater(current);
+          project.compose.chapters[idx] = { ...current, ...updated };
+          project.updatedAt = new Date().toISOString();
+          localStorage.setItem(CURRENT_PROJECT_KEY, JSON.stringify(project));
+        }
+      }
+    }
+
+    // Notify other components
+    window.dispatchEvent(new Event("project:change"));
+  } catch (err) {
+    console.error("[StoryPrompts] Failed to update chapter:", err);
+  }
+}
+
+/** Save StoryLab-specific data for a chapter */
+function saveStoryLabData(chapterId, storyLabData) {
+  updateChapterInStorage(chapterId, (ch) => ({
+    ...ch,
+    storyLab: { ...(ch.storyLab || {}), ...storyLabData },
   }));
 }
 
@@ -117,8 +199,8 @@ const PROMPT_CATEGORIES = {
 };
 
 function generateEnhancedPrompts(chapters, characters, selectedChapter) {
-  const fullText = chapters.map((c) => c.text).join("\n\n");
-  const selectedText = selectedChapter?.text || fullText;
+  const fullText = chapters.map((c) => c.text || c.content || "").join("\n\n");
+  const selectedText = selectedChapter?.text || selectedChapter?.content || fullText;
   const structure = analyzeStoryStructure(chapters, selectedChapter);
   const emotions = extractEmotions(selectedText);
   const conflicts = extractConflicts(selectedText);
@@ -201,39 +283,133 @@ function generateEnhancedPrompts(chapters, characters, selectedChapter) {
 }
 
 /* =========================================================
-   MODALS (light / glass)
+   MODALS
 ========================================================= */
-function Scratchpad({ isOpen, onClose, content, onChange, onSave, onSendToChapter, onClear }) {
+
+// Enhanced Scratchpad with chapter selector
+function Scratchpad({ 
+  isOpen, 
+  onClose, 
+  content, 
+  onChange, 
+  onSave, 
+  onSendToChapter, 
+  onClear,
+  chapters,
+  selectedChapterId,
+  onChapterSelect 
+}) {
+  const [insertPosition, setInsertPosition] = useState("top"); // "top" or "bottom"
+
   if (!isOpen) return null;
+
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-white/90 backdrop-blur-xl rounded-2xl w-full max-w-2xl max-h-[80vh] flex flex-col border border-white/60 shadow-xl">
-        <div className="flex items-center justify-between p-4 border-b border-white/60">
-          <h3 className="text-lg font-semibold text-ink">Writing Scratchpad</h3>
-          <button onClick={onClose} className="p-2 hover:bg-white/60 rounded-lg transition-colors">
-            <X size={20} className="text-ink/70" />
+      <div className="bg-white/95 backdrop-blur-xl rounded-2xl w-full max-w-3xl max-h-[85vh] flex flex-col border border-white/60 shadow-xl">
+        {/* Header */}
+        <div className="flex items-center justify-between p-4 border-b border-slate-200">
+          <h3 className="text-lg font-semibold text-slate-800">Writing Scratchpad</h3>
+          <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
+            <X size={20} className="text-slate-600" />
           </button>
         </div>
-        <div className="flex-1 p-4">
+
+        {/* Content */}
+        <div className="flex-1 p-4 overflow-auto">
           <textarea
             value={content}
             onChange={(e) => onChange(e.target.value)}
-            placeholder="Start writing from the prompt…"
-            className="w-full h-64 p-3 border border-white/60 rounded-lg resize-none focus:outline-none focus:ring-2 focus:ring-primary text-ink bg-white"
+            placeholder="Start writing from the prompt… Your work here can be sent directly to any chapter."
+            className="w-full h-72 p-4 border border-slate-200 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-amber-400 focus:border-transparent text-slate-800 bg-white text-[15px] leading-relaxed"
           />
         </div>
-        <div className="flex items-center justify-between p-4 border-t border-white/60">
-          <div className="flex gap-2">
-            <button onClick={onSave} className="flex items-center gap-2 px-4 py-2 bg-accent text-ink rounded-lg hover:bg-accent/90 transition-colors border border-white/60">
-              <Save size={16} />
-              Save Work
-            </button>
-            <button onClick={onSendToChapter} className="flex items-center gap-2 px-4 py-2 bg-emerald-500/80 text-ink rounded-lg hover:bg-emerald-500 transition-colors border border-white/60">
+
+        {/* Send to Chapter Section */}
+        <div className="px-4 py-3 border-t border-slate-200 bg-slate-50">
+          <div className="flex items-center gap-3 flex-wrap">
+            <span className="text-sm text-slate-600 font-medium">Send to:</span>
+            
+            {/* Chapter Selector */}
+            <div className="relative">
+              <select
+                value={selectedChapterId || ""}
+                onChange={(e) => onChapterSelect(e.target.value)}
+                className="appearance-none pl-3 pr-8 py-2 bg-white border border-slate-200 rounded-lg text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-amber-400 cursor-pointer min-w-[200px]"
+              >
+                <option value="">Select a chapter...</option>
+                {chapters.map((ch) => (
+                  <option key={ch.id} value={ch.id}>
+                    {ch.title || `Chapter ${chapters.indexOf(ch) + 1}`}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown size={16} className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            </div>
+
+            {/* Position Selector */}
+            <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-lg p-1">
+              <button
+                onClick={() => setInsertPosition("top")}
+                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                  insertPosition === "top" 
+                    ? "bg-amber-100 text-amber-800" 
+                    : "text-slate-600 hover:bg-slate-100"
+                }`}
+              >
+                At Top
+              </button>
+              <button
+                onClick={() => setInsertPosition("bottom")}
+                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors ${
+                  insertPosition === "bottom" 
+                    ? "bg-amber-100 text-amber-800" 
+                    : "text-slate-600 hover:bg-slate-100"
+                }`}
+              >
+                At Bottom
+              </button>
+            </div>
+
+            {/* Send Button */}
+            <button
+              onClick={() => onSendToChapter(insertPosition)}
+              disabled={!selectedChapterId || !content.trim()}
+              className="flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium"
+            >
               <Send size={16} />
               Send to Chapter
             </button>
           </div>
-          <button onClick={onClear} className="flex items-center gap-2 px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition-colors">
+        </div>
+
+        {/* Footer Actions */}
+        <div className="flex items-center justify-between p-4 border-t border-slate-200">
+          <div className="flex gap-2">
+            <button 
+              onClick={onSave} 
+              disabled={!content.trim()}
+              className="flex items-center gap-2 px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors disabled:opacity-50 text-sm font-medium"
+            >
+              <Save size={16} />
+              Save Work
+            </button>
+            <button
+              onClick={() => {
+                if (content.trim()) {
+                  navigator.clipboard?.writeText(content);
+                }
+              }}
+              disabled={!content.trim()}
+              className="flex items-center gap-2 px-4 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors disabled:opacity-50 text-sm font-medium"
+            >
+              <Copy size={16} />
+              Copy All
+            </button>
+          </div>
+          <button 
+            onClick={onClear} 
+            className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors text-sm font-medium"
+          >
             <Trash2 size={16} />
             Clear
           </button>
@@ -247,31 +423,34 @@ function SavedPromptsMenu({ savedPrompts, isOpen, onClose, onLoadPrompt }) {
   if (!isOpen) return null;
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-white/90 backdrop-blur-xl rounded-2xl w-full max-w-3xl max-h-[80vh] flex flex-col border border-white/60 shadow-xl">
-        <div className="flex items-center justify-between p-4 border-b border-white/60">
-          <h3 className="text-lg font-semibold text-ink">Saved Prompt Work</h3>
-          <button onClick={onClose} className="p-2 hover:bg-white/60 rounded-lg transition-colors">
-            <X size={20} className="text-ink/70" />
+      <div className="bg-white/95 backdrop-blur-xl rounded-2xl w-full max-w-3xl max-h-[80vh] flex flex-col border border-white/60 shadow-xl">
+        <div className="flex items-center justify-between p-4 border-b border-slate-200">
+          <h3 className="text-lg font-semibold text-slate-800">Saved Prompt Work</h3>
+          <button onClick={onClose} className="p-2 hover:bg-slate-100 rounded-lg transition-colors">
+            <X size={20} className="text-slate-600" />
           </button>
         </div>
         <div className="flex-1 p-4 overflow-y-auto">
           {savedPrompts.length === 0 ? (
-            <div className="text-center py-8 text-ink/70">
-              <FileText size={48} className="mx-auto mb-4 text-ink/50" />
-              <p>No saved prompt work yet</p>
-              <p className="text-sm">Write with prompts and save them to see them here.</p>
+            <div className="text-center py-8 text-slate-500">
+              <FileText size={48} className="mx-auto mb-4 text-slate-300" />
+              <p className="font-medium">No saved prompt work yet</p>
+              <p className="text-sm mt-1">Write with prompts and save them to see them here.</p>
             </div>
           ) : (
             <div className="space-y-4">
               {savedPrompts.map((item) => (
-                <div key={item.id} className="bg-white rounded-lg p-4 border border-white/60">
+                <div key={item.id} className="bg-slate-50 rounded-lg p-4 border border-slate-200">
                   <div className="flex items-start justify-between mb-2">
-                    <h4 className="font-medium text-ink text-sm">{item.prompt.slice(0, 80)}…</h4>
-                    <span className="text-xs text-ink/60">{new Date(item.timestamp).toLocaleDateString()}</span>
+                    <h4 className="font-medium text-slate-800 text-sm">{item.prompt.slice(0, 80)}…</h4>
+                    <span className="text-xs text-slate-500">{new Date(item.timestamp).toLocaleDateString()}</span>
                   </div>
-                  <p className="text-ink/80 text-sm mb-3">{item.content.slice(0, 150)}…</p>
-                  <button onClick={() => onLoadPrompt(item)} className="text-primary/90 hover:text-primary font-medium text-sm">
-                    Load &amp; Edit
+                  <p className="text-slate-600 text-sm mb-3">{item.content.slice(0, 150)}…</p>
+                  <button 
+                    onClick={() => onLoadPrompt(item)} 
+                    className="text-amber-600 hover:text-amber-700 font-medium text-sm"
+                  >
+                    Load &amp; Edit →
                   </button>
                 </div>
               ))}
@@ -306,7 +485,7 @@ function PromptCard({ prompt, onPin, onUnpin, onUse, onMarkTried, isPinned, stat
   const StatusIcon = status ? statusIcons[status]?.icon : null;
 
   return (
-    <div className="bg-white/80 backdrop-blur-xl rounded-xl p-4 border border-white/60 hover:bg-white/90 transition-colors shadow-sm">
+    <div className="bg-white rounded-xl p-4 border border-slate-200 hover:border-slate-300 hover:shadow-md transition-all">
       {/* Header */}
       <div className="flex items-start justify-between mb-3">
         <div className="flex items-center gap-2">
@@ -317,11 +496,11 @@ function PromptCard({ prompt, onPin, onUnpin, onUse, onMarkTried, isPinned, stat
           {prompt.difficulty ? (
             <div className="flex gap-0.5">
               {Array.from({ length: 4 }, (_, i) => (
-                <div key={i} className={`w-1.5 h-1.5 rounded-full ${i < prompt.difficulty ? "bg-ink" : "bg-slate-300"}`} />
+                <div key={i} className={`w-1.5 h-1.5 rounded-full ${i < prompt.difficulty ? "bg-slate-600" : "bg-slate-200"}`} />
               ))}
             </div>
           ) : null}
-          {cat?.time ? <span className="text-xs text-ink/60">{cat.time}</span> : null}
+          {cat?.time ? <span className="text-xs text-slate-500">{cat.time}</span> : null}
         </div>
         {status && StatusIcon ? (
           <div className={`flex items-center gap-1 text-xs ${statusIcons[status].color}`}>
@@ -332,14 +511,24 @@ function PromptCard({ prompt, onPin, onUnpin, onUse, onMarkTried, isPinned, stat
       </div>
 
       {/* Prompt text */}
-      <div className="text-ink text-sm leading-relaxed mb-4">{prompt.text}</div>
+      <div className="text-slate-700 text-sm leading-relaxed mb-4">{prompt.text}</div>
+
+      {/* Contextual badge */}
+      {prompt.contextual && (
+        <div className="mb-3">
+          <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs bg-amber-50 text-amber-700 border border-amber-200">
+            <Lightbulb size={12} />
+            From your story
+          </span>
+        </div>
+      )}
 
       {/* Actions */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <button
             onClick={() => navigator.clipboard && navigator.clipboard.writeText(prompt.text)}
-            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-white/70 border border-white/60 hover:bg-white text-xs text-ink transition-all"
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-slate-50 border border-slate-200 hover:bg-slate-100 text-xs text-slate-600 transition-all"
             title="Copy"
           >
             <Copy size={12} />
@@ -348,7 +537,7 @@ function PromptCard({ prompt, onPin, onUnpin, onUse, onMarkTried, isPinned, stat
 
           <button
             onClick={() => onUse(prompt.text)}
-            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-accent text-ink text-xs hover:bg-accent/90 transition-all border border-white/60"
+            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-amber-50 text-amber-700 text-xs hover:bg-amber-100 transition-all border border-amber-200"
             title="Use in scratchpad"
           >
             <Edit3 size={12} />
@@ -358,7 +547,7 @@ function PromptCard({ prompt, onPin, onUnpin, onUse, onMarkTried, isPinned, stat
           {isPinned ? (
             <button
               onClick={() => onUnpin(prompt.text)}
-              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-amber-100 border border-amber-200 hover:bg-amber-200 text-amber-800 text-xs transition-all"
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-amber-100 border border-amber-300 hover:bg-amber-200 text-amber-800 text-xs transition-all"
               title="Remove from Session Pack"
             >
               <Check size={12} />
@@ -367,7 +556,7 @@ function PromptCard({ prompt, onPin, onUnpin, onUse, onMarkTried, isPinned, stat
           ) : (
             <button
               onClick={() => onPin(prompt.text)}
-              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-white/70 border border-white/60 hover:bg-white text-xs text-ink transition-all"
+              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-slate-50 border border-slate-200 hover:bg-slate-100 text-xs text-slate-600 transition-all"
               title="Add to Session Pack"
             >
               <Pin size={12} />
@@ -410,10 +599,11 @@ function PromptCard({ prompt, onPin, onUnpin, onUse, onMarkTried, isPinned, stat
 }
 
 /* =========================================================
-   MAIN — light/glass layout
+   MAIN COMPONENT
 ========================================================= */
 export default function StoryPromptsWorkshop() {
   const [chapters, setChapters] = useState([]);
+  const [projectMeta, setProjectMeta] = useState({ title: "", author: "" });
   const [selectedChapter, setSelectedChapter] = useState(null);
   const [characters, setCharacters] = useState([]);
   const [activeCategory, setActiveCategory] = useState("all");
@@ -429,54 +619,64 @@ export default function StoryPromptsWorkshop() {
   const [currentPrompt, setCurrentPrompt] = useState("");
   const [savedPrompts, setSavedPrompts] = useState([]);
   const [savedPromptsMenuOpen, setSavedPromptsMenuOpen] = useState(false);
+  const [targetChapterId, setTargetChapterId] = useState(null);
 
+  // Load chapters on mount
   useEffect(() => {
-    const loadedChapters = loadChaptersFromLocalStorage();
-    setChapters(loadedChapters);
-    if (loadedChapters.length > 0) {
-      const first = loadedChapters[0];
-      setSelectedChapter(first);
-      const allText = loadedChapters.map((c) => c.text).join("\n\n");
+    const loaded = loadChaptersFromStorage();
+    const meta = loadProjectMeta();
+    
+    console.log("[StoryPrompts] Loaded chapters:", loaded.length);
+    
+    setChapters(loaded);
+    setProjectMeta(meta);
+    
+    if (loaded.length > 0) {
+      setSelectedChapter(loaded[0]);
+      setTargetChapterId(loaded[0].id);
+      const allText = loaded.map((c) => c.text || c.content || "").join("\n\n");
       setCharacters(guessCharacters(allText));
     }
   }, []);
 
-  // Live refresh when project changes (from other views or tabs)
+  // Refresh when project changes
   useEffect(() => {
-    const refresh = () => setChapters(loadChaptersFromLocalStorage());
+    const refresh = () => {
+      const loaded = loadChaptersFromStorage();
+      setChapters(loaded);
+      if (loaded.length > 0 && !selectedChapter) {
+        setSelectedChapter(loaded[0]);
+        setTargetChapterId(loaded[0].id);
+      }
+    };
     window.addEventListener("project:change", refresh);
-    window.addEventListener("storage", refresh); // cross-tab refresh
+    window.addEventListener("storage", refresh);
     return () => {
       window.removeEventListener("project:change", refresh);
       window.removeEventListener("storage", refresh);
     };
-  }, []);
+  }, [selectedChapter]);
 
-  // Load chapter's lab data
+  // Load StoryLab data for selected chapter
   useEffect(() => {
     if (!selectedChapter) return;
-    const proj = ensureWorkshopFields(getProject());
-    const ch = proj?.chapters?.find((c) => c.id === selectedChapter.id);
+    const ch = chapters.find((c) => c.id === selectedChapter.id);
     const lab = ch?.storyLab || {};
     setPinned(Array.isArray(lab.pinned) ? lab.pinned : []);
     setPromptStatuses(lab.promptStatuses || {});
     setScratchpadContent(lab.scratchpad || "");
     setSavedPrompts(lab.savedPrompts || []);
-  }, [selectedChapter]);
+  }, [selectedChapter, chapters]);
 
-  // Persist lab data
+  // Persist StoryLab data
   useEffect(() => {
     if (!selectedChapter) return;
-    updateChapterById(selectedChapter.id, (c) => ({
-      ...c,
-      storyLab: {
-        ...(c.storyLab || {}),
-        pinned,
-        promptStatuses,
-        scratchpad: scratchpadContent,
-        savedPrompts,
-      },
-    }));
+    saveStoryLabData(selectedChapter.id, {
+      pinned,
+      promptStatuses,
+      scratchpad: scratchpadContent,
+      savedPrompts,
+    });
   }, [pinned, promptStatuses, scratchpadContent, savedPrompts, selectedChapter]);
 
   // Actions
@@ -484,15 +684,19 @@ export default function StoryPromptsWorkshop() {
   const unpinPrompt = (text) => setPinned((p) => p.filter((t) => t !== text));
   const updatePromptStatus = (id, status) => setPromptStatuses((prev) => ({ ...prev, [id]: status }));
 
+  const showToast = (message) => {
+    setToast(message);
+    setTimeout(() => setToast(""), 2500);
+  };
+
   const usePrompt = (text) => {
     setCurrentPrompt(text);
     setScratchpadContent((prev) => {
       const prefix = prev && !prev.endsWith("\n") ? "\n\n" : "";
-      return `${prev}${prefix}> Prompt: ${text}\n\n`;
+      return `${prev}${prefix}✨ Prompt: ${text}\n\n`;
     });
     setScratchpadOpen(true);
-    setToast("Prompt added to scratchpad");
-    setTimeout(() => setToast(""), 1200);
+    showToast("Prompt added to scratchpad");
   };
 
   const savePromptWork = () => {
@@ -505,24 +709,54 @@ export default function StoryPromptsWorkshop() {
       chapterId: selectedChapter?.id,
     };
     setSavedPrompts((prev) => [promptWork, ...prev]);
-    setToast("Prompt work saved");
-    setTimeout(() => setToast(""), 1200);
+    showToast("Work saved!");
   };
 
-  const sendToChapter = () => {
-    if (!selectedChapter || !scratchpadContent.trim()) return;
-    updateChapterById(selectedChapter.id, (c) => {
-      const existing = c.text || "";
-      const sep = existing && !/\n$/.test(existing) ? "\n\n" : "";
-      const block = `**[WRITING PROMPT]** ${currentPrompt || "Session Work"}\n\n${scratchpadContent}\n\n`;
-      return {
-        ...c,
-        text: `${existing}${sep}${block}`,
-        lastEdited: new Date().toISOString(),
-      };
+  // Send to chapter - now with position control
+  const sendToChapter = (position = "top") => {
+    if (!targetChapterId || !scratchpadContent.trim()) {
+      showToast("Please select a chapter and add some content");
+      return;
+    }
+
+    const targetChapter = chapters.find((c) => String(c.id) === String(targetChapterId));
+    if (!targetChapter) {
+      showToast("Chapter not found");
+      return;
+    }
+
+    // Format the content with a highlight wrapper
+    const timestamp = new Date().toLocaleString();
+    const block = `<div class="storylab-insertion" style="background: linear-gradient(135deg, #fef3c7, #fde68a); padding: 16px; border-radius: 8px; margin: 16px 0; border-left: 4px solid #f59e0b;">
+<div style="font-size: 11px; color: #92400e; margin-bottom: 8px; font-weight: 600;">📝 WRITING PROMPT WORK — ${timestamp}</div>
+<div style="font-style: italic; color: #78350f; margin-bottom: 12px; font-size: 13px;">"${currentPrompt || "Session Work"}"</div>
+<div style="color: #1f2937; white-space: pre-wrap;">${scratchpadContent.replace(/\n/g, "<br>")}</div>
+</div>`;
+
+    updateChapterInStorage(targetChapterId, (ch) => {
+      const existing = ch.content || ch.text || ch.textHTML || "";
+      
+      if (position === "top") {
+        // Insert at top
+        return {
+          ...ch,
+          content: block + "\n\n" + existing,
+          text: block + "\n\n" + existing,
+          textHTML: block + "\n\n" + existing,
+        };
+      } else {
+        // Insert at bottom
+        const sep = existing && !existing.endsWith("\n") ? "\n\n" : "";
+        return {
+          ...ch,
+          content: existing + sep + block,
+          text: existing + sep + block,
+          textHTML: existing + sep + block,
+        };
+      }
     });
-    setToast("Sent to chapter");
-    setTimeout(() => setToast(""), 1200);
+
+    showToast(`✅ Sent to "${targetChapter.title}" (${position})`);
   };
 
   const clearScratchpad = () => {
@@ -535,11 +769,10 @@ export default function StoryPromptsWorkshop() {
     setScratchpadContent(item.content);
     setScratchpadOpen(true);
     setSavedPromptsMenuOpen(false);
-    setToast("Loaded saved work");
-    setTimeout(() => setToast(""), 1200);
+    showToast("Loaded saved work");
   };
 
-  // Generate + filter
+  // Generate + filter prompts
   const allPrompts = useMemo(
     () => generateEnhancedPrompts(chapters, characters, selectedChapter),
     [chapters, characters, selectedChapter]
@@ -567,7 +800,7 @@ export default function StoryPromptsWorkshop() {
     return { total, tried, helpful, skipped };
   }, [allPrompts, promptStatuses]);
 
-  // Session pack helpers (uses pinned)
+  // Session pack helpers
   const shufflePack = (count = 12) => {
     const pool = [...filteredPrompts];
     for (let i = pool.length - 1; i > 0; i--) {
@@ -576,30 +809,29 @@ export default function StoryPromptsWorkshop() {
     }
     const chosen = pool.slice(0, count).map((p) => p.text);
     setPinned(chosen);
-    setToast(`Session Pack: ${chosen.length} prompts`);
-    setTimeout(() => setToast(""), 1200);
+    showToast(`Session Pack: ${chosen.length} prompts`);
   };
 
   const sendPackToScratchpad = () => {
     if (!pinned.length) return;
-    const lines = pinned.map((t, i) => `(${i + 1}) ${t}`).join("\n");
+    const lines = pinned.map((t, i) => `(${i + 1}) ${t}`).join("\n\n");
     setCurrentPrompt("Session Pack");
     setScratchpadContent((prev) => {
       const prefix = prev && !prev.endsWith("\n") ? "\n\n" : "";
-      return `${prev}${prefix}> Session Pack\n\n${lines}\n\n`;
+      return `${prev}${prefix}📋 Session Pack\n\n${lines}\n\n`;
     });
     setScratchpadOpen(true);
   };
 
   return (
-    <div className="min-h-screen bg-base bg-radial-fade text-ink">
-      {/* Global back bar with Saved Work button on the right */}
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-amber-50/30 text-slate-800">
+      {/* Header */}
       <BackToLanding
         title="Story Prompts"
         rightSlot={
           <button
             onClick={() => setSavedPromptsMenuOpen(true)}
-            className="inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium bg-white/70 border border-white/60 hover:bg-white"
+            className="inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium bg-white border border-slate-200 hover:bg-slate-50 shadow-sm"
             title="Open Saved Work"
           >
             <FileText size={16} />
@@ -610,71 +842,111 @@ export default function StoryPromptsWorkshop() {
 
       {/* Toast */}
       {toast && (
-        <div className="fixed right-4 top-24 z-50 px-3 py-1.5 text-xs rounded-md bg-emerald-600 text-white shadow">
+        <div className="fixed right-4 top-24 z-50 px-4 py-2 text-sm rounded-lg bg-emerald-600 text-white shadow-lg">
           {toast}
         </div>
       )}
 
-      <div className="max-w-7xl mx-auto px-6 py-10 grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* LEFT SIDEBAR (sticky) */}
-        <aside className="lg:col-span-4 xl:col-span-3">
+      {/* Story Info Banner */}
+      {chapters.length > 0 && (
+        <div className="max-w-7xl mx-auto px-6 pt-6">
+          <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm flex items-center justify-between">
+            <div>
+              <div className="text-sm text-slate-500">Working on</div>
+              <div className="text-lg font-semibold text-slate-800">
+                {projectMeta.title || "Your Story"}
+              </div>
+              <div className="text-sm text-slate-500">
+                {chapters.length} chapter{chapters.length !== 1 ? "s" : ""} • {characters.length} characters detected
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="text-2xl font-bold text-amber-600">{allPrompts.length}</div>
+              <div className="text-xs text-slate-500">prompts generated</div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* No Story Warning */}
+      {chapters.length === 0 && (
+        <div className="max-w-7xl mx-auto px-6 pt-6">
+          <div className="bg-amber-50 rounded-xl p-6 border border-amber-200 text-center">
+            <Lightbulb size={48} className="mx-auto mb-4 text-amber-500" />
+            <h2 className="text-lg font-semibold text-amber-800 mb-2">No Story Found</h2>
+            <p className="text-amber-700 mb-4">
+              Start writing in the Compose section first, then come back here for personalized prompts.
+            </p>
+            <button
+              onClick={() => window.location.href = "/compose"}
+              className="px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 transition-colors font-medium"
+            >
+              Go to Compose →
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="max-w-7xl mx-auto px-6 py-8 grid grid-cols-1 lg:grid-cols-12 gap-8">
+        {/* LEFT SIDEBAR */}
+        <aside className="lg:col-span-4 xl:col-span-3 space-y-4">
           {/* Chapter picker */}
           {chapters.length > 1 && (
-            <div className="mb-6 p-4 bg-white/70 backdrop-blur-xl rounded-xl border border-white/60">
-              <div className="flex items-center justify-between">
-                <span className="text-sm">Working with chapter:</span>
-                <select
-                  value={selectedChapter?.id ?? ""}
-                  onChange={(e) => {
-                    const idVal = e.target.value; // keep as string
-                    const ch = chapters.find((c) => String(c.id) === String(idVal));
-                    setSelectedChapter(ch || null);
-                  }}
-                  className="px-3 py-2 bg-white border border-white/60 rounded-lg text-ink text-sm"
-                >
-                  {chapters.map((ch) => (
-                    <option key={ch.id} value={ch.id}>
-                      {ch.title}
-                    </option>
-                  ))}
-                </select>
-              </div>
+            <div className="p-4 bg-white rounded-xl border border-slate-200 shadow-sm">
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Working with chapter:
+              </label>
+              <select
+                value={selectedChapter?.id ?? ""}
+                onChange={(e) => {
+                  const ch = chapters.find((c) => String(c.id) === e.target.value);
+                  setSelectedChapter(ch || null);
+                  if (ch) setTargetChapterId(ch.id);
+                }}
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-700 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+              >
+                {chapters.map((ch, idx) => (
+                  <option key={ch.id} value={ch.id}>
+                    {ch.title || `Chapter ${idx + 1}`}
+                  </option>
+                ))}
+              </select>
             </div>
           )}
 
-          {/* Session Pack (uses pinned) */}
-          <div className="mb-6 p-4 bg-white/80 backdrop-blur-xl rounded-xl border border-white/60">
+          {/* Session Pack */}
+          <div className="p-4 bg-white rounded-xl border border-slate-200 shadow-sm">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="font-semibold">Session Pack</h3>
+              <h3 className="font-semibold text-slate-800">Session Pack</h3>
               <div className="flex gap-1">
                 <button
                   onClick={() => shufflePack(12)}
-                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs bg-white/70 border border-white/60 hover:bg-white"
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs bg-slate-50 border border-slate-200 hover:bg-slate-100 text-slate-600"
                   title="Shuffle 12"
                 >
-                  <Shuffle size={12} /> Shuffle 12
+                  <Shuffle size={12} /> Shuffle
                 </button>
                 <button
                   onClick={sendPackToScratchpad}
                   disabled={!pinned.length}
-                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs bg-accent text-ink border border-white/60 disabled:opacity-50"
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs bg-amber-50 text-amber-700 border border-amber-200 disabled:opacity-50"
                   title="Send to Scratchpad"
                 >
-                  <Send size={12} /> Use Pack
+                  <Send size={12} /> Use
                 </button>
               </div>
             </div>
             {pinned.length === 0 ? (
-              <div className="text-sm text-ink/60">Pin prompts to build your session pack.</div>
+              <div className="text-sm text-slate-500">Pin prompts to build your session pack.</div>
             ) : (
-              <ul className="space-y-2 max-h-64 overflow-auto pr-1">
+              <ul className="space-y-2 max-h-48 overflow-auto">
                 {pinned.map((t, i) => (
-                  <li key={i} className="text-sm flex items-start gap-2">
-                    <span className="text-ink/50">{i + 1}.</span>
-                    <span className="flex-1">{t}</span>
+                  <li key={i} className="text-sm flex items-start gap-2 text-slate-600">
+                    <span className="text-slate-400 font-mono text-xs">{i + 1}.</span>
+                    <span className="flex-1 line-clamp-2">{t}</span>
                     <button
                       onClick={() => unpinPrompt(t)}
-                      className="text-ink/50 hover:text-ink"
+                      className="text-slate-400 hover:text-red-500 flex-shrink-0"
                       title="Remove"
                     >
                       <X size={14} />
@@ -686,39 +958,34 @@ export default function StoryPromptsWorkshop() {
           </div>
 
           {/* Stats */}
-          <div className="grid grid-cols-4 gap-3 mb-6">
-            <div className="text-center p-3 rounded-lg bg-white/70 border border-white/60">
-              <div className="text-lg font-bold">{stats.tried}</div>
-              <div className="text-[11px] text-emerald-700">Tried</div>
-            </div>
-            <div className="text-center p-3 rounded-lg bg-white/70 border border-white/60">
-              <div className="text-lg font-bold">{stats.helpful}</div>
-              <div className="text-[11px] text-amber-600">Helpful</div>
-            </div>
-            <div className="text-center p-3 rounded-lg bg-white/70 border border-white/60">
-              <div className="text-lg font-bold">{pinned.length}</div>
-              <div className="text-[11px] text-primary">In Pack</div>
-            </div>
-            <div className="text-center p-3 rounded-lg bg-white/70 border border-white/60">
-              <div className="text-lg font-bold">
-                {stats.total - stats.tried - stats.helpful - stats.skipped}
+          <div className="grid grid-cols-4 gap-2">
+            {[
+              { value: stats.tried, label: "Tried", color: "text-emerald-600" },
+              { value: stats.helpful, label: "Helpful", color: "text-amber-600" },
+              { value: pinned.length, label: "In Pack", color: "text-blue-600" },
+              { value: stats.total - stats.tried - stats.helpful - stats.skipped, label: "New", color: "text-slate-600" },
+            ].map((stat, i) => (
+              <div key={i} className="text-center p-3 rounded-lg bg-white border border-slate-200">
+                <div className={`text-lg font-bold ${stat.color}`}>{stat.value}</div>
+                <div className="text-[10px] text-slate-500 uppercase">{stat.label}</div>
               </div>
-              <div className="text-[11px] text-ink/60">New</div>
-            </div>
+            ))}
           </div>
 
           {/* Filters */}
-          <div className="p-4 bg-white/80 backdrop-blur-xl rounded-xl border border-white/60 sticky top-[6.5rem]">
+          <div className="p-4 bg-white rounded-xl border border-slate-200 shadow-sm sticky top-20">
             <div className="flex items-center gap-2 mb-3">
-              <Filter size={16} className="text-ink/70" />
-              <span className="text-sm">Filters</span>
+              <Filter size={16} className="text-slate-500" />
+              <span className="text-sm font-medium text-slate-700">Filters</span>
             </div>
 
             <div className="flex flex-wrap gap-2 mb-3">
               <button
                 onClick={() => setActiveCategory("all")}
-                className={`px-3 py-1.5 rounded-lg text-xs border transition-all ${
-                  activeCategory === "all" ? "bg-white border-white/60" : "bg-white/70 border-white/60 hover:bg-white"
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                  activeCategory === "all" 
+                    ? "bg-slate-800 text-white border-slate-800" 
+                    : "bg-white border-slate-200 hover:bg-slate-50 text-slate-600"
                 }`}
               >
                 All
@@ -730,8 +997,10 @@ export default function StoryPromptsWorkshop() {
                   <button
                     key={key}
                     onClick={() => setActiveCategory(key)}
-                    className={`px-3 py-1.5 rounded-lg text-xs border transition-all ${
-                      active ? "bg-white border-white/60" : "bg-white/70 border-white/60 hover:bg-white"
+                    className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
+                      active 
+                        ? "bg-slate-800 text-white border-slate-800" 
+                        : "bg-white border-slate-200 hover:bg-slate-50 text-slate-600"
                     }`}
                     title={category.label}
                   >
@@ -743,13 +1012,13 @@ export default function StoryPromptsWorkshop() {
             </div>
 
             <div className="mb-3">
-              <label className="block text-xs mb-1">Difficulty</label>
+              <label className="block text-xs font-medium text-slate-600 mb-1">Difficulty</label>
               <select
                 value={difficultyFilter}
                 onChange={(e) => setDifficultyFilter(e.target.value)}
-                className="w-full px-3 py-1.5 rounded-lg text-xs bg-white/70 border border-white/60"
+                className="w-full px-3 py-1.5 rounded-lg text-xs bg-slate-50 border border-slate-200 text-slate-700"
               >
-                <option value="all">All</option>
+                <option value="all">All Levels</option>
                 <option value="1">Easy (●○○○)</option>
                 <option value="2">Medium (●●○○)</option>
                 <option value="3">Hard (●●●○)</option>
@@ -757,52 +1026,52 @@ export default function StoryPromptsWorkshop() {
               </select>
             </div>
 
-            <label className="flex items-center gap-2 text-xs">
+            <label className="flex items-center gap-2 text-xs text-slate-600 cursor-pointer">
               <input
                 type="checkbox"
                 checked={showContextual}
                 onChange={(e) => setShowContextual(e.target.checked)}
-                className="accent-current"
+                className="accent-amber-500 w-4 h-4"
               />
-              Show story-specific prompts
+              Show prompts from your story
             </label>
           </div>
         </aside>
 
-        {/* RIGHT: PROMPTS GRID */}
+        {/* MAIN: PROMPTS GRID */}
         <main className="lg:col-span-8 xl:col-span-9">
-          {/* Header block */}
-          <div className="bg-white/90 backdrop-blur-xl rounded-2xl p-6 border border-white/60 mb-6">
+          {/* Header */}
+          <div className="bg-white rounded-2xl p-6 border border-slate-200 shadow-sm mb-6">
             <div className="flex items-center justify-between">
               <div>
-                <h1 className="text-2xl font-bold">Interactive Story Prompts</h1>
-                <p className="text-sm text-ink/70">
-                  Smart prompts that adapt to your chapters, characters, and structure.
+                <h1 className="text-2xl font-bold text-slate-800">Interactive Story Prompts</h1>
+                <p className="text-sm text-slate-500 mt-1">
+                  Smart prompts that adapt to your chapters, characters, and story structure.
                 </p>
               </div>
               <div className="text-right">
-                <div className="text-2xl font-bold">{filteredPrompts.length}</div>
-                <div className="text-xs text-ink/60">Available prompts</div>
+                <div className="text-3xl font-bold text-amber-600">{filteredPrompts.length}</div>
+                <div className="text-xs text-slate-500">available prompts</div>
               </div>
             </div>
           </div>
 
-          {/* Pinned (compact row) */}
+          {/* Pinned row */}
           {pinned.length > 0 && (
-            <div className="bg-white/80 backdrop-blur-xl rounded-xl p-4 border border-white/60 mb-6">
+            <div className="bg-amber-50 rounded-xl p-4 border border-amber-200 mb-6">
               <div className="flex items-center justify-between mb-3">
-                <div className="font-medium">Pinned (Session Pack)</div>
+                <div className="font-medium text-amber-800">📌 Session Pack ({pinned.length})</div>
                 <div className="flex gap-2">
                   <button
                     onClick={sendPackToScratchpad}
-                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs bg-accent text-ink border border-white/60"
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs bg-amber-500 text-white hover:bg-amber-600"
                   >
                     <Send size={12} />
                     Use Pack
                   </button>
                   <button
                     onClick={() => setPinned([])}
-                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-xs bg-white/70 border border-white/60 hover:bg-white"
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-md text-xs bg-white border border-amber-300 text-amber-700 hover:bg-amber-100"
                   >
                     <Trash2 size={12} />
                     Clear
@@ -813,10 +1082,10 @@ export default function StoryPromptsWorkshop() {
                 {pinned.map((t, i) => (
                   <span
                     key={i}
-                    className="text-xs px-2 py-1 rounded-md bg-white border border-white/60"
+                    className="text-xs px-2 py-1 rounded-md bg-white border border-amber-200 text-amber-800"
                     title={t}
                   >
-                    {i + 1}. {t.length > 64 ? `${t.slice(0, 64)}…` : t}
+                    {i + 1}. {t.length > 50 ? `${t.slice(0, 50)}…` : t}
                   </span>
                 ))}
               </div>
@@ -825,10 +1094,10 @@ export default function StoryPromptsWorkshop() {
 
           {/* Prompts grid */}
           {filteredPrompts.length === 0 ? (
-            <div className="text-center py-16 bg-white/70 backdrop-blur-xl rounded-2xl border border-white/60">
-              <Lightbulb size={48} className="mx-auto mb-4 text-ink/50" />
-              <div className="text-lg font-semibold mb-2">No prompts match your filters</div>
-              <div className="text-ink/70">Adjust filters or add more chapters for personalized prompts.</div>
+            <div className="text-center py-16 bg-white rounded-2xl border border-slate-200">
+              <Lightbulb size={48} className="mx-auto mb-4 text-slate-300" />
+              <div className="text-lg font-semibold mb-2 text-slate-700">No prompts match your filters</div>
+              <div className="text-slate-500">Adjust filters or add more chapters for personalized prompts.</div>
             </div>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -858,6 +1127,9 @@ export default function StoryPromptsWorkshop() {
         onSave={savePromptWork}
         onSendToChapter={sendToChapter}
         onClear={clearScratchpad}
+        chapters={chapters}
+        selectedChapterId={targetChapterId}
+        onChapterSelect={setTargetChapterId}
       />
 
       {/* Saved Prompts Modal */}
@@ -868,8 +1140,9 @@ export default function StoryPromptsWorkshop() {
         onLoadPrompt={loadSavedPrompt}
       />
 
-      {/* Mobile FAB back to landing */}
+      {/* Mobile FAB */}
       <BackToLandingFab />
     </div>
   );
 }
+
