@@ -1,10 +1,10 @@
 // src/lib/storylab/projectStore.js
-// Updated to connect with ComposePage and the unified project system
+// Updated to connect with the unified project system
 
 // Legacy key (kept for backward compatibility)
 export const STORAGE_KEY = "dahtruth-story-lab-toc-v3";
 
-// Keys from ComposePage / main project system
+// Keys from the main project system
 const CURRENT_PROJECT_KEY = "dahtruth_current_project";
 const LEGACY_CHAPTERS_KEY = "dahtruth_chapters";
 const LEGACY_META_KEY = "dahtruth_project_meta";
@@ -22,8 +22,8 @@ function hasStorage() {
  * Load the current project from the unified system
  * Priority:
  * 1. New project system (dahtruth_current_project)
- * 2. Legacy Compose chapters (dahtruth_chapters) ← ComposePage writes here
- * 3. Legacy StoryLab key (dahtruth-story-lab-toc-v3)
+ * 2. Legacy StoryLab key (dahtruth-story-lab-toc-v3)
+ * 3. Legacy Compose chapters (dahtruth_chapters)
  */
 export function loadProject() {
   if (!hasStorage()) return null;
@@ -34,6 +34,7 @@ export function loadProject() {
     if (currentProjectRaw) {
       const project = JSON.parse(currentProjectRaw);
       if (project && project.compose && Array.isArray(project.compose.chapters)) {
+        // Convert from new format to StoryLab format
         const converted = {
           id: project.id,
           title: project.title,
@@ -41,15 +42,15 @@ export function loadProject() {
           chapters: project.compose.chapters.map((ch, idx) => ({
             id: ch.id,
             title: ch.title || `Chapter ${idx + 1}`,
-            text: ch.text || ch.textHTML || ch.content || "",
-            textHTML: ch.textHTML || ch.text || ch.content || "",
-            content: ch.content || ch.text || ch.textHTML || "",
+            text: ch.text || ch.textHTML || "",
+            textHTML: ch.textHTML || ch.text || "",
             wordCount: ch.wordCount || 0,
             status: ch.status || "draft",
             included: ch.included !== false,
             storyLab: ch.storyLab || {},
           })),
           characters: project.compose.characters || [],
+          // Preserve StoryLab-specific fields if they exist
           roadmap: [],
           priorities: [],
           scenes: [],
@@ -59,7 +60,16 @@ export function loadProject() {
       }
     }
 
-    // 2. Try legacy Compose chapters (this is what ComposePage writes to!)
+    // 2. Try legacy StoryLab key
+    const storyLabRaw = window.localStorage.getItem(STORAGE_KEY);
+    if (storyLabRaw) {
+      const parsed = JSON.parse(storyLabRaw);
+      if (parsed && (parsed.chapters || parsed.title)) {
+        return migrate(parsed);
+      }
+    }
+
+    // 3. Try legacy Compose chapters
     const legacyChaptersRaw = window.localStorage.getItem(LEGACY_CHAPTERS_KEY);
     if (legacyChaptersRaw) {
       const chapters = JSON.parse(legacyChaptersRaw);
@@ -79,8 +89,7 @@ export function loadProject() {
             id: ch.id || String(idx),
             title: ch.title || `Chapter ${idx + 1}`,
             text: ch.text || ch.textHTML || ch.content || ch.body || "",
-            textHTML: ch.textHTML || ch.text || ch.content || "",
-            content: ch.content || ch.text || ch.textHTML || "",
+            textHTML: ch.textHTML || ch.text || "",
             wordCount: ch.wordCount || 0,
             status: ch.status || "draft",
             included: ch.included !== false,
@@ -96,15 +105,6 @@ export function loadProject() {
       }
     }
 
-    // 3. Try legacy StoryLab key
-    const storyLabRaw = window.localStorage.getItem(STORAGE_KEY);
-    if (storyLabRaw) {
-      const parsed = JSON.parse(storyLabRaw);
-      if (parsed && (parsed.chapters || parsed.title)) {
-        return migrate(parsed);
-      }
-    }
-
     // No data found
     return null;
   } catch (err) {
@@ -115,7 +115,7 @@ export function loadProject() {
 
 /**
  * Save project back to storage
- * Writes to StoryLab key AND syncs back to Compose's dahtruth_chapters
+ * Writes to both StoryLab key AND syncs to unified system
  */
 export function saveProject(next) {
   if (!hasStorage() || !next) return;
@@ -124,53 +124,42 @@ export function saveProject(next) {
     // Always save to StoryLab key for backward compat
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
 
-    // Also sync back to dahtruth_chapters so ComposePage sees changes
-    if (next.chapters && Array.isArray(next.chapters)) {
-      const chaptersForCompose = next.chapters.map((ch, idx) => ({
-        id: ch.id,
-        title: ch.title || `Chapter ${idx + 1}`,
-        content: ch.content || ch.text || ch.textHTML || "",
-        text: ch.text || ch.content || "",
-        textHTML: ch.textHTML || ch.text || ch.content || "",
-        wordCount: ch.wordCount || countWords(ch.text || ch.content || ""),
-        status: ch.status || "draft",
-        included: ch.included !== false,
-        storyLab: ch.storyLab || {},
-      }));
-      window.localStorage.setItem(LEGACY_CHAPTERS_KEY, JSON.stringify(chaptersForCompose));
-    }
-
-    // Update unified project system if it exists
+    // Also update the unified project system if it exists
     const currentProjectRaw = window.localStorage.getItem(CURRENT_PROJECT_KEY);
     if (currentProjectRaw) {
       const currentProject = JSON.parse(currentProjectRaw);
       if (currentProject && currentProject.compose) {
+        // Merge StoryLab data back into unified project
         currentProject.compose.chapters = (next.chapters || []).map((ch, idx) => {
+          // Find existing chapter in current project to preserve extra fields
           const existing = currentProject.compose.chapters?.find(c => c.id === ch.id) || {};
           return {
             ...existing,
             id: ch.id,
             title: ch.title || `Chapter ${idx + 1}`,
-            text: ch.text || ch.content || "",
-            textHTML: ch.textHTML || ch.text || ch.content || "",
-            content: ch.content || ch.text || "",
-            wordCount: ch.wordCount || countWords(ch.text || ch.content || ""),
+            text: ch.text || "",
+            textHTML: ch.textHTML || ch.text || "",
+            wordCount: ch.wordCount || countWords(ch.text || ""),
             status: ch.status || "draft",
             included: ch.included !== false,
             storyLab: ch.storyLab || {},
           };
         });
 
+        // Sync characters if StoryLab has them
         if (Array.isArray(next.characters)) {
           currentProject.compose.characters = next.characters;
         }
 
+        // Update timestamp
         currentProject.updatedAt = new Date().toISOString();
+
+        // Save back
         window.localStorage.setItem(CURRENT_PROJECT_KEY, JSON.stringify(currentProject));
       }
     }
 
-    // Dispatch event so ComposePage and other components know data changed
+    // Dispatch event so other components know data changed
     try {
       window.dispatchEvent(new Event("project:change"));
     } catch {}
@@ -219,6 +208,7 @@ export function getTotalWordCount(project) {
 /** Count words in text */
 function countWords(text) {
   if (!text) return 0;
+  // Strip HTML tags
   const plain = text.replace(/<[^>]*>/g, " ");
   const words = plain.trim().split(/\s+/).filter(Boolean);
   return words.length;
@@ -250,31 +240,40 @@ export function uid() {
     if (typeof window !== "undefined" && window.crypto && typeof window.crypto.randomUUID === "function") {
       return window.crypto.randomUUID();
     }
-  } catch {}
+  } catch {
+    // fall through
+  }
   return String(Date.now()) + "_" + Math.random().toString(36).slice(2);
 }
 
 /** Tiny migration to keep older saves from breaking */
 function migrate(p) {
   if (!p || typeof p !== "object") return p;
+  // Ensure chapters is always an array
   if (!Array.isArray(p.chapters)) p.chapters = [];
+  // Normalize chapter text fields
   p.chapters = p.chapters.map((ch, idx) => ({
     ...ch,
     id: ch.id || String(idx),
     title: ch.title || `Chapter ${idx + 1}`,
     text: ch.text || ch.textHTML || ch.content || ch.body || "",
-    content: ch.content || ch.text || ch.textHTML || "",
   }));
+  // Add new fields safely
   ensureWorkshopFields(p);
   return p;
 }
 
-/** Force refresh from the latest source */
+/**
+ * Force refresh from the latest source
+ * Useful after ComposePage saves new content
+ */
 export function refreshProject() {
   return loadProject();
 }
 
-/** Check if there's any story data available */
+/**
+ * Check if there's any story data available
+ */
 export function hasStoryData() {
   const project = loadProject();
   return project && Array.isArray(project.chapters) && project.chapters.length > 0;
