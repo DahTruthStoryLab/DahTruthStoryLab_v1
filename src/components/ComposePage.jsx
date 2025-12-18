@@ -184,6 +184,13 @@ function DropdownMenu({ label, icon: Icon, children, disabled = false }) {
         type="button"
         onClick={() => !disabled && setOpen(!open)}
         disabled={disabled}
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => !disabled && setOpen(!open)}
+        disabled={disabled}
         className={`
           inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium
           border border-slate-200 bg-white hover:bg-slate-50 
@@ -1178,7 +1185,7 @@ export default function ComposePage() {
 
             {/* Main content grid - flex-1 to fill space */}
             <div
-              className="grid gap-6 flex-1 min-h-0"
+             className="grid gap-6 flex-1 min-h-0 overflow-hidden"
               style={{
                 gridTemplateColumns: showAssistant
                   ? "220px minmax(0, 1fr) 320px"
@@ -1251,7 +1258,7 @@ export default function ComposePage() {
               </aside>
 
               {/* Main Editor OR Paginated View - contained in its grid cell */}
-              <div className="min-h-0 overflow-hidden">
+              <div className="min-h-0 min-w-0 overflow-hidden">
                 {editorViewMode === "pages" ? (
                   <PaginatedView
                     html={html}
