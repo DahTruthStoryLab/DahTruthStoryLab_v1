@@ -30,21 +30,10 @@ export default function EditorPane({
   // Line spacing state ("1", "1.5", "2")
   const [lineSpacing, setLineSpacing] = useState("1.5");
 
-  // Quill modules with more fonts
+  // FIXED: Quill modules - toolbar points to external element by id
   const modules = useMemo(
     () => ({
-      toolbar: [
-        [{ font: [] }, { size: [] }],
-        ["bold", "italic", "underline", "strike"],
-        [{ color: [] }, { background: [] }],
-        [{ script: "sub" }, { script: "super" }],
-        [{ header: 1 }, { header: 2 }],
-        [{ align: [] }],
-        [{ list: "ordered" }, { list: "bullet" }],
-        [{ indent: "-1" }, { indent: "+1" }],
-        ["blockquote"],
-        ["clean"],
-      ],
+      toolbar: "#editor-toolbar", // Use external toolbar
       history: {
         delay: 500,
         maxStack: 500,
@@ -123,7 +112,7 @@ export default function EditorPane({
 
   return (
     <div className="relative flex flex-col gap-4">
-      {/* Title row + stats + spacing + undo/redo */}
+      {/* Row 1: Title + stats + spacing + undo/redo */}
       <div className="flex flex-wrap items-center justify-between gap-3 bg-white rounded-lg border border-slate-200 p-3 shadow-sm">
         <input
           type="text"
@@ -178,13 +167,67 @@ export default function EditorPane({
       </div>
 
       {/* ═══════════════════════════════════════════════════════════════
-          WORD DOCUMENT LOOK: Gray background with white page
+          Row 2: QUILL FORMATTING TOOLBAR - ABOVE the gray area
+      ═══════════════════════════════════════════════════════════════ */}
+      <div 
+        id="editor-toolbar" 
+        className="bg-white rounded-lg border border-slate-200 p-2 shadow-sm"
+      >
+        {/* Font & Size */}
+        <select className="ql-font">
+          <option value="">Sans Serif</option>
+          <option value="serif">Serif</option>
+          <option value="monospace">Monospace</option>
+        </select>
+        <select className="ql-size">
+          <option value="small">Small</option>
+          <option value="">Normal</option>
+          <option value="large">Large</option>
+          <option value="huge">Huge</option>
+        </select>
+
+        {/* Basic formatting */}
+        <button className="ql-bold" />
+        <button className="ql-italic" />
+        <button className="ql-underline" />
+        <button className="ql-strike" />
+
+        {/* Colors */}
+        <select className="ql-color" />
+        <select className="ql-background" />
+
+        {/* Scripts */}
+        <button className="ql-script" value="sub" />
+        <button className="ql-script" value="super" />
+
+        {/* Headers */}
+        <button className="ql-header" value="1" />
+        <button className="ql-header" value="2" />
+
+        {/* Alignment */}
+        <select className="ql-align" />
+
+        {/* Lists */}
+        <button className="ql-list" value="ordered" />
+        <button className="ql-list" value="bullet" />
+
+        {/* Indent */}
+        <button className="ql-indent" value="-1" />
+        <button className="ql-indent" value="+1" />
+
+        {/* Blockquote & Clean */}
+        <button className="ql-blockquote" />
+        <button className="ql-clean" />
+      </div>
+
+      {/* ═══════════════════════════════════════════════════════════════
+          Row 3: WORD DOCUMENT LOOK - Gray background with white page
       ═══════════════════════════════════════════════════════════════ */}
       <div 
         className="rounded-lg p-8"
         style={{ 
-          backgroundColor: "#d4d4d4",
-          minHeight: "calc(100vh - 280px)",
+          backgroundColor: "#c0c0c0",
+          minHeight: "calc(100vh - 340px)",
         }}
       >
         {/* White "page" - like a Word document */}
@@ -192,8 +235,8 @@ export default function EditorPane({
           className="mx-auto bg-white shadow-xl"
           style={{
             maxWidth: pageWidth,
-            minHeight: "calc(100vh - 340px)",
-            padding: "72px 72px 72px 72px", // 1 inch margins like Word
+            minHeight: "calc(100vh - 400px)",
+            padding: "72px", // 1 inch margins like Word
             boxShadow: "0 4px 24px rgba(0,0,0,0.2), 0 0 0 1px rgba(0,0,0,0.05)",
           }}
         >
@@ -204,9 +247,9 @@ export default function EditorPane({
             onChange={handleChange}
             modules={modules}
             formats={formats}
-            className={`storylab-editor ${spacingClass}`}
+            className={`storylab-editor-clean ${spacingClass}`}
             style={{
-              minHeight: "calc(100vh - 480px)",
+              minHeight: "calc(100vh - 540px)",
             }}
           />
         </div>
@@ -222,3 +265,4 @@ export default function EditorPane({
     </div>
   );
 }
+
