@@ -181,6 +181,7 @@ function DropdownMenu({ label, icon: Icon, children, disabled = false }) {
   return (
     <div ref={ref} className="relative">
       <button
+        type="button"
         onClick={() => !disabled && setOpen(!open)}
         disabled={disabled}
         className={`
@@ -218,6 +219,7 @@ function DropdownItem({ icon: Icon, label, onClick, disabled = false, active = f
 
   return (
     <button
+      type="button"
       onClick={handleClick}
       disabled={disabled}
       className={`
@@ -962,6 +964,7 @@ export default function ComposePage() {
         <div className="max-w-[1800px] mx-auto px-4 py-2 flex items-center gap-3 overflow-x-auto">
           {/* Dashboard Button (Gold) */}
           <button
+            type="button"
             onClick={goBack}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white transition-all hover:scale-105 flex-shrink-0"
             style={{ background: "linear-gradient(135deg, #D4AF37, #B8960C)" }}
@@ -1057,6 +1060,7 @@ export default function ComposePage() {
 
           {/* Search Button */}
           <button
+            type="button"
             onClick={() => setShowSearch((s) => !s)}
             className={`
               inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium
