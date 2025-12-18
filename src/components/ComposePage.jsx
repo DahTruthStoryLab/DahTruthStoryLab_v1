@@ -160,7 +160,7 @@ function htmlToPlainText(html = "") {
 }
 
 /* =========================================================
-   DROPDOWN MENU COMPONENT
+   DROPDOWN MENU COMPONENT - FIXED
 ========================================================= */
 function DropdownMenu({ label, icon: Icon, children, disabled = false }) {
   const [open, setOpen] = useState(false);
@@ -181,6 +181,7 @@ function DropdownMenu({ label, icon: Icon, children, disabled = false }) {
   return (
     <div ref={ref} className="relative">
       <button
+        type="button"
         onClick={() => !disabled && setOpen(!open)}
         disabled={disabled}
         className={`
@@ -196,23 +197,36 @@ function DropdownMenu({ label, icon: Icon, children, disabled = false }) {
       </button>
 
       {open && (
-        <div className="absolute top-full left-0 mt-1 min-w-[180px] bg-white border border-slate-200 rounded-lg shadow-lg z-50 py-1">
-          {React.Children.map(children, (child) =>
-            child ? React.cloneElement(child, { onClickCapture: () => setOpen(false) }) : null
-          )}
+        <div className="absolute top-full left-0 mt-1 min-w-[200px] bg-white border border-slate-200 rounded-lg shadow-lg z-50 py-1">
+          {React.Children.map(children, (child) => {
+            if (!child) return null;
+            // FIXED: Pass closeMenu function instead of onClickCapture
+            return React.cloneElement(child, { closeMenu: () => setOpen(false) });
+          })}
         </div>
       )}
     </div>
   );
 }
 
-function DropdownItem({ icon: Icon, label, onClick, disabled = false, active = false, shortcut, onClickCapture }) {
+// FIXED: DropdownItem now uses closeMenu and executes action with delay
+function DropdownItem({ icon: Icon, label, onClick, disabled = false, active = false, shortcut, closeMenu }) {
+  const handleClick = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (disabled) return;
+    // Close menu first
+    if (closeMenu) closeMenu();
+    // Then execute action with small delay to ensure menu closes
+    setTimeout(() => {
+      if (onClick) onClick(e);
+    }, 10);
+  };
+
   return (
     <button
-      onClick={(e) => {
-        if (onClickCapture) onClickCapture();
-        if (onClick) onClick(e);
-      }}
+      type="button"
+      onClick={handleClick}
       disabled={disabled}
       className={`
         w-full flex items-center gap-2 px-3 py-2 text-sm text-left
@@ -835,8 +849,12 @@ export default function ComposePage() {
     URL.revokeObjectURL(url);
   };
 
+  // FIXED: Better error message when no chapter selected
   const handleDeleteCurrent = () => {
-    if (!hasChapter) return;
+    if (!hasChapter) {
+      alert("Please select a chapter first by clicking on a chapter card.");
+      return;
+    }
     if (window.confirm(`Delete "${title || selectedChapter.title}"?\n\nThis cannot be undone.`)) {
       deleteChapter(selectedId);
       setTimeout(() => setView("grid"), 100);
@@ -855,6 +873,24 @@ export default function ComposePage() {
   };
 
   const goBack = () => navigate("/dashboard");
+
+  // FIXED: Helper to switch to editor view (auto-selects first chapter if needed)
+  const switchToEditor = () => {
+    if (!selectedId && chapters.length > 0) {
+      setSelectedId(chapters[0].id);
+    }
+    setView("editor");
+    setEditorViewMode("editor");
+  };
+
+  // FIXED: Helper to switch to page view (auto-selects first chapter if needed)
+  const switchToPageView = () => {
+    if (!selectedId && chapters.length > 0) {
+      setSelectedId(chapters[0].id);
+    }
+    setView("editor");
+    setEditorViewMode("pages");
+  };
 
   if (!Array.isArray(chapters)) {
     return (
@@ -884,13 +920,13 @@ export default function ComposePage() {
       >
         <div className="max-w-[1800px] mx-auto px-4 py-3">
           <div className="flex items-center justify-between flex-wrap gap-3">
-            {/* Left: Title */}
+            {/* Left: Title - FIXED: explicit text-white */}
             <div className="flex items-center gap-3">
               <PenLine size={24} className="text-amber-300" />
-              <h1 className="text-xl font-bold">Compose</h1>
+              <h1 className="text-xl font-bold text-white">Compose</h1>
             </div>
 
-            {/* Center: Story Info */}
+            {/* Center: Story Info - FIXED: explicit text-white */}
             <div className="flex items-center gap-4 md:gap-6 text-sm flex-wrap">
               <div className="flex items-center gap-2">
                 <span className="text-white/70">Story:</span>
@@ -898,17 +934,17 @@ export default function ComposePage() {
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-white/70">Chapter:</span>
-                <span className="font-medium">
+                <span className="font-medium text-white">
                   {currentChapterIndex > 0 ? `${currentChapterIndex} / ${chapters.length}` : `${chapters.length} total`}
                 </span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-white/70">Words:</span>
-                <span className="font-medium">{totalWordCount.toLocaleString()}</span>
+                <span className="font-medium text-white">{totalWordCount.toLocaleString()}</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-white/70">Characters:</span>
-                <span className="font-medium">{characterCount}</span>
+                <span className="font-medium text-white">{characterCount}</span>
               </div>
             </div>
 
@@ -935,6 +971,7 @@ export default function ComposePage() {
         <div className="max-w-[1800px] mx-auto px-4 py-2 flex items-center gap-3 overflow-x-auto">
           {/* Dashboard Button (Gold) */}
           <button
+            type="button"
             onClick={goBack}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white transition-all hover:scale-105 flex-shrink-0"
             style={{ background: "linear-gradient(135deg, #D4AF37, #B8960C)" }}
@@ -964,7 +1001,7 @@ export default function ComposePage() {
             />
           </DropdownMenu>
 
-          {/* View Dropdown */}
+          {/* View Dropdown - FIXED: uses helper functions that auto-select */}
           <DropdownMenu label="View" icon={Eye}>
             <DropdownItem
               icon={Grid3X3}
@@ -975,13 +1012,13 @@ export default function ComposePage() {
             <DropdownItem
               icon={Edit3}
               label="Editor"
-              onClick={() => { setView("editor"); setEditorViewMode("editor"); }}
+              onClick={switchToEditor}
               active={view === "editor" && editorViewMode === "editor"}
             />
             <DropdownItem
               icon={FileText}
               label="Page View (8.5 × 11)"
-              onClick={() => { setView("editor"); setEditorViewMode("pages"); }}
+              onClick={switchToPageView}
               active={view === "editor" && editorViewMode === "pages"}
             />
             <DropdownDivider />
@@ -1030,6 +1067,7 @@ export default function ComposePage() {
 
           {/* Search Button */}
           <button
+            type="button"
             onClick={() => setShowSearch((s) => !s)}
             className={`
               inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium
@@ -1046,7 +1084,7 @@ export default function ComposePage() {
           </button>
 
           {/* Spacer */}
-          <div className="flex-1" />
+          <div className="flex-1 min-w-[20px]" />
 
           {/* Status indicators */}
           {queueLength > 0 && (
@@ -1235,7 +1273,7 @@ export default function ComposePage() {
                 onSave={handleSave}
                 onAI={handleAI}
                 aiBusy={aiBusy || chatBusy}
-                pageWidth={1200}
+                pageWidth={850}
                 onHeadingsChange={setHeadings}
               />
             )}
