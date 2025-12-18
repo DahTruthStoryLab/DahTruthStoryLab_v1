@@ -30,10 +30,21 @@ export default function EditorPane({
   // Line spacing state ("1", "1.5", "2")
   const [lineSpacing, setLineSpacing] = useState("1.5");
 
-  // FIXED: Quill modules - toolbar points to external element by id
+  // FIXED: Standard Quill toolbar (NOT external)
   const modules = useMemo(
     () => ({
-      toolbar: "#editor-toolbar", // Use external toolbar
+      toolbar: [
+        [{ font: [] }, { size: [] }],
+        ["bold", "italic", "underline", "strike"],
+        [{ color: [] }, { background: [] }],
+        [{ script: "sub" }, { script: "super" }],
+        [{ header: 1 }, { header: 2 }],
+        [{ align: [] }],
+        [{ list: "ordered" }, { list: "bullet" }],
+        [{ indent: "-1" }, { indent: "+1" }],
+        ["blockquote"],
+        ["clean"],
+      ],
       history: {
         delay: 500,
         maxStack: 500,
@@ -167,61 +178,8 @@ export default function EditorPane({
       </div>
 
       {/* ═══════════════════════════════════════════════════════════════
-          Row 2: QUILL FORMATTING TOOLBAR - ABOVE the gray area
-      ═══════════════════════════════════════════════════════════════ */}
-      <div 
-        id="editor-toolbar" 
-        className="bg-white rounded-lg border border-slate-200 p-2 shadow-sm"
-      >
-        {/* Font & Size */}
-        <select className="ql-font">
-          <option value="">Sans Serif</option>
-          <option value="serif">Serif</option>
-          <option value="monospace">Monospace</option>
-        </select>
-        <select className="ql-size">
-          <option value="small">Small</option>
-          <option value="">Normal</option>
-          <option value="large">Large</option>
-          <option value="huge">Huge</option>
-        </select>
-
-        {/* Basic formatting */}
-        <button className="ql-bold" />
-        <button className="ql-italic" />
-        <button className="ql-underline" />
-        <button className="ql-strike" />
-
-        {/* Colors */}
-        <select className="ql-color" />
-        <select className="ql-background" />
-
-        {/* Scripts */}
-        <button className="ql-script" value="sub" />
-        <button className="ql-script" value="super" />
-
-        {/* Headers */}
-        <button className="ql-header" value="1" />
-        <button className="ql-header" value="2" />
-
-        {/* Alignment */}
-        <select className="ql-align" />
-
-        {/* Lists */}
-        <button className="ql-list" value="ordered" />
-        <button className="ql-list" value="bullet" />
-
-        {/* Indent */}
-        <button className="ql-indent" value="-1" />
-        <button className="ql-indent" value="+1" />
-
-        {/* Blockquote & Clean */}
-        <button className="ql-blockquote" />
-        <button className="ql-clean" />
-      </div>
-
-      {/* ═══════════════════════════════════════════════════════════════
-          Row 3: WORD DOCUMENT LOOK - Gray background with white page
+          WORD DOCUMENT LOOK - Gray background with white page
+          Quill toolbar will appear at top of the white page area
       ═══════════════════════════════════════════════════════════════ */}
       <div 
         className="rounded-lg p-8"
@@ -247,7 +205,7 @@ export default function EditorPane({
             onChange={handleChange}
             modules={modules}
             formats={formats}
-            className={`storylab-editor-clean ${spacingClass}`}
+            className={`storylab-editor ${spacingClass}`}
             style={{
               minHeight: "calc(100vh - 540px)",
             }}
