@@ -160,7 +160,7 @@ function htmlToPlainText(html = "") {
 }
 
 /* =========================================================
-   DROPDOWN MENU COMPONENT - FIXED
+   DROPDOWN MENU COMPONENT
 ========================================================= */
 function DropdownMenu({ label, icon: Icon, children, disabled = false }) {
   const [open, setOpen] = useState(false);
@@ -181,7 +181,6 @@ function DropdownMenu({ label, icon: Icon, children, disabled = false }) {
   return (
     <div ref={ref} className="relative">
       <button
-        type="button"
         onClick={() => !disabled && setOpen(!open)}
         disabled={disabled}
         className={`
@@ -197,35 +196,30 @@ function DropdownMenu({ label, icon: Icon, children, disabled = false }) {
       </button>
 
       {open && (
-        <div className="absolute top-full left-0 mt-1 min-w-[200px] bg-white border border-slate-200 rounded-lg shadow-lg z-50 py-1">
-          {React.Children.map(children, (child) => {
-            if (!child) return null;
-            // FIXED: Pass closeMenu function instead of onClickCapture
-            return React.cloneElement(child, { closeMenu: () => setOpen(false) });
-          })}
+        <div className="absolute top-full left-0 mt-1 min-w-[180px] bg-white border border-slate-200 rounded-lg shadow-lg z-50 py-1">
+          {React.Children.map(children, (child) =>
+            child ? React.cloneElement(child, { closeMenu: () => setOpen(false) }) : null
+          )}
         </div>
       )}
     </div>
   );
 }
 
-// FIXED: DropdownItem now uses closeMenu and executes action with delay
+// FIXED: DropdownItem now properly closes menu then executes action
 function DropdownItem({ icon: Icon, label, onClick, disabled = false, active = false, shortcut, closeMenu }) {
   const handleClick = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
     if (disabled) return;
     // Close menu first
     if (closeMenu) closeMenu();
-    // Then execute action with small delay to ensure menu closes
-    setTimeout(() => {
-      if (onClick) onClick(e);
-    }, 10);
+    // Execute action after brief delay to ensure menu closes
+    if (onClick) {
+      setTimeout(() => onClick(e), 10);
+    }
   };
 
   return (
     <button
-      type="button"
       onClick={handleClick}
       disabled={disabled}
       className={`
@@ -849,10 +843,10 @@ export default function ComposePage() {
     URL.revokeObjectURL(url);
   };
 
-  // FIXED: Better error message when no chapter selected
+  // FIXED: Show helpful message instead of doing nothing when no chapter selected
   const handleDeleteCurrent = () => {
     if (!hasChapter) {
-      alert("Please select a chapter first by clicking on a chapter card.");
+      alert("Please select a chapter first by clicking on a chapter card or from the sidebar.");
       return;
     }
     if (window.confirm(`Delete "${title || selectedChapter.title}"?\n\nThis cannot be undone.`)) {
@@ -874,7 +868,7 @@ export default function ComposePage() {
 
   const goBack = () => navigate("/dashboard");
 
-  // FIXED: Helper to switch to editor view (auto-selects first chapter if needed)
+  // FIXED: Helper functions for view switching that auto-select first chapter if needed
   const switchToEditor = () => {
     if (!selectedId && chapters.length > 0) {
       setSelectedId(chapters[0].id);
@@ -883,7 +877,6 @@ export default function ComposePage() {
     setEditorViewMode("editor");
   };
 
-  // FIXED: Helper to switch to page view (auto-selects first chapter if needed)
   const switchToPageView = () => {
     if (!selectedId && chapters.length > 0) {
       setSelectedId(chapters[0].id);
@@ -920,13 +913,13 @@ export default function ComposePage() {
       >
         <div className="max-w-[1800px] mx-auto px-4 py-3">
           <div className="flex items-center justify-between flex-wrap gap-3">
-            {/* Left: Title - FIXED: explicit text-white */}
+            {/* Left: Title */}
             <div className="flex items-center gap-3">
               <PenLine size={24} className="text-amber-300" />
               <h1 className="text-xl font-bold text-white">Compose</h1>
             </div>
 
-            {/* Center: Story Info - FIXED: explicit text-white */}
+            {/* Center: Story Info */}
             <div className="flex items-center gap-4 md:gap-6 text-sm flex-wrap">
               <div className="flex items-center gap-2">
                 <span className="text-white/70">Story:</span>
@@ -971,7 +964,6 @@ export default function ComposePage() {
         <div className="max-w-[1800px] mx-auto px-4 py-2 flex items-center gap-3 overflow-x-auto">
           {/* Dashboard Button (Gold) */}
           <button
-            type="button"
             onClick={goBack}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold text-white transition-all hover:scale-105 flex-shrink-0"
             style={{ background: "linear-gradient(135deg, #D4AF37, #B8960C)" }}
@@ -1001,7 +993,7 @@ export default function ComposePage() {
             />
           </DropdownMenu>
 
-          {/* View Dropdown - FIXED: uses helper functions that auto-select */}
+          {/* View Dropdown - FIXED: uses helper functions that auto-select first chapter */}
           <DropdownMenu label="View" icon={Eye}>
             <DropdownItem
               icon={Grid3X3}
@@ -1067,7 +1059,6 @@ export default function ComposePage() {
 
           {/* Search Button */}
           <button
-            type="button"
             onClick={() => setShowSearch((s) => !s)}
             className={`
               inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium
@@ -1084,7 +1075,7 @@ export default function ComposePage() {
           </button>
 
           {/* Spacer */}
-          <div className="flex-1 min-w-[20px]" />
+          <div className="flex-1" />
 
           {/* Status indicators */}
           {queueLength > 0 && (
@@ -1273,7 +1264,7 @@ export default function ComposePage() {
                 onSave={handleSave}
                 onAI={handleAI}
                 aiBusy={aiBusy || chatBusy}
-                pageWidth={850}
+                pageWidth={1200}
                 onHeadingsChange={setHeadings}
               />
             )}
