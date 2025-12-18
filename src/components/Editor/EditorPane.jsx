@@ -121,6 +121,9 @@ export default function EditorPane({
   // Build a class for line spacing
   const spacingClass = `storylab-lh-${lineSpacing.replace(".", "_")}`;
 
+  // Line height value for inline styles
+  const lineHeightValue = lineSpacing === "1" ? "1.4" : lineSpacing === "1.5" ? "1.8" : "2.4";
+
   return (
     <div className="relative flex flex-col h-full">
       {/* Row 1: Title + stats + spacing + undo/redo */}
@@ -178,47 +181,55 @@ export default function EditorPane({
       </div>
 
       {/* ═══════════════════════════════════════════════════════════════
-          WORD DOCUMENT LOOK - Gray background with white page
-          FIXED: flex-1 to fill available height, overflow-auto for scroll
+          WORD-LIKE EDITOR - Clean white page, type directly
+          NO gray background, NO box-in-box
       ═══════════════════════════════════════════════════════════════ */}
-      <div 
-        className="rounded-lg p-6 flex-1 overflow-auto"
-        style={{ 
-          backgroundColor: "#c0c0c0",
-        }}
-      >
-        {/* White "page" - like a Word document */}
-        <div
-          className="mx-auto bg-white shadow-xl"
-          style={{
-            maxWidth: pageWidth,
-            minHeight: "900px", // Roughly a page height
-            padding: "72px", // 1 inch margins like Word
-            boxShadow: "0 4px 24px rgba(0,0,0,0.2), 0 0 0 1px rgba(0,0,0,0.05)",
-          }}
-        >
-          <ReactQuill
-            ref={quillRef}
-            theme="snow"
-            value={html}
-            onChange={handleChange}
-            modules={modules}
-            formats={formats}
-            className={`storylab-editor ${spacingClass}`}
-            style={{
-              minHeight: "700px",
-            }}
-          />
-        </div>
+      
+      {/* CSS to remove Quill's default borders and make it seamless */}
+      <style>{`
+        .word-style-editor .ql-toolbar {
+          border: none !important;
+          border-bottom: 1px solid #e2e8f0 !important;
+          background: #f8fafc;
+          border-radius: 8px 8px 0 0;
+        }
+        .word-style-editor .ql-container {
+          border: none !important;
+          font-family: 'Times New Roman', Georgia, serif;
+          font-size: 12pt;
+        }
+        .word-style-editor .ql-editor {
+          padding: 60px 72px;
+          min-height: 600px;
+          line-height: ${lineHeightValue};
+        }
+        .word-style-editor .ql-editor:focus {
+          outline: none;
+        }
+      `}</style>
 
-        {/* AI busy indicator */}
-        {aiBusy && (
-          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 text-sm text-slate-700 bg-white px-4 py-2 rounded-full border border-slate-200 shadow-lg flex items-center gap-2 z-50">
-            <div className="w-4 h-4 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
-            AI is working...
-          </div>
-        )}
+      <div 
+        className="flex-1 overflow-auto bg-white rounded-lg border border-slate-200 shadow-sm"
+        style={{ maxWidth: pageWidth }}
+      >
+        <ReactQuill
+          ref={quillRef}
+          theme="snow"
+          value={html}
+          onChange={handleChange}
+          modules={modules}
+          formats={formats}
+          className={`word-style-editor ${spacingClass}`}
+        />
       </div>
+
+      {/* AI busy indicator */}
+      {aiBusy && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 text-sm text-slate-700 bg-white px-4 py-2 rounded-full border border-slate-200 shadow-lg flex items-center gap-2 z-50">
+          <div className="w-4 h-4 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
+          AI is working...
+        </div>
+      )}
     </div>
   );
 }
