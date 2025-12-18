@@ -22,15 +22,15 @@ export default function EditorPane({
   onSave,
   onAI,
   aiBusy,
-  pageWidth = 1000,
+  pageWidth = 850,
   onHeadingsChange,
 }) {
   const quillRef = useRef(null);
 
-  // 🔹 line spacing state ("1", "1.5", "2")
+  // Line spacing state ("1", "1.5", "2")
   const [lineSpacing, setLineSpacing] = useState("1.5");
 
-  // Quill modules (including history for undo/redo)
+  // Quill modules with more fonts
   const modules = useMemo(
     () => ({
       toolbar: [
@@ -42,6 +42,7 @@ export default function EditorPane({
         [{ align: [] }],
         [{ list: "ordered" }, { list: "bullet" }],
         [{ indent: "-1" }, { indent: "+1" }],
+        ["blockquote"],
         ["clean"],
       ],
       history: {
@@ -68,6 +69,7 @@ export default function EditorPane({
       "align",
       "list",
       "indent",
+      "blockquote",
     ],
     []
   );
@@ -76,7 +78,7 @@ export default function EditorPane({
   const plainText = useMemo(() => stripHtml(html), [html]);
   const wordCount = useMemo(() => countWords(plainText), [plainText]);
   const pageCount = useMemo(
-    () => Math.max(1, Math.ceil(wordCount / 300)), // simple estimate
+    () => Math.max(1, Math.ceil(wordCount / 300)),
     [wordCount]
   );
 
@@ -87,7 +89,7 @@ export default function EditorPane({
       const tmp = document.createElement("div");
       tmp.innerHTML = html || "";
       const hs = Array.from(tmp.querySelectorAll("h1, h2, h3")).map((el) => ({
-        level: el.tagName.toLowerCase(), // "h1" | "h2" | "h3"
+        level: el.tagName.toLowerCase(),
         text: el.textContent || "",
         id: el.id || "",
       }));
@@ -101,7 +103,7 @@ export default function EditorPane({
     setHtml(value);
   };
 
-  // 🔹 Undo / Redo using Quill history
+  // Undo / Redo using Quill history
   const handleUndo = () => {
     const editor = quillRef.current?.getEditor?.();
     if (editor && editor.history) {
@@ -116,27 +118,27 @@ export default function EditorPane({
     }
   };
 
-  // Build a class for line spacing: "storylab-lh-1", "storylab-lh-1_5", "storylab-lh-2"
+  // Build a class for line spacing
   const spacingClass = `storylab-lh-${lineSpacing.replace(".", "_")}`;
 
   return (
-    <div className="relative flex flex-col gap-3">
+    <div className="relative flex flex-col gap-4">
       {/* Title row + stats + spacing + undo/redo */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-white rounded-lg border border-slate-200 p-3 shadow-sm">
         <input
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           onBlur={onSave}
           placeholder="Untitled chapter"
-          className="flex-1 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-[var(--brand-accent)]"
+          className="flex-1 min-w-[200px] rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
         />
 
-        {/* Left: word + page info */}
+        {/* Word + page info */}
         <div className="flex items-center gap-3 text-xs text-slate-600">
           <span>{wordCount.toLocaleString()} words</span>
-          <span className="inline-flex items-center rounded-full border border-slate-200 bg-white/80 px-3 py-1 shadow-sm">
-            Pg ~{pageCount}
+          <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1">
+            ~{pageCount} page{pageCount !== 1 ? "s" : ""}
           </span>
         </div>
 
@@ -146,7 +148,7 @@ export default function EditorPane({
           <select
             value={lineSpacing}
             onChange={(e) => setLineSpacing(e.target.value)}
-            className="border border-slate-300 rounded px-2 py-1 text-xs bg-white"
+            className="border border-slate-300 rounded px-2 py-1 text-xs bg-white focus:ring-2 focus:ring-amber-400"
           >
             <option value="1">Single</option>
             <option value="1.5">1.5</option>
@@ -159,51 +161,63 @@ export default function EditorPane({
           <button
             type="button"
             onClick={handleUndo}
-            className="px-2 py-1 rounded border border-slate-200 bg-white hover:bg-slate-50"
+            className="px-3 py-1.5 rounded border border-slate-200 bg-white hover:bg-slate-50 font-medium"
             title="Undo (Ctrl+Z)"
           >
-            Undo
+            ↩ Undo
           </button>
           <button
             type="button"
             onClick={handleRedo}
-            className="px-2 py-1 rounded border border-slate-200 bg-white hover:bg-slate-50"
+            className="px-3 py-1.5 rounded border border-slate-200 bg-white hover:bg-slate-50 font-medium"
             title="Redo (Ctrl+Y)"
           >
-            Redo
+            ↪ Redo
           </button>
         </div>
       </div>
 
-      {/* Editor "page" */}
-      <div className="flex justify-center">
+      {/* ═══════════════════════════════════════════════════════════════
+          WORD DOCUMENT LOOK: Gray background with white page
+      ═══════════════════════════════════════════════════════════════ */}
+      <div 
+        className="rounded-lg p-8"
+        style={{ 
+          backgroundColor: "#d4d4d4",
+          minHeight: "calc(100vh - 280px)",
+        }}
+      >
+        {/* White "page" - like a Word document */}
         <div
-          className="relative bg-white shadow-lg border border-slate-200 rounded-md overflow-hidden"
+          className="mx-auto bg-white shadow-xl"
           style={{
-            width: pageWidth,
-            minHeight: "80vh",
+            maxWidth: pageWidth,
+            minHeight: "calc(100vh - 340px)",
+            padding: "72px 72px 72px 72px", // 1 inch margins like Word
+            boxShadow: "0 4px 24px rgba(0,0,0,0.2), 0 0 0 1px rgba(0,0,0,0.05)",
           }}
         >
           <ReactQuill
-          ref={quillRef}
-          theme="snow"
-          value={html}
-          onChange={handleChange}
-          modules={modules}
-          formats={formats}
-          className={`storylab-editor ${spacingClass}`}
-          style={{
-            height: "calc(100vh - 200px)", // fixed “page” height
-          }}
-        />
-
-          {/* Optional footer inside the page (AI busy indicator) */}
-          {aiBusy && (
-            <div className="absolute bottom-3 left-1/2 -translate-x-1/2 text-[11px] text-slate-500 bg-white/80 px-2 py-1 rounded border border-slate-200 shadow-sm">
-              AI working…
-            </div>
-          )}
+            ref={quillRef}
+            theme="snow"
+            value={html}
+            onChange={handleChange}
+            modules={modules}
+            formats={formats}
+            className={`storylab-editor ${spacingClass}`}
+            style={{
+              minHeight: "calc(100vh - 480px)",
+            }}
+          />
         </div>
+
+        {/* AI busy indicator */}
+        {aiBusy && (
+          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 text-sm text-slate-700 bg-white px-4 py-2 rounded-full border border-slate-200 shadow-lg flex items-center gap-2 z-50">
+            <div className="w-4 h-4 border-2 border-amber-500 border-t-transparent rounded-full animate-spin" />
+            AI is working...
+          </div>
+        )}
       </div>
     </div>
   );
