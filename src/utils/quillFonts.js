@@ -2,7 +2,8 @@ src/utils/quillFonts.js
 // src/utils/quillFonts.js
 // Import this file ONCE in your App.jsx or index.js
 
-import ReactQuill from "react-quill";
+import ReactQuill from "react-quill"; 
+import './utils/quillFonts';
 
 // Get Quill from ReactQuill
 const Quill = ReactQuill.Quill;
