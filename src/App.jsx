@@ -22,7 +22,7 @@ import {
 } from "dnd-multi-backend";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { TouchBackend } from "react-dnd-touch-backend";
-import './utils/quillFonts';
+// import './utils/quillFonts'; // REMOVED - was causing build error
 
 // Global user context
 import { UserProvider } from "./lib/userStore.jsx";
@@ -395,3 +395,4 @@ export default function App() {
     </UserProvider>
   );
 }
+
