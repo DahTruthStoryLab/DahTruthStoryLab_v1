@@ -30,7 +30,7 @@ export default function EditorPane({
   // Line spacing state ("1", "1.5", "2")
   const [lineSpacing, setLineSpacing] = useState("1.5");
 
-  // FIXED: Standard Quill toolbar (NOT external)
+  // Standard Quill toolbar
   const modules = useMemo(
     () => ({
       toolbar: [
@@ -122,9 +122,9 @@ export default function EditorPane({
   const spacingClass = `storylab-lh-${lineSpacing.replace(".", "_")}`;
 
   return (
-    <div className="relative flex flex-col gap-4">
+    <div className="relative flex flex-col h-full">
       {/* Row 1: Title + stats + spacing + undo/redo */}
-      <div className="flex flex-wrap items-center justify-between gap-3 bg-white rounded-lg border border-slate-200 p-3 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-3 bg-white rounded-lg border border-slate-200 p-3 shadow-sm flex-shrink-0 mb-4">
         <input
           type="text"
           value={title}
@@ -179,13 +179,12 @@ export default function EditorPane({
 
       {/* ═══════════════════════════════════════════════════════════════
           WORD DOCUMENT LOOK - Gray background with white page
-          Quill toolbar will appear at top of the white page area
+          FIXED: flex-1 to fill available height, overflow-auto for scroll
       ═══════════════════════════════════════════════════════════════ */}
       <div 
-        className="rounded-lg p-8"
+        className="rounded-lg p-6 flex-1 overflow-auto"
         style={{ 
           backgroundColor: "#c0c0c0",
-          minHeight: "calc(100vh - 340px)",
         }}
       >
         {/* White "page" - like a Word document */}
@@ -193,7 +192,7 @@ export default function EditorPane({
           className="mx-auto bg-white shadow-xl"
           style={{
             maxWidth: pageWidth,
-            minHeight: "calc(100vh - 400px)",
+            minHeight: "900px", // Roughly a page height
             padding: "72px", // 1 inch margins like Word
             boxShadow: "0 4px 24px rgba(0,0,0,0.2), 0 0 0 1px rgba(0,0,0,0.05)",
           }}
@@ -207,7 +206,7 @@ export default function EditorPane({
             formats={formats}
             className={`storylab-editor ${spacingClass}`}
             style={{
-              minHeight: "calc(100vh - 540px)",
+              minHeight: "700px",
             }}
           />
         </div>
@@ -223,3 +222,4 @@ export default function EditorPane({
     </div>
   );
 }
+
