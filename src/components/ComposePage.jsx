@@ -182,14 +182,14 @@ function DropdownMenu({ label, icon: Icon, children, disabled = false }) {
     <div ref={ref} className="relative">
       <button
         type="button"
-        onClick={() => !disabled && setOpen(!open)}
-        disabled={disabled}
-
-  return (
-    <div ref={ref} className="relative">
-      <button
-        type="button"
-        onClick={() => !disabled && setOpen(!open)}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (!disabled) {
+            console.log('[Dropdown] ' + label + ' clicked');
+            setOpen(!open);
+          }
+        }}
         disabled={disabled}
         className={`
           inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium
