@@ -22,6 +22,7 @@ import {
 } from "dnd-multi-backend";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { TouchBackend } from "react-dnd-touch-backend";
+import './utils/quillFonts';
 
 // Global user context
 import { UserProvider } from "./lib/userStore.jsx";
