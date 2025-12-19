@@ -1465,7 +1465,7 @@ const goToWriter = (chapterId) => {
                   </div>
                 )}
 
-                <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+                <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm min-h-[140px]">
                   <div className="text-xs font-semibold text-slate-700 mb-2 flex items-center justify-between">
                     <span>Characters</span>
                     <span className="text-[11px] text-slate-500">
