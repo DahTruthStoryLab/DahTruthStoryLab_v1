@@ -402,3 +402,9 @@ iframe {
 :root {
   --brand-peach: var(--brand-pink);
 }
+
+/* DEBUG: show boundaries */
+aside { outline: 3px solid red !important; }
+.word-style-editor { outline: 3px solid blue !important; }
+.word-style-editor .ql-container { outline: 3px solid green !important; }
+.word-style-editor .ql-editor { outline: 3px solid purple !important; }
