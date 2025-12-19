@@ -13,6 +13,7 @@ import PaginatedView from "./Writing/PaginatedView";
 import { useChapterManager } from "../hooks/useChapterManager";
 import { documentParser } from "../utils/documentParser";
 import { rateLimiter } from "../utils/rateLimiter";
+import { createPortal } from "react-dom";
 
 import { runAssistant } from "../lib/api";
 import {
@@ -162,30 +163,60 @@ function htmlToPlainText(html = "") {
 ========================================================= */
 function DropdownMenu({ label, icon: Icon, children, disabled = false }) {
   const [open, setOpen] = useState(false);
-  const ref = useRef(null);
+  const btnRef = useRef(null);
+  const menuRef = useRef(null);
+  const [pos, setPos] = useState({ top: 0, left: 0, width: 180 });
+
+  const close = () => setOpen(false);
+
+  const computePos = () => {
+    const el = btnRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    setPos({
+      top: r.bottom + 8,
+      left: r.left,
+      width: Math.max(180, r.width),
+    });
+  };
 
   useEffect(() => {
-    const handleClick = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) {
-        setOpen(false);
-      }
+    if (!open) return;
+
+    computePos();
+
+    const onDocMouseDown = (e) => {
+      const btn = btnRef.current;
+      const menu = menuRef.current;
+      if (!btn || !menu) return;
+      if (btn.contains(e.target) || menu.contains(e.target)) return;
+      close();
     };
-    if (open) {
-      document.addEventListener("mousedown", handleClick);
-    }
-    return () => document.removeEventListener("mousedown", handleClick);
+
+    const onScrollOrResize = () => computePos();
+
+    document.addEventListener("mousedown", onDocMouseDown, true);
+    window.addEventListener("scroll", onScrollOrResize, true);
+    window.addEventListener("resize", onScrollOrResize);
+
+    return () => {
+      document.removeEventListener("mousedown", onDocMouseDown, true);
+      window.removeEventListener("scroll", onScrollOrResize, true);
+      window.removeEventListener("resize", onScrollOrResize);
+    };
   }, [open]);
 
   return (
-    <div ref={ref} className="relative z-[9999]">
+    <>
       <button
+        ref={btnRef}
         type="button"
         onClick={(e) => {
           e.preventDefault();
           e.stopPropagation();
-          if (!disabled) {
-            setOpen((v) => !v);
-          }
+          if (disabled) return;
+          console.log(`[Dropdown] ${label} clicked`);
+          setOpen((v) => !v);
         }}
         disabled={disabled}
         className={`
@@ -199,22 +230,30 @@ function DropdownMenu({ label, icon: Icon, children, disabled = false }) {
         <span>{label}</span>
         <ChevronDown
           size={14}
-          className={`text-slate-400 transition-transform ${
-            open ? "rotate-180" : ""
-          }`}
+          className={`text-slate-400 transition-transform ${open ? "rotate-180" : ""}`}
         />
       </button>
 
-      {open && (
-        <div className="absolute top-full left-0 mt-1 min-w-[180px] bg-white border border-slate-200 rounded-lg shadow-lg z-[9999] py-1">
-          {React.Children.map(children, (child) =>
-            child
-              ? React.cloneElement(child, { closeMenu: () => setOpen(false) })
-              : null
-          )}
-        </div>
-      )}
-    </div>
+      {open &&
+        createPortal(
+          <div
+            ref={menuRef}
+            style={{
+              position: "fixed",
+              top: pos.top,
+              left: pos.left,
+              minWidth: pos.width,
+              zIndex: 999999,
+            }}
+            className="bg-white border border-slate-200 rounded-lg shadow-lg py-1"
+          >
+            {React.Children.map(children, (child) =>
+              child ? React.cloneElement(child, { closeMenu: close }) : null
+            )}
+          </div>,
+          document.body
+        )}
+    </>
   );
 }
 
@@ -1453,9 +1492,9 @@ const goToWriter = (chapterId) => {
                 </div>
               </aside>
 
-              {/* Main Editor/Paginated View
-                  FIXED: contain overflow so it cannot cover sidebar */}
-              <div className="min-h-0 min-w-0 overflow-x-auto overflow-y-hidden">
+             {/* Main Editor/Paginated View - contained so it cannot cover sidebar */}
+            <div className="min-h-0 min-w-0 overflow-hidden">
+              <div className="min-h-0 min-w-0 w-full h-full overflow-x-auto">
                 {editorViewMode === "pages" ? (
                   <PaginatedView
                     html={html}
@@ -1478,8 +1517,9 @@ const goToWriter = (chapterId) => {
                   />
                 )}
               </div>
+            </div>
 
-              {/* Right-hand AI Assistant */}
+           {/* Right-hand AI Assistant */}
               {showAssistant && (
                 <section className="flex flex-col bg-white border border-slate-200 rounded-xl shadow-sm min-h-0 max-h-full overflow-hidden">
                   <div className="px-3 py-2 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
