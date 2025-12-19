@@ -95,40 +95,37 @@
 }
 
 /* ===========================================================
-   ✅ FIX: Stop Quill UI from overlapping the LEFT SIDEBAR
-   -----------------------------------------------------------
-   The old rule used z-index: 30 globally which can cause the
-   editor UI to sit "above" neighboring grid columns.
+   ✅ FIX: Quill stacking should be LOCAL to the editor only
+   (prevents Quill UI from overlaying your sidebar/grid)
    =========================================================== */
-.ql-toolbar {
+.word-style-editor .ql-toolbar {
   overflow: visible !important;
-  position: relative; /* z-index only works reliably with positioned elements */
-  z-index: 2; /* keep above editor content, not above other layout columns */
+  position: relative;
+  z-index: 2;
 }
 
-.ql-container {
+.word-style-editor .ql-container {
   position: relative;
   z-index: 1;
 }
 
-/* Dropdown options panel should show above toolbar but stay local */
-.ql-snow .ql-picker.ql-expanded .ql-picker-options {
+/* Dropdown options panel above toolbar but still local */
+.word-style-editor .ql-toolbar.ql-snow .ql-picker.ql-expanded .ql-picker-options {
   z-index: 6;
 }
 
-/* Quill tooltip (link tooltip etc.) */
-.ql-tooltip {
+/* Quill tooltip (link tooltip etc.) local only */
+.word-style-editor .ql-tooltip {
   z-index: 7;
 }
 
-/* === NEW: Line-height picker (1 / 1.5 / 2) visibility & styling === */
+/* === Line-height picker visibility & styling (if you keep it) === */
 .ql-toolbar .ql-picker.ql-line-height .ql-picker-label::before,
 .ql-toolbar .ql-picker.ql-line-height .ql-picker-item::before {
   color: #0f172a;
   font-size: 12px;
 }
 
-/* Dropdown panel background for the line-height picker */
 .ql-toolbar .ql-picker.ql-line-height .ql-picker-options {
   background: #ffffff;
   border: 1px solid #e5e7eb;
@@ -136,7 +133,6 @@
   z-index: 8;
 }
 
-/* Give the line-height picker a bit of width so numbers do not get clipped */
 .ql-toolbar .ql-picker.ql-line-height {
   min-width: 2.5rem;
 }
@@ -184,7 +180,7 @@
     --brand-mauve: #8b6f8f;
     --brand-ink: #0f172a;
 
-    /* HSL tokens (optional: shadcn/ui-style usage) */
+    /* HSL tokens */
     --background: 210 50% 98%;
     --foreground: 222 47% 11%;
     --muted: 215 20% 93%;
@@ -373,13 +369,6 @@ iframe {
   background: transparent;
 }
 
-/* Make sticky sidebars feel right on iOS/Safari */
-@supports (position: sticky) {
-  aside[aria-label="Publishing sidebar"] {
-    will-change: transform;
-  }
-}
-
 /* Optional: nicer focus ring for accessibility */
 :focus-visible {
   outline: 2px solid var(--brand-accent);
@@ -388,11 +377,8 @@ iframe {
 
 /* --- Publishing header + brand tune --- */
 :root {
-  /* Softer blush tones for header + accents */
   --brand-rose: #e48aa8;
   --brand-peach: #f6c0b3;
-
-  /* Align primary/accent with softer scheme */
   --brand-primary: #d46d92;
   --brand-accent: #f1a3bf;
   --brand-highlight: rgba(212, 109, 146, 0.12);
@@ -403,8 +389,33 @@ iframe {
   --brand-peach: var(--brand-pink);
 }
 
-/* DEBUG: show boundaries */
-aside { outline: 3px solid red !important; }
-.word-style-editor { outline: 3px solid blue !important; }
-.word-style-editor .ql-container { outline: 3px solid green !important; }
-.word-style-editor .ql-editor { outline: 3px solid purple !important; }
+/* =========================================================
+   HARD RESET for Quill layout
+   This prevents the editor "page" from overlapping the sidebar
+   ========================================================= */
+.word-style-editor .ql-container,
+.word-style-editor .ql-editor,
+.word-style-editor .ql-toolbar {
+  position: static !important;
+  left: auto !important;
+  right: auto !important;
+  top: auto !important;
+  bottom: auto !important;
+  transform: none !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  z-index: auto !important;
+}
+
+.word-style-editor,
+.word-style-editor * {
+  box-sizing: border-box !important;
+  max-width: 100% !important;
+}
+
+/* Prevent any Quill inner element from forcing horizontal overflow */
+.word-style-editor .ql-editor {
+  margin: 0 !important;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
