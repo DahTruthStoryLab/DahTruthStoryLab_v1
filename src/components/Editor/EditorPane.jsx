@@ -20,7 +20,7 @@ export default function EditorPane({
   html,
   setHtml,
   onSave,
-  onAI, // (kept for compatibility even if not used directly here)
+  onAI,
   aiBusy,
   pageWidth = 850,
   onHeadingsChange,
@@ -109,14 +109,16 @@ export default function EditorPane({
     if (editor?.history) editor.history.redo();
   };
 
-  // Spacing class + line height
+  // Build a class for line spacing
   const spacingClass = `storylab-lh-${lineSpacing.replace(".", "_")}`;
+
+  // Line height value for inline styles
   const lineHeightValue =
     lineSpacing === "1" ? "1.4" : lineSpacing === "1.5" ? "1.8" : "2.4";
 
   return (
-    // IMPORTANT: min-w-0 / min-h-0 keeps the editor constrained inside the grid cell
-    <div className="relative flex flex-col h-full min-h-0 min-w-0">
+    // KEY: min-w-0 + overflow-hidden ensures Quill cannot escape its column
+    <div className="relative flex flex-col h-full min-h-0 min-w-0 overflow-hidden">
       {/* Row 1: Title + stats + spacing + undo/redo */}
       <div className="flex flex-wrap items-center justify-between gap-3 bg-white rounded-lg border border-slate-200 p-3 shadow-sm flex-shrink-0 mb-4">
         <input
@@ -171,52 +173,104 @@ export default function EditorPane({
         </div>
       </div>
 
-      {/* Quill styling */}
+      {/* Quill styling + HARD CLAMPS to prevent overlap */}
       <style>{`
+        /* Prevent any Quill element from expanding past its container */
+        .word-style-editor,
+        .word-style-editor * {
+          box-sizing: border-box;
+          max-width: 100%;
+        }
+
+        /* Make Quill itself fill the available column width */
+        .word-style-editor {
+          width: 100%;
+          min-width: 0;
+        }
+
         .word-style-editor .ql-toolbar {
           border: none !important;
           border-bottom: 1px solid #e2e8f0 !important;
           background: #f8fafc;
           border-radius: 8px 8px 0 0;
         }
+
         .word-style-editor .ql-container {
           border: none !important;
+          width: 100%;
+          min-width: 0;
           font-family: 'Times New Roman', Georgia, serif;
           font-size: 12pt;
         }
+
         .word-style-editor .ql-editor {
           padding: 60px 72px;
           min-height: 600px;
           line-height: ${lineHeightValue};
+          overflow-wrap: anywhere; /* prevents long strings from forcing width */
+          word-break: break-word;
         }
-        .word-style-editor .ql-editor:focus {
-          outline: none;
-        }
+<style>{`
+  .word-style-editor .ql-toolbar {
+    border: none !important;
+    border-bottom: 1px solid #e2e8f0 !important;
+    background: #f8fafc;
+    border-radius: 8px 8px 0 0;
+  }
 
-        /* Responsive padding to prevent horizontal overflow on smaller screens */
-        @media (max-width: 1024px) {
-          .word-style-editor .ql-editor {
-            padding: 40px 36px;
-          }
-        }
-        @media (max-width: 640px) {
-          .word-style-editor .ql-editor {
-            padding: 28px 18px;
-          }
-        }
-      `}</style>
+  .word-style-editor .ql-container {
+    border: none !important;
+    width: 100%;
+    min-width: 0;
+    font-family: 'Times New Roman', Georgia, serif;
+    font-size: 12pt;
+  }
 
-      {/* 
-        KEY FIX:
-        - outer wrapper prevents the editor from "spilling" into the sidebar
-        - inner container is full width of the grid cell, with a centered maxWidth "page"
+  .word-style-editor .ql-editor {
+    padding: 60px 72px;
+    min-height: 600px;
+    line-height: ${lineHeightValue};
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .word-style-editor .ql-editor:focus {
+    outline: none;
+  }
+
+  /* HARD OVERRIDES: stop any global Quill CSS from breaking layout */
+  .word-style-editor .ql-container,
+  .word-style-editor .ql-editor,
+  .word-style-editor .ql-toolbar {
+    position: static !important;
+    left: auto !important;
+    right: auto !important;
+    top: auto !important;
+    bottom: auto !important;
+    transform: none !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    z-index: auto !important;
+  }
+
+  /* Prevent “page” width from forcing the grid wider */
+  .word-style-editor .ql-editor {
+    margin: 0 !important;
+  }
+`}</style>
+
+        {/* Page wrapper:
+          - w-full so it respects the column
+          - maxWidth to keep the Word-like page size
+          - mx-auto to center inside the column
+          - overflow-hidden so it can never spill into sidebar
       */}
-      <div className="flex-1 min-h-0 min-w-0 overflow-hidden">
+      <div className="flex-1 min-h-0 min-w-0 overflow-auto">
         <div
-          className="h-full w-full overflow-auto bg-white rounded-lg border border-slate-200 shadow-sm mx-auto"
+          className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden mx-auto"
           style={{
-            maxWidth: pageWidth, // keep your page width
-            width: "100%",       // but never exceed the grid cell
+            width: "100%",
+            maxWidth: pageWidth,
           }}
         >
           <ReactQuill
