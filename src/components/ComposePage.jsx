@@ -1402,16 +1402,16 @@ const goToWriter = (chapterId) => {
             </div>
 
             {/* Main layout */}
-            <div
+           <div
               className="grid gap-6 flex-1 min-h-0 overflow-hidden"
               style={{
                 gridTemplateColumns: showAssistant
-                  ? "minmax(220px, 220px) minmax(0, 1fr) minmax(320px, 320px)"
-                  : "minmax(220px, 220px) minmax(0, 1fr)",
+                  ? "220px minmax(0, 1fr) 320px"
+                  : "220px minmax(0, 1fr)",
               }}
             >
               {/* Left Sidebar */}
-              <aside className="space-y-3 overflow-y-auto min-w-0 relative z-30 pr-1">
+           <aside className="space-y-3 overflow-y-auto min-w-0 relative z-20">  
                 {showSearch && (
                   <SearchPanel
                     chapters={chapters}
@@ -1492,35 +1492,34 @@ const goToWriter = (chapterId) => {
               </aside>
 
               {/* Main Editor/Paginated View */}
-              <div className="min-h-0 min-w-0 overflow-hidden relative z-10">
-                <div className="min-h-0 min-w-0 w-full h-full overflow-x-auto overflow-y-hidden">
-                  {editorViewMode === "pages" ? (
-                    <PaginatedView
-                      html={html}
-                      title={title}
-                      author={author}
-                      chapterNumber={chapters.findIndex((c) => c.id === selectedId) + 1}
-                      onEdit={() => setEditorViewMode("editor")}
-                    />
-                  ) : (
-                    <EditorPane
-                      title={title}
-                      setTitle={setTitle}
-                      html={html}
-                      setHtml={setHtml}
-                      onSave={handleSave}
-                      onAI={handleAI}
-                      aiBusy={aiBusy || chatBusy}
-                      pageWidth={850}
-                      onHeadingsChange={setHeadings}
-                    />
-                  )}
-                </div>
-              </div>
-
+  <div className="min-h-0 min-w-0 overflow-hidden relative z-10">
+    <div className="min-h-0 min-w-0 w-full h-full overflow-x-auto">
+      {editorViewMode === "pages" ? (
+        <PaginatedView
+          html={html}
+          title={title}
+          author={author}
+          chapterNumber={chapters.findIndex((c) => c.id === selectedId) + 1}
+          onEdit={() => setEditorViewMode("editor")}
+        />
+      ) : (
+        <EditorPane
+          title={title}
+          setTitle={setTitle}
+          html={html}
+          setHtml={setHtml}
+          onSave={handleSave}
+          onAI={handleAI}
+          aiBusy={aiBusy || chatBusy}
+          pageWidth={850}
+          onHeadingsChange={setHeadings}
+        />
+      )}
+    </div>
+  </div>
               {/* Right-hand AI Assistant */}
-              {showAssistant && (
-                <section className="flex flex-col bg-white border border-slate-200 rounded-xl shadow-sm min-h-0 max-h-full overflow-hidden relative z-20">
+                {showAssistant && (
+                  <section className="flex flex-col bg-white border border-slate-200 rounded-xl shadow-sm min-h-0 max-h-full overflow-hidden relative z-20">
                   <div className="px-3 py-2 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
                     <div>
                       <div className="text-xs font-semibold text-slate-800">AI Assistant</div>
