@@ -20,7 +20,7 @@ export default function EditorPane({
   html,
   setHtml,
   onSave,
-  onAI,
+  onAI, // (kept for compatibility even if not used directly here)
   aiBusy,
   pageWidth = 850,
   onHeadingsChange,
@@ -77,10 +77,7 @@ export default function EditorPane({
   // Word + page count
   const plainText = useMemo(() => stripHtml(html), [html]);
   const wordCount = useMemo(() => countWords(plainText), [plainText]);
-  const pageCount = useMemo(
-    () => Math.max(1, Math.ceil(wordCount / 300)),
-    [wordCount]
-  );
+  const pageCount = useMemo(() => Math.max(1, Math.ceil(wordCount / 300)), [wordCount]);
 
   // Headings → TOC in sidebar
   useEffect(() => {
@@ -99,33 +96,27 @@ export default function EditorPane({
     }
   }, [html, onHeadingsChange]);
 
-  const handleChange = (value) => {
-    setHtml(value);
-  };
+  const handleChange = (value) => setHtml(value);
 
   // Undo / Redo using Quill history
   const handleUndo = () => {
     const editor = quillRef.current?.getEditor?.();
-    if (editor && editor.history) {
-      editor.history.undo();
-    }
+    if (editor?.history) editor.history.undo();
   };
 
   const handleRedo = () => {
     const editor = quillRef.current?.getEditor?.();
-    if (editor && editor.history) {
-      editor.history.redo();
-    }
+    if (editor?.history) editor.history.redo();
   };
 
-  // Build a class for line spacing
+  // Spacing class + line height
   const spacingClass = `storylab-lh-${lineSpacing.replace(".", "_")}`;
-
-  // Line height value for inline styles
-  const lineHeightValue = lineSpacing === "1" ? "1.4" : lineSpacing === "1.5" ? "1.8" : "2.4";
+  const lineHeightValue =
+    lineSpacing === "1" ? "1.4" : lineSpacing === "1.5" ? "1.8" : "2.4";
 
   return (
-    <div className="relative flex flex-col h-full">
+    // IMPORTANT: min-w-0 / min-h-0 keeps the editor constrained inside the grid cell
+    <div className="relative flex flex-col h-full min-h-0 min-w-0">
       {/* Row 1: Title + stats + spacing + undo/redo */}
       <div className="flex flex-wrap items-center justify-between gap-3 bg-white rounded-lg border border-slate-200 p-3 shadow-sm flex-shrink-0 mb-4">
         <input
@@ -180,12 +171,7 @@ export default function EditorPane({
         </div>
       </div>
 
-      {/* ═══════════════════════════════════════════════════════════════
-          WORD-LIKE EDITOR - Clean white page, type directly
-          NO gray background, NO box-in-box
-      ═══════════════════════════════════════════════════════════════ */}
-      
-      {/* CSS to remove Quill's default borders and make it seamless */}
+      {/* Quill styling */}
       <style>{`
         .word-style-editor .ql-toolbar {
           border: none !important;
@@ -206,21 +192,43 @@ export default function EditorPane({
         .word-style-editor .ql-editor:focus {
           outline: none;
         }
+
+        /* Responsive padding to prevent horizontal overflow on smaller screens */
+        @media (max-width: 1024px) {
+          .word-style-editor .ql-editor {
+            padding: 40px 36px;
+          }
+        }
+        @media (max-width: 640px) {
+          .word-style-editor .ql-editor {
+            padding: 28px 18px;
+          }
+        }
       `}</style>
 
-      <div 
-        className="flex-1 overflow-auto bg-white rounded-lg border border-slate-200 shadow-sm"
-        style={{ maxWidth: pageWidth }}
-      >
-        <ReactQuill
-          ref={quillRef}
-          theme="snow"
-          value={html}
-          onChange={handleChange}
-          modules={modules}
-          formats={formats}
-          className={`word-style-editor ${spacingClass}`}
-        />
+      {/* 
+        KEY FIX:
+        - outer wrapper prevents the editor from "spilling" into the sidebar
+        - inner container is full width of the grid cell, with a centered maxWidth "page"
+      */}
+      <div className="flex-1 min-h-0 min-w-0 overflow-hidden">
+        <div
+          className="h-full w-full overflow-auto bg-white rounded-lg border border-slate-200 shadow-sm mx-auto"
+          style={{
+            maxWidth: pageWidth, // keep your page width
+            width: "100%",       // but never exceed the grid cell
+          }}
+        >
+          <ReactQuill
+            ref={quillRef}
+            theme="snow"
+            value={html}
+            onChange={handleChange}
+            modules={modules}
+            formats={formats}
+            className={`word-style-editor ${spacingClass}`}
+          />
+        </div>
       </div>
 
       {/* AI busy indicator */}
@@ -233,4 +241,3 @@ export default function EditorPane({
     </div>
   );
 }
-
