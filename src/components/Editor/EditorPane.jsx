@@ -22,7 +22,12 @@ export default function EditorPane({
   onSave,
   onAI, // kept for compatibility (not used here)
   aiBusy,
-  pageWidth = 850,
+  <EditorPane
+  ...
+  pageWidth={1000}
+  ...
+/>
+
   onHeadingsChange,
 }) {
   const quillRef = useRef(null);
