@@ -20,7 +20,7 @@ export default function EditorPane({
   html,
   setHtml,
   onSave,
-  onAI,
+  onAI, // kept for compatibility (not used here)
   aiBusy,
   pageWidth = 850,
   onHeadingsChange,
@@ -77,7 +77,10 @@ export default function EditorPane({
   // Word + page count
   const plainText = useMemo(() => stripHtml(html), [html]);
   const wordCount = useMemo(() => countWords(plainText), [plainText]);
-  const pageCount = useMemo(() => Math.max(1, Math.ceil(wordCount / 300)), [wordCount]);
+  const pageCount = useMemo(
+    () => Math.max(1, Math.ceil(wordCount / 300)),
+    [wordCount]
+  );
 
   // Headings → TOC in sidebar
   useEffect(() => {
@@ -117,7 +120,7 @@ export default function EditorPane({
     lineSpacing === "1" ? "1.4" : lineSpacing === "1.5" ? "1.8" : "2.4";
 
   return (
-    // KEY: min-w-0 + overflow-hidden ensures Quill cannot escape its column
+    // KEY: min-w-0 + overflow-hidden prevents Quill from escaping grid column
     <div className="relative flex flex-col h-full min-h-0 min-w-0 overflow-hidden">
       {/* Row 1: Title + stats + spacing + undo/redo */}
       <div className="flex flex-wrap items-center justify-between gap-3 bg-white rounded-lg border border-slate-200 p-3 shadow-sm flex-shrink-0 mb-4">
@@ -197,8 +200,9 @@ export default function EditorPane({
 
         .word-style-editor .ql-container {
           border: none !important;
-          width: 100%;
-          min-width: 0;
+          width: 100% !important;
+          min-width: 0 !important;
+          max-width: 100% !important;
           font-family: 'Times New Roman', Georgia, serif;
           font-size: 12pt;
         }
@@ -209,69 +213,34 @@ export default function EditorPane({
           line-height: ${lineHeightValue};
           overflow-wrap: anywhere; /* prevents long strings from forcing width */
           word-break: break-word;
+          margin: 0 !important;
         }
-<style>{`
-  .word-style-editor .ql-toolbar {
-    border: none !important;
-    border-bottom: 1px solid #e2e8f0 !important;
-    background: #f8fafc;
-    border-radius: 8px 8px 0 0;
-  }
 
-  .word-style-editor .ql-container {
-    border: none !important;
-    width: 100%;
-    min-width: 0;
-    font-family: 'Times New Roman', Georgia, serif;
-    font-size: 12pt;
-  }
+        .word-style-editor .ql-editor:focus {
+          outline: none;
+        }
 
-  .word-style-editor .ql-editor {
-    padding: 60px 72px;
-    min-height: 600px;
-    line-height: ${lineHeightValue};
-    overflow-wrap: anywhere;
-    word-break: break-word;
-  }
+        /* HARD OVERRIDES: stop any global Quill CSS from breaking layout */
+        .word-style-editor .ql-container,
+        .word-style-editor .ql-editor,
+        .word-style-editor .ql-toolbar {
+          position: static !important;
+          left: auto !important;
+          right: auto !important;
+          top: auto !important;
+          bottom: auto !important;
+          transform: none !important;
+          width: 100% !important;
+          max-width: 100% !important;
+          z-index: auto !important;
+        }
+      `}</style>
 
-  .word-style-editor .ql-editor:focus {
-    outline: none;
-  }
-
-  /* HARD OVERRIDES: stop any global Quill CSS from breaking layout */
-  .word-style-editor .ql-container,
-  .word-style-editor .ql-editor,
-  .word-style-editor .ql-toolbar {
-    position: static !important;
-    left: auto !important;
-    right: auto !important;
-    top: auto !important;
-    bottom: auto !important;
-    transform: none !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    z-index: auto !important;
-  }
-
-  /* Prevent “page” width from forcing the grid wider */
-  .word-style-editor .ql-editor {
-    margin: 0 !important;
-  }
-`}</style>
-
-        {/* Page wrapper:
-          - w-full so it respects the column
-          - maxWidth to keep the Word-like page size
-          - mx-auto to center inside the column
-          - overflow-hidden so it can never spill into sidebar
-      */}
+      {/* Page wrapper (keeps Word-like width but cannot spill out of column) */}
       <div className="flex-1 min-h-0 min-w-0 overflow-auto">
         <div
           className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden mx-auto"
-          style={{
-            width: "100%",
-            maxWidth: pageWidth,
-          }}
+          style={{ width: "100%", maxWidth: pageWidth }}
         >
           <ReactQuill
             ref={quillRef}
