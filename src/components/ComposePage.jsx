@@ -11,8 +11,6 @@ import SearchPanel from "./Writing/SearchPanel";
 import PaginatedView from "./Writing/PaginatedView";
 
 import { useChapterManager } from "../hooks/useChapterManager";
-import { GoldButton, WritingCrumb } from "./UI/UIComponents";
-
 import { documentParser } from "../utils/documentParser";
 import { rateLimiter } from "../utils/rateLimiter";
 
@@ -160,7 +158,7 @@ function htmlToPlainText(html = "") {
 }
 
 /* =========================================================
-   DROPDOWN MENU COMPONENT
+   DROPDOWN MENU COMPONENTS
 ========================================================= */
 function DropdownMenu({ label, icon: Icon, children, disabled = false }) {
   const [open, setOpen] = useState(false);
@@ -179,34 +177,40 @@ function DropdownMenu({ label, icon: Icon, children, disabled = false }) {
   }, [open]);
 
   return (
-    <div ref={ref} className="relative">
+    <div ref={ref} className="relative z-[9999]">
       <button
         type="button"
         onClick={(e) => {
           e.preventDefault();
           e.stopPropagation();
           if (!disabled) {
-            console.log('[Dropdown] ' + label + ' clicked');
-            setOpen(!open);
+            setOpen((v) => !v);
           }
         }}
         disabled={disabled}
         className={`
           inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium
-          border border-slate-200 bg-white hover:bg-slate-50 
+          border border-slate-200 bg-white hover:bg-slate-50
           disabled:opacity-50 disabled:cursor-not-allowed
           ${open ? "bg-slate-100 border-slate-300" : ""}
         `}
       >
         {Icon && <Icon size={16} className="text-slate-600" />}
         <span>{label}</span>
-        <ChevronDown size={14} className={`text-slate-400 transition-transform ${open ? "rotate-180" : ""}`} />
+        <ChevronDown
+          size={14}
+          className={`text-slate-400 transition-transform ${
+            open ? "rotate-180" : ""
+          }`}
+        />
       </button>
 
       {open && (
-        <div className="absolute top-full left-0 mt-1 min-w-[180px] bg-white border border-slate-200 rounded-lg shadow-lg z-50 py-1">
+        <div className="absolute top-full left-0 mt-1 min-w-[180px] bg-white border border-slate-200 rounded-lg shadow-lg z-[9999] py-1">
           {React.Children.map(children, (child) =>
-            child ? React.cloneElement(child, { closeMenu: () => setOpen(false) }) : null
+            child
+              ? React.cloneElement(child, { closeMenu: () => setOpen(false) })
+              : null
           )}
         </div>
       )}
@@ -215,12 +219,18 @@ function DropdownMenu({ label, icon: Icon, children, disabled = false }) {
 }
 
 // FIXED: Execute action immediately (preserves user gesture), then close menu
-function DropdownItem({ icon: Icon, label, onClick, disabled = false, active = false, shortcut, closeMenu }) {
+function DropdownItem({
+  icon: Icon,
+  label,
+  onClick,
+  disabled = false,
+  active = false,
+  shortcut,
+  closeMenu,
+}) {
   const handleClick = (e) => {
     if (disabled) return;
-    // Execute action FIRST - preserves user gesture for file inputs/downloads
     if (onClick) onClick(e);
-    // Then close menu
     if (closeMenu) closeMenu();
   };
 
@@ -235,7 +245,9 @@ function DropdownItem({ icon: Icon, label, onClick, disabled = false, active = f
         ${active ? "bg-amber-50 text-amber-800" : "text-slate-700"}
       `}
     >
-      {Icon && <Icon size={16} className={active ? "text-amber-600" : "text-slate-500"} />}
+      {Icon && (
+        <Icon size={16} className={active ? "text-amber-600" : "text-slate-500"} />
+      )}
       <span className="flex-1">{label}</span>
       {shortcut && <span className="text-xs text-slate-400">{shortcut}</span>}
       {active && <span className="text-amber-500">✓</span>}
@@ -255,19 +267,6 @@ export default function ComposePage() {
 
   const [activeProject, setActiveProject] = useState(null);
 
-  useEffect(() => {
-    try {
-      const p = ensureSelectedProject();
-      if (p?.id) {
-        setActiveProject(p);
-        setSelectedProjectId(p.id);
-        if (p.title && p.title !== bookTitle) setBookTitle(p.title);
-      }
-    } catch (e) {
-      console.error("Failed to ensure selected project:", e);
-    }
-  }, []);
-
   const {
     book,
     chapters: rawChapters = [],
@@ -282,9 +281,29 @@ export default function ComposePage() {
   } = useChapterManager();
 
   const chapters = useMemo(
-    () => Array.isArray(rawChapters) ? rawChapters.filter((c) => c && c.id != null) : [],
+    () =>
+      Array.isArray(rawChapters)
+        ? rawChapters.filter((c) => c && c.id != null)
+        : [],
     [rawChapters]
   );
+
+  const [bookTitle, setBookTitle] = useState(book?.title || "Untitled Story");
+  const [author, setAuthor] = useState("Jacqueline Session Ausby");
+
+  useEffect(() => {
+    try {
+      const p = ensureSelectedProject();
+      if (p?.id) {
+        setActiveProject(p);
+        setSelectedProjectId(p.id);
+        if (p.title && p.title !== bookTitle) setBookTitle(p.title);
+      }
+    } catch (e) {
+      console.error("Failed to ensure selected project:", e);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const { characters, characterCount } = useMemo(
     () => computeCharactersFromChapters(chapters || []),
@@ -311,15 +330,12 @@ export default function ComposePage() {
   const [chatInput, setChatInput] = useState("");
   const [chatBusy, setChatBusy] = useState(false);
 
-  const [view, setView] = useState("grid");
+  const [view, setView] = useState("grid"); // "grid" | "editor"
   const [showSearch, setShowSearch] = useState(false);
-  const [editorViewMode, setEditorViewMode] = useState("editor");
+  const [editorViewMode, setEditorViewMode] = useState("editor"); // "editor" | "pages"
 
   const [title, setTitle] = useState(selectedChapter?.title ?? "");
   const [html, setHtml] = useState(selectedChapter?.content ?? "");
-
-  const [author, setAuthor] = useState("Jacqueline Session Ausby");
-  const [bookTitle, setBookTitle] = useState(book?.title || "Untitled Story");
 
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [selectMode, setSelectMode] = useState(false);
@@ -329,7 +345,7 @@ export default function ComposePage() {
   const [importProgress, setImportProgress] = useState("");
   const [queueLength, setQueueLength] = useState(0);
 
-  const [saveStatus, setSaveStatus] = useState("idle");
+  const [saveStatus, setSaveStatus] = useState("idle"); // "idle" | "saving" | "saved"
   const [headings, setHeadings] = useState([]);
   const [activeAiTab, setActiveAiTab] = useState("proofread");
 
@@ -356,13 +372,17 @@ export default function ComposePage() {
     try {
       const stored = localStorage.getItem("dt_activeAiTab");
       if (stored) setActiveAiTab(stored);
-    } catch {}
+    } catch {
+      // ignore
+    }
   }, []);
 
   useEffect(() => {
     try {
       if (activeAiTab) localStorage.setItem("dt_activeAiTab", activeAiTab);
-    } catch {}
+    } catch {
+      // ignore
+    }
   }, [activeAiTab]);
 
   const clearSelection = () => setSelectedIds(new Set());
@@ -413,6 +433,7 @@ export default function ComposePage() {
     const onKey = (e) => {
       const tag = (e.target && e.target.tagName) || "";
       if (/input|textarea|select/i.test(tag)) return;
+
       if ((e.key === "Delete" || e.key === "Backspace") && selectedIds.size) {
         e.preventDefault();
         handleDeleteMultiple(Array.from(selectedIds));
@@ -426,9 +447,11 @@ export default function ComposePage() {
         handleSave();
       }
     };
+
     window.addEventListener("keydown", onKey, { capture: true });
     return () => window.removeEventListener("keydown", onKey, { capture: true });
-  }, [selectedIds]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedIds, selectedId, chapters, hasChapter, saveStatus, html, title]);
 
   useEffect(() => {
     if (selectedChapter) {
@@ -452,19 +475,30 @@ export default function ComposePage() {
 
       const totalWords = computeWordsFromChapters(chapters || []);
       const chapterCount = Array.isArray(chapters) ? chapters.length : 0;
-      const { characterCount: computedCharacterCount } = computeCharactersFromChapters(chapters || []);
+      const { characterCount: computedCharacterCount } =
+        computeCharactersFromChapters(chapters || []);
 
       await Promise.resolve(
         saveProject({
           book: { ...book, title: bookTitle },
-          stats: { wordCount: totalWords, chapterCount, characterCount: computedCharacterCount },
+          stats: {
+            wordCount: totalWords,
+            chapterCount,
+            characterCount: computedCharacterCount,
+          },
         })
       );
 
-      const safeTitle = (bookTitle && bookTitle.trim()) || (book?.title && book.title.trim()) || "Untitled Book";
-      const projectId = activeProject?.id || getSelectedProjectId() || book?.id || "unknown";
+      const safeTitle =
+        (bookTitle && bookTitle.trim()) ||
+        (book?.title && book.title.trim()) ||
+        "Untitled Book";
+
+      const projectId =
+        activeProject?.id || getSelectedProjectId() || book?.id || "unknown";
 
       saveCurrentStorySnapshot({ id: projectId, title: safeTitle });
+
       upsertProjectMeta({
         id: projectId,
         title: safeTitle,
@@ -472,6 +506,7 @@ export default function ComposePage() {
         targetWords: 50000,
         characterCount: computedCharacterCount,
       });
+
       syncProjectForCurrentStory({
         wordCount: totalWords,
         targetWords: 50000,
@@ -523,7 +558,9 @@ export default function ComposePage() {
       selection.isCollapsed ||
       !editorEl.contains(selection.getRangeAt(0).commonAncestorContainer)
     ) {
-      alert("Please highlight the text you want the AI to revise, then click the AI button again.");
+      alert(
+        "Please highlight the text you want the AI to revise, then click the AI button again."
+      );
       return;
     }
 
@@ -533,14 +570,21 @@ export default function ComposePage() {
     const selectedHtml = container.innerHTML.trim();
 
     if (!selectedHtml) {
-      alert("I couldn't read any content from your selection. Please select the exact sentence or paragraph you want revised and try again.");
+      alert(
+        "I couldn't read any content from your selection. Please select the exact sentence or paragraph you want revised and try again."
+      );
       return;
     }
 
-    const selectedPlain = selectedHtml.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+    const selectedPlain = selectedHtml
+      .replace(/<[^>]*>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
 
     if (!selectedPlain) {
-      alert("The selected content seems to be empty or only formatting. Please select normal text and try again.");
+      alert(
+        "The selected content seems to be empty or only formatting. Please select normal text and try again."
+      );
       return;
     }
 
@@ -550,8 +594,14 @@ export default function ComposePage() {
     const wrapAsHtml = (text) => {
       let cleaned = String(text || "");
       cleaned = cleaned.replace(/<\/?p>/gi, "");
-      const safe = cleaned.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-      const parts = safe.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
+      const safe = cleaned
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+      const parts = safe
+        .split(/\n{2,}/)
+        .map((p) => p.trim())
+        .filter(Boolean);
       if (parts.length === 0) return `<p>${safe}</p>`;
       return parts.map((p) => `<p>${p}</p>`).join("");
     };
@@ -562,10 +612,15 @@ export default function ComposePage() {
         runAssistant(targetText, action, instructions || "", provider)
       );
 
-      const resultTextRaw = (result && (result.result || result.text || result.output || result.data)) || result || "";
+      const resultTextRaw =
+        (result && (result.result || result.text || result.output || result.data)) ||
+        result ||
+        "";
 
       if (!resultTextRaw) {
-        alert("The AI did not return any text. Please try again with a smaller selection or a different mode.");
+        alert(
+          "The AI did not return any text. Please try again with a smaller selection or a different mode."
+        );
         return;
       }
 
@@ -580,6 +635,7 @@ export default function ComposePage() {
 
       const updatedHtml = fullHtml.replace(selectedHtml, replacementHtml);
       setHtml(updatedHtml);
+
       updateChapter(selectedId, {
         title: title || selectedChapter?.title || "",
         content: updatedHtml,
@@ -616,7 +672,9 @@ export default function ComposePage() {
         `You are the DahTruth StoryLab writing assistant.`,
         `The user is working on a chapter titled "${title || "Untitled Chapter"}".`,
         `When you suggest edits, please quote or clearly separate your suggested text so it can be copy-pasted into the manuscript.`,
-        snippet ? `Here is an excerpt of the chapter for context:\n\n${snippet}` : `There is no chapter text yet; answer based on the question only.`,
+        snippet
+          ? `Here is an excerpt of the chapter for context:\n\n${snippet}`
+          : `There is no chapter text yet; answer based on the question only.`,
       ].join("\n\n");
 
       const res = await rateLimiter.addToQueue(() =>
@@ -626,7 +684,9 @@ export default function ComposePage() {
       const replyText = (res && (res.result || res.text || res.output || res.data)) || "";
       const assistantMessage = {
         role: "assistant",
-        content: replyText || "I couldn't generate a response. Please try asking your question in a different way.",
+        content:
+          replyText ||
+          "I couldn't generate a response. Please try asking your question in a different way.",
         id: Date.now() + 1,
       };
 
@@ -665,7 +725,9 @@ export default function ComposePage() {
       let parsed;
 
       if (name.endsWith(".doc") || name.endsWith(".docx")) {
-        parsed = await rateLimiter.addToQueue(() => documentParser.parseWordDocument(file));
+        parsed = await rateLimiter.addToQueue(() =>
+          documentParser.parseWordDocument(file)
+        );
       } else if (name.endsWith(".txt") || name.endsWith(".md")) {
         parsed = await documentParser.parseTextDocument(file);
       } else {
@@ -678,6 +740,8 @@ export default function ComposePage() {
         return;
       }
 
+      if (DEBUG_IMPORT) console.log("Parsed import:", parsed);
+
       if (parsed.title && parsed.title !== bookTitle) {
         setBookTitle(parsed.title);
       }
@@ -689,18 +753,26 @@ export default function ComposePage() {
         !(existing[0].title || "").trim();
 
       if (splitByHeadings && parsed.chapters && parsed.chapters.length > 0) {
-        setImportProgress(`Creating ${parsed.chapters.length} chapter(s) from "${file.name}"...`);
+        setImportProgress(
+          `Creating ${parsed.chapters.length} chapter(s) from "${file.name}"...`
+        );
 
         parsed.chapters.forEach((c, index) => {
           const doubleSpacedContent = applyDoubleSpacing(c.content || "");
 
           if (isSingleBlank && index === 0) {
             const firstId = existing[0].id;
-            updateChapter(firstId, { title: c.title || "Untitled Chapter", content: doubleSpacedContent });
+            updateChapter(firstId, {
+              title: c.title || "Untitled Chapter",
+              content: doubleSpacedContent,
+            });
             setSelectedId(firstId);
           } else {
             const newId = addChapter();
-            updateChapter(newId, { title: c.title || "Untitled Chapter", content: doubleSpacedContent });
+            updateChapter(newId, {
+              title: c.title || "Untitled Chapter",
+              content: doubleSpacedContent,
+            });
           }
         });
 
@@ -718,17 +790,24 @@ export default function ComposePage() {
 
         if (isSingleBlank) {
           const firstId = existing[0].id;
-          updateChapter(firstId, { title: parsed.title || "Imported Manuscript", content: fullContent });
+          updateChapter(firstId, {
+            title: parsed.title || "Imported Manuscript",
+            content: fullContent,
+          });
           setSelectedId(firstId);
         } else if (hasChapter) {
           setHtml(fullContent);
           updateChapter(selectedId, {
-            title: title || selectedChapter?.title || parsed.title || "Imported Manuscript",
+            title:
+              title || selectedChapter?.title || parsed.title || "Imported Manuscript",
             content: fullContent,
           });
         } else {
           const newId = addChapter();
-          updateChapter(newId, { title: parsed.title || "Imported Manuscript", content: fullContent });
+          updateChapter(newId, {
+            title: parsed.title || "Imported Manuscript",
+            content: fullContent,
+          });
           setSelectedId(newId);
           setView("editor");
         }
@@ -739,7 +818,11 @@ export default function ComposePage() {
       saveProject({ book: { ...book, title: parsed.title || bookTitle } });
     } catch (error) {
       console.error("Import failed:", error);
-      alert(`❌ Failed to import document: ${error instanceof Error ? error.message : "Unknown error"}`);
+      alert(
+        `❌ Failed to import document: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
     } finally {
       setIsImporting(false);
       setImportProgress("");
@@ -754,6 +837,75 @@ export default function ComposePage() {
     const file = e.target.files?.[0];
     if (file) handleImport(file);
     e.target.value = "";
+  };
+
+  const handleExport = () => {
+    const cleanHtml = stripCharacterTags(html);
+    const blob = new Blob([cleanHtml], { type: "text/html" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${title || "chapter"}.html`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleDeleteCurrent = () => {
+    if (!hasChapter) {
+      alert("Please select a chapter first by clicking on a chapter card or from the sidebar.");
+      return;
+    }
+    if (
+      window.confirm(
+        `Delete "${title || selectedChapter.title}"?\n\nThis cannot be undone.`
+      )
+    ) {
+      deleteChapter(selectedId);
+      setTimeout(() => setView("grid"), 100);
+    }
+  };
+
+  const handleDeleteMultiple = (ids) => {
+    if (!ids?.length) return;
+    if (!window.confirm(`Delete ${ids.length} chapter(s)? This cannot be undone.`))
+      return;
+
+    ids.forEach((id) => deleteChapter(id));
+    clearSelection();
+    if (ids.includes(selectedId)) {
+      setTimeout(() => setView("grid"), 100);
+    }
+  };
+
+  const goBack = () => navigate("/dashboard");
+
+  // View switching helpers
+  const switchToEditor = () => {
+    if (!selectedId && chapters.length > 0) {
+      setSelectedId(chapters[0].id);
+    }
+    setView("editor");
+    setEditorViewMode("editor");
+  };
+
+  const switchToPageView = () => {
+    if (!selectedId && chapters.length > 0) {
+      setSelectedId(chapters[0].id);
+    }
+    setView("editor");
+    setEditorViewMode("pages");
+  };
+
+  // Explicit Grid <-> Writer buttons
+  const goToGrid = () => {
+    setView("grid");
+    setEditorViewMode("editor");
+  };
+
+  const goToWriter = () => {
+    if (!selectedId && chapters.length > 0) setSelectedId(chapters[0].id);
+    setView("editor");
+    setEditorViewMode("editor");
   };
 
   const handleSendToPublishing = async () => {
@@ -795,7 +947,9 @@ export default function ComposePage() {
       });
 
       const safeBookTitle =
-        (bookTitle && bookTitle.trim()) || (book?.title && book.title.trim()) || "Untitled Book";
+        (bookTitle && bookTitle.trim()) ||
+        (book?.title && book.title.trim()) ||
+        "Untitled Book";
 
       const meta = {
         title: safeBookTitle,
@@ -818,7 +972,8 @@ export default function ComposePage() {
         })),
       };
 
-      const projectId = activeProject?.id || getSelectedProjectId() || book?.id || "unknown";
+      const projectId =
+        activeProject?.id || getSelectedProjectId() || book?.id || "unknown";
       const chaptersKey = chaptersKeyForProject(projectId);
       const metaKey = `dahtruth_project_meta_${projectId}`;
       const draftKey = `publishingDraft_${projectId}`;
@@ -827,6 +982,7 @@ export default function ComposePage() {
       localStorage.setItem(metaKey, JSON.stringify(meta));
       localStorage.setItem(draftKey, JSON.stringify(payload));
 
+      // Back-compat keys
       localStorage.setItem("dahtruth_chapters", JSON.stringify(normalizedForPublishing));
       localStorage.setItem("dahtruth_project_meta", JSON.stringify(meta));
       localStorage.setItem(PUBLISHING_DRAFT_KEY, JSON.stringify(payload));
@@ -839,59 +995,7 @@ export default function ComposePage() {
     }
   };
 
-  const handleExport = () => {
-    const cleanHtml = stripCharacterTags(html);
-    const blob = new Blob([cleanHtml], { type: "text/html" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${title || "chapter"}.html`;
-    a.click();
-    URL.revokeObjectURL(url);
-  };
-
-  // FIXED: Show helpful message instead of doing nothing when no chapter selected
-  const handleDeleteCurrent = () => {
-    if (!hasChapter) {
-      alert("Please select a chapter first by clicking on a chapter card or from the sidebar.");
-      return;
-    }
-    if (window.confirm(`Delete "${title || selectedChapter.title}"?\n\nThis cannot be undone.`)) {
-      deleteChapter(selectedId);
-      setTimeout(() => setView("grid"), 100);
-    }
-  };
-
-  const handleDeleteMultiple = (ids) => {
-    if (!ids?.length) return;
-    if (!window.confirm(`Delete ${ids.length} chapter(s)? This cannot be undone.`)) return;
-
-    ids.forEach((id) => deleteChapter(id));
-    clearSelection();
-    if (ids.includes(selectedId)) {
-      setTimeout(() => setView("grid"), 100);
-    }
-  };
-
-  const goBack = () => navigate("/dashboard");
-
-  // FIXED: Helper functions for view switching that auto-select first chapter if needed
-  const switchToEditor = () => {
-    if (!selectedId && chapters.length > 0) {
-      setSelectedId(chapters[0].id);
-    }
-    setView("editor");
-    setEditorViewMode("editor");
-  };
-
-  const switchToPageView = () => {
-    if (!selectedId && chapters.length > 0) {
-      setSelectedId(chapters[0].id);
-    }
-    setView("editor");
-    setEditorViewMode("pages");
-  };
-
+  // Defensive: if chapter manager returns non-array, show loading
   if (!Array.isArray(chapters)) {
     return (
       <div className="min-h-screen bg-[rgb(244,247,250)] flex items-center justify-center">
@@ -912,11 +1016,14 @@ export default function ComposePage() {
       />
 
       {/* ═══════════════════════════════════════════════════════════════
-          BANNER - StoryLab Gradient
+          BANNER
       ═══════════════════════════════════════════════════════════════ */}
-      <div 
+      <div
         className="text-white flex-shrink-0"
-        style={{ background: "linear-gradient(135deg, #1e3a5f 0%, #2d4a6f 40%, #9b7bc9 100%)" }}
+        style={{
+          background:
+            "linear-gradient(135deg, #1e3a5f 0%, #2d4a6f 40%, #9b7bc9 100%)",
+        }}
       >
         <div className="max-w-[1800px] mx-auto px-4 py-3">
           <div className="flex items-center justify-between flex-wrap gap-3">
@@ -930,18 +1037,27 @@ export default function ComposePage() {
             <div className="flex items-center gap-4 md:gap-6 text-sm flex-wrap">
               <div className="flex items-center gap-2">
                 <span className="text-white/70">Story:</span>
-                <span className="font-semibold text-amber-300">{bookTitle || "Untitled"}</span>
+                <span className="font-semibold text-amber-300">
+                  {bookTitle || "Untitled"}
+                </span>
               </div>
+
               <div className="flex items-center gap-2">
                 <span className="text-white/70">Chapter:</span>
                 <span className="font-medium text-white">
-                  {currentChapterIndex > 0 ? `${currentChapterIndex} / ${chapters.length}` : `${chapters.length} total`}
+                  {currentChapterIndex > 0
+                    ? `${currentChapterIndex} / ${chapters.length}`
+                    : `${chapters.length} total`}
                 </span>
               </div>
+
               <div className="flex items-center gap-2">
                 <span className="text-white/70">Words:</span>
-                <span className="font-medium text-white">{totalWordCount.toLocaleString()}</span>
+                <span className="font-medium text-white">
+                  {totalWordCount.toLocaleString()}
+                </span>
               </div>
+
               <div className="flex items-center gap-2">
                 <span className="text-white/70">Characters:</span>
                 <span className="font-medium text-white">{characterCount}</span>
@@ -956,8 +1072,12 @@ export default function ComposePage() {
                 value={provider}
                 onChange={(e) => setProvider(e.target.value)}
               >
-                <option value="anthropic" className="text-slate-800">Claude</option>
-                <option value="openai" className="text-slate-800">GPT-4</option>
+                <option value="anthropic" className="text-slate-800">
+                  Claude
+                </option>
+                <option value="openai" className="text-slate-800">
+                  GPT-4
+                </option>
               </select>
             </div>
           </div>
@@ -965,11 +1085,11 @@ export default function ComposePage() {
       </div>
 
       {/* ═══════════════════════════════════════════════════════════════
-          TOOLBAR
+          TOOLBAR (dropdown fix: allow Y overflow)
       ═══════════════════════════════════════════════════════════════ */}
       <div className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-slate-200 shadow-sm flex-shrink-0">
-        <div className="max-w-[1800px] mx-auto px-4 py-2 flex items-center gap-3 overflow-x-auto">
-          {/* Dashboard Button (Gold) */}
+        <div className="max-w-[1800px] mx-auto px-4 py-2 flex items-center gap-3 overflow-x-auto overflow-y-visible">
+          {/* Dashboard Button */}
           <button
             type="button"
             onClick={goBack}
@@ -980,14 +1100,57 @@ export default function ComposePage() {
             Dashboard
           </button>
 
+          {/* Grid <-> Writer quick buttons */}
+          {view === "grid" ? (
+            <button
+              type="button"
+              onClick={goToWriter}
+              disabled={!hasAnyChapters}
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium
+                border border-slate-200 bg-white hover:bg-slate-50 text-slate-700
+                disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+              title="Go to Writer"
+            >
+              <Edit3 size={16} />
+              Writer
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={goToGrid}
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium
+                border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 flex-shrink-0"
+              title="Back to Chapter Grid"
+            >
+              <Grid3X3 size={16} />
+              Grid
+            </button>
+          )}
+
           {/* File Dropdown */}
           <DropdownMenu label="File" icon={FolderOpen}>
-            <DropdownItem icon={FolderOpen} label="Import Manuscript" onClick={triggerImport} shortcut="Ctrl+O" />
-            <DropdownItem icon={Download} label="Export Chapter" onClick={handleExport} disabled={!hasChapter} />
+            <DropdownItem
+              icon={FolderOpen}
+              label="Import Manuscript"
+              onClick={triggerImport}
+              shortcut="Ctrl+O"
+            />
+            <DropdownItem
+              icon={Download}
+              label="Export Chapter"
+              onClick={handleExport}
+              disabled={!hasChapter}
+            />
             <DropdownDivider />
             <DropdownItem
               icon={Save}
-              label={saveStatus === "saving" ? "Saving..." : saveStatus === "saved" ? "Saved ✓" : "Save"}
+              label={
+                saveStatus === "saving"
+                  ? "Saving..."
+                  : saveStatus === "saved"
+                  ? "Saved ✓"
+                  : "Save"
+              }
               onClick={handleSave}
               disabled={!hasChapter || saveStatus === "saving"}
               shortcut="Ctrl+S"
@@ -1001,7 +1164,7 @@ export default function ComposePage() {
             />
           </DropdownMenu>
 
-          {/* View Dropdown - FIXED: uses helper functions that auto-select first chapter */}
+          {/* View Dropdown */}
           <DropdownMenu label="View" icon={Eye}>
             <DropdownItem
               icon={Grid3X3}
@@ -1030,30 +1193,42 @@ export default function ComposePage() {
             />
           </DropdownMenu>
 
-          {/* AI Dropdown */}
+          {/* AI Dropdown (sets activeAiTab + runs action) */}
           <DropdownMenu label="AI Tools" icon={Sparkles} disabled={!hasChapter || aiBusy}>
             <DropdownItem
               icon={BookCheck}
               label="Proofread"
-              onClick={() => handleAI("proofread")}
+              onClick={() => {
+                setActiveAiTab("proofread");
+                handleAI("proofread");
+              }}
               active={activeAiTab === "proofread"}
             />
             <DropdownItem
               icon={Wand2}
               label="Clarify"
-              onClick={() => handleAI("clarify")}
+              onClick={() => {
+                setActiveAiTab("clarify");
+                handleAI("clarify");
+              }}
               active={activeAiTab === "clarify"}
             />
             <DropdownItem
               icon={RefreshCw}
               label="Rewrite"
-              onClick={() => handleAI("rewrite")}
+              onClick={() => {
+                setActiveAiTab("rewrite");
+                handleAI("rewrite");
+              }}
               active={activeAiTab === "rewrite"}
             />
             <DropdownItem
               icon={Eye}
               label="Readability"
-              onClick={() => handleAI("readability")}
+              onClick={() => {
+                setActiveAiTab("readability");
+                handleAI("readability");
+              }}
               active={activeAiTab === "readability"}
             />
             <DropdownDivider />
@@ -1072,9 +1247,10 @@ export default function ComposePage() {
             className={`
               inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium
               border transition-all flex-shrink-0
-              ${showSearch
-                ? "bg-amber-100 border-amber-300 text-amber-800"
-                : "bg-white border-slate-200 hover:bg-slate-50 text-slate-700"
+              ${
+                showSearch
+                  ? "bg-amber-100 border-amber-300 text-amber-800"
+                  : "bg-white border-slate-200 hover:bg-slate-50 text-slate-700"
               }
             `}
             title="Search manuscript (Ctrl+F)"
@@ -1083,10 +1259,8 @@ export default function ComposePage() {
             Search
           </button>
 
-          {/* Spacer */}
           <div className="flex-1" />
 
-          {/* Status indicators */}
           {queueLength > 0 && (
             <div className="flex items-center gap-1 px-2 py-1 bg-blue-50 rounded border border-blue-200 flex-shrink-0">
               <span className="text-xs text-blue-700">
@@ -1102,7 +1276,6 @@ export default function ComposePage() {
             </div>
           )}
 
-          {/* Send to Publishing Button */}
           <button
             type="button"
             onClick={handleSendToPublishing}
@@ -1156,17 +1329,17 @@ export default function ComposePage() {
             onRangeSelect={(idx) => rangeSelect(idx)}
             lastClickedIndexRef={lastClickedIndexRef}
           />
+
           <TrashDock onDelete={handleDeleteMultiple} />
         </div>
       )}
 
       {/* ═══════════════════════════════════════════════════════════════
-          EDITOR VIEW - FIXED: flex-1 to fill remaining height
+          EDITOR VIEW
       ═══════════════════════════════════════════════════════════════ */}
       {view === "editor" && (
         <div className="flex-1 flex flex-col min-h-0">
           <div className="max-w-[1800px] mx-auto px-4 py-4 flex-1 flex flex-col min-h-0 w-full">
-            {/* Editor Formatting Toolbar */}
             <div className="mb-4 flex-shrink-0">
               <EditorToolbar
                 onAI={handleAI}
@@ -1183,9 +1356,8 @@ export default function ComposePage() {
               />
             </div>
 
-            {/* Main content grid - flex-1 to fill space */}
             <div
-             className="grid gap-6 flex-1 min-h-0 overflow-hidden"
+              className="grid gap-6 flex-1 min-h-0 overflow-hidden"
               style={{
                 gridTemplateColumns: showAssistant
                   ? "220px minmax(0, 1fr) 320px"
@@ -1193,7 +1365,7 @@ export default function ComposePage() {
               }}
             >
               {/* Left Sidebar */}
-              <aside className="space-y-3 overflow-y-auto">
+              <aside className="space-y-3 overflow-y-auto min-w-0">
                 {showSearch && (
                   <SearchPanel
                     chapters={chapters}
@@ -1221,11 +1393,24 @@ export default function ComposePage() {
 
                 {headings.length > 0 && (
                   <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
-                    <div className="text-xs font-semibold text-slate-700 mb-2">Table of Contents</div>
+                    <div className="text-xs font-semibold text-slate-700 mb-2">
+                      Table of Contents
+                    </div>
                     <ul className="space-y-1 max-h-64 overflow-auto text-xs">
                       {headings.map((h, idx) => (
-                        <li key={`${h.level}-${idx}-${h.text}`} className="text-slate-700">
-                          <span className={h.level === "h1" ? "font-semibold" : h.level === "h2" ? "ml-2" : "ml-4 text-slate-500"}>
+                        <li
+                          key={`${h.level}-${idx}-${h.text}`}
+                          className="text-slate-700"
+                        >
+                          <span
+                            className={
+                              h.level === "h1"
+                                ? "font-semibold"
+                                : h.level === "h2"
+                                ? "ml-2"
+                                : "ml-4 text-slate-500"
+                            }
+                          >
                             {h.text}
                           </span>
                         </li>
@@ -1237,7 +1422,9 @@ export default function ComposePage() {
                 <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
                   <div className="text-xs font-semibold text-slate-700 mb-2 flex items-center justify-between">
                     <span>Characters</span>
-                    <span className="text-[11px] text-slate-500">{characterCount} tagged</span>
+                    <span className="text-[11px] text-slate-500">
+                      {characterCount} tagged
+                    </span>
                   </div>
 
                   {characterCount === 0 ? (
@@ -1245,20 +1432,25 @@ export default function ComposePage() {
                       No characters tagged yet.
                       <br />
                       Introduce a character as{" "}
-                      <span className="font-mono text-[11px] bg-slate-100 px-1 py-0.5 rounded">@char: John Smith</span>
+                      <span className="font-mono text-[11px] bg-slate-100 px-1 py-0.5 rounded">
+                        @char: John Smith
+                      </span>
                     </p>
                   ) : (
                     <ul className="space-y-1 max-h-40 overflow-auto text-xs">
                       {characters.map((name) => (
-                        <li key={name} className="text-slate-700 truncate">{name}</li>
+                        <li key={name} className="text-slate-700 truncate">
+                          {name}
+                        </li>
                       ))}
                     </ul>
                   )}
                 </div>
               </aside>
 
-              {/* Main Editor OR Paginated View - contained in its grid cell */}
-              <div className="min-h-0 min-w-0 overflow-hidden">
+              {/* Main Editor/Paginated View
+                  FIXED: contain overflow so it cannot cover sidebar */}
+              <div className="min-h-0 min-w-0 overflow-x-auto overflow-y-hidden">
                 {editorViewMode === "pages" ? (
                   <PaginatedView
                     html={html}
@@ -1287,8 +1479,12 @@ export default function ComposePage() {
                 <section className="flex flex-col bg-white border border-slate-200 rounded-xl shadow-sm min-h-0 max-h-full overflow-hidden">
                   <div className="px-3 py-2 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
                     <div>
-                      <div className="text-xs font-semibold text-slate-800">AI Assistant</div>
-                      <div className="text-[11px] text-slate-500">Ask questions, get suggestions</div>
+                      <div className="text-xs font-semibold text-slate-800">
+                        AI Assistant
+                      </div>
+                      <div className="text-[11px] text-slate-500">
+                        Ask questions, get suggestions
+                      </div>
                     </div>
                     <button
                       type="button"
@@ -1312,16 +1508,21 @@ export default function ComposePage() {
                     {chatMessages.map((msg) => (
                       <div
                         key={msg.id}
-                        className={msg.role === "user"
-                          ? "self-end max-w-[80%] rounded-lg bg-indigo-50 px-3 py-2 text-xs"
-                          : "self-start max-w-[80%] rounded-lg bg-slate-50 px-3 py-2 text-xs"
+                        className={
+                          msg.role === "user"
+                            ? "self-end max-w-[80%] rounded-lg bg-indigo-50 px-3 py-2 text-xs"
+                            : "self-start max-w-[80%] rounded-lg bg-slate-50 px-3 py-2 text-xs"
                         }
                       >
-                        <div className="whitespace-pre-wrap text-slate-800">{msg.content}</div>
+                        <div className="whitespace-pre-wrap text-slate-800">
+                          {msg.content}
+                        </div>
                         {msg.role === "assistant" && (
                           <button
                             type="button"
-                            onClick={() => navigator.clipboard.writeText(msg.content)}
+                            onClick={() =>
+                              navigator.clipboard.writeText(msg.content)
+                            }
                             className="mt-1 text-[10px] px-2 py-0.5 rounded border border-slate-200 bg-white hover:bg-slate-100"
                           >
                             Copy
@@ -1331,7 +1532,13 @@ export default function ComposePage() {
                     ))}
                   </div>
 
-                  <form onSubmit={(e) => { e.preventDefault(); handleAssistantSend(); }} className="border-t border-slate-200 p-2 space-y-2 flex-shrink-0">
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      handleAssistantSend();
+                    }}
+                    className="border-t border-slate-200 p-2 space-y-2 flex-shrink-0"
+                  >
                     <textarea
                       rows={3}
                       className="w-full resize-none rounded-md border border-slate-300 px-2 py-1 text-[13px] focus:outline-none focus:ring-2 focus:ring-amber-400"
@@ -1361,4 +1568,3 @@ export default function ComposePage() {
     </div>
   );
 }
-
