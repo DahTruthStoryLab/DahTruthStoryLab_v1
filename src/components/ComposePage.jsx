@@ -894,7 +894,19 @@ export default function ComposePage() {
     }
     setView("editor");
     setEditorViewMode("pages");
-  };
+  }; 
+
+  const goToTOC = () => {
+  setView("grid");              // table of contents
+  setEditorViewMode("editor");  // optional reset
+};
+
+const goToWriter = (chapterId) => {
+  const idToUse = chapterId || selectedId || chapters?.[0]?.id;
+  if (idToUse) setSelectedId(idToUse);
+  setView("editor");            // writer/editor view
+  setEditorViewMode("editor");
+};
 
   // Explicit Grid <-> Writer buttons
   const goToGrid = () => {
@@ -902,13 +914,7 @@ export default function ComposePage() {
     setEditorViewMode("editor");
   };
 
-  const goToWriter = () => {
-    if (!selectedId && chapters.length > 0) setSelectedId(chapters[0].id);
-    setView("editor");
-    setEditorViewMode("editor");
-  };
-
-  const handleSendToPublishing = async () => {
+    const handleSendToPublishing = async () => {
     if (!Array.isArray(chapters) || chapters.length === 0) {
       alert("You need at least one chapter before sending to Publishing.");
       return;
@@ -1308,7 +1314,7 @@ export default function ComposePage() {
             </div>
           )}
 
-          <ChapterGrid
+         <ChapterGrid
             chapters={chapters}
             selectedId={selectedId}
             onSelectChapter={(id) => {
@@ -1316,8 +1322,7 @@ export default function ComposePage() {
               if (selectMode) {
                 toggleSelect(id);
               } else {
-                setSelectedId(id);
-                setView("editor");
+                goToWriter(id);
               }
             }}
             onAddChapter={addChapter}
