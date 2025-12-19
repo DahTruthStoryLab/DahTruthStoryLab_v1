@@ -1514,7 +1514,7 @@ const goToWriter = (chapterId) => {
                       onSave={handleSave}
                       onAI={handleAI}
                       aiBusy={aiBusy || chatBusy}
-                      pageWidth={850}
+                      pageWidth={1000}
                       onHeadingsChange={setHeadings}
                     />
                   )}
