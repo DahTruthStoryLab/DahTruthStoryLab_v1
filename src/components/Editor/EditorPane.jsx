@@ -22,11 +22,9 @@ export default function EditorPane({
   onSave,
   onAI, // kept for compatibility (not used here)
   aiBusy,
-  <EditorPane
-  ...
-  pageWidth={1000}
-  ...
-/>
+  pageWidth = 850,
+  onHeadingsChange,
+}) {
 
   onHeadingsChange,
 }) {
