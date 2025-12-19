@@ -1406,12 +1406,12 @@ const goToWriter = (chapterId) => {
               className="grid gap-6 flex-1 min-h-0 overflow-hidden"
               style={{
                 gridTemplateColumns: showAssistant
-                  ? "220px minmax(0, 1fr) 320px"
-                  : "220px minmax(0, 1fr)",
+                  ? "300px minmax(0, 1fr) 320px"
+                  : "300px minmax(0, 1fr)",
               }}
             >
               {/* Left Sidebar */}
-              <aside className="space-y-3 overflow-y-auto min-w-0 relative z-20">
+             <aside className="space-y-3 overflow-y-auto min-w-[280px] relative z-20">
                 {showSearch && (
                   <SearchPanel
                     chapters={chapters}
