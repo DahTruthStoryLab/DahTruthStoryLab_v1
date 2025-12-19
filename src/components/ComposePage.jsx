@@ -1378,12 +1378,13 @@ const goToWriter = (chapterId) => {
         </div>
       )}
 
-      {/* ═══════════════════════════════════════════════════════════════
+           {/* ═══════════════════════════════════════════════════════════════
           EDITOR VIEW
       ═══════════════════════════════════════════════════════════════ */}
       {view === "editor" && (
         <div className="flex-1 flex flex-col min-h-0">
           <div className="max-w-[1800px] mx-auto px-4 py-4 flex-1 flex flex-col min-h-0 w-full">
+            {/* Editor Formatting Toolbar */}
             <div className="mb-4 flex-shrink-0">
               <EditorToolbar
                 onAI={handleAI}
@@ -1400,197 +1401,206 @@ const goToWriter = (chapterId) => {
               />
             </div>
 
-         <div
-  className="grid gap-6 flex-1 min-h-0 overflow-hidden"
-  style={{
-    gridTemplateColumns: showAssistant
-      ? "minmax(220px, 220px) minmax(0, 1fr) minmax(320px, 320px)"
-      : "minmax(220px, 220px) minmax(0, 1fr)",
-  }}
->
-  {/* Left Sidebar */}
-  <aside className="space-y-3 overflow-y-auto min-w-0 relative z-30 pr-1">
-    {showSearch && (
-      <SearchPanel
-        chapters={chapters}
-        onSelectChapter={(id) => {
-          setSelectedId(id);
-          setShowSearch(false);
-        }}
-        onClose={() => setShowSearch(false)}
-      />
-    )}
+            {/* Main layout */}
+            <div
+              className="grid gap-6 flex-1 min-h-0 overflow-hidden"
+              style={{
+                gridTemplateColumns: showAssistant
+                  ? "minmax(220px, 220px) minmax(0, 1fr) minmax(320px, 320px)"
+                  : "minmax(220px, 220px) minmax(0, 1fr)",
+              }}
+            >
+              {/* Left Sidebar */}
+              <aside className="space-y-3 overflow-y-auto min-w-0 relative z-30 pr-1">
+                {showSearch && (
+                  <SearchPanel
+                    chapters={chapters}
+                    onSelectChapter={(id) => {
+                      setSelectedId(id);
+                      setShowSearch(false);
+                    }}
+                    onClose={() => setShowSearch(false)}
+                  />
+                )}
 
-    <ChapterSidebar
-      chapters={chapters}
-      selectedId={selectedId}
-      onSelectChapter={setSelectedId}
-      onAddChapter={addChapter}
-      onDeleteMultiple={handleDeleteMultiple}
-      selectMode={selectMode}
-      selectedIds={selectedIds}
-      onToggleSelect={toggleSelect}
-      onRangeSelect={(idx) => rangeSelect(idx)}
-      lastClickedIndexRef={lastClickedIndexRef}
-      onRenameChapter={handleRenameChapter}
-    />
+                <ChapterSidebar
+                  chapters={chapters}
+                  selectedId={selectedId}
+                  onSelectChapter={setSelectedId}
+                  onAddChapter={addChapter}
+                  onDeleteMultiple={handleDeleteMultiple}
+                  selectMode={selectMode}
+                  selectedIds={selectedIds}
+                  onToggleSelect={toggleSelect}
+                  onRangeSelect={(idx) => rangeSelect(idx)}
+                  lastClickedIndexRef={lastClickedIndexRef}
+                  onRenameChapter={handleRenameChapter}
+                />
 
-    {headings.length > 0 && (
-      <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
-        <div className="text-xs font-semibold text-slate-700 mb-2">
-          Table of Contents
-        </div>
-        <ul className="space-y-1 max-h-64 overflow-auto text-xs">
-          {headings.map((h, idx) => (
-            <li key={`${h.level}-${idx}-${h.text}`} className="text-slate-700">
-              <span
-                className={
-                  h.level === "h1"
-                    ? "font-semibold"
-                    : h.level === "h2"
-                    ? "ml-2"
-                    : "ml-4 text-slate-500"
-                }
-              >
-                {h.text}
-              </span>
-            </li>
-          ))}
-        </ul>
-      </div>
-    )}
+                {headings.length > 0 && (
+                  <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+                    <div className="text-xs font-semibold text-slate-700 mb-2">
+                      Table of Contents
+                    </div>
+                    <ul className="space-y-1 max-h-64 overflow-auto text-xs">
+                      {headings.map((h, idx) => (
+                        <li key={`${h.level}-${idx}-${h.text}`} className="text-slate-700">
+                          <span
+                            className={
+                              h.level === "h1"
+                                ? "font-semibold"
+                                : h.level === "h2"
+                                ? "ml-2"
+                                : "ml-4 text-slate-500"
+                            }
+                          >
+                            {h.text}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
 
-    <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
-      <div className="text-xs font-semibold text-slate-700 mb-2 flex items-center justify-between">
-        <span>Characters</span>
-        <span className="text-[11px] text-slate-500">{characterCount} tagged</span>
-      </div>
+                <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+                  <div className="text-xs font-semibold text-slate-700 mb-2 flex items-center justify-between">
+                    <span>Characters</span>
+                    <span className="text-[11px] text-slate-500">
+                      {characterCount} tagged
+                    </span>
+                  </div>
 
-      {characterCount === 0 ? (
-        <p className="text-[11px] text-slate-500 leading-snug">
-          No characters tagged yet.
-          <br />
-          Introduce a character as{" "}
-          <span className="font-mono text-[11px] bg-slate-100 px-1 py-0.5 rounded">
-            @char: John Smith
-          </span>
-        </p>
-      ) : (
-        <ul className="space-y-1 max-h-40 overflow-auto text-xs">
-          {characters.map((name) => (
-            <li key={name} className="text-slate-700 truncate">
-              {name}
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  </aside>
+                  {characterCount === 0 ? (
+                    <p className="text-[11px] text-slate-500 leading-snug">
+                      No characters tagged yet.
+                      <br />
+                      Introduce a character as{" "}
+                      <span className="font-mono text-[11px] bg-slate-100 px-1 py-0.5 rounded">
+                        @char: John Smith
+                      </span>
+                    </p>
+                  ) : (
+                    <ul className="space-y-1 max-h-40 overflow-auto text-xs">
+                      {characters.map((name) => (
+                        <li key={name} className="text-slate-700 truncate">
+                          {name}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              </aside>
 
-  {/* Main Editor/Paginated View - CLAMPED so it cannot cover sidebar */}
-  <div className="min-h-0 min-w-0 overflow-hidden relative z-10">
-    <div className="min-h-0 min-w-0 w-full h-full overflow-x-auto overflow-y-hidden">
-      {editorViewMode === "pages" ? (
-        <PaginatedView
-          html={html}
-          title={title}
-          author={author}
-          chapterNumber={chapters.findIndex((c) => c.id === selectedId) + 1}
-          onEdit={() => setEditorViewMode("editor")}
-        />
-      ) : (
-        <EditorPane
-          title={title}
-          setTitle={setTitle}
-          html={html}
-          setHtml={setHtml}
-          onSave={handleSave}
-          onAI={handleAI}
-          aiBusy={aiBusy || chatBusy}
-          pageWidth={850}
-          onHeadingsChange={setHeadings}
-        />
-      )}
-    </div>
-  </div>
+              {/* Main Editor/Paginated View */}
+              <div className="min-h-0 min-w-0 overflow-hidden relative z-10">
+                <div className="min-h-0 min-w-0 w-full h-full overflow-x-auto overflow-y-hidden">
+                  {editorViewMode === "pages" ? (
+                    <PaginatedView
+                      html={html}
+                      title={title}
+                      author={author}
+                      chapterNumber={chapters.findIndex((c) => c.id === selectedId) + 1}
+                      onEdit={() => setEditorViewMode("editor")}
+                    />
+                  ) : (
+                    <EditorPane
+                      title={title}
+                      setTitle={setTitle}
+                      html={html}
+                      setHtml={setHtml}
+                      onSave={handleSave}
+                      onAI={handleAI}
+                      aiBusy={aiBusy || chatBusy}
+                      pageWidth={850}
+                      onHeadingsChange={setHeadings}
+                    />
+                  )}
+                </div>
+              </div>
 
-  {/* Right-hand AI Assistant */}
-  {showAssistant && (
-    <section className="flex flex-col bg-white border border-slate-200 rounded-xl shadow-sm min-h-0 max-h-full overflow-hidden relative z-20">
-      <div className="px-3 py-2 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
-        <div>
-          <div className="text-xs font-semibold text-slate-800">AI Assistant</div>
-          <div className="text-[11px] text-slate-500">Ask questions, get suggestions</div>
-        </div>
-        <button
-          type="button"
-          onClick={() => setShowAssistant(false)}
-          className="text-[11px] px-2 py-1 rounded border border-slate-200 hover:bg-slate-50"
-        >
-          Close
-        </button>
-      </div>
+              {/* Right-hand AI Assistant */}
+              {showAssistant && (
+                <section className="flex flex-col bg-white border border-slate-200 rounded-xl shadow-sm min-h-0 max-h-full overflow-hidden relative z-20">
+                  <div className="px-3 py-2 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
+                    <div>
+                      <div className="text-xs font-semibold text-slate-800">AI Assistant</div>
+                      <div className="text-[11px] text-slate-500">Ask questions, get suggestions</div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setShowAssistant(false)}
+                      className="text-[11px] px-2 py-1 rounded border border-slate-200 hover:bg-slate-50"
+                    >
+                      Close
+                    </button>
+                  </div>
 
-      <div className="flex-1 overflow-y-auto px-3 py-2 space-y-2 text-sm">
-        {chatMessages.length === 0 && (
-          <p className="text-[12px] text-slate-500 mt-2">
-            Example questions:
-            <br />• "Help me tighten this opening."
-            <br />• "Is this dialogue natural?"
-            <br />• "Suggest a stronger ending."
-          </p>
-        )}
+                  <div className="flex-1 overflow-y-auto px-3 py-2 space-y-2 text-sm">
+                    {chatMessages.length === 0 && (
+                      <p className="text-[12px] text-slate-500 mt-2">
+                        Example questions:
+                        <br />• "Help me tighten this opening."
+                        <br />• "Is this dialogue natural?"
+                        <br />• "Suggest a stronger ending."
+                      </p>
+                    )}
 
-        {chatMessages.map((msg) => (
-          <div
-            key={msg.id}
-            className={
-              msg.role === "user"
-                ? "self-end max-w-[80%] rounded-lg bg-indigo-50 px-3 py-2 text-xs"
-                : "self-start max-w-[80%] rounded-lg bg-slate-50 px-3 py-2 text-xs"
-            }
-          >
-            <div className="whitespace-pre-wrap text-slate-800">{msg.content}</div>
-            {msg.role === "assistant" && (
-              <button
-                type="button"
-                onClick={() => navigator.clipboard.writeText(msg.content)}
-                className="mt-1 text-[10px] px-2 py-0.5 rounded border border-slate-200 bg-white hover:bg-slate-100"
-              >
-                Copy
-              </button>
-            )}
+                    {chatMessages.map((msg) => (
+                      <div
+                        key={msg.id}
+                        className={
+                          msg.role === "user"
+                            ? "self-end max-w-[80%] rounded-lg bg-indigo-50 px-3 py-2 text-xs"
+                            : "self-start max-w-[80%] rounded-lg bg-slate-50 px-3 py-2 text-xs"
+                        }
+                      >
+                        <div className="whitespace-pre-wrap text-slate-800">{msg.content}</div>
+                        {msg.role === "assistant" && (
+                          <button
+                            type="button"
+                            onClick={() => navigator.clipboard.writeText(msg.content)}
+                            className="mt-1 text-[10px] px-2 py-0.5 rounded border border-slate-200 bg-white hover:bg-slate-100"
+                          >
+                            Copy
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      handleAssistantSend();
+                    }}
+                    className="border-t border-slate-200 p-2 space-y-2 flex-shrink-0"
+                  >
+                    <textarea
+                      rows={3}
+                      className="w-full resize-none rounded-md border border-slate-300 px-2 py-1 text-[13px] focus:outline-none focus:ring-2 focus:ring-amber-400"
+                      placeholder="Ask a question..."
+                      value={chatInput}
+                      onChange={(e) => setChatInput(e.target.value)}
+                      onKeyDown={handleAssistantKeyDown}
+                      disabled={chatBusy}
+                    />
+                    <div className="flex items-center justify-between">
+                      <div className="text-[11px] text-slate-500">Enter to send</div>
+                      <button
+                        type="submit"
+                        disabled={!chatInput.trim() || chatBusy}
+                        className="text-[13px] px-3 py-1.5 rounded-md bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-50"
+                      >
+                        {chatBusy ? "Thinking…" : "Send"}
+                      </button>
+                    </div>
+                  </form>
+                </section>
+              )}
+            </div>
           </div>
-        ))}
-      </div>
-
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          handleAssistantSend();
-        }}
-        className="border-t border-slate-200 p-2 space-y-2 flex-shrink-0"
-      >
-        <textarea
-          rows={3}
-          className="w-full resize-none rounded-md border border-slate-300 px-2 py-1 text-[13px] focus:outline-none focus:ring-2 focus:ring-amber-400"
-          placeholder="Ask a question..."
-          value={chatInput}
-          onChange={(e) => setChatInput(e.target.value)}
-          onKeyDown={handleAssistantKeyDown}
-          disabled={chatBusy}
-        />
-        <div className="flex items-center justify-between">
-          <div className="text-[11px] text-slate-500">Enter to send</div>
-          <button
-            type="submit"
-            disabled={!chatInput.trim() || chatBusy}
-            className="text-[13px] px-3 py-1.5 rounded-md bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-50"
-          >
-            {chatBusy ? "Thinking…" : "Send"}
-          </button>
         </div>
-      </form>
-    </section>
-  )}
-</div>
+      )}
+    </div>
+  );
+}
