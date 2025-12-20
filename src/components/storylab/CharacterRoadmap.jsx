@@ -1,8 +1,7 @@
 // src/components/storylab/CharacterRoadmap.jsx
-import React, { useState, useRef, useMemo, useCallback } from "react";
+import React, { useState, useRef, useMemo, useCallback, useEffect } from "react";
 import { Link } from "react-router-dom";
 import {
-  Map as RouteIcon,
   Plus,
   Trash2,
   GripVertical,
@@ -12,7 +11,6 @@ import {
   Network,
   ChevronDown,
   Link2,
-  Unlink,
   ArrowRight,
   Heart,
   Swords,
@@ -23,18 +21,12 @@ import {
   Edit3,
   Check,
   X,
+  ArrowLeft,
 } from "lucide-react";
 import { useDrag, useDrop } from "react-dnd";
-import {
-  loadProject,
-  saveProject,
-  ensureWorkshopFields,
-  uid,
-} from "../../lib/storylab/projectStore";
-import BackToLanding, { BackToLandingFab } from "./BackToLanding";
 
 /* ---------------------------
-   Brand Colors & Glassmorphism
+   Brand Colors
 ---------------------------- */
 const BRAND = {
   navy: "#1e3a5f",
@@ -46,9 +38,82 @@ const BRAND = {
 };
 
 /* ---------------------------
-   Page Banner (glassmorphic)
+   Storage Keys (match ComposePage)
 ---------------------------- */
-const PageBanner = ({ activeView }) => {
+const STORYLAB_KEY = "dahtruth-story-lab-toc-v3";
+const ROADMAP_KEY = "dahtruth-character-roadmap";
+
+/* ---------------------------
+   Utility: Generate unique ID
+---------------------------- */
+function uid() {
+  try {
+    if (typeof window !== "undefined" && window.crypto?.randomUUID) {
+      return window.crypto.randomUUID();
+    }
+  } catch {}
+  return String(Date.now()) + "_" + Math.random().toString(36).slice(2);
+}
+
+/* ---------------------------
+   Extract characters from chapter content (same as ComposePage)
+---------------------------- */
+function extractCharactersFromChapters(chapters = []) {
+  const charSet = new Set();
+  const charPattern = /@char:\s*([A-Za-z][A-Za-z\s.'-]*)/gi;
+
+  chapters.forEach((ch) => {
+    const content = ch.content || ch.text || ch.textHTML || "";
+    let match;
+    while ((match = charPattern.exec(content)) !== null) {
+      const name = match[1].trim();
+      if (name) charSet.add(name);
+    }
+  });
+
+  return Array.from(charSet).sort();
+}
+
+/* ---------------------------
+   Load data from localStorage
+---------------------------- */
+function loadStoryLabData() {
+  try {
+    const raw = localStorage.getItem(STORYLAB_KEY);
+    if (raw) {
+      return JSON.parse(raw);
+    }
+  } catch (err) {
+    console.error("[CharacterRoadmap] Failed to load StoryLab data:", err);
+  }
+  return null;
+}
+
+function loadRoadmapData() {
+  try {
+    const raw = localStorage.getItem(ROADMAP_KEY);
+    if (raw) {
+      return JSON.parse(raw);
+    }
+  } catch (err) {
+    console.error("[CharacterRoadmap] Failed to load roadmap data:", err);
+  }
+  return { characters: [], relationships: [] };
+}
+
+function saveRoadmapData(data) {
+  try {
+    localStorage.setItem(ROADMAP_KEY, JSON.stringify(data));
+    window.dispatchEvent(new Event("project:change"));
+  } catch (err) {
+    console.error("[CharacterRoadmap] Failed to save roadmap data:", err);
+  }
+}
+
+/* ---------------------------
+   Page Banner (matches other pages)
+---------------------------- */
+const PageBanner = ({ activeView, bookTitle }) => {
   const viewLabels = {
     milestones: "Track character arcs and story beats",
     timeline: "Visualize character journeys across chapters",
@@ -57,46 +122,24 @@ const PageBanner = ({ activeView }) => {
   };
 
   return (
-    <div className="mx-auto mb-8">
-      <div
-        className="relative mx-auto max-w-4xl rounded-2xl border px-6 py-6 text-center shadow-lg overflow-hidden"
-        style={{
-          background: "rgba(255, 255, 255, 0.85)",
-          backdropFilter: "blur(20px)",
-          borderColor: "rgba(30, 58, 95, 0.15)",
-        }}
-      >
-        <div
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            background: `linear-gradient(135deg, ${BRAND.navy}08 0%, transparent 50%, ${BRAND.gold}12 100%)`,
-          }}
-        />
-        <div className="relative z-10">
-          <div
-            className="mx-auto mb-3 inline-flex items-center justify-center rounded-xl px-4 py-1.5"
-            style={{
-              background: "rgba(255, 255, 255, 0.8)",
-              border: `1px solid ${BRAND.navy}20`,
-            }}
-          >
-            <RouteIcon size={14} className="mr-2" style={{ color: BRAND.navy }} />
-            <span
-              className="text-xs font-semibold tracking-wide"
-              style={{ color: BRAND.navy }}
-            >
-              DahTruth · StoryLab
-            </span>
+    <div
+      className="text-white mb-6"
+      style={{
+        background: `linear-gradient(135deg, ${BRAND.navy} 0%, ${BRAND.navyLight} 40%, ${BRAND.mauve} 100%)`,
+        borderRadius: "1rem",
+        padding: "1.5rem 2rem",
+      }}
+    >
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h1 className="text-2xl font-bold text-white mb-1">Character Roadmap</h1>
+          <p className="text-white/80 text-sm">{viewLabels[activeView]}</p>
+        </div>
+        <div className="flex items-center gap-4 text-sm">
+          <div className="flex items-center gap-2">
+            <span className="text-white/70">Story:</span>
+            <span className="font-semibold text-amber-300">{bookTitle || "Untitled"}</span>
           </div>
-          <h1
-            className="text-3xl font-extrabold mb-2"
-            style={{ color: BRAND.navy }}
-          >
-            Character Roadmap
-          </h1>
-          <p className="mt-1 text-sm max-w-xl mx-auto" style={{ color: "#64748b" }}>
-            {viewLabels[activeView]}
-          </p>
         </div>
       </div>
     </div>
@@ -104,7 +147,7 @@ const PageBanner = ({ activeView }) => {
 };
 
 /* ---------------------------
-   Tab Navigation
+   Tab Navigation (centered)
 ---------------------------- */
 const ViewTabs = ({ activeView, setActiveView }) => {
   const tabs = [
@@ -115,7 +158,7 @@ const ViewTabs = ({ activeView, setActiveView }) => {
   ];
 
   return (
-    <div className="flex flex-wrap gap-2 mb-6">
+    <div className="flex flex-wrap justify-center gap-2 mb-6">
       {tabs.map((tab) => {
         const Icon = tab.icon;
         const isActive = activeView === tab.id;
@@ -127,7 +170,7 @@ const ViewTabs = ({ activeView, setActiveView }) => {
             style={{
               background: isActive
                 ? `linear-gradient(135deg, ${BRAND.navy} 0%, ${BRAND.navyLight} 100%)`
-                : "rgba(255, 255, 255, 0.8)",
+                : "rgba(255, 255, 255, 0.9)",
               color: isActive ? "#fff" : BRAND.navy,
               border: `1px solid ${isActive ? BRAND.navy : "rgba(30, 58, 95, 0.2)"}`,
               boxShadow: isActive
@@ -147,13 +190,25 @@ const ViewTabs = ({ activeView, setActiveView }) => {
 /* ---------------------------
    Character Selector
 ---------------------------- */
-const CharacterSelector = ({ characters, selectedId, onSelect, onAddCharacter }) => {
+const CharacterSelector = ({
+  characters,
+  storyCharacters,
+  selectedId,
+  onSelect,
+  onAddCharacter,
+  onImportCharacter,
+}) => {
   const [isOpen, setIsOpen] = useState(false);
   const selected = characters.find((c) => c.id === selectedId);
 
+  // Characters from story that aren't in roadmap yet
+  const unimportedChars = storyCharacters.filter(
+    (name) => !characters.some((c) => c.name === name)
+  );
+
   return (
-    <div className="relative mb-6">
-      <div className="flex items-center gap-3">
+    <div className="mb-6">
+      <div className="flex items-center gap-3 flex-wrap">
         <label className="text-sm font-medium" style={{ color: BRAND.navy }}>
           Character:
         </label>
@@ -162,7 +217,7 @@ const CharacterSelector = ({ characters, selectedId, onSelect, onAddCharacter })
             onClick={() => setIsOpen(!isOpen)}
             className="w-full flex items-center justify-between gap-2 rounded-xl px-4 py-2.5 text-left transition-all"
             style={{
-              background: "rgba(255, 255, 255, 0.9)",
+              background: "rgba(255, 255, 255, 0.95)",
               border: `1px solid ${BRAND.navy}20`,
             }}
           >
@@ -188,33 +243,56 @@ const CharacterSelector = ({ characters, selectedId, onSelect, onAddCharacter })
                 border: `1px solid ${BRAND.navy}15`,
               }}
             >
-              {characters.length === 0 ? (
+              {characters.length === 0 && unimportedChars.length === 0 ? (
                 <div className="px-4 py-3 text-sm text-gray-500">
-                  No characters yet
+                  No characters yet. Add one or tag characters in your chapters with @char: Name
                 </div>
               ) : (
-                characters.map((char) => (
-                  <button
-                    key={char.id}
-                    onClick={() => {
-                      onSelect(char.id);
-                      setIsOpen(false);
-                    }}
-                    className="w-full flex items-center gap-2 px-4 py-2.5 text-left hover:bg-gray-50 transition-colors"
-                    style={{
-                      background:
-                        char.id === selectedId ? `${BRAND.gold}15` : "transparent",
-                    }}
-                  >
-                    <User size={14} style={{ color: BRAND.mauve }} />
-                    <span style={{ color: BRAND.navy }}>{char.name}</span>
-                    {char.role && (
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">
-                        {char.role}
-                      </span>
-                    )}
-                  </button>
-                ))
+                <>
+                  {characters.map((char) => (
+                    <button
+                      key={char.id}
+                      onClick={() => {
+                        onSelect(char.id);
+                        setIsOpen(false);
+                      }}
+                      className="w-full flex items-center gap-2 px-4 py-2.5 text-left hover:bg-gray-50 transition-colors"
+                      style={{
+                        background: char.id === selectedId ? `${BRAND.gold}15` : "transparent",
+                      }}
+                    >
+                      <User size={14} style={{ color: BRAND.mauve }} />
+                      <span style={{ color: BRAND.navy }}>{char.name}</span>
+                      {char.role && (
+                        <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">
+                          {char.role}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+
+                  {unimportedChars.length > 0 && (
+                    <>
+                      <div className="px-4 py-2 text-xs font-semibold text-gray-400 border-t border-gray-100">
+                        From your story (@char: tags)
+                      </div>
+                      {unimportedChars.map((name) => (
+                        <button
+                          key={name}
+                          onClick={() => {
+                            onImportCharacter(name);
+                            setIsOpen(false);
+                          }}
+                          className="w-full flex items-center gap-2 px-4 py-2.5 text-left hover:bg-amber-50 transition-colors"
+                        >
+                          <Plus size={14} style={{ color: BRAND.gold }} />
+                          <span style={{ color: BRAND.navy }}>{name}</span>
+                          <span className="text-xs text-amber-600">Import</span>
+                        </button>
+                      ))}
+                    </>
+                  )}
+                </>
               )}
             </div>
           )}
@@ -222,11 +300,11 @@ const CharacterSelector = ({ characters, selectedId, onSelect, onAddCharacter })
 
         <button
           onClick={onAddCharacter}
-          className="inline-flex items-center gap-1 rounded-xl px-3 py-2.5 text-sm font-medium transition-all"
+          className="inline-flex items-center gap-1.5 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all hover:scale-105"
           style={{
-            background: `${BRAND.gold}20`,
-            color: BRAND.navy,
-            border: `1px solid ${BRAND.gold}40`,
+            background: `linear-gradient(135deg, ${BRAND.gold}, #B8960C)`,
+            color: "#fff",
+            boxShadow: `0 4px 12px ${BRAND.gold}40`,
           }}
         >
           <Plus size={16} />
@@ -247,14 +325,7 @@ const ItemTypes = {
 /* ---------------------------
    Draggable Milestone Row
 ---------------------------- */
-function DraggableMilestone({
-  item,
-  index,
-  moveItem,
-  update,
-  remove,
-  chapters,
-}) {
+function DraggableMilestone({ item, index, moveItem, update, remove, chapters }) {
   const ref = useRef(null);
 
   const [, drop] = useDrop({
@@ -284,13 +355,12 @@ function DraggableMilestone({
         isDragging ? "opacity-60 scale-[0.98]" : ""
       }`}
       style={{
-        background: item.done ? `${BRAND.gold}08` : "rgba(255, 255, 255, 0.9)",
+        background: item.done ? `${BRAND.gold}08` : "rgba(255, 255, 255, 0.95)",
         border: `1px solid ${item.done ? BRAND.gold + "40" : "rgba(30, 58, 95, 0.12)"}`,
         boxShadow: isDragging ? "none" : "0 2px 8px rgba(0,0,0,0.04)",
       }}
     >
       <div className="flex items-start gap-3">
-        {/* Drag handle */}
         <div
           className="flex items-center justify-center pt-1 cursor-grab active:cursor-grabbing select-none"
           title="Drag to reorder"
@@ -299,7 +369,6 @@ function DraggableMilestone({
         </div>
 
         <div className="flex-1 space-y-2">
-          {/* Title input */}
           <input
             value={item.title}
             onChange={(e) => update(item.id, { title: e.target.value })}
@@ -308,7 +377,6 @@ function DraggableMilestone({
             placeholder="Milestone title"
           />
 
-          {/* Description */}
           <textarea
             value={item.description || ""}
             onChange={(e) => update(item.id, { description: e.target.value })}
@@ -318,7 +386,6 @@ function DraggableMilestone({
             rows={2}
           />
 
-          {/* Chapter Link & Phase */}
           <div className="flex flex-wrap items-center gap-3 pt-1">
             <select
               value={item.chapterId || ""}
@@ -331,9 +398,9 @@ function DraggableMilestone({
               }}
             >
               <option value="">Link to chapter...</option>
-              {chapters.map((ch) => (
+              {chapters.map((ch, idx) => (
                 <option key={ch.id} value={ch.id}>
-                  {ch.title || `Chapter ${ch.number || "?"}`}
+                  {ch.title || `Chapter ${idx + 1}`}
                 </option>
               ))}
             </select>
@@ -380,7 +447,6 @@ function DraggableMilestone({
           </div>
         </div>
 
-        {/* Done checkbox & Delete */}
         <div className="flex items-center gap-2 pt-1">
           <label className="flex items-center gap-1.5 cursor-pointer">
             <input
@@ -409,7 +475,32 @@ function DraggableMilestone({
 }
 
 /* ---------------------------
-   Milestones View (Per-Character Arc)
+   Empty State Component
+---------------------------- */
+const EmptyState = ({ icon: Icon, title, description, action }) => (
+  <div
+    className="rounded-2xl p-8 text-center"
+    style={{
+      background: "rgba(255, 255, 255, 0.6)",
+      border: `1px dashed ${BRAND.navy}20`,
+    }}
+  >
+    <div
+      className="w-12 h-12 rounded-xl mx-auto mb-4 flex items-center justify-center"
+      style={{ background: `${BRAND.mauve}20` }}
+    >
+      <Icon size={24} style={{ color: BRAND.mauve }} />
+    </div>
+    <h4 className="font-semibold mb-1" style={{ color: BRAND.navy }}>
+      {title}
+    </h4>
+    <p className="text-sm text-gray-500 max-w-sm mx-auto">{description}</p>
+    {action}
+  </div>
+);
+
+/* ---------------------------
+   Milestones View
 ---------------------------- */
 const MilestonesView = ({
   character,
@@ -430,15 +521,6 @@ const MilestonesView = ({
     );
   }
 
-  const phaseGroups = {
-    beginning: { label: "Beginning (Setup)", color: BRAND.mauve },
-    rising: { label: "Rising Action", color: "#60a5fa" },
-    midpoint: { label: "Midpoint", color: BRAND.gold },
-    falling: { label: "Falling Action", color: "#f97316" },
-    climax: { label: "Climax", color: "#ef4444" },
-    resolution: { label: "Resolution", color: "#22c55e" },
-  };
-
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -453,11 +535,11 @@ const MilestonesView = ({
         </div>
         <button
           onClick={onAdd}
-          className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-all"
+          className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-all hover:scale-105"
           style={{
-            background: `linear-gradient(135deg, ${BRAND.navy} 0%, ${BRAND.navyLight} 100%)`,
+            background: `linear-gradient(135deg, ${BRAND.gold}, #B8960C)`,
             color: "#fff",
-            boxShadow: `0 4px 12px ${BRAND.navy}25`,
+            boxShadow: `0 4px 12px ${BRAND.gold}40`,
           }}
         >
           <Plus size={16} />
@@ -465,9 +547,11 @@ const MilestonesView = ({
         </button>
       </div>
 
-      {/* Progress bar */}
       {milestones.length > 0 && (
-        <div className="h-2 rounded-full overflow-hidden" style={{ background: `${BRAND.navy}10` }}>
+        <div
+          className="h-2 rounded-full overflow-hidden"
+          style={{ background: `${BRAND.navy}10` }}
+        >
           <div
             className="h-full rounded-full transition-all duration-500"
             style={{
@@ -478,7 +562,6 @@ const MilestonesView = ({
         </div>
       )}
 
-      {/* Milestone list */}
       <div className="space-y-3">
         {milestones.length === 0 ? (
           <EmptyState
@@ -522,24 +605,18 @@ const MilestonesView = ({
    Timeline View
 ---------------------------- */
 const TimelineView = ({ characters, chapters }) => {
-  // Build timeline data: each chapter gets events from all characters
   const timelineData = useMemo(() => {
-    return chapters.map((chapter) => {
+    return chapters.map((chapter, idx) => {
       const charEvents = characters
         .map((char) => {
           const milestones = (char.milestones || []).filter(
             (m) => m.chapterId === chapter.id
           );
-          return milestones.length > 0
-            ? { character: char, milestones }
-            : null;
+          return milestones.length > 0 ? { character: char, milestones } : null;
         })
         .filter(Boolean);
 
-      return {
-        chapter,
-        events: charEvents,
-      };
+      return { chapter, index: idx, events: charEvents };
     });
   }, [characters, chapters]);
 
@@ -555,27 +632,19 @@ const TimelineView = ({ characters, chapters }) => {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-bold" style={{ color: BRAND.navy }}>
-          Story Timeline
-        </h3>
-        <div className="text-sm text-gray-500">
-          {chapters.length} chapter{chapters.length !== 1 ? "s" : ""}
-        </div>
-      </div>
+      <h3 className="text-lg font-bold" style={{ color: BRAND.navy }}>
+        Story Timeline
+      </h3>
 
-      {/* Timeline track */}
       <div className="relative">
-        {/* Vertical line */}
         <div
           className="absolute left-6 top-0 bottom-0 w-0.5"
           style={{ background: `${BRAND.navy}15` }}
         />
 
         <div className="space-y-6">
-          {timelineData.map(({ chapter, events }, idx) => (
+          {timelineData.map(({ chapter, index, events }) => (
             <div key={chapter.id} className="relative pl-16">
-              {/* Chapter marker */}
               <div
                 className="absolute left-4 w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold"
                 style={{
@@ -587,19 +656,18 @@ const TimelineView = ({ characters, chapters }) => {
                   color: events.length > 0 ? "#fff" : BRAND.navy,
                 }}
               >
-                {idx + 1}
+                {index + 1}
               </div>
 
-              {/* Chapter card */}
               <div
                 className="rounded-xl p-4"
                 style={{
-                  background: "rgba(255, 255, 255, 0.9)",
+                  background: "rgba(255, 255, 255, 0.95)",
                   border: `1px solid ${BRAND.navy}12`,
                 }}
               >
                 <h4 className="font-semibold mb-2" style={{ color: BRAND.navy }}>
-                  {chapter.title || `Chapter ${chapter.number || idx + 1}`}
+                  {chapter.title || `Chapter ${index + 1}`}
                 </h4>
 
                 {events.length === 0 ? (
@@ -617,41 +685,18 @@ const TimelineView = ({ characters, chapters }) => {
                           <User size={12} style={{ color: BRAND.mauve }} />
                         </div>
                         <div className="flex-1">
-                          <span
-                            className="text-sm font-medium"
-                            style={{ color: BRAND.navy }}
-                          >
+                          <span className="text-sm font-medium" style={{ color: BRAND.navy }}>
                             {character.name}
                           </span>
                           <div className="mt-1 space-y-1">
                             {milestones.map((m) => (
-                              <div
-                                key={m.id}
-                                className="text-sm flex items-center gap-2"
-                              >
+                              <div key={m.id} className="text-sm flex items-center gap-2">
                                 <span
                                   className={`w-2 h-2 rounded-full flex-shrink-0 ${
                                     m.done ? "bg-green-400" : "bg-gray-300"
                                   }`}
                                 />
                                 <span className="text-gray-600">{m.title}</span>
-                                {m.emotionalState && m.emotionalState !== "neutral" && (
-                                  <span className="text-xs">
-                                    {
-                                      {
-                                        hopeful: "🌟",
-                                        determined: "💪",
-                                        conflicted: "😰",
-                                        defeated: "😔",
-                                        triumphant: "🎉",
-                                        grieving: "💔",
-                                        angry: "😠",
-                                        fearful: "😨",
-                                        peaceful: "😌",
-                                      }[m.emotionalState]
-                                    }
-                                  </span>
-                                )}
                               </div>
                             ))}
                           </div>
@@ -672,7 +717,13 @@ const TimelineView = ({ characters, chapters }) => {
 /* ---------------------------
    Relationships View
 ---------------------------- */
-const RelationshipsView = ({ characters, relationships, onAddRelationship, onUpdateRelationship, onRemoveRelationship }) => {
+const RelationshipsView = ({
+  characters,
+  relationships,
+  onAddRelationship,
+  onUpdateRelationship,
+  onRemoveRelationship,
+}) => {
   const [editingId, setEditingId] = useState(null);
 
   const relationshipTypes = [
@@ -708,11 +759,11 @@ const RelationshipsView = ({ characters, relationships, onAddRelationship, onUpd
         </div>
         <button
           onClick={onAddRelationship}
-          className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-all"
+          className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition-all hover:scale-105"
           style={{
-            background: `linear-gradient(135deg, ${BRAND.navy} 0%, ${BRAND.navyLight} 100%)`,
+            background: `linear-gradient(135deg, ${BRAND.gold}, #B8960C)`,
             color: "#fff",
-            boxShadow: `0 4px 12px ${BRAND.navy}25`,
+            boxShadow: `0 4px 12px ${BRAND.gold}40`,
           }}
         >
           <Link2 size={16} />
@@ -728,11 +779,10 @@ const RelationshipsView = ({ characters, relationships, onAddRelationship, onUpd
           border: `1px solid ${BRAND.navy}10`,
         }}
       >
-        {/* Simple circular layout */}
         <div className="relative w-full aspect-square max-w-md mx-auto">
           {characters.map((char, idx) => {
             const angle = (idx / characters.length) * 2 * Math.PI - Math.PI / 2;
-            const radius = 40; // percentage from center
+            const radius = 40;
             const x = 50 + radius * Math.cos(angle);
             const y = 50 + radius * Math.sin(angle);
 
@@ -740,10 +790,7 @@ const RelationshipsView = ({ characters, relationships, onAddRelationship, onUpd
               <div
                 key={char.id}
                 className="absolute transform -translate-x-1/2 -translate-y-1/2 z-10"
-                style={{
-                  left: `${x}%`,
-                  top: `${y}%`,
-                }}
+                style={{ left: `${x}%`, top: `${y}%` }}
               >
                 <div
                   className="w-16 h-16 rounded-full flex items-center justify-center shadow-lg cursor-pointer hover:scale-110 transition-transform"
@@ -761,7 +808,6 @@ const RelationshipsView = ({ characters, relationships, onAddRelationship, onUpd
             );
           })}
 
-          {/* Draw relationship lines */}
           <svg className="absolute inset-0 w-full h-full" style={{ zIndex: 0 }}>
             {relationships.map((rel) => {
               const char1Idx = characters.findIndex((c) => c.id === rel.from);
@@ -796,20 +842,13 @@ const RelationshipsView = ({ characters, relationships, onAddRelationship, onUpd
           </svg>
         </div>
 
-        {/* Legend */}
         <div className="mt-4 flex flex-wrap justify-center gap-3">
-          {relationshipTypes.map((type) => {
-            const Icon = type.icon;
-            return (
-              <div key={type.id} className="flex items-center gap-1.5 text-xs">
-                <div
-                  className="w-3 h-3 rounded-full"
-                  style={{ background: type.color }}
-                />
-                <span className="text-gray-600">{type.label}</span>
-              </div>
-            );
-          })}
+          {relationshipTypes.map((type) => (
+            <div key={type.id} className="flex items-center gap-1.5 text-xs">
+              <div className="w-3 h-3 rounded-full" style={{ background: type.color }} />
+              <span className="text-gray-600">{type.label}</span>
+            </div>
+          ))}
         </div>
       </div>
 
@@ -820,20 +859,6 @@ const RelationshipsView = ({ characters, relationships, onAddRelationship, onUpd
             icon={Network}
             title="No Relationships Defined"
             description="Start mapping how your characters connect to each other."
-            action={
-              <button
-                onClick={onAddRelationship}
-                className="mt-3 inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium"
-                style={{
-                  background: `${BRAND.gold}20`,
-                  color: BRAND.navy,
-                  border: `1px solid ${BRAND.gold}40`,
-                }}
-              >
-                <Link2 size={16} />
-                Add First Relationship
-              </button>
-            }
           />
         ) : (
           relationships.map((rel) => {
@@ -848,7 +873,7 @@ const RelationshipsView = ({ characters, relationships, onAddRelationship, onUpd
                 key={rel.id}
                 className="rounded-xl p-4 transition-all"
                 style={{
-                  background: "rgba(255, 255, 255, 0.9)",
+                  background: "rgba(255, 255, 255, 0.95)",
                   border: `1px solid ${typeData.color}30`,
                 }}
               >
@@ -857,9 +882,7 @@ const RelationshipsView = ({ characters, relationships, onAddRelationship, onUpd
                     <div className="grid grid-cols-2 gap-3">
                       <select
                         value={rel.from}
-                        onChange={(e) =>
-                          onUpdateRelationship(rel.id, { from: e.target.value })
-                        }
+                        onChange={(e) => onUpdateRelationship(rel.id, { from: e.target.value })}
                         className="rounded-lg px-3 py-2 text-sm"
                         style={{ border: `1px solid ${BRAND.navy}20` }}
                       >
@@ -871,9 +894,7 @@ const RelationshipsView = ({ characters, relationships, onAddRelationship, onUpd
                       </select>
                       <select
                         value={rel.to}
-                        onChange={(e) =>
-                          onUpdateRelationship(rel.id, { to: e.target.value })
-                        }
+                        onChange={(e) => onUpdateRelationship(rel.id, { to: e.target.value })}
                         className="rounded-lg px-3 py-2 text-sm"
                         style={{ border: `1px solid ${BRAND.navy}20` }}
                       >
@@ -886,9 +907,7 @@ const RelationshipsView = ({ characters, relationships, onAddRelationship, onUpd
                     </div>
                     <select
                       value={rel.type}
-                      onChange={(e) =>
-                        onUpdateRelationship(rel.id, { type: e.target.value })
-                      }
+                      onChange={(e) => onUpdateRelationship(rel.id, { type: e.target.value })}
                       className="w-full rounded-lg px-3 py-2 text-sm"
                       style={{ border: `1px solid ${BRAND.navy}20` }}
                     >
@@ -900,9 +919,7 @@ const RelationshipsView = ({ characters, relationships, onAddRelationship, onUpd
                     </select>
                     <textarea
                       value={rel.description || ""}
-                      onChange={(e) =>
-                        onUpdateRelationship(rel.id, { description: e.target.value })
-                      }
+                      onChange={(e) => onUpdateRelationship(rel.id, { description: e.target.value })}
                       placeholder="Describe this relationship..."
                       className="w-full rounded-lg px-3 py-2 text-sm resize-none"
                       style={{ border: `1px solid ${BRAND.navy}20` }}
@@ -937,10 +954,7 @@ const RelationshipsView = ({ characters, relationships, onAddRelationship, onUpd
                         </span>
                         <span
                           className="text-xs px-2 py-0.5 rounded-full"
-                          style={{
-                            background: `${typeData.color}15`,
-                            color: typeData.color,
-                          }}
+                          style={{ background: `${typeData.color}15`, color: typeData.color }}
                         >
                           {typeData.label}
                         </span>
@@ -988,16 +1002,7 @@ const GoalsView = ({ character, onUpdate }) => {
     );
   }
 
-  const goals = character.goals || {
-    want: "",
-    need: "",
-    fear: "",
-    flaw: "",
-    strength: "",
-    lie: "",
-    truth: "",
-    stakes: "",
-  };
+  const goals = character.goals || {};
 
   const updateGoal = (key, value) => {
     onUpdate(character.id, {
@@ -1006,62 +1011,14 @@ const GoalsView = ({ character, onUpdate }) => {
   };
 
   const fields = [
-    {
-      key: "want",
-      label: "External Want",
-      placeholder: "What does this character consciously pursue?",
-      icon: Target,
-      color: BRAND.gold,
-    },
-    {
-      key: "need",
-      label: "Internal Need",
-      placeholder: "What do they actually need (often unknown to them)?",
-      icon: Heart,
-      color: "#ec4899",
-    },
-    {
-      key: "fear",
-      label: "Greatest Fear",
-      placeholder: "What are they most afraid of?",
-      icon: Swords,
-      color: "#ef4444",
-    },
-    {
-      key: "flaw",
-      label: "Fatal Flaw",
-      placeholder: "What weakness holds them back?",
-      icon: X,
-      color: "#f97316",
-    },
-    {
-      key: "strength",
-      label: "Core Strength",
-      placeholder: "What's their greatest asset?",
-      icon: Sparkles,
-      color: "#22c55e",
-    },
-    {
-      key: "lie",
-      label: "The Lie They Believe",
-      placeholder: "What false belief shapes their worldview?",
-      icon: HelpCircle,
-      color: BRAND.mauve,
-    },
-    {
-      key: "truth",
-      label: "The Truth",
-      placeholder: "What must they learn by story's end?",
-      icon: Check,
-      color: BRAND.navy,
-    },
-    {
-      key: "stakes",
-      label: "Stakes",
-      placeholder: "What happens if they fail?",
-      icon: Target,
-      color: "#dc2626",
-    },
+    { key: "want", label: "External Want", placeholder: "What does this character consciously pursue?", icon: Target, color: BRAND.gold },
+    { key: "need", label: "Internal Need", placeholder: "What do they actually need (often unknown to them)?", icon: Heart, color: "#ec4899" },
+    { key: "fear", label: "Greatest Fear", placeholder: "What are they most afraid of?", icon: Swords, color: "#ef4444" },
+    { key: "flaw", label: "Fatal Flaw", placeholder: "What weakness holds them back?", icon: X, color: "#f97316" },
+    { key: "strength", label: "Core Strength", placeholder: "What's their greatest asset?", icon: Sparkles, color: "#22c55e" },
+    { key: "lie", label: "The Lie They Believe", placeholder: "What false belief shapes their worldview?", icon: HelpCircle, color: BRAND.mauve },
+    { key: "truth", label: "The Truth", placeholder: "What must they learn by story's end?", icon: Check, color: BRAND.navy },
+    { key: "stakes", label: "Stakes", placeholder: "What happens if they fail?", icon: Target, color: "#dc2626" },
   ];
 
   return (
@@ -1081,7 +1038,7 @@ const GoalsView = ({ character, onUpdate }) => {
             key={key}
             className="rounded-xl p-4 transition-all"
             style={{
-              background: "rgba(255, 255, 255, 0.9)",
+              background: "rgba(255, 255, 255, 0.95)",
               border: `1px solid ${color}25`,
             }}
           >
@@ -1108,7 +1065,7 @@ const GoalsView = ({ character, onUpdate }) => {
         ))}
       </div>
 
-      {/* Conflict Summary */}
+      {/* Arc Summary */}
       <div
         className="rounded-xl p-5"
         style={{
@@ -1124,29 +1081,25 @@ const GoalsView = ({ character, onUpdate }) => {
             <p>
               <strong>{character.name}</strong> wants{" "}
               <em className="text-gray-700">{goals.want.toLowerCase()}</em>, but what they
-              really need is{" "}
-              <em className="text-gray-700">{goals.need.toLowerCase()}</em>.
+              really need is <em className="text-gray-700">{goals.need.toLowerCase()}</em>.
             </p>
           )}
           {goals.lie && goals.truth && (
             <p>
-              They believe{" "}
-              <em className="text-gray-700">{goals.lie.toLowerCase()}</em>, but must learn
-              that <em className="text-gray-700">{goals.truth.toLowerCase()}</em>.
+              They believe <em className="text-gray-700">{goals.lie.toLowerCase()}</em>, but
+              must learn that <em className="text-gray-700">{goals.truth.toLowerCase()}</em>.
             </p>
           )}
           {goals.fear && goals.flaw && (
             <p>
-              Their fear of{" "}
-              <em className="text-gray-700">{goals.fear.toLowerCase()}</em> and their{" "}
-              <em className="text-gray-700">{goals.flaw.toLowerCase()}</em> stand in their
-              way.
+              Their fear of <em className="text-gray-700">{goals.fear.toLowerCase()}</em> and
+              their <em className="text-gray-700">{goals.flaw.toLowerCase()}</em> stand in
+              their way.
             </p>
           )}
           {goals.stakes && (
             <p>
-              If they fail,{" "}
-              <em className="text-gray-700">{goals.stakes.toLowerCase()}</em>.
+              If they fail, <em className="text-gray-700">{goals.stakes.toLowerCase()}</em>.
             </p>
           )}
           {!goals.want && !goals.need && !goals.lie && !goals.fear && (
@@ -1160,66 +1113,60 @@ const GoalsView = ({ character, onUpdate }) => {
   );
 };
 
-/* ---------------------------
-   Empty State Component
----------------------------- */
-const EmptyState = ({ icon: Icon, title, description, action }) => (
-  <div
-    className="rounded-2xl p-8 text-center"
-    style={{
-      background: "rgba(255, 255, 255, 0.6)",
-      border: `1px dashed ${BRAND.navy}20`,
-    }}
-  >
-    <div
-      className="w-12 h-12 rounded-xl mx-auto mb-4 flex items-center justify-center"
-      style={{ background: `${BRAND.mauve}20` }}
-    >
-      <Icon size={24} style={{ color: BRAND.mauve }} />
-    </div>
-    <h4 className="font-semibold mb-1" style={{ color: BRAND.navy }}>
-      {title}
-    </h4>
-    <p className="text-sm text-gray-500 max-w-sm mx-auto">{description}</p>
-    {action}
-  </div>
-);
-
 /* ------------------------------------------------
    Main CharacterRoadmap Component
 ------------------------------------------------- */
 export default function CharacterRoadmap() {
-  const [project, setProject] = useState(() => ensureWorkshopFields(loadProject()));
   const [activeView, setActiveView] = useState("milestones");
-  const [selectedCharacterId, setSelectedCharacterId] = useState(() => {
-    const chars = project.characters || [];
-    return chars.length > 0 ? chars[0].id : null;
-  });
+  const [roadmapData, setRoadmapData] = useState(() => loadRoadmapData());
+  const [storyLabData, setStoryLabData] = useState(() => loadStoryLabData());
+  const [selectedCharacterId, setSelectedCharacterId] = useState(null);
 
-  // Derived data
-  const characters = project.characters || [];
-  const chapters = project.chapters || [];
-  const relationships = project.characterRelationships || [];
+  // Extract characters from story chapters using @char: pattern
+  const storyCharacters = useMemo(() => {
+    if (!storyLabData?.chapters) return [];
+    return extractCharactersFromChapters(storyLabData.chapters);
+  }, [storyLabData]);
+
+  // Roadmap characters (with milestones and goals)
+  const characters = roadmapData.characters || [];
+  const relationships = roadmapData.relationships || [];
+  const chapters = storyLabData?.chapters || [];
+  const bookTitle = storyLabData?.book?.title || "Untitled";
+
+  // Selected character
   const selectedCharacter = characters.find((c) => c.id === selectedCharacterId);
   const selectedMilestones = selectedCharacter?.milestones || [];
 
-  // Persist helper
+  // Auto-select first character if none selected
+  useEffect(() => {
+    if (!selectedCharacterId && characters.length > 0) {
+      setSelectedCharacterId(characters[0].id);
+    }
+  }, [characters, selectedCharacterId]);
+
+  // Listen for project changes
+  useEffect(() => {
+    const handleChange = () => {
+      setStoryLabData(loadStoryLabData());
+      setRoadmapData(loadRoadmapData());
+    };
+    window.addEventListener("project:change", handleChange);
+    window.addEventListener("storage", handleChange);
+    return () => {
+      window.removeEventListener("project:change", handleChange);
+      window.removeEventListener("storage", handleChange);
+    };
+  }, []);
+
+  // Save helper
   const commit = useCallback((mutator) => {
-    setProject((prev) => {
+    setRoadmapData((prev) => {
       const copy = JSON.parse(JSON.stringify(prev));
       mutator(copy);
-      ensureWorkshopFields(copy);
-      // Ensure characterRelationships exists
-      if (!copy.characterRelationships) copy.characterRelationships = [];
-      // Ensure each character has milestones and goals
-      (copy.characters || []).forEach((c) => {
-        if (!c.milestones) c.milestones = [];
-        if (!c.goals) c.goals = {};
-      });
-      saveProject(copy);
-      try {
-        window.dispatchEvent(new Event("project:change"));
-      } catch {}
+      if (!copy.characters) copy.characters = [];
+      if (!copy.relationships) copy.relationships = [];
+      saveRoadmapData(copy);
       return copy;
     });
   }, []);
@@ -1227,9 +1174,8 @@ export default function CharacterRoadmap() {
   // Character CRUD
   const addCharacter = () => {
     const newId = uid();
-    commit((p) => {
-      if (!p.characters) p.characters = [];
-      p.characters.push({
+    commit((data) => {
+      data.characters.push({
         id: newId,
         name: "New Character",
         role: "",
@@ -1240,20 +1186,33 @@ export default function CharacterRoadmap() {
     setSelectedCharacterId(newId);
   };
 
+  const importCharacter = (name) => {
+    const newId = uid();
+    commit((data) => {
+      data.characters.push({
+        id: newId,
+        name: name,
+        role: "",
+        milestones: [],
+        goals: {},
+      });
+    });
+    setSelectedCharacterId(newId);
+  };
+
   const updateCharacter = (id, patch) => {
-    commit((p) => {
-      const char = (p.characters || []).find((c) => c.id === id);
+    commit((data) => {
+      const char = data.characters.find((c) => c.id === id);
       if (char) Object.assign(char, patch);
     });
   };
 
-  // Milestone CRUD (per character)
+  // Milestone CRUD
   const addMilestone = () => {
     if (!selectedCharacterId) return;
-    commit((p) => {
-      const char = (p.characters || []).find((c) => c.id === selectedCharacterId);
+    commit((data) => {
+      const char = data.characters.find((c) => c.id === selectedCharacterId);
       if (char) {
-        if (!char.milestones) char.milestones = [];
         char.milestones.push({
           id: uid(),
           title: "New Milestone",
@@ -1269,10 +1228,10 @@ export default function CharacterRoadmap() {
 
   const updateMilestone = (milestoneId, patch) => {
     if (!selectedCharacterId) return;
-    commit((p) => {
-      const char = (p.characters || []).find((c) => c.id === selectedCharacterId);
+    commit((data) => {
+      const char = data.characters.find((c) => c.id === selectedCharacterId);
       if (char) {
-        const m = (char.milestones || []).find((x) => x.id === milestoneId);
+        const m = char.milestones.find((x) => x.id === milestoneId);
         if (m) Object.assign(m, patch);
       }
     });
@@ -1280,26 +1239,21 @@ export default function CharacterRoadmap() {
 
   const removeMilestone = (milestoneId) => {
     if (!selectedCharacterId) return;
-    commit((p) => {
-      const char = (p.characters || []).find((c) => c.id === selectedCharacterId);
+    commit((data) => {
+      const char = data.characters.find((c) => c.id === selectedCharacterId);
       if (char) {
-        char.milestones = (char.milestones || []).filter((m) => m.id !== milestoneId);
+        char.milestones = char.milestones.filter((m) => m.id !== milestoneId);
       }
     });
   };
 
   const moveMilestone = (fromIndex, toIndex) => {
     if (!selectedCharacterId) return;
-    commit((p) => {
-      const char = (p.characters || []).find((c) => c.id === selectedCharacterId);
-      if (char && char.milestones) {
+    commit((data) => {
+      const char = data.characters.find((c) => c.id === selectedCharacterId);
+      if (char?.milestones) {
         const list = char.milestones;
-        if (
-          fromIndex < 0 ||
-          toIndex < 0 ||
-          fromIndex >= list.length ||
-          toIndex >= list.length
-        )
+        if (fromIndex < 0 || toIndex < 0 || fromIndex >= list.length || toIndex >= list.length)
           return;
         const [m] = list.splice(fromIndex, 1);
         list.splice(toIndex, 0, m);
@@ -1310,9 +1264,8 @@ export default function CharacterRoadmap() {
   // Relationship CRUD
   const addRelationship = () => {
     if (characters.length < 2) return;
-    commit((p) => {
-      if (!p.characterRelationships) p.characterRelationships = [];
-      p.characterRelationships.push({
+    commit((data) => {
+      data.relationships.push({
         id: uid(),
         from: characters[0].id,
         to: characters[1].id,
@@ -1323,62 +1276,69 @@ export default function CharacterRoadmap() {
   };
 
   const updateRelationship = (id, patch) => {
-    commit((p) => {
-      const rel = (p.characterRelationships || []).find((r) => r.id === id);
+    commit((data) => {
+      const rel = data.relationships.find((r) => r.id === id);
       if (rel) Object.assign(rel, patch);
     });
   };
 
   const removeRelationship = (id) => {
-    commit((p) => {
-      p.characterRelationships = (p.characterRelationships || []).filter(
-        (r) => r.id !== id
-      );
+    commit((data) => {
+      data.relationships = data.relationships.filter((r) => r.id !== id);
     });
   };
 
   return (
     <div className="min-h-screen" style={{ background: "#f8fafc" }}>
-      {/* Global back bar */}
-      <BackToLanding
-        title="Character Roadmap"
-        rightSlot={
+      {/* Top Navigation Bar */}
+      <div className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-slate-200 shadow-sm">
+        <div className="max-w-6xl mx-auto px-4 py-2 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Link
+              to="/story-lab"
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-100 transition-colors"
+            >
+              <ArrowLeft size={16} />
+              Landing
+            </Link>
+            <span className="text-slate-300">|</span>
+            <span className="text-sm font-semibold" style={{ color: BRAND.navy }}>
+              Character Roadmap
+            </span>
+          </div>
           <Link
             to="/story-lab/workshop"
-            className="inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium hover:bg-white/90 transition-colors"
+            className="inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-all hover:scale-105"
             style={{
-              background: "rgba(255, 255, 255, 0.8)",
-              border: `1px solid ${BRAND.navy}15`,
-              color: BRAND.navy,
+              background: `linear-gradient(135deg, ${BRAND.gold}, #B8960C)`,
+              color: "#fff",
             }}
-            title="Open Workshop Hub"
           >
             Workshop Hub
           </Link>
-        }
-      />
+        </div>
+      </div>
 
-      <div className="mx-auto max-w-6xl px-6 py-8">
-        <PageBanner activeView={activeView} />
+      <div className="mx-auto max-w-6xl px-6 py-6">
+        <PageBanner activeView={activeView} bookTitle={bookTitle} />
 
-        {/* View Tabs */}
         <ViewTabs activeView={activeView} setActiveView={setActiveView} />
 
-        {/* Character Selector (for milestones and goals views) */}
         {(activeView === "milestones" || activeView === "goals") && (
           <CharacterSelector
             characters={characters}
+            storyCharacters={storyCharacters}
             selectedId={selectedCharacterId}
             onSelect={setSelectedCharacterId}
             onAddCharacter={addCharacter}
+            onImportCharacter={importCharacter}
           />
         )}
 
-        {/* Main Content Area */}
         <div
           className="rounded-2xl p-6"
           style={{
-            background: "rgba(255, 255, 255, 0.7)",
+            background: "rgba(255, 255, 255, 0.8)",
             backdropFilter: "blur(20px)",
             border: `1px solid ${BRAND.navy}10`,
             boxShadow: "0 4px 20px rgba(0,0,0,0.04)",
@@ -1415,10 +1375,6 @@ export default function CharacterRoadmap() {
           )}
         </div>
       </div>
-
-      {/* Mobile FAB */}
-      <BackToLandingFab />
     </div>
   );
 }
-
