@@ -54,6 +54,7 @@ export function loadProject() {
           roadmap: [],
           priorities: [],
           scenes: [],
+          characterRelationships: project.compose.characterRelationships || [],
           _source: "unified",
         };
         return ensureWorkshopFields(converted);
@@ -99,6 +100,7 @@ export function loadProject() {
           roadmap: [],
           priorities: [],
           scenes: [],
+          characterRelationships: [],
           _source: "legacy-compose",
         };
         return ensureWorkshopFields(converted);
@@ -151,6 +153,11 @@ export function saveProject(next) {
           currentProject.compose.characters = next.characters;
         }
 
+        // Sync character relationships
+        if (Array.isArray(next.characterRelationships)) {
+          currentProject.compose.characterRelationships = next.characterRelationships;
+        }
+
         // Update timestamp
         currentProject.updatedAt = new Date().toISOString();
 
@@ -175,6 +182,27 @@ export function ensureWorkshopFields(project) {
   if (!Array.isArray(project.roadmap)) project.roadmap = [];
   if (!Array.isArray(project.priorities)) project.priorities = [];
   if (!Array.isArray(project.scenes)) project.scenes = [];
+  
+  // Character Roadmap enhancements
+  if (!Array.isArray(project.characterRelationships)) project.characterRelationships = [];
+  
+  // Ensure each character has milestones and goals
+  project.characters.forEach((char) => {
+    if (!Array.isArray(char.milestones)) char.milestones = [];
+    if (!char.goals || typeof char.goals !== "object") {
+      char.goals = {
+        want: "",      // External goal - what they consciously pursue
+        need: "",      // Internal need - what they actually need
+        fear: "",      // Greatest fear
+        flaw: "",      // Fatal flaw / weakness
+        strength: "",  // Core strength / asset
+        lie: "",       // The lie they believe
+        truth: "",     // The truth they must learn
+        stakes: "",    // What happens if they fail
+      };
+    }
+  });
+  
   return project;
 }
 
