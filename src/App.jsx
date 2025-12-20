@@ -22,7 +22,6 @@ import {
 } from "dnd-multi-backend";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { TouchBackend } from "react-dnd-touch-backend";
-// import './utils/quillFonts'; // REMOVED - was causing build error
 
 // Global user context
 import { UserProvider } from "./lib/userStore.jsx";
@@ -60,7 +59,6 @@ const LandingPage = lazy(() => import("./components/LandingPage"));
 const RegistrationPage = lazy(() => import("./components/RegistrationPage"));
 const SignInPage = lazy(() => import("./components/SignInPage"));
 const Dashboard = lazy(() => import("./components/Dashboard"));
-// TOCPage/TOCPage2 removed from imports
 const ProjectPage = lazy(() => import("./components/ProjectPage"));
 const WhoAmI = lazy(() => import("./components/WhoAmI"));
 const ComposePage = lazy(() => import("./components/ComposePage"));
@@ -68,9 +66,6 @@ const Calendar = lazy(() => import("./components/Calendar"));
 const StoryLabLanding = lazy(() => import("./lib/storylab/StoryLabLanding"));
 const StoryPromptsWorkshop = lazy(() =>
   import("./lib/storylab/StoryPromptsWorkshop")
-);
-const StoryWorkshop = lazy(() =>
-  import("./components/storylab/StoryWorkshop")
 );
 const PriorityCards = lazy(() =>
   import("./components/storylab/PriorityCards")
@@ -199,7 +194,7 @@ export default function App() {
               >
                 <Route index element={<StoryLabLanding />} />
                 <Route path="narrative-arc" element={<NarrativeArc />} />
-                <Route path="workshop" element={<StoryWorkshop />} />
+                <Route path="workshop" element={<WorkshopCohort />} />
                 <Route
                   path="workshop/priorities"
                   element={<PriorityCards />}
@@ -217,7 +212,6 @@ export default function App() {
                   element={<HopesFearsLegacy />}
                 />
                 <Route path="prompts" element={<StoryPromptsWorkshop />} />
-                <Route path="community" element={<WorkshopCohort />} />
               </Route>
 
               {/* Typo/alias redirect for old /storylab base (no hyphen) */}
@@ -395,4 +389,3 @@ export default function App() {
     </UserProvider>
   );
 }
-
