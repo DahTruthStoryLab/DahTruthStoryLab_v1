@@ -599,69 +599,39 @@ function StoryToolsSection({ navigate }) {
   );
 }
 
-/* ============ Workshop Hub Section ============ */
-function WorkshopHubSection({ navigate }) {
-  const workshopItems = [
-    {
-      id: "manager",
-      title: "Workshop Manager",
-      blurb: "Launch modules & manage session flow.",
-      icon: Compass,
-      route: `${BASE}/workshop`,
-    },
-    {
-      id: "community",
-      title: "Workshop Community",
-      blurb: "Sessions, pairings, critique hub.",
-      icon: Users,
-      route: `${BASE}/community`,
-    },
-    {
-      id: "critique",
-      title: "Critique Room",
-      blurb: "Open live critique sessions.",
-      icon: MessageSquare,
-      route: `${BASE}/critique`,
-    },
-  ];
-
+/* ============ Workshop Community Button ============ */
+function WorkshopCommunitySection({ navigate }) {
   return (
     <section className="mb-10">
-      <div className="mb-4">
-        <h2 className="text-lg font-bold" style={{ color: BRAND.navy }}>
-          Workshop Hub
-        </h2>
-        <p className="text-slate-500 text-sm">Facilitate sessions and connect with your community</p>
-      </div>
-
-      <div className="grid sm:grid-cols-3 gap-3">
-        {workshopItems.map((item) => (
-          <button
-            key={item.id}
-            onClick={() => navigate(item.route)}
-            className="group rounded-xl p-4 text-left transition-all hover:shadow-md"
-            style={{
-              background: `linear-gradient(135deg, ${BRAND.mauve}08 0%, ${BRAND.navy}05 100%)`,
-              border: `1px solid ${BRAND.mauve}20`,
-            }}
+      <button
+        onClick={() => navigate(`${BASE}/workshop`)}
+        className="w-full group rounded-2xl p-6 text-left transition-all hover:shadow-lg hover:scale-[1.01]"
+        style={{
+          background: `linear-gradient(135deg, ${BRAND.mauve}15 0%, ${BRAND.navy}10 100%)`,
+          border: `1px solid ${BRAND.mauve}30`,
+        }}
+      >
+        <div className="flex items-center gap-4">
+          <div
+            className="w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0"
+            style={{ background: `linear-gradient(135deg, ${BRAND.mauve} 0%, ${BRAND.navy} 100%)` }}
           >
-            <div className="flex items-start gap-3">
-              <div
-                className="w-10 h-10 rounded-lg flex items-center justify-center"
-                style={{ background: `${BRAND.mauve}20` }}
-              >
-                <item.icon size={20} style={{ color: BRAND.mauve }} />
-              </div>
-              <div>
-                <h3 className="font-semibold text-sm" style={{ color: BRAND.navy }}>
-                  {item.title}
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">{item.blurb}</p>
-              </div>
-            </div>
-          </button>
-        ))}
-      </div>
+            <Users size={28} className="text-white" />
+          </div>
+          <div className="flex-1">
+            <h3 className="text-lg font-bold mb-1" style={{ color: BRAND.navy }}>
+              Workshop Community
+            </h3>
+            <p className="text-sm text-slate-600">
+              Connect with your cohort, share writing for critique, manage sessions, and collaborate on your story journey together.
+            </p>
+          </div>
+          <ChevronRight
+            size={24}
+            className="text-slate-300 group-hover:text-slate-500 group-hover:translate-x-1 transition-all"
+          />
+        </div>
+      </button>
     </section>
   );
 }
@@ -777,7 +747,7 @@ export default function StoryLabLanding() {
           <StoryToolsSection navigate={navigate} />
 
           {/* Workshop Hub */}
-          <WorkshopHubSection navigate={navigate} />
+          <WorkshopCommunitySection navigate={navigate} />
 
           {/* Footer */}
           <footer className="text-center text-xs text-slate-400 py-8">
