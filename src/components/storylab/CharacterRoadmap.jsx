@@ -22,8 +22,15 @@ import {
   Check,
   X,
   ArrowLeft,
+  Wand2,
+  Loader2,
+  ChevronUp,
+  Lightbulb,
+  TrendingUp,
+  FileText,
 } from "lucide-react";
 import { useDrag, useDrop } from "react-dnd";
+import { runAssistant } from "../../lib/api";
 
 /* ---------------------------
    Brand Colors
@@ -56,6 +63,16 @@ function uid() {
 }
 
 /* ---------------------------
+   Strip HTML to plain text
+---------------------------- */
+function stripHtml(html = "") {
+  if (!html) return "";
+  const tmp = document.createElement("div");
+  tmp.innerHTML = html;
+  return tmp.textContent || tmp.innerText || "";
+}
+
+/* ---------------------------
    Extract characters from chapter content (same as ComposePage)
 ---------------------------- */
 function extractCharactersFromChapters(chapters = []) {
@@ -72,6 +89,42 @@ function extractCharactersFromChapters(chapters = []) {
   });
 
   return Array.from(charSet).sort();
+}
+
+/* ---------------------------
+   Extract character passages from chapters
+---------------------------- */
+function extractCharacterPassages(chapters = [], characterName) {
+  if (!characterName) return [];
+  
+  const passages = [];
+  const namePattern = new RegExp(characterName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+  const charTagPattern = new RegExp(`@char:\\s*${characterName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'gi');
+  
+  chapters.forEach((ch, idx) => {
+    const content = ch.content || ch.text || ch.textHTML || "";
+    const plainText = stripHtml(content);
+    
+    // Check if character is mentioned in this chapter
+    if (namePattern.test(plainText) || charTagPattern.test(content)) {
+      // Extract sentences/paragraphs containing the character
+      const sentences = plainText.split(/[.!?]+/).filter(s => s.trim());
+      const relevantSentences = sentences.filter(s => 
+        namePattern.test(s) || s.toLowerCase().includes(characterName.toLowerCase())
+      );
+      
+      if (relevantSentences.length > 0) {
+        passages.push({
+          chapterId: ch.id,
+          chapterTitle: ch.title || `Chapter ${idx + 1}`,
+          chapterIndex: idx + 1,
+          excerpts: relevantSentences.slice(0, 5).map(s => s.trim()), // Limit to 5 excerpts per chapter
+        });
+      }
+    }
+  });
+  
+  return passages;
 }
 
 /* ---------------------------
@@ -188,7 +241,135 @@ const ViewTabs = ({ activeView, setActiveView }) => {
 };
 
 /* ---------------------------
-   Character Selector
+   AI Analysis Panel
+---------------------------- */
+const AnalysisPanel = ({ analysis, isOpen, onClose, characterName }) => {
+  if (!isOpen || !analysis) return null;
+
+  return (
+    <div
+      className="mb-6 rounded-2xl overflow-hidden"
+      style={{
+        background: "rgba(255, 255, 255, 0.95)",
+        border: `1px solid ${BRAND.gold}40`,
+        boxShadow: `0 4px 20px ${BRAND.gold}20`,
+      }}
+    >
+      {/* Header */}
+      <div
+        className="px-5 py-4 flex items-center justify-between"
+        style={{
+          background: `linear-gradient(135deg, ${BRAND.navy}08 0%, ${BRAND.gold}12 100%)`,
+          borderBottom: `1px solid ${BRAND.gold}20`,
+        }}
+      >
+        <div className="flex items-center gap-3">
+          <div
+            className="w-10 h-10 rounded-xl flex items-center justify-center"
+            style={{ background: `${BRAND.gold}20` }}
+          >
+            <Wand2 size={20} style={{ color: BRAND.gold }} />
+          </div>
+          <div>
+            <h3 className="font-bold" style={{ color: BRAND.navy }}>
+              AI Analysis: {characterName}
+            </h3>
+            <p className="text-xs text-gray-500">Based on your chapter content</p>
+          </div>
+        </div>
+        <button
+          onClick={onClose}
+          className="p-2 rounded-lg hover:bg-gray-100 transition-colors"
+        >
+          <X size={18} className="text-gray-400" />
+        </button>
+      </div>
+
+      {/* Content */}
+      <div className="p-5 space-y-5">
+        {/* Summary */}
+        {analysis.summary && (
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <User size={16} style={{ color: BRAND.navy }} />
+              <h4 className="font-semibold text-sm" style={{ color: BRAND.navy }}>
+                Character Summary
+              </h4>
+            </div>
+            <p className="text-sm text-gray-700 leading-relaxed">{analysis.summary}</p>
+          </div>
+        )}
+
+        {/* Arc So Far */}
+        {analysis.arcSoFar && (
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <TrendingUp size={16} style={{ color: BRAND.mauve }} />
+              <h4 className="font-semibold text-sm" style={{ color: BRAND.navy }}>
+                Arc So Far
+              </h4>
+            </div>
+            <p className="text-sm text-gray-700 leading-relaxed">{analysis.arcSoFar}</p>
+          </div>
+        )}
+
+        {/* Suggested Directions */}
+        {analysis.suggestions && analysis.suggestions.length > 0 && (
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <Lightbulb size={16} style={{ color: BRAND.gold }} />
+              <h4 className="font-semibold text-sm" style={{ color: BRAND.navy }}>
+                Where They Could Go Next
+              </h4>
+            </div>
+            <ul className="space-y-2">
+              {analysis.suggestions.map((suggestion, idx) => (
+                <li
+                  key={idx}
+                  className="flex items-start gap-2 text-sm text-gray-700"
+                >
+                  <span
+                    className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5 text-xs font-bold"
+                    style={{ background: `${BRAND.gold}20`, color: BRAND.gold }}
+                  >
+                    {idx + 1}
+                  </span>
+                  <span>{suggestion}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
+        {/* Chapter Appearances */}
+        {analysis.chapterAppearances && analysis.chapterAppearances.length > 0 && (
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <FileText size={16} style={{ color: "#6b7280" }} />
+              <h4 className="font-semibold text-sm" style={{ color: BRAND.navy }}>
+                Appears In
+              </h4>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {analysis.chapterAppearances.map((ch, idx) => (
+                <span
+                  key={idx}
+                  className="text-xs px-2 py-1 rounded-lg"
+                  style={{ background: `${BRAND.navy}10`, color: BRAND.navy }}
+                >
+                  {ch}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+/* ---------------------------
+   Character Selector (CENTERED)
 ---------------------------- */
 const CharacterSelector = ({
   characters,
@@ -197,6 +378,8 @@ const CharacterSelector = ({
   onSelect,
   onAddCharacter,
   onImportCharacter,
+  onAnalyzeCharacter,
+  isAnalyzing,
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const selected = characters.find((c) => c.id === selectedId);
@@ -208,11 +391,12 @@ const CharacterSelector = ({
 
   return (
     <div className="mb-6">
-      <div className="flex items-center gap-3 flex-wrap">
+      {/* CENTERED row */}
+      <div className="flex items-center justify-center gap-3 flex-wrap">
         <label className="text-sm font-medium" style={{ color: BRAND.navy }}>
           Character:
         </label>
-        <div className="relative flex-1 max-w-xs">
+        <div className="relative w-64">
           <button
             onClick={() => setIsOpen(!isOpen)}
             className="w-full flex items-center justify-between gap-2 rounded-xl px-4 py-2.5 text-left transition-all"
@@ -298,6 +482,26 @@ const CharacterSelector = ({
           )}
         </div>
 
+        {/* Analyze Character Button */}
+        <button
+          onClick={onAnalyzeCharacter}
+          disabled={!selected || isAnalyzing}
+          className="inline-flex items-center gap-1.5 rounded-xl px-4 py-2.5 text-sm font-medium transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+          style={{
+            background: selected ? `${BRAND.mauve}20` : "#f1f5f9",
+            color: selected ? BRAND.navy : "#94a3b8",
+            border: `1px solid ${selected ? BRAND.mauve + "40" : "#e2e8f0"}`,
+          }}
+        >
+          {isAnalyzing ? (
+            <Loader2 size={16} className="animate-spin" />
+          ) : (
+            <Wand2 size={16} />
+          )}
+          {isAnalyzing ? "Analyzing..." : "Analyze"}
+        </button>
+
+        {/* New Character Button */}
         <button
           onClick={onAddCharacter}
           className="inline-flex items-center gap-1.5 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all hover:scale-105"
@@ -1121,6 +1325,11 @@ export default function CharacterRoadmap() {
   const [roadmapData, setRoadmapData] = useState(() => loadRoadmapData());
   const [storyLabData, setStoryLabData] = useState(() => loadStoryLabData());
   const [selectedCharacterId, setSelectedCharacterId] = useState(null);
+  
+  // AI Analysis state
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisResult, setAnalysisResult] = useState(null);
+  const [showAnalysis, setShowAnalysis] = useState(false);
 
   // Extract characters from story chapters using @char: pattern
   const storyCharacters = useMemo(() => {
@@ -1205,6 +1414,92 @@ export default function CharacterRoadmap() {
       const char = data.characters.find((c) => c.id === id);
       if (char) Object.assign(char, patch);
     });
+  };
+
+  // AI Character Analysis
+  const analyzeCharacter = async () => {
+    if (!selectedCharacter || !chapters.length) return;
+    
+    setIsAnalyzing(true);
+    setShowAnalysis(false);
+    
+    try {
+      // Extract passages where this character appears
+      const passages = extractCharacterPassages(chapters, selectedCharacter.name);
+      
+      // Build context for AI
+      const chapterAppearances = passages.map(p => p.chapterTitle);
+      const excerptText = passages
+        .map(p => `[${p.chapterTitle}]: ${p.excerpts.join(" ... ")}`)
+        .join("\n\n")
+        .slice(0, 3000); // Limit context size
+      
+      // Get existing goals if any
+      const goalsContext = selectedCharacter.goals 
+        ? Object.entries(selectedCharacter.goals)
+            .filter(([k, v]) => v)
+            .map(([k, v]) => `${k}: ${v}`)
+            .join("; ")
+        : "";
+      
+      const prompt = `Analyze this character from a fiction manuscript:
+
+CHARACTER NAME: ${selectedCharacter.name}
+${selectedCharacter.role ? `ROLE: ${selectedCharacter.role}` : ""}
+${goalsContext ? `AUTHOR'S NOTES: ${goalsContext}` : ""}
+
+EXCERPTS FROM THE STORY:
+${excerptText || "No specific excerpts found - character may be newly introduced."}
+
+Please provide:
+1. CHARACTER SUMMARY: A 2-3 sentence summary of who this character is based on their appearances
+2. ARC SO FAR: What has happened to this character emotionally/narratively across the chapters they appear in?
+3. SUGGESTED DIRECTIONS: Give 3 specific, actionable suggestions for where this character's arc could go next. Consider unresolved tensions, growth opportunities, and narrative potential.
+
+Respond in this exact JSON format:
+{
+  "summary": "...",
+  "arcSoFar": "...",
+  "suggestions": ["suggestion 1", "suggestion 2", "suggestion 3"]
+}`;
+
+      const result = await runAssistant(prompt, "clarify", "", "anthropic");
+      
+      // Parse the response
+      let parsed = null;
+      const responseText = result?.result || result?.text || result?.output || result || "";
+      
+      // Try to extract JSON from response
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        try {
+          parsed = JSON.parse(jsonMatch[0]);
+        } catch (e) {
+          console.error("Failed to parse AI response as JSON:", e);
+        }
+      }
+      
+      // If parsing failed, create a structured response from the text
+      if (!parsed) {
+        parsed = {
+          summary: "Analysis completed. See the AI response for details.",
+          arcSoFar: responseText,
+          suggestions: ["Review the character's core motivation", "Consider adding a pivotal scene", "Explore relationships with other characters"],
+        };
+      }
+      
+      // Add chapter appearances
+      parsed.chapterAppearances = chapterAppearances;
+      
+      setAnalysisResult(parsed);
+      setShowAnalysis(true);
+      
+    } catch (error) {
+      console.error("Character analysis failed:", error);
+      alert("Failed to analyze character. Please try again.");
+    } finally {
+      setIsAnalyzing(false);
+    }
   };
 
   // Milestone CRUD
@@ -1325,14 +1620,29 @@ export default function CharacterRoadmap() {
         <ViewTabs activeView={activeView} setActiveView={setActiveView} />
 
         {(activeView === "milestones" || activeView === "goals") && (
-          <CharacterSelector
-            characters={characters}
-            storyCharacters={storyCharacters}
-            selectedId={selectedCharacterId}
-            onSelect={setSelectedCharacterId}
-            onAddCharacter={addCharacter}
-            onImportCharacter={importCharacter}
-          />
+          <>
+            <CharacterSelector
+              characters={characters}
+              storyCharacters={storyCharacters}
+              selectedId={selectedCharacterId}
+              onSelect={(id) => {
+                setSelectedCharacterId(id);
+                setShowAnalysis(false); // Hide analysis when switching characters
+              }}
+              onAddCharacter={addCharacter}
+              onImportCharacter={importCharacter}
+              onAnalyzeCharacter={analyzeCharacter}
+              isAnalyzing={isAnalyzing}
+            />
+            
+            {/* AI Analysis Panel */}
+            <AnalysisPanel
+              analysis={analysisResult}
+              isOpen={showAnalysis}
+              onClose={() => setShowAnalysis(false)}
+              characterName={selectedCharacter?.name}
+            />
+          </>
         )}
 
         <div
