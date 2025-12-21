@@ -1,30 +1,51 @@
 // src/hooks/useChapterManager.js
 // Manages chapter state, CRUD operations, and localStorage persistence
+// NOW: Uses project-specific storage via useProjectStore
 
-import { useState, useEffect, useMemo } from "react";
-
-const STORAGE_KEY = "dahtruth-story-lab-toc-v3";
+import { useState, useEffect, useMemo, useCallback } from "react";
+import {
+  getCurrentProjectId,
+  getCurrentProjectData,
+  saveCurrentProjectData,
+  getProjectStorageKey,
+} from "./useProjectStore";
 
 // -------- Helpers --------
 
-// Load from localStorage
+// Load from current project's storage
 const loadState = () => {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    return raw ? JSON.parse(raw) : null;
+    const data = getCurrentProjectData();
+    if (data) return data;
+
+    // Fallback: try legacy key for backwards compatibility
+    const legacyRaw = localStorage.getItem("dahtruth-story-lab-toc-v3");
+    return legacyRaw ? JSON.parse(legacyRaw) : null;
   } catch {
     return null;
   }
 };
 
-// Save to localStorage
+// Save to current project's storage
 const saveState = (state) => {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    // Optional: broadcast that project changed
+    const saved = saveCurrentProjectData(state);
+    
+    // Also save to legacy key for backwards compatibility with other components
+    // that might still be reading from there (like StoryLab modules)
+    const projectId = getCurrentProjectId();
+    if (projectId) {
+      localStorage.setItem("dahtruth-story-lab-toc-v3", JSON.stringify(state));
+      localStorage.setItem("currentStory", state.book?.title || "Untitled");
+    }
+
+    // Broadcast that project changed
     window.dispatchEvent(new Event("project:change"));
+    
+    return saved;
   } catch (err) {
     console.error("Failed to save state:", err);
+    return false;
   }
 };
 
@@ -53,8 +74,11 @@ const countWords = (html = "") => {
 };
 
 export function useChapterManager() {
+  // Track which project we're working with
+  const [projectId, setProjectId] = useState(() => getCurrentProjectId());
+
   // Load initial state once
-  const initial = useMemo(loadState, []);
+  const initial = useMemo(() => loadState(), [projectId]);
 
   const [book, setBook] = useState(
     initial?.book || { title: "Untitled Book" }
@@ -70,8 +94,38 @@ export function useChapterManager() {
   const selectedChapter =
     chapters.find((c) => c.id === selectedId) || chapters[0] || null;
 
+  // -------- Listen for project switches --------
+  useEffect(() => {
+    const handleProjectChange = () => {
+      const newProjectId = getCurrentProjectId();
+      if (newProjectId !== projectId) {
+        console.log(`[ChapterManager] Project switched: ${projectId} → ${newProjectId}`);
+        setProjectId(newProjectId);
+
+        // Reload data for new project
+        const data = getCurrentProjectData();
+        if (data) {
+          setBook(data.book || { title: "Untitled Book" });
+          setChapters(ensureFirstChapter(data.chapters || []));
+          setSelectedId(data.chapters?.[0]?.id || null);
+        } else {
+          // New project with no data yet
+          setBook({ title: "Untitled Book" });
+          setChapters(ensureFirstChapter([]));
+          setSelectedId(null);
+        }
+      }
+    };
+
+    window.addEventListener("project:change", handleProjectChange);
+    return () => window.removeEventListener("project:change", handleProjectChange);
+  }, [projectId]);
+
   // -------- Auto-save whenever book/chapters change --------
   useEffect(() => {
+    // Don't save if no project is selected
+    if (!projectId && !getCurrentProjectId()) return;
+
     const timer = setTimeout(() => {
       const current = loadState() || {};
       saveState({
@@ -84,12 +138,12 @@ export function useChapterManager() {
     }, 400);
 
     return () => clearTimeout(timer);
-  }, [book, chapters]);
+  }, [book, chapters, projectId]);
 
   // -------- CRUD operations --------
 
   // Add new chapter (append, do NOT replace existing)
-  const addChapter = () => {
+  const addChapter = useCallback(() => {
     const id = `chapter-${Date.now()}-${Math.random()
       .toString(36)
       .slice(2, 8)}`;
@@ -112,10 +166,10 @@ export function useChapterManager() {
 
     setSelectedId(id);
     return id;
-  };
+  }, []);
 
   // Update an existing chapter by id
-  const updateChapter = (id, updates) => {
+  const updateChapter = useCallback((id, updates) => {
     setChapters((prev) =>
       prev.map((ch) => {
         if (ch.id !== id) return ch;
@@ -132,10 +186,10 @@ export function useChapterManager() {
         };
       })
     );
-  };
+  }, []);
 
   // Delete a single chapter
-  const deleteChapter = (id) => {
+  const deleteChapter = useCallback((id) => {
     setChapters((prev) => {
       const filtered = prev.filter((c) => c.id !== id);
 
@@ -150,10 +204,10 @@ export function useChapterManager() {
 
       return result;
     });
-  };
+  }, [selectedId]);
 
   // Move chapter (for drag + drop reordering)
-  const moveChapter = (fromIndex, toIndex) => {
+  const moveChapter = useCallback((fromIndex, toIndex) => {
     setChapters((prev) => {
       if (
         fromIndex < 0 ||
@@ -171,10 +225,10 @@ export function useChapterManager() {
       // Recompute order indices
       return copy.map((ch, idx) => ({ ...ch, order: idx }));
     });
-  };
+  }, []);
 
   // Explicit save (used when user clicks Save)
-  const saveProject = (overrides = {}) => {
+  const saveProject = useCallback((overrides = {}) => {
     const current = loadState() || {};
 
     const finalBook = overrides.book || book;
@@ -189,9 +243,41 @@ export function useChapterManager() {
       settings: current.settings || { theme: "light", focusMode: false },
       tocOutline: current.tocOutline || [],
     });
-  };
+  }, [book, chapters]);
+
+  // Load chapters from parsed document (for import INTO CURRENT project)
+  const loadFromParsedDocument = useCallback((parsedDoc) => {
+    const newChapters = parsedDoc.chapters.map((ch, idx) => ({
+      id: ch.id || `chapter-${Date.now()}-${idx}`,
+      title: ch.title,
+      content: ch.content,
+      wordCount: ch.wordCount || countWords(ch.content),
+      lastEdited: new Date().toLocaleString(),
+      status: "draft",
+      order: idx,
+    }));
+
+    setBook({ title: parsedDoc.title });
+    setChapters(ensureFirstChapter(newChapters));
+    setSelectedId(newChapters[0]?.id || null);
+
+    // Save immediately
+    saveState({
+      book: { title: parsedDoc.title },
+      chapters: newChapters,
+      daily: { goal: 500, counts: {} },
+      settings: { theme: "light", focusMode: false },
+      tocOutline: parsedDoc.tableOfContents || [],
+    });
+
+    return newChapters;
+  }, []);
 
   return {
+    // Current project ID
+    projectId,
+
+    // Book & chapters
     book,
     setBook,
     chapters,
@@ -199,10 +285,15 @@ export function useChapterManager() {
     selectedId,
     setSelectedId,
     selectedChapter,
+
+    // CRUD
     addChapter,
     updateChapter,
     deleteChapter,
     moveChapter,
     saveProject,
+
+    // Import
+    loadFromParsedDocument,
   };
 }
