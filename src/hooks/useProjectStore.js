@@ -55,7 +55,30 @@ function loadCurrentProjectId() {
 function saveCurrentProjectId(projectId) {
   try {
     localStorage.setItem(CURRENT_PROJECT_KEY, projectId);
+    
+    // Load project data and sync to legacy keys
+    const data = loadProjectData(projectId);
+    if (data) {
+      const title = data.book?.title || "Untitled";
+      const totalWords = (data.chapters || []).reduce((sum, ch) => sum + (ch.wordCount || 0), 0);
+      const chapterCount = (data.chapters || []).length;
+      
+      // Update legacy storage key
+      localStorage.setItem(LEGACY_STORAGE_KEY, JSON.stringify(data));
+      
+      // Update currentStory for StoryLab sidebar
+      localStorage.setItem("currentStory", JSON.stringify({
+        id: projectId,
+        title: title,
+        status: "Draft",
+        updatedAt: new Date().toISOString(),
+        wordCount: totalWords,
+        chapterCount: chapterCount,
+      }));
+    }
+    
     window.dispatchEvent(new Event("project:change"));
+    window.dispatchEvent(new Event("storage"));
   } catch (err) {
     console.error("Failed to save current project ID:", err);
   }
@@ -83,12 +106,13 @@ function saveProjectData(projectId, data) {
     const projects = loadProjectsList();
     const totalWords = (data.chapters || []).reduce((sum, ch) => sum + (ch.wordCount || 0), 0);
     const chapterCount = (data.chapters || []).length;
+    const title = data.book?.title || "Untitled";
     
     const updated = projects.map((p) =>
       p.id === projectId
         ? {
             ...p,
-            title: data.book?.title || p.title,
+            title: title,
             updatedAt: new Date().toISOString(),
             wordCount: totalWords,
             chapterCount: chapterCount,
@@ -97,9 +121,48 @@ function saveProjectData(projectId, data) {
     );
     saveProjectsList(updated);
     
+    // ===== SYNC WITH LEGACY KEYS =====
+    const currentId = loadCurrentProjectId();
+    if (projectId === currentId) {
+      // Update legacy storage key for backwards compatibility
+      localStorage.setItem(LEGACY_STORAGE_KEY, JSON.stringify(data));
+      
+      // Update currentStory for StoryLab sidebar
+      localStorage.setItem("currentStory", JSON.stringify({
+        id: projectId,
+        title: title,
+        status: "Draft",
+        updatedAt: new Date().toISOString(),
+        wordCount: totalWords,
+        chapterCount: chapterCount,
+      }));
+      
+      // Update userProjects for Project page
+      syncToUserProjects(updated);
+    }
+    
     window.dispatchEvent(new Event("project:change"));
+    window.dispatchEvent(new Event("storage"));
   } catch (err) {
     console.error("Failed to save project data:", err);
+  }
+}
+
+// Sync projects list to legacy userProjects key
+function syncToUserProjects(projects) {
+  try {
+    const userProjects = projects.map(p => ({
+      id: p.id,
+      title: p.title,
+      status: p.status || "Draft",
+      source: p.source || "Project",
+      updatedAt: p.updatedAt,
+      wordCount: p.wordCount,
+      chapterCount: p.chapterCount,
+    }));
+    localStorage.setItem("userProjects", JSON.stringify(userProjects));
+  } catch (err) {
+    console.error("Failed to sync userProjects:", err);
   }
 }
 
@@ -235,16 +298,22 @@ export function useProjectStore() {
 
     // Create default project data
     const data = createDefaultProjectData(title);
-    saveProjectData(projectId, data);
+    
+    // Save to project-specific key
+    const key = getProjectDataKey(projectId);
+    localStorage.setItem(key, JSON.stringify(data));
 
     // Add to projects list
     const updated = [...projects, project];
     saveProjectsList(updated);
     setProjects(updated);
 
-    // Switch to new project
+    // Switch to new project (this will sync legacy keys)
     saveCurrentProjectId(projectId);
     setCurrentProjectId(projectId);
+
+    // Also sync to userProjects for Project page
+    syncToUserProjects(updated);
 
     console.log(`[ProjectStore] Created new project: "${title}" (${projectId})`);
     return projectId;
@@ -273,6 +342,7 @@ export function useProjectStore() {
       id: ch.id || `chapter-${Date.now()}-${idx}`,
       title: ch.title,
       content: ch.content,
+      preview: ch.preview || "",
       wordCount: ch.wordCount || 0,
       lastEdited: now,
       status: "draft",
@@ -287,16 +357,21 @@ export function useProjectStore() {
       tocOutline: parsedDocument.tableOfContents || [],
     };
 
-    saveProjectData(projectId, data);
+    // Save to project-specific key
+    const key = getProjectDataKey(projectId);
+    localStorage.setItem(key, JSON.stringify(data));
 
     // Add to projects list
     const updated = [...projects, project];
     saveProjectsList(updated);
     setProjects(updated);
 
-    // Switch to new project
+    // Switch to new project (this will sync legacy keys)
     saveCurrentProjectId(projectId);
     setCurrentProjectId(projectId);
+
+    // Also sync to userProjects for Project page
+    syncToUserProjects(updated);
 
     console.log(`[ProjectStore] Imported project: "${parsedDocument.title}" (${chapters.length} chapters, ${totalWords} words)`);
     return projectId;
