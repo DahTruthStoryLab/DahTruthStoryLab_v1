@@ -11,6 +11,7 @@ import SearchPanel from "./Writing/SearchPanel";
 import PaginatedView from "./Writing/PaginatedView";
 
 import { useChapterManager } from "../hooks/useChapterManager";
+import { useProjectStore } from "../hooks/useProjectStore";
 import { documentParser } from "../utils/documentParser";
 import { rateLimiter } from "../utils/rateLimiter";
 import { createPortal } from "react-dom";
@@ -36,6 +37,11 @@ import {
   ArrowLeft,
   PenLine,
   Trash2,
+  BookOpen,
+  Plus,
+  Upload,
+  Check,
+  FolderPlus,
 } from "lucide-react";
 
 import {
@@ -54,6 +60,13 @@ const USER_PROJECTS_KEY = "userProjects";
 const PUBLISHING_DRAFT_KEY = "publishingDraft";
 
 const DEBUG_IMPORT = false;
+
+// Brand colors
+const BRAND = {
+  navy: "#1e3a5f",
+  gold: "#d4af37",
+  mauve: "#b8a9c9",
+};
 
 // Strip @char: markers for final output (but keep the names)
 function stripCharacterTags(html = "") {
@@ -86,6 +99,17 @@ const applyDoubleSpacing = (text = "") => {
     .replace(/\n{5,}/g, "\n\n\n\n")
     .trim();
 };
+
+// Generate preview text from HTML content
+function generatePreview(html = "", maxWords = 20) {
+  if (!html) return "";
+  const tmp = document.createElement("div");
+  tmp.innerHTML = html;
+  const text = (tmp.textContent || tmp.innerText || "").trim();
+  const words = text.split(/\s+/).filter(w => w.length > 0);
+  const preview = words.slice(0, maxWords).join(" ");
+  return words.length > maxWords ? preview + "..." : preview;
+}
 
 // Save a simple "current story" snapshot for ProjectPage to read
 function saveCurrentStorySnapshot({ id, title }) {
@@ -159,6 +183,204 @@ function htmlToPlainText(html = "") {
 }
 
 /* =========================================================
+   PROJECT DROPDOWN COMPONENT
+========================================================= */
+function ProjectDropdown({ currentProject, projects, onSwitch, onCreate, onImportNew }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  return (
+    <div ref={dropdownRef} className="relative">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium bg-white/20 hover:bg-white/30 text-white transition-colors"
+      >
+        <BookOpen size={16} />
+        <span className="max-w-[180px] truncate">
+          {currentProject?.title || "No Project"}
+        </span>
+        <ChevronDown
+          size={14}
+          className={`transition-transform ${isOpen ? "rotate-180" : ""}`}
+        />
+      </button>
+
+      {isOpen && (
+        <div className="absolute top-full left-0 mt-2 z-50 bg-white rounded-xl shadow-xl border min-w-[280px] py-2">
+          <div className="px-3 py-1.5 text-xs font-semibold text-slate-400 uppercase tracking-wide">
+            My Manuscripts
+          </div>
+
+          <div className="max-h-64 overflow-y-auto">
+            {projects.length === 0 ? (
+              <div className="px-3 py-4 text-sm text-slate-500 text-center">
+                No projects yet
+              </div>
+            ) : (
+              projects.map((project) => (
+                <button
+                  key={project.id}
+                  onClick={() => {
+                    onSwitch(project.id);
+                    setIsOpen(false);
+                  }}
+                  className={`w-full px-3 py-2.5 text-left text-sm hover:bg-slate-50 flex items-center gap-3 ${
+                    project.id === currentProject?.id ? "bg-amber-50" : ""
+                  }`}
+                >
+                  <BookOpen
+                    size={16}
+                    style={{
+                      color: project.id === currentProject?.id ? BRAND.gold : BRAND.navy,
+                    }}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="font-medium truncate" style={{ color: BRAND.navy }}>
+                      {project.title}
+                    </div>
+                    <div className="text-xs text-slate-500">
+                      {project.chapterCount || 0} chapters • {project.wordCount?.toLocaleString() || 0} words
+                    </div>
+                  </div>
+                  {project.id === currentProject?.id && (
+                    <Check size={16} style={{ color: BRAND.gold }} />
+                  )}
+                </button>
+              ))
+            )}
+          </div>
+
+          <div className="border-t border-slate-100 mt-1 pt-1">
+            <button
+              onClick={() => {
+                onCreate();
+                setIsOpen(false);
+              }}
+              className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50 flex items-center gap-3"
+              style={{ color: BRAND.navy }}
+            >
+              <Plus size={16} />
+              <span>New Empty Manuscript</span>
+            </button>
+            <button
+              onClick={() => {
+                onImportNew();
+                setIsOpen(false);
+              }}
+              className="w-full px-3 py-2 text-left text-sm hover:bg-slate-50 flex items-center gap-3"
+              style={{ color: BRAND.gold }}
+            >
+              <FolderPlus size={16} />
+              <span className="font-medium">Import as New Project</span>
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* =========================================================
+   IMPORT OPTIONS MODAL
+========================================================= */
+function ImportOptionsModal({ isOpen, onClose, onImportCurrent, onImportNew, fileName }) {
+  if (!isOpen) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/50">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
+        <h2 className="text-xl font-bold mb-2" style={{ color: BRAND.navy }}>
+          Import Manuscript
+        </h2>
+        <p className="text-sm text-slate-600 mb-6">
+          You selected: <strong>{fileName}</strong>
+        </p>
+
+        <div className="space-y-3">
+          {/* Import as NEW Project */}
+          <button
+            onClick={onImportNew}
+            className="w-full p-4 rounded-xl text-left transition-all hover:scale-[1.02] hover:shadow-md"
+            style={{
+              background: `linear-gradient(135deg, ${BRAND.gold}15, ${BRAND.gold}05)`,
+              border: `2px solid ${BRAND.gold}`,
+            }}
+          >
+            <div className="flex items-start gap-3">
+              <div
+                className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
+                style={{ background: BRAND.gold }}
+              >
+                <FolderPlus size={20} className="text-white" />
+              </div>
+              <div>
+                <div className="font-semibold" style={{ color: BRAND.navy }}>
+                  Create New Project
+                </div>
+                <div className="text-sm text-slate-600 mt-0.5">
+                  Import as a separate manuscript. Your current work stays safe.
+                </div>
+                <div
+                  className="text-xs font-medium mt-2 px-2 py-1 rounded-full inline-block"
+                  style={{ background: `${BRAND.gold}20`, color: BRAND.gold }}
+                >
+                  ✓ Recommended
+                </div>
+              </div>
+            </div>
+          </button>
+
+          {/* Import into CURRENT Project */}
+          <button
+            onClick={onImportCurrent}
+            className="w-full p-4 rounded-xl text-left transition-all hover:shadow-md"
+            style={{
+              background: "#f8fafc",
+              border: "1px solid #e2e8f0",
+            }}
+          >
+            <div className="flex items-start gap-3">
+              <div
+                className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
+                style={{ background: "#e2e8f0" }}
+              >
+                <Upload size={20} className="text-slate-500" />
+              </div>
+              <div>
+                <div className="font-semibold" style={{ color: BRAND.navy }}>
+                  Add to Current Project
+                </div>
+                <div className="text-sm text-slate-600 mt-0.5">
+                  Append chapters to your current manuscript.
+                </div>
+              </div>
+            </div>
+          </button>
+        </div>
+
+        <button
+          onClick={onClose}
+          className="w-full mt-4 py-2 text-sm text-slate-500 hover:text-slate-700"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>,
+    document.body
+  );
+}
+
+/* =========================================================
    DROPDOWN MENU COMPONENTS
 ========================================================= */
 function DropdownMenu({ label, icon: Icon, children, disabled = false }) {
@@ -215,7 +437,6 @@ function DropdownMenu({ label, icon: Icon, children, disabled = false }) {
           e.preventDefault();
           e.stopPropagation();
           if (disabled) return;
-          console.log(`[Dropdown] ${label} clicked`);
           setOpen((v) => !v);
         }}
         disabled={disabled}
@@ -257,7 +478,6 @@ function DropdownMenu({ label, icon: Icon, children, disabled = false }) {
   );
 }
 
-// FIXED: Execute action immediately (preserves user gesture), then close menu
 function DropdownItem({
   icon: Icon,
   label,
@@ -304,7 +524,15 @@ function DropdownDivider() {
 export default function ComposePage() {
   const navigate = useNavigate();
 
-  const [activeProject, setActiveProject] = useState(null);
+  // Project management
+  const {
+    projects,
+    currentProjectId,
+    currentProject,
+    createProject,
+    createProjectFromImport,
+    switchProject,
+  } = useProjectStore();
 
   const {
     book,
@@ -317,12 +545,17 @@ export default function ComposePage() {
     deleteChapter,
     moveChapter,
     saveProject,
+    loadFromParsedDocument,
   } = useChapterManager();
 
   const chapters = useMemo(
     () =>
       Array.isArray(rawChapters)
-        ? rawChapters.filter((c) => c && c.id != null)
+        ? rawChapters.filter((c) => c && c.id != null).map(ch => ({
+            ...ch,
+            // Ensure preview exists for grid cards
+            preview: ch.preview || generatePreview(ch.content, 20),
+          }))
         : [],
     [rawChapters]
   );
@@ -330,19 +563,14 @@ export default function ComposePage() {
   const [bookTitle, setBookTitle] = useState(book?.title || "Untitled Story");
   const [author, setAuthor] = useState("Jacqueline Session Ausby");
 
+  // Update bookTitle when project changes
   useEffect(() => {
-    try {
-      const p = ensureSelectedProject();
-      if (p?.id) {
-        setActiveProject(p);
-        setSelectedProjectId(p.id);
-        if (p.title && p.title !== bookTitle) setBookTitle(p.title);
-      }
-    } catch (e) {
-      console.error("Failed to ensure selected project:", e);
+    if (currentProject?.title) {
+      setBookTitle(currentProject.title);
+    } else if (book?.title) {
+      setBookTitle(book.title);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [currentProject, book]);
 
   const { characters, characterCount } = useMemo(
     () => computeCharactersFromChapters(chapters || []),
@@ -369,9 +597,9 @@ export default function ComposePage() {
   const [chatInput, setChatInput] = useState("");
   const [chatBusy, setChatBusy] = useState(false);
 
-  const [view, setView] = useState("grid"); // "grid" | "editor"
+  const [view, setView] = useState("grid");
   const [showSearch, setShowSearch] = useState(false);
-  const [editorViewMode, setEditorViewMode] = useState("editor"); // "editor" | "pages"
+  const [editorViewMode, setEditorViewMode] = useState("editor");
 
   const [title, setTitle] = useState(selectedChapter?.title ?? "");
   const [html, setHtml] = useState(selectedChapter?.content ?? "");
@@ -384,14 +612,19 @@ export default function ComposePage() {
   const [importProgress, setImportProgress] = useState("");
   const [queueLength, setQueueLength] = useState(0);
 
-  const [saveStatus, setSaveStatus] = useState("idle"); // "idle" | "saving" | "saved"
+  const [saveStatus, setSaveStatus] = useState("idle");
   const [headings, setHeadings] = useState([]);
   const [activeAiTab, setActiveAiTab] = useState("proofread");
+
+  // Import modal state
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [pendingImportFile, setPendingImportFile] = useState(null);
 
   const hasChapter = !!selectedId && !!selectedChapter;
   const hasAnyChapters = Array.isArray(chapters) && chapters.length > 0;
 
   const fileInputRef = useRef(null);
+  const newProjectFileInputRef = useRef(null);
 
   const chapterPlainText = useMemo(() => {
     if (!html) return "";
@@ -411,17 +644,13 @@ export default function ComposePage() {
     try {
       const stored = localStorage.getItem("dt_activeAiTab");
       if (stored) setActiveAiTab(stored);
-    } catch {
-      // ignore
-    }
+    } catch {}
   }, []);
 
   useEffect(() => {
     try {
       if (activeAiTab) localStorage.setItem("dt_activeAiTab", activeAiTab);
-    } catch {
-      // ignore
-    }
+    } catch {}
   }, [activeAiTab]);
 
   const clearSelection = () => setSelectedIds(new Set());
@@ -489,7 +718,6 @@ export default function ComposePage() {
 
     window.addEventListener("keydown", onKey, { capture: true });
     return () => window.removeEventListener("keydown", onKey, { capture: true });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedIds, selectedId, chapters, hasChapter, saveStatus, html, title]);
 
   useEffect(() => {
@@ -507,9 +735,12 @@ export default function ComposePage() {
     setSaveStatus("saving");
 
     try {
+      // Update chapter with preview
+      const preview = generatePreview(html, 20);
       updateChapter(selectedId, {
         title: title || selectedChapter?.title || "",
         content: html,
+        preview: preview,
       });
 
       const totalWords = computeWordsFromChapters(chapters || []);
@@ -528,13 +759,8 @@ export default function ComposePage() {
         })
       );
 
-      const safeTitle =
-        (bookTitle && bookTitle.trim()) ||
-        (book?.title && book.title.trim()) ||
-        "Untitled Book";
-
-      const projectId =
-        activeProject?.id || getSelectedProjectId() || book?.id || "unknown";
+      const safeTitle = bookTitle?.trim() || book?.title?.trim() || "Untitled Book";
+      const projectId = currentProjectId || getSelectedProjectId() || "unknown";
 
       saveCurrentStorySnapshot({ id: projectId, title: safeTitle });
 
@@ -597,9 +823,7 @@ export default function ComposePage() {
       selection.isCollapsed ||
       !editorEl.contains(selection.getRangeAt(0).commonAncestorContainer)
     ) {
-      alert(
-        "Please highlight the text you want the AI to revise, then click the AI button again."
-      );
+      alert("Please highlight the text you want the AI to revise, then click the AI button again.");
       return;
     }
 
@@ -609,21 +833,14 @@ export default function ComposePage() {
     const selectedHtml = container.innerHTML.trim();
 
     if (!selectedHtml) {
-      alert(
-        "I couldn't read any content from your selection. Please select the exact sentence or paragraph you want revised and try again."
-      );
+      alert("I couldn't read any content from your selection. Please select the exact sentence or paragraph you want revised and try again.");
       return;
     }
 
-    const selectedPlain = selectedHtml
-      .replace(/<[^>]*>/g, " ")
-      .replace(/\s+/g, " ")
-      .trim();
+    const selectedPlain = selectedHtml.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
 
     if (!selectedPlain) {
-      alert(
-        "The selected content seems to be empty or only formatting. Please select normal text and try again."
-      );
+      alert("The selected content seems to be empty or only formatting. Please select normal text and try again.");
       return;
     }
 
@@ -633,14 +850,8 @@ export default function ComposePage() {
     const wrapAsHtml = (text) => {
       let cleaned = String(text || "");
       cleaned = cleaned.replace(/<\/?p>/gi, "");
-      const safe = cleaned
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;");
-      const parts = safe
-        .split(/\n{2,}/)
-        .map((p) => p.trim())
-        .filter(Boolean);
+      const safe = cleaned.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      const parts = safe.split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
       if (parts.length === 0) return `<p>${safe}</p>`;
       return parts.map((p) => `<p>${p}</p>`).join("");
     };
@@ -652,14 +863,10 @@ export default function ComposePage() {
       );
 
       const resultTextRaw =
-        (result && (result.result || result.text || result.output || result.data)) ||
-        result ||
-        "";
+        (result && (result.result || result.text || result.output || result.data)) || result || "";
 
       if (!resultTextRaw) {
-        alert(
-          "The AI did not return any text. Please try again with a smaller selection or a different mode."
-        );
+        alert("The AI did not return any text. Please try again with a smaller selection or a different mode.");
         return;
       }
 
@@ -678,6 +885,7 @@ export default function ComposePage() {
       updateChapter(selectedId, {
         title: title || selectedChapter?.title || "",
         content: updatedHtml,
+        preview: generatePreview(updatedHtml, 20),
       });
 
       setChatMessages((prev) => [
@@ -723,9 +931,7 @@ export default function ComposePage() {
       const replyText = (res && (res.result || res.text || res.output || res.data)) || "";
       const assistantMessage = {
         role: "assistant",
-        content:
-          replyText ||
-          "I couldn't generate a response. Please try asking your question in a different way.",
+        content: replyText || "I couldn't generate a response. Please try asking your question in a different way.",
         id: Date.now() + 1,
       };
 
@@ -752,34 +958,37 @@ export default function ComposePage() {
     }
   };
 
-  const handleImport = async (file, options = {}) => {
+  // Parse a file and return the parsed document
+  const parseFile = async (file) => {
+    const name = file.name.toLowerCase();
+    let parsed;
+
+    if (name.endsWith(".doc") || name.endsWith(".docx")) {
+      parsed = await rateLimiter.addToQueue(() => documentParser.parseWordDocument(file));
+    } else if (name.endsWith(".txt") || name.endsWith(".md")) {
+      parsed = await documentParser.parseTextDocument(file);
+    } else {
+      throw new Error("Unsupported file type. Please use .docx, .doc, .txt, or .md");
+    }
+
+    return parsed;
+  };
+
+  // Import into CURRENT project (append chapters)
+  const handleImportIntoCurrent = async (file) => {
     if (!file) return;
 
-    const { splitByHeadings = true } = options;
     setIsImporting(true);
     setImportProgress("Parsing document...");
+    setShowImportModal(false);
 
     try {
-      const name = file.name.toLowerCase();
-      let parsed;
-
-      if (name.endsWith(".doc") || name.endsWith(".docx")) {
-        parsed = await rateLimiter.addToQueue(() =>
-          documentParser.parseWordDocument(file)
-        );
-      } else if (name.endsWith(".txt") || name.endsWith(".md")) {
-        parsed = await documentParser.parseTextDocument(file);
-      } else {
-        alert("Unsupported file type. Please use .doc, .docx, .txt, or .md");
-        return;
-      }
+      const parsed = await parseFile(file);
 
       if (!parsed) {
         alert("Could not parse this document.");
         return;
       }
-
-      if (DEBUG_IMPORT) console.log("Parsed import:", parsed);
 
       if (parsed.title && parsed.title !== bookTitle) {
         setBookTitle(parsed.title);
@@ -791,91 +1000,128 @@ export default function ComposePage() {
         !stripHtml(existing[0].content || "").trim() &&
         !(existing[0].title || "").trim();
 
-      if (splitByHeadings && parsed.chapters && parsed.chapters.length > 0) {
-        setImportProgress(
-          `Creating ${parsed.chapters.length} chapter(s) from "${file.name}"...`
-        );
+      if (parsed.chapters && parsed.chapters.length > 0) {
+        setImportProgress(`Creating ${parsed.chapters.length} chapter(s)...`);
 
         parsed.chapters.forEach((c, index) => {
-          const doubleSpacedContent = applyDoubleSpacing(c.content || "");
+          const content = applyDoubleSpacing(c.content || "");
+          const preview = generatePreview(content, 20);
 
           if (isSingleBlank && index === 0) {
             const firstId = existing[0].id;
             updateChapter(firstId, {
               title: c.title || "Untitled Chapter",
-              content: doubleSpacedContent,
+              content: content,
+              preview: preview,
             });
             setSelectedId(firstId);
           } else {
             const newId = addChapter();
             updateChapter(newId, {
               title: c.title || "Untitled Chapter",
-              content: doubleSpacedContent,
+              content: content,
+              preview: preview,
             });
           }
         });
 
-        alert(`✅ Imported ${parsed.chapters.length} chapter(s) from "${file.name}".`);
-      } else {
-        setImportProgress("Importing manuscript into a single chapter...");
-
-        const fullContentRaw =
-          parsed.fullContent ||
-          (parsed.chapters && parsed.chapters.length
-            ? parsed.chapters.map((c) => c.content || "").join("\n\n")
-            : "");
-
-        const fullContent = applyDoubleSpacing(fullContentRaw);
-
-        if (isSingleBlank) {
-          const firstId = existing[0].id;
-          updateChapter(firstId, {
-            title: parsed.title || "Imported Manuscript",
-            content: fullContent,
-          });
-          setSelectedId(firstId);
-        } else if (hasChapter) {
-          setHtml(fullContent);
-          updateChapter(selectedId, {
-            title:
-              title || selectedChapter?.title || parsed.title || "Imported Manuscript",
-            content: fullContent,
-          });
-        } else {
-          const newId = addChapter();
-          updateChapter(newId, {
-            title: parsed.title || "Imported Manuscript",
-            content: fullContent,
-          });
-          setSelectedId(newId);
-          setView("editor");
-        }
-
-        alert(`✅ Document imported into a single chapter from "${file.name}".`);
+        alert(`✅ Imported ${parsed.chapters.length} chapter(s) into current project.`);
       }
 
       saveProject({ book: { ...book, title: parsed.title || bookTitle } });
     } catch (error) {
       console.error("Import failed:", error);
-      alert(
-        `❌ Failed to import document: ${
-          error instanceof Error ? error.message : "Unknown error"
-        }`
-      );
+      alert(`❌ Failed to import: ${error.message || "Unknown error"}`);
     } finally {
       setIsImporting(false);
       setImportProgress("");
+      setPendingImportFile(null);
     }
+  };
+
+  // Import as NEW project
+  const handleImportAsNewProject = async (file) => {
+    if (!file) return;
+
+    setIsImporting(true);
+    setImportProgress("Parsing document...");
+    setShowImportModal(false);
+
+    try {
+      const parsed = await parseFile(file);
+
+      if (!parsed) {
+        alert("Could not parse this document.");
+        return;
+      }
+
+      setImportProgress(`Creating new project "${parsed.title}"...`);
+
+      // Add preview to each chapter
+      const chaptersWithPreview = parsed.chapters.map(ch => ({
+        ...ch,
+        preview: generatePreview(ch.content, 20),
+      }));
+
+      // Create a NEW project from the parsed document
+      const projectId = createProjectFromImport({
+        ...parsed,
+        chapters: chaptersWithPreview,
+      });
+
+      setBookTitle(parsed.title);
+
+      alert(`✅ Created new project "${parsed.title}" with ${parsed.chapters.length} chapter(s).`);
+
+      // Navigate to compose (already on it, but will reload with new project)
+      navigate("/compose");
+    } catch (error) {
+      console.error("Import failed:", error);
+      alert(`❌ Failed to import: ${error.message || "Unknown error"}`);
+    } finally {
+      setIsImporting(false);
+      setImportProgress("");
+      setPendingImportFile(null);
+    }
+  };
+
+  // File input handler - shows modal to choose import type
+  const handleFileSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setPendingImportFile(file);
+      setShowImportModal(true);
+    }
+    e.target.value = "";
+  };
+
+  // Direct import as new project (from project dropdown)
+  const handleNewProjectFileSelect = async (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      await handleImportAsNewProject(file);
+    }
+    e.target.value = "";
   };
 
   const triggerImport = () => {
     fileInputRef.current?.click();
   };
 
-  const handleFileSelect = (e) => {
-    const file = e.target.files?.[0];
-    if (file) handleImport(file);
-    e.target.value = "";
+  const triggerNewProjectImport = () => {
+    newProjectFileInputRef.current?.click();
+  };
+
+  const handleCreateNewProject = () => {
+    const title = window.prompt("Enter a title for your new manuscript:", "Untitled Book");
+    if (title) {
+      createProject(title);
+      setBookTitle(title);
+    }
+  };
+
+  const handleSwitchProject = (projectId) => {
+    switchProject(projectId);
   };
 
   const handleExport = () => {
@@ -891,14 +1137,10 @@ export default function ComposePage() {
 
   const handleDeleteCurrent = () => {
     if (!hasChapter) {
-      alert("Please select a chapter first by clicking on a chapter card or from the sidebar.");
+      alert("Please select a chapter first.");
       return;
     }
-    if (
-      window.confirm(
-        `Delete "${title || selectedChapter.title}"?\n\nThis cannot be undone.`
-      )
-    ) {
+    if (window.confirm(`Delete "${title || selectedChapter.title}"?\n\nThis cannot be undone.`)) {
       deleteChapter(selectedId);
       setTimeout(() => setView("grid"), 100);
     }
@@ -906,8 +1148,7 @@ export default function ComposePage() {
 
   const handleDeleteMultiple = (ids) => {
     if (!ids?.length) return;
-    if (!window.confirm(`Delete ${ids.length} chapter(s)? This cannot be undone.`))
-      return;
+    if (!window.confirm(`Delete ${ids.length} chapter(s)? This cannot be undone.`)) return;
 
     ids.forEach((id) => deleteChapter(id));
     clearSelection();
@@ -918,7 +1159,6 @@ export default function ComposePage() {
 
   const goBack = () => navigate("/dashboard");
 
-  // View switching helpers
   const switchToEditor = () => {
     if (!selectedId && chapters.length > 0) {
       setSelectedId(chapters[0].id);
@@ -933,27 +1173,26 @@ export default function ComposePage() {
     }
     setView("editor");
     setEditorViewMode("pages");
-  }; 
+  };
 
   const goToTOC = () => {
-  setView("grid");              // table of contents
-  setEditorViewMode("editor");  // optional reset
-};
+    setView("grid");
+    setEditorViewMode("editor");
+  };
 
-const goToWriter = (chapterId) => {
-  const idToUse = chapterId || selectedId || chapters?.[0]?.id;
-  if (idToUse) setSelectedId(idToUse);
-  setView("editor");            // writer/editor view
-  setEditorViewMode("editor");
-};
+  const goToWriter = (chapterId) => {
+    const idToUse = chapterId || selectedId || chapters?.[0]?.id;
+    if (idToUse) setSelectedId(idToUse);
+    setView("editor");
+    setEditorViewMode("editor");
+  };
 
-  // Explicit Grid <-> Writer buttons
   const goToGrid = () => {
     setView("grid");
     setEditorViewMode("editor");
   };
 
-    const handleSendToPublishing = async () => {
+  const handleSendToPublishing = async () => {
     if (!Array.isArray(chapters) || chapters.length === 0) {
       alert("You need at least one chapter before sending to Publishing.");
       return;
@@ -991,10 +1230,7 @@ const goToWriter = (chapterId) => {
         };
       });
 
-      const safeBookTitle =
-        (bookTitle && bookTitle.trim()) ||
-        (book?.title && book.title.trim()) ||
-        "Untitled Book";
+      const safeBookTitle = bookTitle?.trim() || book?.title?.trim() || "Untitled Book";
 
       const meta = {
         title: safeBookTitle,
@@ -1017,8 +1253,7 @@ const goToWriter = (chapterId) => {
         })),
       };
 
-      const projectId =
-        activeProject?.id || getSelectedProjectId() || book?.id || "unknown";
+      const projectId = currentProjectId || getSelectedProjectId() || "unknown";
       const chaptersKey = chaptersKeyForProject(projectId);
       const metaKey = `dahtruth_project_meta_${projectId}`;
       const draftKey = `publishingDraft_${projectId}`;
@@ -1027,7 +1262,6 @@ const goToWriter = (chapterId) => {
       localStorage.setItem(metaKey, JSON.stringify(meta));
       localStorage.setItem(draftKey, JSON.stringify(payload));
 
-      // Back-compat keys
       localStorage.setItem("dahtruth_chapters", JSON.stringify(normalizedForPublishing));
       localStorage.setItem("dahtruth_project_meta", JSON.stringify(meta));
       localStorage.setItem(PUBLISHING_DRAFT_KEY, JSON.stringify(payload));
@@ -1040,7 +1274,6 @@ const goToWriter = (chapterId) => {
     }
   };
 
-  // Defensive: if chapter manager returns non-array, show loading
   if (!Array.isArray(chapters)) {
     return (
       <div className="min-h-screen bg-[rgb(244,247,250)] flex items-center justify-center">
@@ -1051,13 +1284,32 @@ const goToWriter = (chapterId) => {
 
   return (
     <div className="min-h-screen bg-[rgb(244,247,250)] text-slate-900 flex flex-col">
-      {/* Hidden file input for import */}
+      {/* Hidden file inputs */}
       <input
         ref={fileInputRef}
         type="file"
         accept=".doc,.docx,.txt,.md"
         onChange={handleFileSelect}
         className="hidden"
+      />
+      <input
+        ref={newProjectFileInputRef}
+        type="file"
+        accept=".doc,.docx,.txt,.md"
+        onChange={handleNewProjectFileSelect}
+        className="hidden"
+      />
+
+      {/* Import Options Modal */}
+      <ImportOptionsModal
+        isOpen={showImportModal}
+        onClose={() => {
+          setShowImportModal(false);
+          setPendingImportFile(null);
+        }}
+        onImportCurrent={() => handleImportIntoCurrent(pendingImportFile)}
+        onImportNew={() => handleImportAsNewProject(pendingImportFile)}
+        fileName={pendingImportFile?.name || ""}
       />
 
       {/* ═══════════════════════════════════════════════════════════════
@@ -1066,27 +1318,30 @@ const goToWriter = (chapterId) => {
       <div
         className="text-white flex-shrink-0"
         style={{
-          background:
-            "linear-gradient(135deg, #1e3a5f 0%, #2d4a6f 40%, #9b7bc9 100%)",
+          background: "linear-gradient(135deg, #1e3a5f 0%, #2d4a6f 40%, #9b7bc9 100%)",
         }}
       >
         <div className="max-w-[1800px] mx-auto px-4 py-3">
           <div className="flex items-center justify-between flex-wrap gap-3">
-            {/* Left: Title */}
-            <div className="flex items-center gap-3">
-              <PenLine size={24} className="text-amber-300" />
-              <h1 className="text-xl font-bold text-white">Compose</h1>
+            {/* Left: Title + Project Dropdown */}
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-3">
+                <PenLine size={24} className="text-amber-300" />
+                <h1 className="text-xl font-bold text-white">Compose</h1>
+              </div>
+
+              {/* Project Dropdown */}
+              <ProjectDropdown
+                currentProject={currentProject}
+                projects={projects}
+                onSwitch={handleSwitchProject}
+                onCreate={handleCreateNewProject}
+                onImportNew={triggerNewProjectImport}
+              />
             </div>
 
             {/* Center: Story Info */}
             <div className="flex items-center gap-4 md:gap-6 text-sm flex-wrap">
-              <div className="flex items-center gap-2">
-                <span className="text-white/70">Story:</span>
-                <span className="font-semibold text-amber-300">
-                  {bookTitle || "Untitled"}
-                </span>
-              </div>
-
               <div className="flex items-center gap-2">
                 <span className="text-white/70">Chapter:</span>
                 <span className="font-medium text-white">
@@ -1117,12 +1372,8 @@ const goToWriter = (chapterId) => {
                 value={provider}
                 onChange={(e) => setProvider(e.target.value)}
               >
-                <option value="anthropic" className="text-slate-800">
-                  Claude
-                </option>
-                <option value="openai" className="text-slate-800">
-                  GPT-4
-                </option>
+                <option value="anthropic" className="text-slate-800">Claude</option>
+                <option value="openai" className="text-slate-800">GPT-4</option>
               </select>
             </div>
           </div>
@@ -1130,7 +1381,7 @@ const goToWriter = (chapterId) => {
       </div>
 
       {/* ═══════════════════════════════════════════════════════════════
-          TOOLBAR (dropdown fix: allow Y overflow)
+          TOOLBAR
       ═══════════════════════════════════════════════════════════════ */}
       <div className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-slate-200 shadow-sm flex-shrink-0">
         <div className="max-w-[1800px] mx-auto px-4 py-2 flex items-center gap-3 overflow-x-auto overflow-y-visible">
@@ -1154,7 +1405,6 @@ const goToWriter = (chapterId) => {
               className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium
                 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700
                 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
-              title="Go to Writer"
             >
               <Edit3 size={16} />
               Writer
@@ -1165,7 +1415,6 @@ const goToWriter = (chapterId) => {
               onClick={goToGrid}
               className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium
                 border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 flex-shrink-0"
-              title="Back to Chapter Grid"
             >
               <Grid3X3 size={16} />
               Grid
@@ -1175,11 +1424,16 @@ const goToWriter = (chapterId) => {
           {/* File Dropdown */}
           <DropdownMenu label="File" icon={FolderOpen}>
             <DropdownItem
-              icon={FolderOpen}
-              label="Import Manuscript"
-              onClick={triggerImport}
-              shortcut="Ctrl+O"
+              icon={FolderPlus}
+              label="Import as New Project"
+              onClick={triggerNewProjectImport}
             />
+            <DropdownItem
+              icon={Upload}
+              label="Import into Current Project"
+              onClick={triggerImport}
+            />
+            <DropdownDivider />
             <DropdownItem
               icon={Download}
               label="Export Chapter"
@@ -1238,7 +1492,7 @@ const goToWriter = (chapterId) => {
             />
           </DropdownMenu>
 
-          {/* AI Dropdown (sets activeAiTab + runs action) */}
+          {/* AI Dropdown */}
           <DropdownMenu label="AI Tools" icon={Sparkles} disabled={!hasChapter || aiBusy}>
             <DropdownItem
               icon={BookCheck}
@@ -1292,13 +1546,11 @@ const goToWriter = (chapterId) => {
             className={`
               inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium
               border transition-all flex-shrink-0
-              ${
-                showSearch
-                  ? "bg-amber-100 border-amber-300 text-amber-800"
-                  : "bg-white border-slate-200 hover:bg-slate-50 text-slate-700"
+              ${showSearch
+                ? "bg-amber-100 border-amber-300 text-amber-800"
+                : "bg-white border-slate-200 hover:bg-slate-50 text-slate-700"
               }
             `}
-            title="Search manuscript (Ctrl+F)"
           >
             <Search size={16} />
             Search
@@ -1353,7 +1605,7 @@ const goToWriter = (chapterId) => {
             </div>
           )}
 
-         <ChapterGrid
+          <ChapterGrid
             chapters={chapters}
             selectedId={selectedId}
             onSelectChapter={(id) => {
@@ -1378,7 +1630,7 @@ const goToWriter = (chapterId) => {
         </div>
       )}
 
-             {/* ═══════════════════════════════════════════════════════════════
+      {/* ═══════════════════════════════════════════════════════════════
           EDITOR VIEW
       ═══════════════════════════════════════════════════════════════ */}
       {view === "editor" && (
@@ -1389,7 +1641,7 @@ const goToWriter = (chapterId) => {
               <EditorToolbar
                 onAI={handleAI}
                 onSave={handleSave}
-                onImport={handleImport}
+                onImport={handleImportIntoCurrent}
                 onExport={handleExport}
                 onDelete={handleDeleteCurrent}
                 aiBusy={aiBusy || isImporting || chatBusy}
@@ -1411,7 +1663,7 @@ const goToWriter = (chapterId) => {
               }}
             >
               {/* Left Sidebar */}
-             <aside className="space-y-3 overflow-y-auto min-w-[280px] relative z-20">
+              <aside className="space-y-3 overflow-y-auto min-w-[280px] relative z-20">
                 {showSearch && (
                   <SearchPanel
                     chapters={chapters}
@@ -1444,10 +1696,7 @@ const goToWriter = (chapterId) => {
                     </div>
                     <ul className="space-y-1 max-h-64 overflow-auto text-xs">
                       {headings.map((h, idx) => (
-                        <li
-                          key={`${h.level}-${idx}-${h.text}`}
-                          className="text-slate-700"
-                        >
+                        <li key={`${h.level}-${idx}-${h.text}`} className="text-slate-700">
                           <span
                             className={
                               h.level === "h1"
@@ -1468,9 +1717,7 @@ const goToWriter = (chapterId) => {
                 <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm min-h-[140px]">
                   <div className="text-xs font-semibold text-slate-700 mb-2 flex items-center justify-between">
                     <span>Characters</span>
-                    <span className="text-[11px] text-slate-500">
-                      {characterCount} tagged
-                    </span>
+                    <span className="text-[11px] text-slate-500">{characterCount} tagged</span>
                   </div>
 
                   {characterCount === 0 ? (
@@ -1526,12 +1773,8 @@ const goToWriter = (chapterId) => {
                 <section className="flex flex-col bg-white border border-slate-200 rounded-xl shadow-sm min-h-0 max-h-full overflow-hidden relative z-20">
                   <div className="px-3 py-2 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
                     <div>
-                      <div className="text-xs font-semibold text-slate-800">
-                        AI Assistant
-                      </div>
-                      <div className="text-[11px] text-slate-500">
-                        Ask questions, get suggestions
-                      </div>
+                      <div className="text-xs font-semibold text-slate-800">AI Assistant</div>
+                      <div className="text-[11px] text-slate-500">Ask questions, get suggestions</div>
                     </div>
                     <button
                       type="button"
@@ -1561,9 +1804,7 @@ const goToWriter = (chapterId) => {
                             : "self-start max-w-[80%] rounded-lg bg-slate-50 px-3 py-2 text-xs"
                         }
                       >
-                        <div className="whitespace-pre-wrap text-slate-800">
-                          {msg.content}
-                        </div>
+                        <div className="whitespace-pre-wrap text-slate-800">{msg.content}</div>
                         {msg.role === "assistant" && (
                           <button
                             type="button"
