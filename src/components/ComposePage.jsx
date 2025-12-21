@@ -1073,8 +1073,8 @@ export default function ComposePage() {
 
       alert(`✅ Created new project "${parsed.title}" with ${parsed.chapters.length} chapter(s).`);
 
-      // Navigate to compose (already on it, but will reload with new project)
-      navigate("/compose");
+      // Force page reload to ensure all state is fresh
+      window.location.reload();
     } catch (error) {
       console.error("Import failed:", error);
       alert(`❌ Failed to import: ${error.message || "Unknown error"}`);
