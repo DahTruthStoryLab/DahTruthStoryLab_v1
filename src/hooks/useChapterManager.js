@@ -36,11 +36,22 @@ const saveState = (state) => {
     const projectId = getCurrentProjectId();
     if (projectId) {
       localStorage.setItem("dahtruth-story-lab-toc-v3", JSON.stringify(state));
-      localStorage.setItem("currentStory", state.book?.title || "Untitled");
+      
+      // Save currentStory as JSON object for StoryLab sidebar
+      const totalWords = (state.chapters || []).reduce((sum, ch) => sum + (ch.wordCount || 0), 0);
+      localStorage.setItem("currentStory", JSON.stringify({
+        id: projectId,
+        title: state.book?.title || "Untitled",
+        status: "Draft",
+        updatedAt: new Date().toISOString(),
+        wordCount: totalWords,
+        chapterCount: (state.chapters || []).length,
+      }));
     }
 
     // Broadcast that project changed
     window.dispatchEvent(new Event("project:change"));
+    window.dispatchEvent(new Event("storage"));
     
     return saved;
   } catch (err) {
