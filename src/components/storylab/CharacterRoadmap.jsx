@@ -20,11 +20,16 @@ import {
   Sparkles,
   BookOpen,
   User,
+  Edit3,
   Check,
   X,
   ArrowLeft,
   Wand2,
   Loader2,
+  ChevronUp,
+  Lightbulb,
+  TrendingUp,
+  FileText,
   Star,
   Shield,
   AlertCircle,
@@ -35,21 +40,47 @@ import { useDrag, useDrop } from "react-dnd";
 import { runAssistant } from "../../lib/api";
 import { loadProject } from "../../lib/storylab/projectStore";
 
-// ============================================
-// PROJECT-AWARE STORAGE UTILITIES
-// ============================================
+/* ---------------------------
+   Brand Colors
+---------------------------- */
+const BRAND = {
+  navy: "#1e3a5f",
+  gold: "#d4af37",
+  mauve: "#b8a9c9",
+  navyLight: "#2d4a6f",
+  goldLight: "#e6c860",
+  mauveLight: "#d4c8e0",
+};
+
+/* ---------------------------
+   Character Roles
+---------------------------- */
+const CHARACTER_ROLES = [
+  { id: "protagonist", label: "Protagonist", icon: Star, color: BRAND.gold, description: "Main character - full arc (6-8 milestones)" },
+  { id: "antagonist", label: "Antagonist", icon: Shield, color: "#ef4444", description: "Opposition - shorter arc (3-5 milestones)" },
+  { id: "supporting", label: "Supporting", icon: Users, color: BRAND.mauve, description: "Supporting character" },
+];
+
+/* ---------------------------
+   BASE Storage Keys (will be made project-specific)
+---------------------------- */
+const STORYLAB_KEY_BASE = "dahtruth-story-lab-toc-v3";
+const ROADMAP_KEY_BASE = "dahtruth-character-roadmap";
+
+/* ============================================
+   PROJECT-AWARE STORAGE UTILITIES
+   ============================================ */
 
 /**
- * Get the currently selected project ID
- * This is the KEY FIX - we now track which project is active
+ * Get the currently selected project ID from localStorage
  */
 function getSelectedProjectId() {
   try {
-    // Try to get from dedicated storage first
+    // Check direct key first
     const stored = localStorage.getItem('dahtruth-selected-project-id');
     if (stored) return stored;
     
-    // Fallback: try project store
+    // Fallback: check project store
     const projectData = localStorage.getItem('dahtruth-project-store');
     if (projectData) {
       const parsed = JSON.parse(projectData);
@@ -64,48 +95,20 @@ function getSelectedProjectId() {
 
 /**
  * Get project-specific storage key
- * This ensures each manuscript has its own data
+ * For 'default' project, returns base key (backwards compatibility)
+ * For other projects, returns baseKey-projectId
  */
 function getProjectKey(baseKey) {
   const projectId = getSelectedProjectId();
-  // Keep backwards compatibility for default project
   if (projectId === 'default') {
-    return baseKey;
+    return baseKey; // Backwards compatibility
   }
   return `${baseKey}-${projectId}`;
 }
 
-// ============================================
-// BRAND COLORS
-// ============================================
-const BRAND = {
-  navy: "#1e3a5f",
-  gold: "#d4af37",
-  mauve: "#b8a9c9",
-  navyLight: "#2d4a6f",
-  goldLight: "#e6c860",
-  mauveLight: "#d4c8e0",
-};
-
-// ============================================
-// CHARACTER ROLES
-// ============================================
-const CHARACTER_ROLES = [
-  { id: "protagonist", label: "Protagonist", icon: Star, color: BRAND.gold, description: "Main character - full arc (6-8 milestones)" },
-  { id: "antagonist", label: "Antagonist", icon: Shield, color: "#ef4444", description: "Opposition - shorter arc (3-5 milestones)" },
-  { id: "supporting", label: "Supporting", icon: Users, color: BRAND.mauve, description: "Supporting character" },
-];
-
-// ============================================
-// BASE STORAGE KEYS (will be made project-specific)
-// ============================================
-const STORYLAB_KEY_BASE = "dahtruth-story-lab-toc-v3";
-const ROADMAP_KEY_BASE = "dahtruth-character-roadmap";
-
-// ============================================
-// UTILITY FUNCTIONS
-// ============================================
-
+/* ---------------------------
+   Utility: Generate unique ID
+---------------------------- */
 function uid() {
   try {
     if (typeof window !== "undefined" && window.crypto?.randomUUID) {
@@ -115,6 +118,9 @@ function uid() {
   return String(Date.now()) + "_" + Math.random().toString(36).slice(2);
 }
 
+/* ---------------------------
+   Strip HTML to plain text
+---------------------------- */
 function stripHtml(html = "") {
   if (!html) return "";
   const tmp = document.createElement("div");
@@ -122,6 +128,9 @@ function stripHtml(html = "") {
   return tmp.textContent || tmp.innerText || "";
 }
 
+/* ---------------------------
+   Extract characters from chapter content (same as ComposePage)
+---------------------------- */
 function extractCharactersFromChapters(chapters = []) {
   const charSet = new Set();
   const charPattern = /@char:\s*([A-Za-z][A-Za-z\s.'-]*)/gi;
@@ -138,14 +147,9 @@ function extractCharactersFromChapters(chapters = []) {
   return Array.from(charSet).sort();
 }
 
-// ============================================
-// PROJECT-AWARE DATA LOADING
-// ============================================
-
-/**
- * Load all priorities from project store
- * This already uses the project store which should be project-aware
- */
+/* ---------------------------
+   Load all priorities from project store
+---------------------------- */
 function loadAllPriorities() {
   try {
     const project = loadProject();
@@ -155,10 +159,9 @@ function loadAllPriorities() {
   }
 }
 
-/**
- * Load StoryLab TOC data for CURRENT project
- * NOW USES PROJECT-SPECIFIC KEY
- */
+/* ---------------------------
+   Load data from localStorage (PROJECT-AWARE)
+---------------------------- */
 function loadStoryLabData() {
   try {
     const key = getProjectKey(STORYLAB_KEY_BASE);
@@ -172,10 +175,6 @@ function loadStoryLabData() {
   return null;
 }
 
-/**
- * Load Character Roadmap data for CURRENT project
- * NOW USES PROJECT-SPECIFIC KEY
- */
 function loadRoadmapData() {
   try {
     const key = getProjectKey(ROADMAP_KEY_BASE);
@@ -189,10 +188,6 @@ function loadRoadmapData() {
   return { characters: [], relationships: [] };
 }
 
-/**
- * Save Character Roadmap data for CURRENT project
- * NOW USES PROJECT-SPECIFIC KEY
- */
 function saveRoadmapData(data) {
   try {
     const key = getProjectKey(ROADMAP_KEY_BASE);
@@ -203,11 +198,10 @@ function saveRoadmapData(data) {
   }
 }
 
-// ============================================
-// UI COMPONENTS
-// ============================================
-
-const PageBanner = ({ activeView, bookTitle }) => {
+/* ---------------------------
+   Page Banner (matches other pages)
+---------------------------- */
+const PageBanner = ({ activeView, bookTitle, currentProjectId }) => {
   const viewLabels = {
     milestones: "Track character arcs and story beats",
     timeline: "Visualize character journeys across chapters",
@@ -234,12 +228,17 @@ const PageBanner = ({ activeView, bookTitle }) => {
             <span className="text-white/70">Story:</span>
             <span className="font-semibold text-amber-300">{bookTitle || "Untitled"}</span>
           </div>
+          {/* Debug: show current project */}
+          <span className="text-white/50 text-xs">(Project: {currentProjectId})</span>
         </div>
       </div>
     </div>
   );
 };
 
+/* ---------------------------
+   Tab Navigation (centered)
+---------------------------- */
 const ViewTabs = ({ activeView, setActiveView }) => {
   const tabs = [
     { id: "milestones", label: "Arc Milestones", icon: Sparkles },
@@ -278,6 +277,9 @@ const ViewTabs = ({ activeView, setActiveView }) => {
   );
 };
 
+/* ---------------------------
+   Character Priorities Panel
+---------------------------- */
 const PrioritiesPanel = ({ characterName, priorities }) => {
   if (!characterName) return null;
   
@@ -366,6 +368,9 @@ const PrioritiesPanel = ({ characterName, priorities }) => {
   );
 };
 
+/* ---------------------------
+   Milestone Suggestions Panel
+---------------------------- */
 const MilestoneSuggestionsPanel = ({ 
   suggestions, 
   isLoading, 
@@ -390,6 +395,7 @@ const MilestoneSuggestionsPanel = ({
         boxShadow: `0 4px 20px ${BRAND.gold}15`,
       }}
     >
+      {/* Header */}
       <div 
         className="px-5 py-4 flex items-center justify-between"
         style={{
@@ -421,6 +427,7 @@ const MilestoneSuggestionsPanel = ({
         </button>
       </div>
 
+      {/* Loading state */}
       {isLoading && (
         <div className="flex items-center justify-center py-12">
           <Loader2 size={28} className="animate-spin mr-3" style={{ color: BRAND.gold }} />
@@ -428,6 +435,7 @@ const MilestoneSuggestionsPanel = ({
         </div>
       )}
 
+      {/* Error state */}
       {error && (
         <div className="p-5">
           <div className="flex items-center gap-3 p-4 bg-red-50 rounded-xl text-red-700">
@@ -437,6 +445,7 @@ const MilestoneSuggestionsPanel = ({
         </div>
       )}
 
+      {/* Suggestions list */}
       {!isLoading && !error && suggestions.length > 0 && (
         <div className="p-5">
           <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
@@ -522,6 +531,9 @@ const MilestoneSuggestionsPanel = ({
   );
 };
 
+/* ---------------------------
+   Role Selector Component
+---------------------------- */
 const RoleSelector = ({ role, onChange }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
@@ -600,6 +612,9 @@ const RoleSelector = ({ role, onChange }) => {
   );
 };
 
+/* ---------------------------
+   Character Selector with Role
+---------------------------- */
 const CharacterSelector = ({
   characters,
   storyCharacters,
@@ -803,11 +818,16 @@ const CharacterSelector = ({
   );
 };
 
-// DnD Types
+/* ---------------------------
+   DnD Types
+---------------------------- */
 const ItemTypes = {
   MILESTONE: "MILESTONE",
 };
 
+/* ---------------------------
+   Draggable Milestone Row
+---------------------------- */
 function DraggableMilestone({ item, index, moveItem, update, remove, chapters }) {
   const ref = useRef(null);
 
@@ -975,6 +995,9 @@ function DraggableMilestone({ item, index, moveItem, update, remove, chapters })
   );
 }
 
+/* ---------------------------
+   Empty State Component
+---------------------------- */
 const EmptyState = ({ icon: Icon, title, description, action }) => (
   <div
     className="rounded-2xl p-8 text-center"
@@ -997,6 +1020,9 @@ const EmptyState = ({ icon: Icon, title, description, action }) => (
   </div>
 );
 
+/* ---------------------------
+   Milestones View
+---------------------------- */
 const MilestonesView = ({
   character,
   milestones,
@@ -1118,6 +1144,9 @@ const MilestonesView = ({
   );
 };
 
+/* ---------------------------
+   Timeline View
+---------------------------- */
 const TimelineView = ({ characters, chapters }) => {
   const timelineData = useMemo(() => {
     return chapters.map((chapter, idx) => {
@@ -1231,10 +1260,14 @@ const TimelineView = ({ characters, chapters }) => {
   );
 };
 
+/* ---------------------------
+   Relationships View
+---------------------------- */
 const RelationshipsView = ({
   characters,
   relationships,
   onAddRelationship,
+  onUpdateRelationship,
   onRemoveRelationship,
 }) => {
   const relationshipTypes = [
@@ -1331,12 +1364,14 @@ const RelationshipsView = ({
                       <p className="text-sm text-gray-500 mt-1">{rel.description}</p>
                     )}
                   </div>
-                  <button
-                    onClick={() => onRemoveRelationship(rel.id)}
-                    className="p-1.5 rounded-lg hover:bg-red-50"
-                  >
-                    <Trash2 size={14} className="text-red-400" />
-                  </button>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => onRemoveRelationship(rel.id)}
+                      className="p-1.5 rounded-lg hover:bg-red-50"
+                    >
+                      <Trash2 size={14} className="text-red-400" />
+                    </button>
+                  </div>
                 </div>
               </div>
             );
@@ -1347,6 +1382,9 @@ const RelationshipsView = ({
   );
 };
 
+/* ---------------------------
+   Goals & Conflicts View
+---------------------------- */
 const GoalsView = ({ character, onUpdate, allPriorities }) => {
   if (!character) {
     return (
@@ -1429,12 +1467,13 @@ const GoalsView = ({ character, onUpdate, allPriorities }) => {
   );
 };
 
-// ============================================
-// MAIN COMPONENT
-// ============================================
-
+/* ------------------------------------------------
+   Main CharacterRoadmap Component
+------------------------------------------------- */
 export default function CharacterRoadmap() {
-  // Track current project ID for change detection
+  // ============================================
+  // KEY FIX: Track current project ID for multi-manuscript support
+  // ============================================
   const [currentProjectId, setCurrentProjectId] = useState(getSelectedProjectId);
   
   const [activeView, setActiveView] = useState("milestones");
@@ -1443,13 +1482,11 @@ export default function CharacterRoadmap() {
   const [selectedCharacterId, setSelectedCharacterId] = useState(null);
   const [allPriorities, setAllPriorities] = useState(() => loadAllPriorities());
   
-  // Milestone generation state
   const [isGenerating, setIsGenerating] = useState(false);
   const [milestoneSuggestions, setMilestoneSuggestions] = useState([]);
   const [generationError, setGenerationError] = useState(null);
   const [showSuggestions, setShowSuggestions] = useState(false);
 
-  // Extract characters from story chapters
   const storyCharacters = useMemo(() => {
     if (!storyLabData?.chapters) return [];
     return extractCharactersFromChapters(storyLabData.chapters);
@@ -1463,7 +1500,6 @@ export default function CharacterRoadmap() {
   const selectedCharacter = characters.find((c) => c.id === selectedCharacterId);
   const selectedMilestones = selectedCharacter?.milestones || [];
 
-  // Auto-select first character
   useEffect(() => {
     if (!selectedCharacterId && characters.length > 0) {
       setSelectedCharacterId(characters[0].id);
@@ -1474,12 +1510,11 @@ export default function CharacterRoadmap() {
   // KEY FIX: Listen for project changes and reload ALL data
   // ============================================
   useEffect(() => {
-    const handleProjectChange = () => {
+    const handleProjectSwitch = () => {
       const newProjectId = getSelectedProjectId();
       
-      // Check if project actually changed
       if (newProjectId !== currentProjectId) {
-        console.log(`[CharacterRoadmap] Project changed: ${currentProjectId} → ${newProjectId}`);
+        console.log(`[CharacterRoadmap] Project switched: ${currentProjectId} → ${newProjectId}`);
         setCurrentProjectId(newProjectId);
         
         // Reload ALL data from new project's storage
@@ -1487,31 +1522,30 @@ export default function CharacterRoadmap() {
         setRoadmapData(loadRoadmapData());
         setAllPriorities(loadAllPriorities());
         
-        // Reset selection
+        // Reset UI state
         setSelectedCharacterId(null);
         setShowSuggestions(false);
         setMilestoneSuggestions([]);
-      } else {
-        // Same project, just data changed - still reload
-        setStoryLabData(loadStoryLabData());
-        setRoadmapData(loadRoadmapData());
-        setAllPriorities(loadAllPriorities());
       }
     };
     
-    // Listen for multiple event types
-    window.addEventListener("project:switch", handleProjectChange);
-    window.addEventListener("project:change", handleProjectChange);
-    window.addEventListener("storage", handleProjectChange);
+    const handleDataChange = () => {
+      setStoryLabData(loadStoryLabData());
+      setRoadmapData(loadRoadmapData());
+      setAllPriorities(loadAllPriorities());
+    };
+    
+    window.addEventListener("project:switch", handleProjectSwitch);
+    window.addEventListener("project:change", handleDataChange);
+    window.addEventListener("storage", handleProjectSwitch);
     
     return () => {
-      window.removeEventListener("project:switch", handleProjectChange);
-      window.removeEventListener("project:change", handleProjectChange);
-      window.removeEventListener("storage", handleProjectChange);
+      window.removeEventListener("project:switch", handleProjectSwitch);
+      window.removeEventListener("project:change", handleDataChange);
+      window.removeEventListener("storage", handleProjectSwitch);
     };
   }, [currentProjectId]);
 
-  // Save helper
   const commit = useCallback((mutator) => {
     setRoadmapData((prev) => {
       const copy = JSON.parse(JSON.stringify(prev));
@@ -1523,7 +1557,6 @@ export default function CharacterRoadmap() {
     });
   }, []);
 
-  // Character CRUD
   const addCharacter = () => {
     const newId = uid();
     commit((data) => {
@@ -1566,7 +1599,6 @@ export default function CharacterRoadmap() {
     });
   };
 
-  // Generate Milestones from Priorities
   const generateMilestones = async () => {
     if (!selectedCharacter) return;
     
@@ -1718,7 +1750,6 @@ Return ONLY the JSON array, no other text.`;
     setGenerationError(null);
   };
 
-  // Milestone CRUD
   const addMilestone = () => {
     if (!selectedCharacterId) return;
     commit((data) => {
@@ -1772,7 +1803,6 @@ Return ONLY the JSON array, no other text.`;
     });
   };
 
-  // Relationship CRUD
   const addRelationship = () => {
     if (characters.length < 2) return;
     commit((data) => {
@@ -1786,6 +1816,13 @@ Return ONLY the JSON array, no other text.`;
     });
   };
 
+  const updateRelationship = (id, patch) => {
+    commit((data) => {
+      const rel = data.relationships.find((r) => r.id === id);
+      if (rel) Object.assign(rel, patch);
+    });
+  };
+
   const removeRelationship = (id) => {
     commit((data) => {
       data.relationships = data.relationships.filter((r) => r.id !== id);
@@ -1794,7 +1831,6 @@ Return ONLY the JSON array, no other text.`;
 
   return (
     <div className="min-h-screen" style={{ background: "#f8fafc" }}>
-      {/* Top Navigation Bar */}
       <div className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-slate-200 shadow-sm">
         <div className="max-w-6xl mx-auto px-4 py-2 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -1808,10 +1844,6 @@ Return ONLY the JSON array, no other text.`;
             <span className="text-slate-300">|</span>
             <span className="text-sm font-semibold" style={{ color: BRAND.navy }}>
               Character Roadmap
-            </span>
-            {/* Debug: Show current project ID */}
-            <span className="text-xs text-slate-400 ml-2">
-              (Project: {currentProjectId})
             </span>
           </div>
           <Link
@@ -1828,7 +1860,11 @@ Return ONLY the JSON array, no other text.`;
       </div>
 
       <div className="mx-auto max-w-6xl px-6 py-6">
-        <PageBanner activeView={activeView} bookTitle={bookTitle} />
+        <PageBanner 
+          activeView={activeView} 
+          bookTitle={bookTitle} 
+          currentProjectId={currentProjectId}
+        />
 
         <ViewTabs activeView={activeView} setActiveView={setActiveView} />
 
@@ -1895,6 +1931,7 @@ Return ONLY the JSON array, no other text.`;
               characters={characters}
               relationships={relationships}
               onAddRelationship={addRelationship}
+              onUpdateRelationship={updateRelationship}
               onRemoveRelationship={removeRelationship}
             />
           )}
