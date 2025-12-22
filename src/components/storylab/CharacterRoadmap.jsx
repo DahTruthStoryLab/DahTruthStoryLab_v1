@@ -1,4 +1,6 @@
 // src/components/storylab/CharacterRoadmap.jsx
+// UPDATED: Now uses project-specific storage keys for multi-manuscript support
+
 import React, { useState, useRef, useMemo, useCallback, useEffect } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -18,16 +20,11 @@ import {
   Sparkles,
   BookOpen,
   User,
-  Edit3,
   Check,
   X,
   ArrowLeft,
   Wand2,
   Loader2,
-  ChevronUp,
-  Lightbulb,
-  TrendingUp,
-  FileText,
   Star,
   Shield,
   AlertCircle,
@@ -38,9 +35,49 @@ import { useDrag, useDrop } from "react-dnd";
 import { runAssistant } from "../../lib/api";
 import { loadProject } from "../../lib/storylab/projectStore";
 
-/* ---------------------------
-   Brand Colors
----------------------------- */
+// ============================================
+// PROJECT-AWARE STORAGE UTILITIES
+// ============================================
+
+/**
+ * Get the currently selected project ID
+ * This is the KEY FIX - we now track which project is active
+ */
+function getSelectedProjectId() {
+  try {
+    // Try to get from dedicated storage first
+    const stored = localStorage.getItem('dahtruth-selected-project-id');
+    if (stored) return stored;
+    
+    // Fallback: try project store
+    const projectData = localStorage.getItem('dahtruth-project-store');
+    if (projectData) {
+      const parsed = JSON.parse(projectData);
+      return parsed.selectedProjectId || parsed.currentProjectId || 'default';
+    }
+    
+    return 'default';
+  } catch {
+    return 'default';
+  }
+}
+
+/**
+ * Get project-specific storage key
+ * This ensures each manuscript has its own data
+ */
+function getProjectKey(baseKey) {
+  const projectId = getSelectedProjectId();
+  // Keep backwards compatibility for default project
+  if (projectId === 'default') {
+    return baseKey;
+  }
+  return `${baseKey}-${projectId}`;
+}
+
+// ============================================
+// BRAND COLORS
+// ============================================
 const BRAND = {
   navy: "#1e3a5f",
   gold: "#d4af37",
@@ -50,24 +87,25 @@ const BRAND = {
   mauveLight: "#d4c8e0",
 };
 
-/* ---------------------------
-   Character Roles
----------------------------- */
+// ============================================
+// CHARACTER ROLES
+// ============================================
 const CHARACTER_ROLES = [
   { id: "protagonist", label: "Protagonist", icon: Star, color: BRAND.gold, description: "Main character - full arc (6-8 milestones)" },
   { id: "antagonist", label: "Antagonist", icon: Shield, color: "#ef4444", description: "Opposition - shorter arc (3-5 milestones)" },
   { id: "supporting", label: "Supporting", icon: Users, color: BRAND.mauve, description: "Supporting character" },
 ];
 
-/* ---------------------------
-   Storage Keys (match ComposePage)
----------------------------- */
-const STORYLAB_KEY = "dahtruth-story-lab-toc-v3";
-const ROADMAP_KEY = "dahtruth-character-roadmap";
+// ============================================
+// BASE STORAGE KEYS (will be made project-specific)
+// ============================================
+const STORYLAB_KEY_BASE = "dahtruth-story-lab-toc-v3";
+const ROADMAP_KEY_BASE = "dahtruth-character-roadmap";
 
-/* ---------------------------
-   Utility: Generate unique ID
----------------------------- */
+// ============================================
+// UTILITY FUNCTIONS
+// ============================================
+
 function uid() {
   try {
     if (typeof window !== "undefined" && window.crypto?.randomUUID) {
@@ -77,9 +115,6 @@ function uid() {
   return String(Date.now()) + "_" + Math.random().toString(36).slice(2);
 }
 
-/* ---------------------------
-   Strip HTML to plain text
----------------------------- */
 function stripHtml(html = "") {
   if (!html) return "";
   const tmp = document.createElement("div");
@@ -87,9 +122,6 @@ function stripHtml(html = "") {
   return tmp.textContent || tmp.innerText || "";
 }
 
-/* ---------------------------
-   Extract characters from chapter content (same as ComposePage)
----------------------------- */
 function extractCharactersFromChapters(chapters = []) {
   const charSet = new Set();
   const charPattern = /@char:\s*([A-Za-z][A-Za-z\s.'-]*)/gi;
@@ -106,9 +138,14 @@ function extractCharactersFromChapters(chapters = []) {
   return Array.from(charSet).sort();
 }
 
-/* ---------------------------
-   Load all priorities from project store
----------------------------- */
+// ============================================
+// PROJECT-AWARE DATA LOADING
+// ============================================
+
+/**
+ * Load all priorities from project store
+ * This already uses the project store which should be project-aware
+ */
 function loadAllPriorities() {
   try {
     const project = loadProject();
@@ -118,12 +155,14 @@ function loadAllPriorities() {
   }
 }
 
-/* ---------------------------
-   Load data from localStorage
----------------------------- */
+/**
+ * Load StoryLab TOC data for CURRENT project
+ * NOW USES PROJECT-SPECIFIC KEY
+ */
 function loadStoryLabData() {
   try {
-    const raw = localStorage.getItem(STORYLAB_KEY);
+    const key = getProjectKey(STORYLAB_KEY_BASE);
+    const raw = localStorage.getItem(key);
     if (raw) {
       return JSON.parse(raw);
     }
@@ -133,9 +172,14 @@ function loadStoryLabData() {
   return null;
 }
 
+/**
+ * Load Character Roadmap data for CURRENT project
+ * NOW USES PROJECT-SPECIFIC KEY
+ */
 function loadRoadmapData() {
   try {
-    const raw = localStorage.getItem(ROADMAP_KEY);
+    const key = getProjectKey(ROADMAP_KEY_BASE);
+    const raw = localStorage.getItem(key);
     if (raw) {
       return JSON.parse(raw);
     }
@@ -145,18 +189,24 @@ function loadRoadmapData() {
   return { characters: [], relationships: [] };
 }
 
+/**
+ * Save Character Roadmap data for CURRENT project
+ * NOW USES PROJECT-SPECIFIC KEY
+ */
 function saveRoadmapData(data) {
   try {
-    localStorage.setItem(ROADMAP_KEY, JSON.stringify(data));
+    const key = getProjectKey(ROADMAP_KEY_BASE);
+    localStorage.setItem(key, JSON.stringify(data));
     window.dispatchEvent(new Event("project:change"));
   } catch (err) {
     console.error("[CharacterRoadmap] Failed to save roadmap data:", err);
   }
 }
 
-/* ---------------------------
-   Page Banner (matches other pages)
----------------------------- */
+// ============================================
+// UI COMPONENTS
+// ============================================
+
 const PageBanner = ({ activeView, bookTitle }) => {
   const viewLabels = {
     milestones: "Track character arcs and story beats",
@@ -190,9 +240,6 @@ const PageBanner = ({ activeView, bookTitle }) => {
   );
 };
 
-/* ---------------------------
-   Tab Navigation (centered)
----------------------------- */
 const ViewTabs = ({ activeView, setActiveView }) => {
   const tabs = [
     { id: "milestones", label: "Arc Milestones", icon: Sparkles },
@@ -231,9 +278,6 @@ const ViewTabs = ({ activeView, setActiveView }) => {
   );
 };
 
-/* ---------------------------
-   Character Priorities Panel
----------------------------- */
 const PrioritiesPanel = ({ characterName, priorities }) => {
   if (!characterName) return null;
   
@@ -322,9 +366,6 @@ const PrioritiesPanel = ({ characterName, priorities }) => {
   );
 };
 
-/* ---------------------------
-   Milestone Suggestions Panel
----------------------------- */
 const MilestoneSuggestionsPanel = ({ 
   suggestions, 
   isLoading, 
@@ -349,7 +390,6 @@ const MilestoneSuggestionsPanel = ({
         boxShadow: `0 4px 20px ${BRAND.gold}15`,
       }}
     >
-      {/* Header */}
       <div 
         className="px-5 py-4 flex items-center justify-between"
         style={{
@@ -381,7 +421,6 @@ const MilestoneSuggestionsPanel = ({
         </button>
       </div>
 
-      {/* Loading state */}
       {isLoading && (
         <div className="flex items-center justify-center py-12">
           <Loader2 size={28} className="animate-spin mr-3" style={{ color: BRAND.gold }} />
@@ -389,7 +428,6 @@ const MilestoneSuggestionsPanel = ({
         </div>
       )}
 
-      {/* Error state */}
       {error && (
         <div className="p-5">
           <div className="flex items-center gap-3 p-4 bg-red-50 rounded-xl text-red-700">
@@ -399,7 +437,6 @@ const MilestoneSuggestionsPanel = ({
         </div>
       )}
 
-      {/* Suggestions list */}
       {!isLoading && !error && suggestions.length > 0 && (
         <div className="p-5">
           <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
@@ -485,16 +522,12 @@ const MilestoneSuggestionsPanel = ({
   );
 };
 
-/* ---------------------------
-   Role Selector Component
----------------------------- */
 const RoleSelector = ({ role, onChange }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
   const selectedRole = CHARACTER_ROLES.find(r => r.id === role) || CHARACTER_ROLES[2];
   const Icon = selectedRole.icon;
 
-  // Close on click outside
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
@@ -567,9 +600,6 @@ const RoleSelector = ({ role, onChange }) => {
   );
 };
 
-/* ---------------------------
-   Character Selector with Role
----------------------------- */
 const CharacterSelector = ({
   characters,
   storyCharacters,
@@ -590,7 +620,6 @@ const CharacterSelector = ({
     (name) => !characters.some((c) => c.name === name)
   );
 
-  // Get priorities for selected character
   const characterPriorities = selected 
     ? allPriorities.filter(p => p.character?.toLowerCase() === selected.name?.toLowerCase())
     : [];
@@ -599,7 +628,6 @@ const CharacterSelector = ({
     (selected.role === "protagonist" || selected.role === "antagonist") &&
     characterPriorities.length > 0;
 
-  // Close on click outside
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
@@ -612,13 +640,11 @@ const CharacterSelector = ({
 
   return (
     <div className="mb-6 space-y-4">
-      {/* Main row */}
       <div className="flex items-center justify-center gap-3 flex-wrap">
         <label className="text-sm font-medium" style={{ color: BRAND.navy }}>
           Character:
         </label>
         
-        {/* Character dropdown */}
         <div className="relative w-64" ref={dropdownRef}>
           <button
             onClick={() => setIsOpen(!isOpen)}
@@ -711,7 +737,6 @@ const CharacterSelector = ({
           )}
         </div>
 
-        {/* Role selector (if character selected) */}
         {selected && (
           <RoleSelector
             role={selected.role || "supporting"}
@@ -719,7 +744,6 @@ const CharacterSelector = ({
           />
         )}
 
-        {/* New Character Button */}
         <button
           onClick={onAddCharacter}
           className="inline-flex items-center gap-1.5 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all hover:scale-105"
@@ -734,7 +758,6 @@ const CharacterSelector = ({
         </button>
       </div>
 
-      {/* Generate Milestones Button (for protagonist/antagonist with priorities) */}
       {selected && (selected.role === "protagonist" || selected.role === "antagonist") && (
         <div className="flex justify-center items-center gap-3">
           <button
@@ -780,16 +803,11 @@ const CharacterSelector = ({
   );
 };
 
-/* ---------------------------
-   DnD Types
----------------------------- */
+// DnD Types
 const ItemTypes = {
   MILESTONE: "MILESTONE",
 };
 
-/* ---------------------------
-   Draggable Milestone Row
----------------------------- */
 function DraggableMilestone({ item, index, moveItem, update, remove, chapters }) {
   const ref = useRef(null);
 
@@ -957,9 +975,6 @@ function DraggableMilestone({ item, index, moveItem, update, remove, chapters })
   );
 }
 
-/* ---------------------------
-   Empty State Component
----------------------------- */
 const EmptyState = ({ icon: Icon, title, description, action }) => (
   <div
     className="rounded-2xl p-8 text-center"
@@ -982,9 +997,6 @@ const EmptyState = ({ icon: Icon, title, description, action }) => (
   </div>
 );
 
-/* ---------------------------
-   Milestones View
----------------------------- */
 const MilestonesView = ({
   character,
   milestones,
@@ -1009,7 +1021,6 @@ const MilestonesView = ({
 
   return (
     <div className="space-y-4">
-      {/* Priorities panel */}
       <PrioritiesPanel 
         characterName={character.name} 
         priorities={allPriorities} 
@@ -1107,9 +1118,6 @@ const MilestonesView = ({
   );
 };
 
-/* ---------------------------
-   Timeline View
----------------------------- */
 const TimelineView = ({ characters, chapters }) => {
   const timelineData = useMemo(() => {
     return chapters.map((chapter, idx) => {
@@ -1223,18 +1231,12 @@ const TimelineView = ({ characters, chapters }) => {
   );
 };
 
-/* ---------------------------
-   Relationships View
----------------------------- */
 const RelationshipsView = ({
   characters,
   relationships,
   onAddRelationship,
-  onUpdateRelationship,
   onRemoveRelationship,
 }) => {
-  const [editingId, setEditingId] = useState(null);
-
   const relationshipTypes = [
     { id: "ally", label: "Ally", icon: Heart, color: "#22c55e" },
     { id: "rival", label: "Rival", icon: Swords, color: "#ef4444" },
@@ -1279,7 +1281,6 @@ const RelationshipsView = ({
         </button>
       </div>
 
-      {/* Relationship list */}
       <div className="space-y-3">
         {relationships.length === 0 ? (
           <EmptyState
@@ -1330,14 +1331,12 @@ const RelationshipsView = ({
                       <p className="text-sm text-gray-500 mt-1">{rel.description}</p>
                     )}
                   </div>
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => onRemoveRelationship(rel.id)}
-                      className="p-1.5 rounded-lg hover:bg-red-50"
-                    >
-                      <Trash2 size={14} className="text-red-400" />
-                    </button>
-                  </div>
+                  <button
+                    onClick={() => onRemoveRelationship(rel.id)}
+                    className="p-1.5 rounded-lg hover:bg-red-50"
+                  >
+                    <Trash2 size={14} className="text-red-400" />
+                  </button>
                 </div>
               </div>
             );
@@ -1348,9 +1347,6 @@ const RelationshipsView = ({
   );
 };
 
-/* ---------------------------
-   Goals & Conflicts View
----------------------------- */
 const GoalsView = ({ character, onUpdate, allPriorities }) => {
   if (!character) {
     return (
@@ -1383,7 +1379,6 @@ const GoalsView = ({ character, onUpdate, allPriorities }) => {
 
   return (
     <div className="space-y-6">
-      {/* Priorities panel */}
       <PrioritiesPanel 
         characterName={character.name} 
         priorities={allPriorities} 
@@ -1434,10 +1429,14 @@ const GoalsView = ({ character, onUpdate, allPriorities }) => {
   );
 };
 
-/* ------------------------------------------------
-   Main CharacterRoadmap Component
-------------------------------------------------- */
+// ============================================
+// MAIN COMPONENT
+// ============================================
+
 export default function CharacterRoadmap() {
+  // Track current project ID for change detection
+  const [currentProjectId, setCurrentProjectId] = useState(getSelectedProjectId);
+  
   const [activeView, setActiveView] = useState("milestones");
   const [roadmapData, setRoadmapData] = useState(() => loadRoadmapData());
   const [storyLabData, setStoryLabData] = useState(() => loadStoryLabData());
@@ -1471,20 +1470,46 @@ export default function CharacterRoadmap() {
     }
   }, [characters, selectedCharacterId]);
 
-  // Listen for changes
+  // ============================================
+  // KEY FIX: Listen for project changes and reload ALL data
+  // ============================================
   useEffect(() => {
-    const handleChange = () => {
-      setStoryLabData(loadStoryLabData());
-      setRoadmapData(loadRoadmapData());
-      setAllPriorities(loadAllPriorities());
+    const handleProjectChange = () => {
+      const newProjectId = getSelectedProjectId();
+      
+      // Check if project actually changed
+      if (newProjectId !== currentProjectId) {
+        console.log(`[CharacterRoadmap] Project changed: ${currentProjectId} → ${newProjectId}`);
+        setCurrentProjectId(newProjectId);
+        
+        // Reload ALL data from new project's storage
+        setStoryLabData(loadStoryLabData());
+        setRoadmapData(loadRoadmapData());
+        setAllPriorities(loadAllPriorities());
+        
+        // Reset selection
+        setSelectedCharacterId(null);
+        setShowSuggestions(false);
+        setMilestoneSuggestions([]);
+      } else {
+        // Same project, just data changed - still reload
+        setStoryLabData(loadStoryLabData());
+        setRoadmapData(loadRoadmapData());
+        setAllPriorities(loadAllPriorities());
+      }
     };
-    window.addEventListener("project:change", handleChange);
-    window.addEventListener("storage", handleChange);
+    
+    // Listen for multiple event types
+    window.addEventListener("project:switch", handleProjectChange);
+    window.addEventListener("project:change", handleProjectChange);
+    window.addEventListener("storage", handleProjectChange);
+    
     return () => {
-      window.removeEventListener("project:change", handleChange);
-      window.removeEventListener("storage", handleChange);
+      window.removeEventListener("project:switch", handleProjectChange);
+      window.removeEventListener("project:change", handleProjectChange);
+      window.removeEventListener("storage", handleProjectChange);
     };
-  }, []);
+  }, [currentProjectId]);
 
   // Save helper
   const commit = useCallback((mutator) => {
@@ -1562,13 +1587,11 @@ export default function CharacterRoadmap() {
     const isProtagonist = selectedCharacter.role === "protagonist";
     const milestoneCount = isProtagonist ? "6-8" : "3-5";
     
-    // Format priorities for the prompt
     const prioritiesText = characterPriorities.map(p => {
       const type = p.priorityType || "Priority";
       return `- ${type}: ${p.title}`;
     }).join("\n");
 
-    // Get character's goals if defined
     const goals = selectedCharacter.goals || {};
     const goalsText = Object.entries(goals)
       .filter(([k, v]) => v)
@@ -1611,7 +1634,6 @@ Return ONLY the JSON array, no other text.`;
       
       const responseText = result?.result || result?.text || result?.output || result || "";
       
-      // Parse JSON
       let parsed = [];
       try {
         const jsonMatch = responseText.match(/\[[\s\S]*\]/);
@@ -1637,7 +1659,6 @@ Return ONLY the JSON array, no other text.`;
     }
   };
 
-  // Accept a single milestone suggestion
   const acceptMilestone = (suggestion) => {
     if (!selectedCharacterId) return;
     
@@ -1661,12 +1682,10 @@ Return ONLY the JSON array, no other text.`;
     setMilestoneSuggestions(prev => prev.filter(s => s.title !== suggestion.title));
   };
 
-  // Reject a milestone suggestion
   const rejectMilestone = (index) => {
     setMilestoneSuggestions(prev => prev.filter((_, i) => i !== index));
   };
 
-  // Accept all milestone suggestions
   const acceptAllMilestones = () => {
     if (!selectedCharacterId) return;
     
@@ -1693,7 +1712,6 @@ Return ONLY the JSON array, no other text.`;
     setShowSuggestions(false);
   };
 
-  // Close suggestions panel
   const closeSuggestions = () => {
     setShowSuggestions(false);
     setMilestoneSuggestions([]);
@@ -1768,13 +1786,6 @@ Return ONLY the JSON array, no other text.`;
     });
   };
 
-  const updateRelationship = (id, patch) => {
-    commit((data) => {
-      const rel = data.relationships.find((r) => r.id === id);
-      if (rel) Object.assign(rel, patch);
-    });
-  };
-
   const removeRelationship = (id) => {
     commit((data) => {
       data.relationships = data.relationships.filter((r) => r.id !== id);
@@ -1797,6 +1808,10 @@ Return ONLY the JSON array, no other text.`;
             <span className="text-slate-300">|</span>
             <span className="text-sm font-semibold" style={{ color: BRAND.navy }}>
               Character Roadmap
+            </span>
+            {/* Debug: Show current project ID */}
+            <span className="text-xs text-slate-400 ml-2">
+              (Project: {currentProjectId})
             </span>
           </div>
           <Link
@@ -1835,7 +1850,6 @@ Return ONLY the JSON array, no other text.`;
           />
         )}
 
-        {/* Milestone Suggestions Panel */}
         {showSuggestions && activeView === "milestones" && (
           <MilestoneSuggestionsPanel
             suggestions={milestoneSuggestions}
@@ -1881,7 +1895,6 @@ Return ONLY the JSON array, no other text.`;
               characters={characters}
               relationships={relationships}
               onAddRelationship={addRelationship}
-              onUpdateRelationship={updateRelationship}
               onRemoveRelationship={removeRelationship}
             />
           )}
@@ -1898,3 +1911,4 @@ Return ONLY the JSON array, no other text.`;
     </div>
   );
 }
+
