@@ -1,4 +1,6 @@
 // src/components/storylab/HopesFearsLegacy.jsx
+// UPDATED: Now listens for project switches to reload data for multi-manuscript support
+
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { Heart, Save } from "lucide-react";
@@ -8,6 +10,32 @@ import {
   ensureWorkshopFields,
 } from "../../lib/storylab/projectStore";
 import BackToLanding, { BackToLandingFab } from "./BackToLanding";
+
+/* ============================================
+   PROJECT-AWARE STORAGE UTILITIES
+   ============================================ */
+
+/**
+ * Get the currently selected project ID from localStorage
+ */
+function getSelectedProjectId() {
+  try {
+    // Check direct key first
+    const stored = localStorage.getItem('dahtruth-selected-project-id');
+    if (stored) return stored;
+    
+    // Fallback: check project store
+    const projectData = localStorage.getItem('dahtruth-project-store');
+    if (projectData) {
+      const parsed = JSON.parse(projectData);
+      return parsed.selectedProjectId || parsed.currentProjectId || 'default';
+    }
+    
+    return 'default';
+  } catch {
+    return 'default';
+  }
+}
 
 /* ---------------------------
    Page banner (light/glass)
@@ -35,7 +63,7 @@ const PageBanner = () => (
 );
 
 /* ---------------------------
-   Small “Saving…” indicator
+   Small "Saving…" indicator
 ---------------------------- */
 function SavingBadge({ state }) {
   const map = {
@@ -62,6 +90,11 @@ function SavingBadge({ state }) {
    HopesFearsLegacy (single export — no duplicates)
 ------------------------------------------------- */
 export default function HopesFearsLegacy() {
+  // ============================================
+  // KEY FIX: Track current project ID for multi-manuscript support
+  // ============================================
+  const [currentProjectId, setCurrentProjectId] = useState(getSelectedProjectId);
+  
   const [project, setProject] = useState(() =>
     ensureWorkshopFields(loadProject())
   );
@@ -86,6 +119,35 @@ export default function HopesFearsLegacy() {
     } catch {}
   };
 
+  // ============================================
+  // KEY FIX: Listen for project changes and reload ALL data
+  // ============================================
+  useEffect(() => {
+    const handleProjectSwitch = () => {
+      const newProjectId = getSelectedProjectId();
+      
+      if (newProjectId !== currentProjectId) {
+        console.log(`[HopesFearsLegacy] Project switched: ${currentProjectId} → ${newProjectId}`);
+        setCurrentProjectId(newProjectId);
+        
+        // Reload project data from new project's storage
+        const newProject = ensureWorkshopFields(loadProject());
+        setProject(newProject);
+        setHfl({ ...DEFAULT, ...(newProject.hfl || {}) });
+      }
+    };
+    
+    // Listen for project switch events
+    window.addEventListener("project:switch", handleProjectSwitch);
+    window.addEventListener("storage", handleProjectSwitch);
+    
+    return () => {
+      window.removeEventListener("project:switch", handleProjectSwitch);
+      window.removeEventListener("storage", handleProjectSwitch);
+    };
+  }, [currentProjectId]);
+
+  // Auto-save with debounce
   useEffect(() => {
     setSaving("saving");
     const id = setTimeout(() => {
@@ -163,6 +225,11 @@ export default function HopesFearsLegacy() {
       <div className="mx-auto max-w-6xl px-6 py-8">
         <PageBanner />
 
+        {/* Debug: show current project */}
+        <div className="text-xs text-slate-400 mb-4 text-right">
+          Project: {currentProjectId}
+        </div>
+
         <div className="space-y-6">
           <RoleCard roleKey="mc" label="Main Character (MC)" />
           <RoleCard roleKey="protagonist" label="Protagonist" />
@@ -171,7 +238,7 @@ export default function HopesFearsLegacy() {
 
         <div className="mt-8 flex items-center justify-between">
           <p className="text-sm text-muted">
-            Tip: keep these short and concrete. They’ll power prompts and the
+            Tip: keep these short and concrete. They'll power prompts and the
             Character Roadmap.
           </p>
           <button
