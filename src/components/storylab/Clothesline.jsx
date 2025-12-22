@@ -1,4 +1,6 @@
 // src/components/storylab/Clothesline.jsx
+// UPDATED: Now uses project-specific storage keys for multi-manuscript support
+
 import React, { useCallback, useMemo, useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { 
@@ -40,16 +42,56 @@ const BRAND = {
 const ITEM = "CHAR_CARD";
 
 /* ---------------------------
-   Storage key for chapters
+   BASE Storage key for chapters (will be made project-specific)
 ---------------------------- */
-const STORYLAB_KEY = "dahtruth-story-lab-toc-v3";
+const STORYLAB_KEY_BASE = "dahtruth-story-lab-toc-v3";
+
+/* ============================================
+   PROJECT-AWARE STORAGE UTILITIES
+   ============================================ */
+
+/**
+ * Get the currently selected project ID from localStorage
+ */
+function getSelectedProjectId() {
+  try {
+    // Check direct key first
+    const stored = localStorage.getItem('dahtruth-selected-project-id');
+    if (stored) return stored;
+    
+    // Fallback: check project store
+    const projectData = localStorage.getItem('dahtruth-project-store');
+    if (projectData) {
+      const parsed = JSON.parse(projectData);
+      return parsed.selectedProjectId || parsed.currentProjectId || 'default';
+    }
+    
+    return 'default';
+  } catch {
+    return 'default';
+  }
+}
+
+/**
+ * Get project-specific storage key
+ * For 'default' project, returns base key (backwards compatibility)
+ * For other projects, returns baseKey-projectId
+ */
+function getProjectKey(baseKey) {
+  const projectId = getSelectedProjectId();
+  if (projectId === 'default') {
+    return baseKey; // Backwards compatibility
+  }
+  return `${baseKey}-${projectId}`;
+}
 
 /* ---------------------------
-   Load chapters from localStorage
+   Load chapters from localStorage (PROJECT-AWARE)
 ---------------------------- */
 function loadChapters() {
   try {
-    const raw = localStorage.getItem(STORYLAB_KEY);
+    const key = getProjectKey(STORYLAB_KEY_BASE);
+    const raw = localStorage.getItem(key);
     if (!raw) return [];
     const data = JSON.parse(raw);
     return Array.isArray(data.chapters) ? data.chapters : [];
@@ -453,30 +495,56 @@ function CharacterDiscoveryPanel({
    Clothesline (main export)
 ------------------------------------------------- */
 export default function Clothesline() {
+  // ============================================
+  // KEY FIX: Track current project ID for multi-manuscript support
+  // ============================================
+  const [currentProjectId, setCurrentProjectId] = useState(getSelectedProjectId);
+  
   // Load project
   const [project, setProject] = useState(() =>
     ensureWorkshopFields(loadProject())
   );
   
-  // Load chapters for character discovery
+  // Load chapters for character discovery (now project-aware)
   const [chapters, setChapters] = useState(() => loadChapters());
   
   // Discovery panel state
   const [isPanelExpanded, setIsPanelExpanded] = useState(true);
 
-  // Listen for changes
+  // ============================================
+  // KEY FIX: Listen for project changes and reload ALL data
+  // ============================================
   useEffect(() => {
-    const handleChange = () => {
+    const handleProjectChange = () => {
+      const newProjectId = getSelectedProjectId();
+      
+      if (newProjectId !== currentProjectId) {
+        console.log(`[Clothesline] Project switched: ${currentProjectId} → ${newProjectId}`);
+        setCurrentProjectId(newProjectId);
+        
+        // Reload ALL data from new project's storage
+        setChapters(loadChapters());
+        setProject(ensureWorkshopFields(loadProject()));
+      }
+    };
+    
+    const handleDataChange = () => {
+      // Data changed within same project - reload
       setChapters(loadChapters());
       setProject(ensureWorkshopFields(loadProject()));
     };
-    window.addEventListener("project:change", handleChange);
-    window.addEventListener("storage", handleChange);
+    
+    // Listen for project switch events
+    window.addEventListener("project:switch", handleProjectChange);
+    window.addEventListener("project:change", handleDataChange);
+    window.addEventListener("storage", handleProjectChange);
+    
     return () => {
-      window.removeEventListener("project:change", handleChange);
-      window.removeEventListener("storage", handleChange);
+      window.removeEventListener("project:switch", handleProjectChange);
+      window.removeEventListener("project:change", handleDataChange);
+      window.removeEventListener("storage", handleProjectChange);
     };
-  }, []);
+  }, [currentProjectId]);
 
   // Discover characters from @char: tags
   const discoveredCharacters = useMemo(() => {
@@ -614,6 +682,8 @@ export default function Clothesline() {
               </h3>
               <p className="text-xs text-slate-500">
                 {order.length} character{order.length !== 1 ? 's' : ''} · Drag to reorder
+                {/* Debug: show current project */}
+                <span className="ml-2 text-slate-400">(Project: {currentProjectId})</span>
               </p>
             </div>
             {discoveredCharacters.length > 0 && order.length === 0 && (
