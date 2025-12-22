@@ -253,6 +253,7 @@ const AIAnalyzer = ({ onAnalyze, isAnalyzing, currentProjectId }) => {
   const [chapters, setChapters] = useState([]);
   const [selectedChapterId, setSelectedChapterId] = useState("");
   const [isOpen, setIsOpen] = useState(false);
+  const [aiProvider, setAiProvider] = useState("openai"); // "openai" or "anthropic"
   const dropdownRef = useRef(null);
 
   // Load chapters on mount and when project changes
@@ -297,7 +298,7 @@ const AIAnalyzer = ({ onAnalyze, isAnalyzing, currentProjectId }) => {
     if (!selectedChapter) return;
     const plainText = stripHtml(selectedChapter.content || "");
     const characters = extractCharacters(selectedChapter.content || "");
-    onAnalyze(plainText, selectedChapter.title, characters);
+    onAnalyze(plainText, selectedChapter.title, characters, aiProvider);
   };
 
   if (chapters.length === 0) {
@@ -361,6 +362,33 @@ const AIAnalyzer = ({ onAnalyze, isAnalyzing, currentProjectId }) => {
               ))}
             </div>
           )}
+        </div>
+
+        {/* AI Provider Toggle */}
+        <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-xl p-1">
+          <button
+            onClick={() => setAiProvider("openai")}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+              aiProvider === "openai"
+                ? "bg-emerald-500 text-white shadow-sm"
+                : "text-slate-500 hover:bg-slate-50"
+            }`}
+            title="Use OpenAI (GPT-4)"
+          >
+            OpenAI
+          </button>
+          <button
+            onClick={() => setAiProvider("anthropic")}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+              aiProvider === "anthropic"
+                ? "text-white shadow-sm"
+                : "text-slate-500 hover:bg-slate-50"
+            }`}
+            style={aiProvider === "anthropic" ? { background: BRAND.navy } : {}}
+            title="Use Anthropic (Claude)"
+          >
+            Claude
+          </button>
         </div>
 
         {/* Analyze Button */}
@@ -676,7 +704,7 @@ export default function PriorityCards() {
 
   // ============ AI Analysis Functions ============
   
-  const analyzeChapter = useCallback(async (chapterText, chapterTitle, characters) => {
+  const analyzeChapter = useCallback(async (chapterText, chapterTitle, characters, provider = "openai") => {
     setIsAnalyzing(true);
     setAnalysisError(null);
     setSuggestions([]);
@@ -715,7 +743,7 @@ Example format:
 Return 4-8 suggestions total. JSON array only, no other text.`;
 
     try {
-      const result = await runAssistant(prompt, "clarify", "", "anthropic");
+      const result = await runAssistant(prompt, "clarify", "", provider);
       
       const responseText = result?.result || result?.text || result?.output || result || "";
       
@@ -740,7 +768,7 @@ Return 4-8 suggestions total. JSON array only, no other text.`;
       }
     } catch (err) {
       console.error("AI analysis error:", err);
-      setAnalysisError("Failed to analyze chapter. Please try again.");
+      setAnalysisError(`Failed to analyze chapter with ${provider === "anthropic" ? "Claude" : "OpenAI"}. Please try again or switch providers.`);
     } finally {
       setIsAnalyzing(false);
     }
