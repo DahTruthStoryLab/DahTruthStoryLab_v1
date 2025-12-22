@@ -42,6 +42,11 @@ import {
   Upload,
   Check,
   FolderPlus,
+  Users,
+  User,
+  X,
+  Loader2,
+  AlertCircle,
 } from "lucide-react";
 
 import {
@@ -180,6 +185,593 @@ function htmlToPlainText(html = "") {
   tmp.innerHTML = html;
   let text = tmp.textContent || tmp.innerText || "";
   return text.replace(/\r\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+
+/* =========================================================
+   CHARACTER SUGGESTION MODAL (Hybrid: Regex + Optional AI)
+========================================================= */
+function CharacterSuggestionModal({ 
+  isOpen, 
+  onClose, 
+  chapters, 
+  onAddCharacterTags,
+  provider,
+}) {
+  const [suggestions, setSuggestions] = useState([]);
+  const [selectedChars, setSelectedChars] = useState(new Set());
+  const [hasScanned, setHasScanned] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [verifyError, setVerifyError] = useState(null);
+
+  // Common words to exclude (not character names)
+  const EXCLUDED_WORDS = new Set([
+    // Common words that get capitalized
+    "the", "a", "an", "and", "but", "or", "for", "nor", "on", "at", "to", "from",
+    "by", "in", "of", "with", "as", "is", "was", "were", "been", "be", "have",
+    "has", "had", "do", "does", "did", "will", "would", "could", "should", "may",
+    "might", "must", "shall", "can", "need", "dare", "ought", "used", "i", "you",
+    "he", "she", "it", "we", "they", "me", "him", "her", "us", "them", "my", "your",
+    "his", "its", "our", "their", "mine", "yours", "hers", "ours", "theirs",
+    "this", "that", "these", "those", "who", "whom", "which", "what", "whose",
+    "where", "when", "why", "how", "all", "each", "every", "both", "few", "more",
+    "most", "other", "some", "such", "no", "not", "only", "own", "same", "so",
+    "than", "too", "very", "just", "also", "now", "here", "there", "then",
+    // Days & months
+    "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday",
+    "january", "february", "march", "april", "may", "june", "july", "august",
+    "september", "october", "november", "december",
+    // Common titles (will be handled separately)
+    "mr", "mrs", "ms", "miss", "dr", "prof", "sir", "lord", "lady",
+    // Common places/things often capitalized
+    "church", "hospital", "school", "university", "street", "avenue", "road",
+    "building", "house", "room", "office", "god", "lord", "bible", "chapter",
+    // Story-related words
+    "chapter", "part", "book", "story", "page", "said", "asked", "replied",
+    "answered", "whispered", "shouted", "cried", "called", "thought", "knew",
+    "felt", "saw", "heard", "looked", "turned", "walked", "ran", "came", "went",
+    "got", "made", "took", "gave", "found", "told", "let", "put", "seemed",
+    "left", "kept", "began", "started", "tried", "wanted", "needed", "liked",
+  ]);
+
+  // Common place indicators
+  const PLACE_INDICATORS = ["street", "avenue", "road", "drive", "lane", "way", 
+    "boulevard", "court", "place", "park", "city", "town", "county", "state",
+    "building", "tower", "center", "mall", "hospital", "church", "school"];
+
+  // Reset state when modal opens and run initial scan
+  useEffect(() => {
+    if (isOpen && chapters && chapters.length > 0) {
+      setSuggestions([]);
+      setSelectedChars(new Set());
+      setHasScanned(false);
+      setIsVerifying(false);
+      setVerifyError(null);
+      
+      // Run regex scan immediately
+      const results = regexScanForCharacters(chapters);
+      setSuggestions(results);
+      setHasScanned(true);
+      
+      // Auto-select high confidence characters
+      const autoSelected = new Set();
+      results.forEach(c => {
+        if (c.confidence === "high" || c.confidence === "medium") {
+          autoSelected.add(c.name);
+        }
+      });
+      setSelectedChars(autoSelected);
+    }
+  }, [isOpen, chapters]);
+
+  // Regex-based character scanning
+  const regexScanForCharacters = (chapterList) => {
+    const nameStats = new Map(); // name -> { count, inDialogue, chapters, contexts }
+    
+    // Get already tagged characters
+    const existingTags = new Set();
+    const tagPattern = /@char:\s*([A-Za-z][A-Za-z\s.'-]*)/gi;
+    chapterList.forEach(ch => {
+      let match;
+      const content = ch.content || "";
+      while ((match = tagPattern.exec(content)) !== null) {
+        existingTags.add(match[1].trim().toLowerCase());
+      }
+    });
+
+    chapterList.forEach((chapter, chIdx) => {
+      const content = stripHtml(chapter.content || "");
+      const chapterTitle = chapter.title || `Chapter ${chIdx + 1}`;
+      
+      // Pattern 1: Names in dialogue tags
+      // "said Grace", "Grace said", "asked Marcus", "Marcus replied", etc.
+      const dialoguePatterns = [
+        /(?:said|asked|replied|answered|whispered|shouted|called|cried|muttered|murmured|exclaimed|demanded|insisted|suggested|continued|added|agreed|admitted|announced|argued|began|begged|bellowed|blurted|boasted|bragged|breathed|chimed|choked|claimed|coaxed|commanded|commented|complained|conceded|concluded|confessed|confirmed|corrected|countered|croaked|declared|denied|drawled|echoed|encouraged|ended|explained|finished|gasped|giggled|groaned|growled|grumbled|grunted|guessed|gulped|hinted|hissed|huffed|hummed|informed|inquired|instructed|interrupted|interjected|joked|laughed|lectured|lied|mentioned|moaned|mocked|mumbled|mused|nagged|nodded|noted|objected|observed|offered|ordered|panted|persisted|piped|pleaded|pointed|pondered|pouted|praised|prayed|pressed|proclaimed|promised|proposed|protested|provoked|purred|questioned|quipped|quoted|ranted|reasoned|reassured|recalled|recited|refused|reminded|repeated|reported|requested|responded|retorted|revealed|roared|sang|scoffed|scolded|screamed|sighed|smiled|snapped|snarled|sneered|sobbed|spoke|spluttered|squeaked|squealed|stammered|started|stated|stormed|stressed|stuttered|suggested|summarized|taunted|teased|thanked|threatened|thundered|urged|uttered|vowed|wailed|warned|wept|whimpered|whined|wondered|yawned|yelled|yelped)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/gi,
+        /([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s+(?:said|asked|replied|answered|whispered|shouted|called|cried|muttered|murmured|exclaimed|demanded|insisted|suggested|continued|added|agreed|admitted|announced|argued|began|begged|bellowed|blurted|boasted|bragged|breathed|chimed|choked|claimed|coaxed|commanded|commented|complained|conceded|concluded|confessed|confirmed|corrected|countered|croaked|declared|denied|drawled|echoed|encouraged|ended|explained|finished|gasped|giggled|groaned|growled|grumbled|grunted|guessed|gulped|hinted|hissed|huffed|hummed|informed|inquired|instructed|interrupted|interjected|joked|laughed|lectured|lied|mentioned|moaned|mocked|mumbled|mused|nagged|nodded|noted|objected|observed|offered|ordered|panted|persisted|piped|pleaded|pointed|pondered|pouted|praised|prayed|pressed|proclaimed|promised|proposed|protested|provoked|purred|questioned|quipped|quoted|ranted|reasoned|reassured|recalled|recited|refused|reminded|repeated|reported|requested|responded|retorted|revealed|roared|sang|scoffed|scolded|screamed|sighed|smiled|snapped|snarled|sneered|sobbed|spoke|spluttered|squeaked|squealed|stammered|started|stated|stormed|stressed|stuttered|suggested|summarized|taunted|teased|thanked|threatened|thundered|urged|uttered|vowed|wailed|warned|wept|whimpered|whined|wondered|yawned|yelled|yelped)/gi,
+      ];
+
+      dialoguePatterns.forEach(pattern => {
+        let match;
+        while ((match = pattern.exec(content)) !== null) {
+          const name = match[1]?.trim();
+          if (name && name.length > 1) {
+            const key = name.toLowerCase();
+            if (!EXCLUDED_WORDS.has(key) && !existingTags.has(key)) {
+              if (!nameStats.has(name)) {
+                nameStats.set(name, { count: 0, inDialogue: 0, chapters: new Set(), contexts: [] });
+              }
+              const stats = nameStats.get(name);
+              stats.count++;
+              stats.inDialogue++;
+              stats.chapters.add(chapterTitle);
+              if (stats.contexts.length < 3) {
+                stats.contexts.push("dialogue");
+              }
+            }
+          }
+        }
+      });
+
+      // Pattern 2: Names with titles (Mr. Smith, Mrs. Johnson, Dr. Carter)
+      const titlePattern = /(?:Mr\.|Mrs\.|Ms\.|Miss|Dr\.|Pastor|Father|Mother|Sister|Brother|Uncle|Aunt|Grandma|Grandpa|Coach|Officer|Detective|Agent|Captain|Professor|Prof\.)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/gi;
+      let match;
+      while ((match = titlePattern.exec(content)) !== null) {
+        const fullMatch = match[0].trim();
+        const name = fullMatch;
+        const key = name.toLowerCase();
+        if (!existingTags.has(key)) {
+          if (!nameStats.has(name)) {
+            nameStats.set(name, { count: 0, inDialogue: 0, chapters: new Set(), contexts: [] });
+          }
+          const stats = nameStats.get(name);
+          stats.count++;
+          stats.chapters.add(chapterTitle);
+          if (stats.contexts.length < 3) {
+            stats.contexts.push("titled");
+          }
+        }
+      }
+
+      // Pattern 3: Proper nouns (capitalized words not at sentence start)
+      // Look for "Word" that appears after lowercase text
+      const properNounPattern = /[a-z,;:]\s+([A-Z][a-z]{2,}(?:\s+[A-Z][a-z]+)?)/g;
+      while ((match = properNounPattern.exec(content)) !== null) {
+        const name = match[1]?.trim();
+        if (name && name.length > 2) {
+          const key = name.toLowerCase();
+          const firstWord = key.split(/\s+/)[0];
+          
+          // Skip if it's an excluded word or place indicator
+          if (EXCLUDED_WORDS.has(firstWord)) continue;
+          if (existingTags.has(key)) continue;
+          
+          // Skip if it looks like a place
+          const isPlace = PLACE_INDICATORS.some(p => key.includes(p));
+          if (isPlace) continue;
+          
+          if (!nameStats.has(name)) {
+            nameStats.set(name, { count: 0, inDialogue: 0, chapters: new Set(), contexts: [] });
+          }
+          const stats = nameStats.get(name);
+          stats.count++;
+          stats.chapters.add(chapterTitle);
+        }
+      }
+
+      // Pattern 4: Action patterns (Name + verb)
+      const actionPattern = /([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s+(?:walked|ran|looked|turned|smiled|frowned|nodded|shook|stood|sat|leaned|reached|grabbed|pulled|pushed|opened|closed|picked|put|took|gave|held|felt|watched|stared|glanced|gazed|noticed|saw|heard|listened|moved|stepped|entered|left|arrived|returned|approached|followed|led|stopped|started|continued|began|tried|wanted|needed|decided|thought|knew|remembered|forgot|realized|understood|believed|hoped|wished|feared|loved|hated|liked)/gi;
+      while ((match = actionPattern.exec(content)) !== null) {
+        const name = match[1]?.trim();
+        if (name && name.length > 1) {
+          const key = name.toLowerCase();
+          if (!EXCLUDED_WORDS.has(key) && !existingTags.has(key)) {
+            if (!nameStats.has(name)) {
+              nameStats.set(name, { count: 0, inDialogue: 0, chapters: new Set(), contexts: [] });
+            }
+            const stats = nameStats.get(name);
+            stats.count++;
+            stats.chapters.add(chapterTitle);
+            if (stats.contexts.length < 3) {
+              stats.contexts.push("action");
+            }
+          }
+        }
+      }
+    });
+
+    // Convert to array and calculate confidence
+    const results = [];
+    nameStats.forEach((stats, name) => {
+      // Skip single-word names that appear only once
+      if (stats.count < 2 && !name.includes(" ") && stats.inDialogue === 0) return;
+      
+      // Calculate confidence
+      let confidence = "low";
+      if (stats.inDialogue >= 2 || (stats.count >= 5 && stats.chapters.size >= 2)) {
+        confidence = "high";
+      } else if (stats.inDialogue >= 1 || stats.count >= 3 || name.includes(" ")) {
+        confidence = "medium";
+      }
+      
+      results.push({
+        name,
+        count: stats.count,
+        inDialogue: stats.inDialogue,
+        chapters: Array.from(stats.chapters),
+        confidence,
+        verified: false,
+        role: null, // Will be set by AI if verified
+      });
+    });
+
+    // Sort: high confidence first, then by count
+    results.sort((a, b) => {
+      const confOrder = { high: 0, medium: 1, low: 2 };
+      if (confOrder[a.confidence] !== confOrder[b.confidence]) {
+        return confOrder[a.confidence] - confOrder[b.confidence];
+      }
+      return b.count - a.count;
+    });
+
+    return results;
+  };
+
+  // AI verification (optional)
+  const verifyWithAI = async () => {
+    if (suggestions.length === 0) return;
+    
+    setIsVerifying(true);
+    setVerifyError(null);
+
+    try {
+      const candidateList = suggestions.map(s => `${s.name} (${s.count} mentions)`).join("\n");
+      
+      const prompt = `I found these potential character names in a manuscript. For each one, tell me:
+1. Is this likely a CHARACTER (person in the story) or NOT (place, thing, or false positive)?
+2. If it's a character, classify as: "major" (central to story), "minor" (supporting), or "mentioned" (referenced only)
+
+Candidates:
+${candidateList}
+
+Respond with ONLY a JSON array:
+[
+  {"name": "Grace Thompson", "isCharacter": true, "role": "major"},
+  {"name": "Downtown", "isCharacter": false, "role": null},
+  {"name": "Pastor Davis", "isCharacter": true, "role": "minor"}
+]
+
+Return ONLY the JSON array, no other text.`;
+
+      const result = await rateLimiter.addToQueue(() =>
+        runAssistant(prompt, "clarify", "", provider)
+      );
+
+      const responseText = result?.result || result?.text || result?.output || result || "";
+
+      let parsed = [];
+      try {
+        const jsonMatch = responseText.match(/\[[\s\S]*\]/);
+        if (jsonMatch) {
+          parsed = JSON.parse(jsonMatch[0]);
+        }
+      } catch (e) {
+        console.error("Failed to parse AI verification:", e);
+        setVerifyError("Couldn't parse AI response. Your selections are still valid.");
+        return;
+      }
+
+      if (Array.isArray(parsed)) {
+        // Update suggestions with AI verification
+        const verificationMap = new Map();
+        parsed.forEach(v => {
+          if (v.name) {
+            verificationMap.set(v.name.toLowerCase(), v);
+          }
+        });
+
+        const updatedSuggestions = suggestions.map(s => {
+          const verification = verificationMap.get(s.name.toLowerCase());
+          if (verification) {
+            return {
+              ...s,
+              verified: true,
+              isCharacter: verification.isCharacter !== false,
+              role: verification.role || null,
+              confidence: verification.isCharacter === false ? "rejected" : 
+                         verification.role === "major" ? "high" : 
+                         verification.role === "minor" ? "medium" : s.confidence,
+            };
+          }
+          return { ...s, verified: true };
+        });
+
+        // Filter out rejected ones and re-sort
+        const filtered = updatedSuggestions.filter(s => s.isCharacter !== false);
+        filtered.sort((a, b) => {
+          const confOrder = { high: 0, medium: 1, low: 2 };
+          if (confOrder[a.confidence] !== confOrder[b.confidence]) {
+            return confOrder[a.confidence] - confOrder[b.confidence];
+          }
+          return b.count - a.count;
+        });
+
+        setSuggestions(filtered);
+
+        // Update selections - select verified major/minor
+        const newSelected = new Set();
+        filtered.forEach(s => {
+          if (s.role === "major" || s.role === "minor" || s.confidence === "high") {
+            newSelected.add(s.name);
+          }
+        });
+        setSelectedChars(newSelected);
+      }
+    } catch (err) {
+      console.error("AI verification failed:", err);
+      setVerifyError("AI verification failed. Your selections are still valid.");
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
+  const toggleCharacter = (name) => {
+    setSelectedChars(prev => {
+      const next = new Set(prev);
+      if (next.has(name)) {
+        next.delete(name);
+      } else {
+        next.add(name);
+      }
+      return next;
+    });
+  };
+
+  const selectAll = () => {
+    setSelectedChars(new Set(suggestions.map(s => s.name)));
+  };
+
+  const selectNone = () => {
+    setSelectedChars(new Set());
+  };
+
+  const handleAddTags = () => {
+    if (selectedChars.size === 0) {
+      onClose();
+      return;
+    }
+    onAddCharacterTags(Array.from(selectedChars));
+    onClose();
+  };
+
+  const getConfidenceColor = (confidence) => {
+    switch (confidence) {
+      case "high": return { bg: `${BRAND.gold}20`, color: BRAND.gold, label: "High confidence" };
+      case "medium": return { bg: `${BRAND.mauve}20`, color: BRAND.mauve, label: "Medium" };
+      default: return { bg: "#f1f5f9", color: "#94a3b8", label: "Low" };
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return createPortal(
+    <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/50">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[80vh] flex flex-col overflow-hidden">
+        {/* Header */}
+        <div 
+          className="px-6 py-4 flex items-center justify-between flex-shrink-0"
+          style={{ 
+            background: `linear-gradient(135deg, ${BRAND.navy}08 0%, ${BRAND.gold}08 100%)`,
+            borderBottom: `1px solid ${BRAND.navy}10`,
+          }}
+        >
+          <div className="flex items-center gap-3">
+            <div 
+              className="w-10 h-10 rounded-xl flex items-center justify-center"
+              style={{ background: `${BRAND.gold}20` }}
+            >
+              <Users size={20} style={{ color: BRAND.gold }} />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold" style={{ color: BRAND.navy }}>
+                Discover Characters
+              </h2>
+              <p className="text-xs text-slate-500">
+                {hasScanned ? `Found ${suggestions.length} potential character${suggestions.length !== 1 ? 's' : ''}` : "Scanning..."}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-2 rounded-lg hover:bg-slate-100 transition-colors"
+          >
+            <X size={20} className="text-slate-400" />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-6">
+          {!hasScanned && (
+            <div className="text-center py-12">
+              <Loader2 size={32} className="animate-spin mx-auto mb-4" style={{ color: BRAND.gold }} />
+              <p className="text-slate-600">Scanning manuscript...</p>
+            </div>
+          )}
+
+          {verifyError && (
+            <div className="flex items-center gap-3 p-4 bg-amber-50 rounded-xl text-amber-700 mb-4">
+              <AlertCircle size={20} />
+              <span className="text-sm">{verifyError}</span>
+            </div>
+          )}
+
+          {hasScanned && suggestions.length === 0 && (
+            <div className="text-center py-8">
+              <div 
+                className="w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center"
+                style={{ background: "#f1f5f9" }}
+              >
+                <User size={32} className="text-slate-400" />
+              </div>
+              <h3 className="font-semibold mb-2" style={{ color: BRAND.navy }}>
+                No New Characters Found
+              </h3>
+              <p className="text-sm text-slate-500 max-w-sm mx-auto">
+                Either all characters are already tagged with @char:, or no character names were detected.
+              </p>
+            </div>
+          )}
+
+          {suggestions.length > 0 && (
+            <>
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h3 className="font-semibold" style={{ color: BRAND.navy }}>
+                    {suggestions.length} Potential Character{suggestions.length !== 1 ? 's' : ''}
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    {selectedChars.size} selected • Confidence based on dialogue tags & frequency
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={selectAll}
+                    className="text-xs px-2 py-1 rounded hover:bg-slate-100"
+                    style={{ color: BRAND.navy }}
+                  >
+                    All
+                  </button>
+                  <span className="text-slate-300">|</span>
+                  <button
+                    onClick={selectNone}
+                    className="text-xs px-2 py-1 rounded hover:bg-slate-100"
+                    style={{ color: BRAND.navy }}
+                  >
+                    None
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                {suggestions.map((char) => {
+                  const conf = getConfidenceColor(char.confidence);
+                  return (
+                    <label
+                      key={char.name}
+                      className="flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all"
+                      style={{
+                        background: selectedChars.has(char.name) ? `${BRAND.gold}10` : "white",
+                        border: `1px solid ${selectedChars.has(char.name) ? BRAND.gold : "#e2e8f0"}`,
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selectedChars.has(char.name)}
+                        onChange={() => toggleCharacter(char.name)}
+                        className="w-4 h-4 rounded"
+                        style={{ accentColor: BRAND.gold }}
+                      />
+                      <div 
+                        className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                        style={{ background: conf.bg }}
+                      >
+                        <User size={16} style={{ color: conf.color }} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-sm truncate" style={{ color: BRAND.navy }}>
+                          {char.name}
+                        </div>
+                        <div className="text-xs text-slate-500 flex items-center gap-2 flex-wrap">
+                          <span>{char.count} mention{char.count !== 1 ? 's' : ''}</span>
+                          {char.inDialogue > 0 && (
+                            <span className="text-emerald-600">• {char.inDialogue} in dialogue</span>
+                          )}
+                          {char.role && (
+                            <span 
+                              className="px-1.5 py-0.5 rounded text-[10px] font-medium"
+                              style={{ background: conf.bg, color: conf.color }}
+                            >
+                              {char.role}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <div 
+                        className="text-[10px] px-2 py-1 rounded-full flex-shrink-0"
+                        style={{ background: conf.bg, color: conf.color }}
+                      >
+                        {char.verified ? (char.role || conf.label) : conf.label}
+                      </div>
+                      {selectedChars.has(char.name) && (
+                        <Check size={16} style={{ color: BRAND.gold }} />
+                      )}
+                    </label>
+                  );
+                })}
+              </div>
+
+              {/* AI Verify Button */}
+              {!suggestions.some(s => s.verified) && (
+                <div className="mt-4 pt-4 border-t border-slate-100">
+                  <button
+                    onClick={verifyWithAI}
+                    disabled={isVerifying}
+                    className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all disabled:opacity-50"
+                    style={{ 
+                      background: `${BRAND.mauve}15`,
+                      color: BRAND.navy,
+                      border: `1px solid ${BRAND.mauve}30`,
+                    }}
+                  >
+                    {isVerifying ? (
+                      <>
+                        <Loader2 size={16} className="animate-spin" />
+                        Verifying with AI...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles size={16} />
+                        Verify with AI (Optional)
+                      </>
+                    )}
+                  </button>
+                  <p className="text-[11px] text-slate-400 text-center mt-2">
+                    AI will confirm which names are characters and classify their roles
+                  </p>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div 
+          className="px-6 py-4 flex items-center justify-between flex-shrink-0"
+          style={{ borderTop: `1px solid ${BRAND.navy}10` }}
+        >
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm text-slate-600 hover:text-slate-800"
+          >
+            Skip
+          </button>
+          
+          {suggestions.length > 0 && (
+            <button
+              onClick={handleAddTags}
+              disabled={selectedChars.size === 0}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
+              style={{ 
+                background: `linear-gradient(135deg, ${BRAND.gold}, #B8960C)`,
+              }}
+            >
+              <Check size={16} />
+              Add @char: Tags ({selectedChars.size})
+            </button>
+          )}
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
 }
 
 /* =========================================================
@@ -589,7 +1181,7 @@ export default function ComposePage() {
   }, [chapters, selectedId]);
 
   const [aiBusy, setAiBusy] = useState(false);
-  const [provider, setProvider] = useState("openai");
+  const [provider, setProvider] = useState("anthropic");
   const [instructions, setInstructions] = useState("");
 
   const [showAssistant, setShowAssistant] = useState(false);
@@ -619,6 +1211,9 @@ export default function ComposePage() {
   // Import modal state
   const [showImportModal, setShowImportModal] = useState(false);
   const [pendingImportFile, setPendingImportFile] = useState(null);
+
+  // Character suggestion modal state
+  const [showCharacterSuggestion, setShowCharacterSuggestion] = useState(false);
 
   const hasChapter = !!selectedId && !!selectedChapter;
   const hasAnyChapters = Array.isArray(chapters) && chapters.length > 0;
@@ -652,6 +1247,20 @@ export default function ComposePage() {
       if (activeAiTab) localStorage.setItem("dt_activeAiTab", activeAiTab);
     } catch {}
   }, [activeAiTab]);
+
+  // Check for pending character scan after reload
+  useEffect(() => {
+    const pending = localStorage.getItem("dt_pending_character_scan");
+    if (pending === "true" && chapters.length > 0) {
+      localStorage.removeItem("dt_pending_character_scan");
+      // Delay slightly to let UI settle
+      setTimeout(() => {
+        if (window.confirm("Would you like AI to scan for character names in your imported manuscript?")) {
+          setShowCharacterSuggestion(true);
+        }
+      }, 500);
+    }
+  }, [chapters]);
 
   const clearSelection = () => setSelectedIds(new Set());
 
@@ -974,6 +1583,53 @@ export default function ComposePage() {
     return parsed;
   };
 
+  // Add @char: tags to chapters for selected characters
+  const handleAddCharacterTags = (characterNames) => {
+    if (!characterNames || characterNames.length === 0) return;
+
+    // For each chapter, find first occurrence of each character name and add @char: tag
+    const updatedChapters = [];
+    const taggedNames = new Set(); // Track which names have been tagged
+
+    chapters.forEach((chapter, idx) => {
+      let content = chapter.content || "";
+      let modified = false;
+      
+      characterNames.forEach(name => {
+        // Only tag once per character across all chapters
+        if (taggedNames.has(name.toLowerCase())) return;
+        
+        // Look for the name in this chapter (case insensitive, whole word)
+        const nameRegex = new RegExp(`\\b(${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})\\b`, 'i');
+        const match = content.match(nameRegex);
+        
+        if (match) {
+          // Replace first occurrence with @char: tagged version
+          content = content.replace(nameRegex, `@char: ${match[1]}`);
+          taggedNames.add(name.toLowerCase());
+          modified = true;
+        }
+      });
+
+      if (modified) {
+        updatedChapters.push({ id: chapter.id, content });
+      }
+    });
+
+    // Update all modified chapters
+    updatedChapters.forEach(({ id, content }) => {
+      updateChapter(id, { content, preview: generatePreview(content, 20) });
+    });
+
+    // Update current editor if it was modified
+    const currentUpdate = updatedChapters.find(u => u.id === selectedId);
+    if (currentUpdate) {
+      setHtml(currentUpdate.content);
+    }
+
+    alert(`✅ Added @char: tags for ${taggedNames.size} character(s).`);
+  };
+
   // Import into CURRENT project (append chapters)
   const handleImportIntoCurrent = async (file) => {
     if (!file) return;
@@ -1026,6 +1682,11 @@ export default function ComposePage() {
         });
 
         alert(`✅ Imported ${parsed.chapters.length} chapter(s) into current project.`);
+        
+        // Offer to scan for characters
+        if (window.confirm("Would you like AI to scan for character names in the imported chapters?")) {
+          setShowCharacterSuggestion(true);
+        }
       }
 
       saveProject({ book: { ...book, title: parsed.title || bookTitle } });
@@ -1070,6 +1731,9 @@ export default function ComposePage() {
       });
 
       setBookTitle(parsed.title);
+
+      // Store flag for character scan after reload
+      localStorage.setItem("dt_pending_character_scan", "true");
 
       alert(`✅ Created new project "${parsed.title}" with ${parsed.chapters.length} chapter(s).`);
 
@@ -1155,6 +1819,15 @@ export default function ComposePage() {
     if (ids.includes(selectedId)) {
       setTimeout(() => setView("grid"), 100);
     }
+  };
+
+  // Manual character scan
+  const handleScanForCharacters = () => {
+    if (!hasAnyChapters) {
+      alert("Import a manuscript first to scan for characters.");
+      return;
+    }
+    setShowCharacterSuggestion(true);
   };
 
   const goBack = () => navigate("/dashboard");
@@ -1312,6 +1985,15 @@ export default function ComposePage() {
         fileName={pendingImportFile?.name || ""}
       />
 
+      {/* Character Suggestion Modal */}
+      <CharacterSuggestionModal
+        isOpen={showCharacterSuggestion}
+        onClose={() => setShowCharacterSuggestion(false)}
+        chapters={chapters}
+        onAddCharacterTags={handleAddCharacterTags}
+        provider={provider}
+      />
+
       {/* ═══════════════════════════════════════════════════════════════
           BANNER
       ═══════════════════════════════════════════════════════════════ */}
@@ -1432,6 +2114,13 @@ export default function ComposePage() {
               icon={Upload}
               label="Import into Current Project"
               onClick={triggerImport}
+            />
+            <DropdownDivider />
+            <DropdownItem
+              icon={Users}
+              label="Scan for Characters"
+              onClick={handleScanForCharacters}
+              disabled={!hasAnyChapters}
             />
             <DropdownDivider />
             <DropdownItem
@@ -1721,14 +2410,23 @@ export default function ComposePage() {
                   </div>
 
                   {characterCount === 0 ? (
-                    <p className="text-[11px] text-slate-500 leading-snug">
-                      No characters tagged yet.
-                      <br />
-                      Introduce a character as{" "}
-                      <span className="font-mono text-[11px] bg-slate-100 px-1 py-0.5 rounded">
-                        @char: John Smith
-                      </span>
-                    </p>
+                    <div>
+                      <p className="text-[11px] text-slate-500 leading-snug mb-2">
+                        No characters tagged yet.
+                        <br />
+                        Introduce a character as{" "}
+                        <span className="font-mono text-[11px] bg-slate-100 px-1 py-0.5 rounded">
+                          @char: John Smith
+                        </span>
+                      </p>
+                      <button
+                        onClick={handleScanForCharacters}
+                        disabled={!hasAnyChapters}
+                        className="text-[11px] px-2 py-1 rounded border bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100 disabled:opacity-50"
+                      >
+                        ✨ Scan for Characters
+                      </button>
+                    </div>
                   ) : (
                     <ul className="space-y-1 max-h-40 overflow-auto text-xs">
                       {characters.map((name) => (
