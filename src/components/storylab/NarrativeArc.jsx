@@ -1,26 +1,111 @@
-import React, { useMemo, useState, useEffect, useRef } from "react";
-import { Heart, Users, Plane, Sparkles, BookOpen, MapPin } from "lucide-react";
+// src/components/storylab/NarrativeArc.jsx
+// UPDATED: Project-aware storage + manuscript integration for multi-project support
 
-/* Icon registry (string key -> component) */
-const ICONS = { Heart, Users, Plane, Sparkles, BookOpen, MapPin };
+import React, { useMemo, useState, useEffect, useRef, useCallback } from "react";
+import { Link } from "react-router-dom";
+import { 
+  Heart, Users, Plane, Sparkles, BookOpen, MapPin, 
+  ArrowLeft, Plus, Trash2, Save, Upload, Download,
+  User, Star, Shield, Zap, Target, Clock, AlertCircle,
+  RefreshCw, ChevronDown, Check, X
+} from "lucide-react";
 
-/* =========================
-   Brand color class mapping
-   ========================= */
-const COLOR_CLASSES = {
-  primary: "bg-brand-navy border-brand-navy text-white",
-  accent:  "bg-brand-rose border-brand-rose text-ink",
-  gold:    "bg-brand-gold border-brand-gold text-ink",
-  muted:   "bg-brand-mauve border-brand-mauve text-white",
-  ink:     "bg-brand-ink border-brand-ink text-white",
+/* ============================================
+   Brand Colors
+   ============================================ */
+const BRAND = {
+  navy: "#1e3a5f",
+  gold: "#d4af37",
+  mauve: "#b8a9c9",
+  rose: "#e8b4b8",
+  ink: "#0F172A",
+  navyLight: "#2d4a6f",
 };
 
-/* =========================
-   LocalStorage + helpers
-   ========================= */
-const LS_BEATS_KEY = "dt_arc_beats_v1";
-const LS_CHARS_KEY = "dt_arc_chars_v1";
+/* ============================================
+   Icon registry (string key -> component)
+   ============================================ */
+const ICONS = { 
+  Heart, Users, Plane, Sparkles, BookOpen, MapPin,
+  Star, Shield, Zap, Target, Clock, AlertCircle, User
+};
 
+const ICON_OPTIONS = [
+  { key: "Heart", label: "Heart", icon: Heart },
+  { key: "Star", label: "Star", icon: Star },
+  { key: "Target", label: "Target", icon: Target },
+  { key: "Users", label: "Users", icon: Users },
+  { key: "Shield", label: "Shield", icon: Shield },
+  { key: "Zap", label: "Lightning", icon: Zap },
+  { key: "Sparkles", label: "Sparkles", icon: Sparkles },
+  { key: "BookOpen", label: "Book", icon: BookOpen },
+  { key: "Plane", label: "Plane", icon: Plane },
+  { key: "MapPin", label: "Location", icon: MapPin },
+  { key: "Clock", label: "Clock", icon: Clock },
+  { key: "AlertCircle", label: "Alert", icon: AlertCircle },
+];
+
+/* ============================================
+   Color Classes
+   ============================================ */
+const COLOR_CLASSES = {
+  primary: { bg: "bg-[#1e3a5f]", border: "border-[#1e3a5f]", text: "text-white" },
+  accent:  { bg: "bg-[#e8b4b8]", border: "border-[#e8b4b8]", text: "text-[#0F172A]" },
+  gold:    { bg: "bg-[#d4af37]", border: "border-[#d4af37]", text: "text-[#0F172A]" },
+  muted:   { bg: "bg-[#b8a9c9]", border: "border-[#b8a9c9]", text: "text-white" },
+  ink:     { bg: "bg-[#0F172A]", border: "border-[#0F172A]", text: "text-white" },
+};
+
+const COLOR_OPTIONS = [
+  { key: "primary", label: "Navy", sample: BRAND.navy },
+  { key: "gold", label: "Gold", sample: BRAND.gold },
+  { key: "accent", label: "Rose", sample: BRAND.rose },
+  { key: "muted", label: "Mauve", sample: BRAND.mauve },
+  { key: "ink", label: "Ink", sample: BRAND.ink },
+];
+
+/* ============================================
+   PROJECT-AWARE STORAGE UTILITIES
+   ============================================ */
+
+const STORYLAB_KEY_BASE = "dahtruth-story-lab-toc-v3";
+const ARC_BEATS_KEY_BASE = "dt_arc_beats_v2";
+const ARC_CHARS_KEY_BASE = "dt_arc_chars_v2";
+
+/**
+ * Get the currently selected project ID from localStorage
+ */
+function getSelectedProjectId() {
+  try {
+    const stored = localStorage.getItem('dahtruth-selected-project-id');
+    if (stored) return stored;
+    
+    const projectData = localStorage.getItem('dahtruth-project-store');
+    if (projectData) {
+      const parsed = JSON.parse(projectData);
+      return parsed.selectedProjectId || parsed.currentProjectId || 'default';
+    }
+    
+    return 'default';
+  } catch {
+    return 'default';
+  }
+}
+
+/**
+ * Get project-specific storage key
+ */
+function getProjectKey(baseKey) {
+  const projectId = getSelectedProjectId();
+  if (projectId === 'default') {
+    return baseKey;
+  }
+  return `${baseKey}-${projectId}`;
+}
+
+/* ============================================
+   Storage Helpers
+   ============================================ */
 const loadLocal = (key, fallback) => {
   try {
     const raw = localStorage.getItem(key);
@@ -29,17 +114,85 @@ const loadLocal = (key, fallback) => {
     return fallback;
   }
 };
+
 const saveLocal = (key, value) => {
   try {
     localStorage.setItem(key, JSON.stringify(value));
+    window.dispatchEvent(new Event("project:change"));
   } catch {}
 };
 
-/* small helpers */
+/* ============================================
+   Load StoryLab Data (chapters, book info)
+   ============================================ */
+function loadStoryLabData() {
+  try {
+    const key = getProjectKey(STORYLAB_KEY_BASE);
+    const raw = localStorage.getItem(key);
+    if (raw) {
+      return JSON.parse(raw);
+    }
+  } catch (err) {
+    console.error("[NarrativeArc] Failed to load StoryLab data:", err);
+  }
+  return null;
+}
+
+/**
+ * Extract characters from chapter content (@char: tags)
+ */
+function extractCharactersFromChapters(chapters = []) {
+  const charSet = new Set();
+  const charPattern = /@char:\s*([A-Za-z][A-Za-z\s.'-]*)/gi;
+
+  chapters.forEach((ch) => {
+    const content = ch.content || ch.text || ch.textHTML || "";
+    let match;
+    while ((match = charPattern.exec(content)) !== null) {
+      const name = match[1].trim();
+      if (name) charSet.add(name);
+    }
+  });
+
+  return Array.from(charSet).sort();
+}
+
+/**
+ * Generate initials from a name
+ */
+function getInitials(name) {
+  return name
+    .split(/\s+/)
+    .map(word => word[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
+}
+
+/**
+ * Generate a color class based on index
+ */
+function getCharacterColor(index) {
+  const colors = ["bg-[#1e3a5f]", "bg-[#d4af37] text-[#0F172A]", "bg-[#b8a9c9]", "bg-[#e8b4b8] text-[#0F172A]", "bg-[#0F172A]"];
+  return colors[index % colors.length];
+}
+
+/* ============================================
+   Small Helpers
+   ============================================ */
 const snap = (val, step = 5, min = 0, max = 100) =>
   Math.max(min, Math.min(max, Math.round(val / step) * step));
 
 const countWords = (s = "") => s.trim().split(/\s+/).filter(Boolean).length;
+
+const uid = () => {
+  try {
+    if (typeof window !== "undefined" && window.crypto?.randomUUID) {
+      return window.crypto.randomUUID();
+    }
+  } catch {}
+  return String(Date.now()) + "_" + Math.random().toString(36).slice(2);
+};
 
 const useDebouncedCallback = (fn, delay = 250) => {
   const tRef = useRef(null);
@@ -49,74 +202,163 @@ const useDebouncedCallback = (fn, delay = 250) => {
   };
 };
 
-/* migrate beats to use iconKey (never store functions) */
+/* Migrate beats to use iconKey (never store functions) */
 function reviveBeats(beats) {
   return (beats || []).map((b) => {
-    const iconKey = b.iconKey || b.icon?.name || "Heart"; // fall back to Heart
-    const { icon, ...rest } = b; // drop any function refs
-    return { ...rest, iconKey };
+    const iconKey = b.iconKey || b.icon?.name || "Heart";
+    const { icon, ...rest } = b;
+    return { ...rest, iconKey, id: b.id || uid() };
   });
 }
 
-/* =========================
-   Defaults
-   ========================= */
+/* ============================================
+   Default Story Beats (empty for new projects)
+   ============================================ */
 const DEFAULT_BEATS = [
-  { id: 1, title: "Preston Meets Darla",        iconKey: "Heart",    position:{ x:10, y:70 }, content:"The moment their paths cross for the first time. Describe the circumstances, the setting, and the immediate connection or tension between them.", color:"primary", size:"large" },
-  { id: 2, title: "Meeting Darla's Parents",    iconKey: "Users",    position:{ x:25, y:45 }, content:"Preston enters Darla's family world. Capture the dynamics, expectations, and how this shapes their relationship.",                                                              color:"accent",  size:"medium" },
-  { id: 3, title: "First Separation",           iconKey: "MapPin",   position:{ x:40, y:60 }, content:"Preston and Darla part ways. What forces them apart? What emotions surface? What remains unresolved?",                                                                               color:"muted",   size:"small" },
-  { id: 4, title: "Mediterranean Consummation", iconKey: "Plane",    position:{ x:55, y:25 }, content:"Their relationship reaches its peak in the Mediterranean. Describe the passion, intimacy, and significance of this moment.",                                                         color:"gold",    size:"xlarge" },
-  { id: 5, title: "Second Separation",          iconKey: "BookOpen", position:{ x:70, y:55 }, content:"Another parting, perhaps more painful than the first. What has changed? What do they each carry forward?",                                                                          color:"muted",   size:"small" },
-  { id: 6, title: "Darla's Death",              iconKey: "Sparkles", position:{ x:85, y:75 }, content:"The final chapter. How does Darla's death occur? What is Preston's emotional journey? How does this transform him?",                                                                 color:"ink",     size:"large" },
+  { id: uid(), title: "Opening Hook", iconKey: "Star", position: { x: 10, y: 70 }, content: "The inciting incident that draws readers in. What disrupts the protagonist's ordinary world?", color: "primary", size: "large", phase: "beginning" },
+  { id: uid(), title: "Rising Action", iconKey: "Target", position: { x: 30, y: 50 }, content: "The protagonist pursues their goal. What obstacles emerge? How do stakes escalate?", color: "gold", size: "medium", phase: "rising" },
+  { id: uid(), title: "Midpoint", iconKey: "Zap", position: { x: 50, y: 25 }, content: "A major revelation or turning point. Everything changes here.", color: "accent", size: "xlarge", phase: "midpoint" },
+  { id: uid(), title: "Crisis", iconKey: "AlertCircle", position: { x: 70, y: 50 }, content: "The darkest moment. All seems lost. What forces the protagonist to their limit?", color: "muted", size: "medium", phase: "falling" },
+  { id: uid(), title: "Climax", iconKey: "Shield", position: { x: 85, y: 30 }, content: "The final confrontation. How does the protagonist face their greatest challenge?", color: "ink", size: "large", phase: "climax" },
+  { id: uid(), title: "Resolution", iconKey: "Heart", position: { x: 95, y: 70 }, content: "The new normal. How has the protagonist been transformed?", color: "primary", size: "medium", phase: "resolution" },
 ];
 
-const DEFAULT_CHARACTERS = [
-  { id: 1,  name: "Darla Baxter",     initials: "DB", role: "Protagonist",     bg: "bg-brand-rose" },
-  { id: 2,  name: "Preston Stanley",  initials: "PS", role: "Airman",          bg: "bg-brand-navy" },
-  { id: 3,  name: "Macy Baxter",      initials: "MB", role: "Mother",          bg: "bg-brand-mauve" },
-  { id: 4,  name: "Roosevelt Baxter", initials: "RB", role: "Father",          bg: "bg-brand-ink" },
-  { id: 5,  name: "Jonathan",         initials: "J",  role: "Brother",         bg: "bg-brand-gold text-ink" },
-  { id: 6,  name: "Michael",          initials: "M",  role: "Brother",         bg: "bg-brand-gold text-ink" },
-  { id: 7,  name: "Theresa",          initials: "T",  role: "Sister",          bg: "bg-brand-rose" },
-  { id: 8,  name: "Rebecca",          initials: "R",  role: "Jonathan’s wife", bg: "bg-brand-mauve" },
-  { id: 9,  name: "Latoya",           initials: "L",  role: "Michael’s wife",  bg: "bg-brand-mauve" },
-  { id: 10, name: "DeShaun",          initials: "DS", role: "Relative",        bg: "bg-brand-navy" },
-  { id: 11, name: "Pauly",            initials: "P",  role: "Relative",        bg: "bg-brand-navy" },
-  { id: 12, name: "Rev. Wiley",       initials: "RW", role: "Pastor",          bg: "bg-brand-ink" },
-  { id: 13, name: "Nina Knox",        initials: "NK", role: "Grandmother",     bg: "bg-brand-gold text-ink" },
-  { id: 14, name: "Sam Knox",         initials: "SK", role: "Grandfather",     bg: "bg-brand-gold text-ink" },
-  { id: 15, name: "Cordelia King",    initials: "CK", role: "Friend",          bg: "bg-brand-rose" },
-  { id: 16, name: "Jersey",           initials: "JY", role: "Friend",          bg: "bg-brand-ink" },
-];
+/* ============================================
+   Load Functions (Project-Aware)
+   ============================================ */
+function loadBeats() {
+  const key = getProjectKey(ARC_BEATS_KEY_BASE);
+  const saved = loadLocal(key, null);
+  if (saved && saved.length > 0) {
+    return reviveBeats(saved);
+  }
+  // Return default beats for new projects
+  return DEFAULT_BEATS.map(b => ({ ...b, id: uid() }));
+}
 
-/* =========================
+function loadCharacters() {
+  const key = getProjectKey(ARC_CHARS_KEY_BASE);
+  return loadLocal(key, []);
+}
+
+function saveBeats(beats) {
+  const key = getProjectKey(ARC_BEATS_KEY_BASE);
+  saveLocal(key, beats);
+}
+
+function saveCharacters(chars) {
+  const key = getProjectKey(ARC_CHARS_KEY_BASE);
+  saveLocal(key, chars);
+}
+
+/* ============================================
    Component
-   ========================= */
+   ============================================ */
 export default function NarrativeArc() {
+  // Project tracking
+  const [currentProjectId, setCurrentProjectId] = useState(getSelectedProjectId);
+  
+  // Story data
+  const [storyLabData, setStoryLabData] = useState(() => loadStoryLabData());
   const [activeNode, setActiveNode] = useState(null);
-  const [storyBeats, setStoryBeats] = useState(() =>
-    reviveBeats(loadLocal(LS_BEATS_KEY, DEFAULT_BEATS))
-  );
-  const [characters, setCharacters] = useState(() =>
-    loadLocal(LS_CHARS_KEY, DEFAULT_CHARACTERS)
-  );
+  const [storyBeats, setStoryBeats] = useState(() => loadBeats());
+  const [characters, setCharacters] = useState(() => loadCharacters());
   const [dragIndex, setDragIndex] = useState(null);
+  const [editingBeat, setEditingBeat] = useState(null);
 
-  // persist to localStorage
-  useEffect(() => { saveLocal(LS_BEATS_KEY, storyBeats); }, [storyBeats]);
-  useEffect(() => { saveLocal(LS_CHARS_KEY, characters); }, [characters]);
+  // Derived data
+  const bookTitle = storyLabData?.book?.title || "Untitled Story";
+  const chapters = storyLabData?.chapters || [];
+  
+  // Characters discovered from manuscript
+  const storyCharacters = useMemo(() => {
+    return extractCharactersFromChapters(chapters);
+  }, [chapters]);
 
-  // Export / Import
+  // ============================================
+  // Project switching detection
+  // ============================================
+  useEffect(() => {
+    const handleProjectSwitch = () => {
+      const newProjectId = getSelectedProjectId();
+      
+      if (newProjectId !== currentProjectId) {
+        console.log(`[NarrativeArc] Project switched: ${currentProjectId} → ${newProjectId}`);
+        setCurrentProjectId(newProjectId);
+        
+        // Reload ALL data from new project
+        setStoryLabData(loadStoryLabData());
+        setStoryBeats(loadBeats());
+        setCharacters(loadCharacters());
+        setActiveNode(null);
+        setEditingBeat(null);
+      }
+    };
+    
+    const handleDataChange = () => {
+      setStoryLabData(loadStoryLabData());
+    };
+    
+    window.addEventListener("project:switch", handleProjectSwitch);
+    window.addEventListener("project:change", handleDataChange);
+    window.addEventListener("storage", handleProjectSwitch);
+    
+    return () => {
+      window.removeEventListener("project:switch", handleProjectSwitch);
+      window.removeEventListener("project:change", handleDataChange);
+      window.removeEventListener("storage", handleProjectSwitch);
+    };
+  }, [currentProjectId]);
+
+  // Persist to localStorage when data changes
+  useEffect(() => { saveBeats(storyBeats); }, [storyBeats]);
+  useEffect(() => { saveCharacters(characters); }, [characters]);
+
+  // ============================================
+  // Import characters from manuscript
+  // ============================================
+  const importCharactersFromStory = useCallback(() => {
+    const existingNames = characters.map(c => c.name.toLowerCase());
+    const newChars = storyCharacters
+      .filter(name => !existingNames.includes(name.toLowerCase()))
+      .map((name, idx) => ({
+        id: uid(),
+        name,
+        initials: getInitials(name),
+        role: "Character",
+        bg: getCharacterColor(characters.length + idx),
+      }));
+    
+    if (newChars.length > 0) {
+      setCharacters(prev => [...prev, ...newChars]);
+    }
+    
+    return newChars.length;
+  }, [characters, storyCharacters]);
+
+  // ============================================
+  // Export / Import JSON
+  // ============================================
   const fileInputRef = useRef(null);
+  
   const exportJSON = () => {
-    const data = { beats: storyBeats, characters };
+    const data = { 
+      beats: storyBeats, 
+      characters,
+      bookTitle,
+      exportedAt: new Date().toISOString(),
+    };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url; a.download = "story-arc.json"; a.click();
+    a.href = url;
+    a.download = `${bookTitle.replace(/\s+/g, '-').toLowerCase()}-story-arc.json`;
+    a.click();
     URL.revokeObjectURL(url);
   };
+  
   const handleImportClick = () => fileInputRef.current?.click();
+  
   const handleImportChange = async (e) => {
     const f = e.target.files?.[0];
     if (!f) return;
@@ -125,20 +367,51 @@ export default function NarrativeArc() {
       const parsed = JSON.parse(text);
       if (parsed.beats) setStoryBeats(reviveBeats(parsed.beats));
       if (parsed.characters) setCharacters(parsed.characters);
-    } catch {}
+    } catch (err) {
+      console.error("Import failed:", err);
+    }
     e.target.value = "";
   };
 
-  // Debounced beat editor
+  // ============================================
+  // Beat CRUD operations
+  // ============================================
+  const addBeat = () => {
+    const newBeat = {
+      id: uid(),
+      title: "New Beat",
+      iconKey: "Star",
+      position: { x: 50, y: 50 },
+      content: "Describe this story beat...",
+      color: "primary",
+      size: "medium",
+      phase: "rising",
+    };
+    setStoryBeats(prev => [...prev, newBeat]);
+    setActiveNode(newBeat.id);
+    setEditingBeat(newBeat.id);
+  };
+
+  const updateBeat = (id, updates) => {
+    setStoryBeats(prev => prev.map(b => b.id === id ? { ...b, ...updates } : b));
+  };
+
+  const deleteBeat = (id) => {
+    setStoryBeats(prev => prev.filter(b => b.id !== id));
+    if (activeNode === id) setActiveNode(null);
+    if (editingBeat === id) setEditingBeat(null);
+  };
+
+  // Debounced content update
   const debouncedUpdate = useDebouncedCallback(({ id, content }) => {
-    setStoryBeats((prev) => prev.map((b) => (b.id === id ? { ...b, content } : b)));
+    updateBeat(id, { content });
   }, 250);
 
-  // Keyboard nudging helper (Shift for faster)
+  // Keyboard nudging
   const nudgeBeat = (id, dx, dy, fast = false) => {
     const step = fast ? 5 : 1;
-    setStoryBeats((prev) =>
-      prev.map((b) =>
+    setStoryBeats(prev =>
+      prev.map(b =>
         b.id === id
           ? {
               ...b,
@@ -152,21 +425,50 @@ export default function NarrativeArc() {
     );
   };
 
+  // ============================================
+  // Character CRUD
+  // ============================================
+  const addCharacter = () => {
+    const newChar = {
+      id: uid(),
+      name: "New Character",
+      initials: "NC",
+      role: "Role",
+      bg: getCharacterColor(characters.length),
+    };
+    setCharacters(prev => [...prev, newChar]);
+  };
+
+  const updateCharacter = (id, updates) => {
+    setCharacters(prev => prev.map(c => c.id === id ? { ...c, ...updates } : c));
+  };
+
+  const deleteCharacter = (id) => {
+    setCharacters(prev => prev.filter(c => c.id !== id));
+  };
+
+  // ============================================
+  // UI Helpers
+  // ============================================
   const getNodeSize = (size) => {
     switch (size) {
-      case "small":  return "w-20 h-20";
-      case "medium": return "w-24 h-24";
-      case "large":  return "w-28 h-28";
-      case "xlarge": return "w-32 h-32";
-      default:       return "w-24 h-24";
+      case "small":  return "w-16 h-16";
+      case "medium": return "w-20 h-20";
+      case "large":  return "w-24 h-24";
+      case "xlarge": return "w-28 h-28";
+      default:       return "w-20 h-20";
     }
   };
 
-  const getColorClasses = (color) => COLOR_CLASSES[color] || COLOR_CLASSES.primary;
+  const getColorClasses = (color) => {
+    const c = COLOR_CLASSES[color] || COLOR_CLASSES.primary;
+    return `${c.bg} ${c.border} ${c.text}`;
+  };
 
+  // SVG path through beats
   const pathD = useMemo(() => {
     if (storyBeats.length < 2) return "";
-    const pts = storyBeats.map((b) => b.position);
+    const pts = storyBeats.map(b => b.position);
     let d = `M ${pts[0].x} ${pts[0].y}`;
     for (let i = 1; i < pts.length; i++) {
       const prev = pts[i - 1];
@@ -177,298 +479,508 @@ export default function NarrativeArc() {
     return d;
   }, [storyBeats]);
 
-  return (
-    <div className="min-h-screen bg-base bg-radial-fade p-8">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="glass-panel p-8 mb-8">
-          <div className="flex items-center gap-4">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-brand-navy to-brand-rose flex items-center justify-center shadow-soft">
-              <BookOpen className="text-white" size={32} />
-            </div>
-            <div>
-              <h1 className="text-4xl font-serif font-bold text-ink">Preston & Darla&apos;s Journey</h1>
-              <p className="text-muted mt-1 font-sans">An emotional arc through love and loss</p>
-            </div>
-          </div>
+  // Count unimported characters
+  const unimportedCount = storyCharacters.filter(
+    name => !characters.some(c => c.name.toLowerCase() === name.toLowerCase())
+  ).length;
 
-          {/* Toolbar */}
-          <div className="mt-6 flex flex-wrap items-center gap-3">
-            <button onClick={exportJSON} className="px-3 py-2 rounded-lg bg-brand-navy text-white hover:opacity-90">Export JSON</button>
-            <button onClick={handleImportClick} className="px-3 py-2 rounded-lg bg-brand-rose text-ink hover:opacity-90">Import JSON</button>
-            <input ref={fileInputRef} type="file" accept="application/json" className="hidden" onChange={handleImportChange} />
+  return (
+    <div className="min-h-screen" style={{ background: "#f8fafc" }}>
+      {/* Navigation Bar */}
+      <div className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-slate-200 shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Link
+              to="/story-lab"
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-100 transition-colors"
+            >
+              <ArrowLeft size={16} />
+              Landing
+            </Link>
+            <span className="text-slate-300">|</span>
+            <span className="text-sm font-semibold" style={{ color: BRAND.navy }}>
+              Narrative Arc
+            </span>
+          </div>
+          <Link
+            to="/story-lab/workshop"
+            className="inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium transition-all hover:scale-105"
+            style={{
+              background: `linear-gradient(135deg, ${BRAND.gold}, #B8960C)`,
+              color: "#fff",
+            }}
+          >
+            Workshop Hub
+          </Link>
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto p-6">
+        {/* Header */}
+        <div 
+          className="rounded-2xl p-6 mb-6 text-white"
+          style={{
+            background: `linear-gradient(135deg, ${BRAND.navy} 0%, ${BRAND.navyLight} 40%, ${BRAND.mauve} 100%)`,
+          }}
+        >
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <div className="flex items-center gap-4">
+              <div 
+                className="w-14 h-14 rounded-2xl flex items-center justify-center"
+                style={{ background: `${BRAND.gold}30` }}
+              >
+                <BookOpen size={28} style={{ color: BRAND.gold }} />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold">{bookTitle}</h1>
+                <p className="text-white/70 text-sm">
+                  Story Arc · {storyBeats.length} beats · {characters.length} characters
+                </p>
+                <p className="text-white/50 text-xs mt-1">Project: {currentProjectId}</p>
+              </div>
+            </div>
+
+            {/* Toolbar */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <button
+                onClick={addBeat}
+                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-white/20 hover:bg-white/30 transition-colors"
+              >
+                <Plus size={16} />
+                Add Beat
+              </button>
+              <button
+                onClick={exportJSON}
+                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-white/20 hover:bg-white/30 transition-colors"
+              >
+                <Download size={16} />
+                Export
+              </button>
+              <button
+                onClick={handleImportClick}
+                className="inline-flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium bg-white/20 hover:bg-white/30 transition-colors"
+              >
+                <Upload size={16} />
+                Import
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="application/json"
+                className="hidden"
+                onChange={handleImportChange}
+              />
+            </div>
           </div>
         </div>
 
-        {/* Master Arc Summary */}
-        <div className="glass-panel p-8 mb-8">
-          <h2 className="text-2xl font-serif font-bold text-ink mb-6">Complete Story Arc - Drag to Arrange</h2>
+        {/* Master Arc Canvas */}
+        <div 
+          className="rounded-2xl p-6 mb-6"
+          style={{
+            background: "rgba(255, 255, 255, 0.9)",
+            border: `1px solid ${BRAND.navy}15`,
+          }}
+        >
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold" style={{ color: BRAND.navy }}>
+              Story Arc Canvas
+            </h2>
+            <p className="text-xs text-slate-500">Drag beats to arrange · Click to edit</p>
+          </div>
+
           <div
-            className="relative h-80 bg-white/40 rounded-2xl p-8"
-            onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; }}
+            className="relative h-80 rounded-xl overflow-hidden"
+            style={{ background: `linear-gradient(135deg, ${BRAND.navy}05 0%, ${BRAND.mauve}10 100%)` }}
+            onDragOver={(e) => {
+              e.preventDefault();
+              e.dataTransfer.dropEffect = "move";
+            }}
             onDrop={(e) => {
               e.preventDefault();
-              const draggedId = parseInt(e.dataTransfer.getData("beatId"), 10);
+              const draggedId = e.dataTransfer.getData("beatId");
               const rect = e.currentTarget.getBoundingClientRect();
               const xRaw = ((e.clientX - rect.left) / rect.width) * 100;
               const yRaw = ((e.clientY - rect.top) / rect.height) * 100;
               const x = snap(xRaw, 5, 5, 95);
               const y = snap(yRaw, 5, 10, 85);
-              setStoryBeats((prev) => prev.map((b) => (b.id === draggedId ? { ...b, position: { x, y } } : b)));
+              updateBeat(draggedId, { position: { x, y } });
             }}
           >
-            {/* Decor path */}
-            <svg className="absolute inset-0 w-full h-full" viewBox="0 0 1000 250" preserveAspectRatio="none" aria-hidden>
+            {/* SVG Path */}
+            <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 100 100" preserveAspectRatio="none">
               <defs>
-                <linearGradient id="masterGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                  <stop offset="0%"   style={{ stopColor: "var(--brand-navy, #0B1B3B)",  stopOpacity: 0.4 }} />
-                  <stop offset="50%"  style={{ stopColor: "var(--brand-gold, #D4AF37)",  stopOpacity: 0.6 }} />
-                  <stop offset="100%" style={{ stopColor: "var(--brand-ink,  #0F172A)",  stopOpacity: 0.4 }} />
+                <linearGradient id="arcGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" style={{ stopColor: BRAND.navy, stopOpacity: 0.3 }} />
+                  <stop offset="50%" style={{ stopColor: BRAND.gold, stopOpacity: 0.5 }} />
+                  <stop offset="100%" style={{ stopColor: BRAND.ink, stopOpacity: 0.3 }} />
                 </linearGradient>
               </defs>
               <path
-                d="M 100 200 Q 250 160, 350 130 Q 450 80, 500 50 Q 550 80, 650 140 Q 750 170, 900 210"
+                d={pathD}
                 fill="none"
-                stroke="url(#masterGradient)"
-                strokeWidth={3}
-                strokeLinecap="round"
-                strokeDasharray="6,4"
+                stroke="url(#arcGradient)"
+                strokeWidth={0.5}
+                strokeDasharray="2,1"
+                vectorEffect="non-scaling-stroke"
               />
             </svg>
 
-            {/* Draggable beats */}
-            <div className="relative z-10 h-full">
-              {storyBeats.map((beat) => {
-                const Icon = ICONS[beat.iconKey] || Heart;
-                const isActive = activeNode === beat.id;
-                return (
-                  <div
-                    key={beat.id}
-                    className="flex flex-col items-center cursor-move group absolute"
-                    style={{ left: `${beat.position.x}%`, top: `${beat.position.y}%`, transform: "translate(-50%, -50%)" }}
-                    draggable
-                    onDragStart={(e) => {
-                      e.dataTransfer.effectAllowed = "move";
-                      e.dataTransfer.setData("beatId", beat.id.toString());
-                      e.currentTarget.style.opacity = "0.5";
-                    }}
-                    onDragEnd={(e) => { e.currentTarget.style.opacity = "1"; }}
-                    onClick={() => setActiveNode(beat.id)}
-                    role="button"
-                    tabIndex={0}
-                    onKeyDown={(ev) => {
-                      if (ev.key === "ArrowLeft")  nudgeBeat(beat.id, -1, 0, ev.shiftKey);
-                      if (ev.key === "ArrowRight") nudgeBeat(beat.id,  1, 0, ev.shiftKey);
-                      if (ev.key === "ArrowUp")    nudgeBeat(beat.id,  0,-1, ev.shiftKey);
-                      if (ev.key === "ArrowDown")  nudgeBeat(beat.id,  0, 1, ev.shiftKey);
-                    }}
-                    aria-label={`Edit beat ${beat.id}: ${beat.title}`}
-                  >
-                    <div className={`w-16 h-16 ${getColorClasses(beat.color)} rounded-full flex items-center justify-center shadow-soft border-4 border-white/50 transition-all duration-300 group-hover:scale-110 group-hover:shadow-glass ${isActive ? "scale-110 ring-4 ring-brand-navy/30" : ""}`}>
-                      <Icon size={24} />
-                    </div>
+            {/* Beat Nodes */}
+            {storyBeats.map((beat, index) => {
+              const Icon = ICONS[beat.iconKey] || Heart;
+              const isActive = activeNode === beat.id;
 
-                    <div className="mt-3 text-center" style={{ width: 120 }}>
-                      <div className="text-[9px] font-bold text-brand-navy mb-1">BEAT {beat.id}</div>
-                      <div className="text-[11px] font-serif font-bold text-ink leading-tight break-words">{beat.title}</div>
-                      <div className="glass mt-2 px-2 py-1 text-[9px] text-muted opacity-0 group-hover:opacity-100 transition-opacity duration-300 break-words">
-                        {beat.content.slice(0, 60)}...
-                      </div>
+              return (
+                <div
+                  key={beat.id}
+                  className="absolute cursor-move group"
+                  style={{
+                    left: `${beat.position.x}%`,
+                    top: `${beat.position.y}%`,
+                    transform: "translate(-50%, -50%)",
+                    zIndex: isActive ? 20 : 10,
+                  }}
+                  draggable
+                  onDragStart={(e) => {
+                    e.dataTransfer.effectAllowed = "move";
+                    e.dataTransfer.setData("beatId", beat.id);
+                    e.currentTarget.style.opacity = "0.5";
+                  }}
+                  onDragEnd={(e) => {
+                    e.currentTarget.style.opacity = "1";
+                  }}
+                  onClick={() => setActiveNode(beat.id)}
+                  onKeyDown={(ev) => {
+                    if (ev.key === "ArrowLeft") nudgeBeat(beat.id, -1, 0, ev.shiftKey);
+                    if (ev.key === "ArrowRight") nudgeBeat(beat.id, 1, 0, ev.shiftKey);
+                    if (ev.key === "ArrowUp") nudgeBeat(beat.id, 0, -1, ev.shiftKey);
+                    if (ev.key === "ArrowDown") nudgeBeat(beat.id, 0, 1, ev.shiftKey);
+                  }}
+                  tabIndex={0}
+                  role="button"
+                  aria-label={`Beat ${index + 1}: ${beat.title}`}
+                >
+                  <div
+                    className={`${getNodeSize(beat.size)} ${getColorClasses(beat.color)} rounded-2xl flex flex-col items-center justify-center shadow-lg border-4 border-white/50 transition-all duration-200 group-hover:scale-110 ${isActive ? "scale-110 ring-4 ring-offset-2" : ""}`}
+                    style={{ ringColor: BRAND.gold }}
+                  >
+                    <Icon size={isActive ? 24 : 18} />
+                    <span className="text-[8px] font-bold mt-1 text-center px-1 leading-tight">
+                      {beat.title.split(" ")[0]}
+                    </span>
+                  </div>
+
+                  {/* Hover tooltip */}
+                  <div className="absolute top-full mt-2 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                    <div 
+                      className="px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap"
+                      style={{ background: "white", color: BRAND.navy, boxShadow: "0 2px 10px rgba(0,0,0,0.1)" }}
+                    >
+                      {beat.title}
                     </div>
                   </div>
-                );
-              })}
-            </div>
+                </div>
+              );
+            })}
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Arc Visualization */}
-          <div className="lg:col-span-2">
-            <div className="glass-soft p-8 h-[600px] relative overflow-hidden">
-              <h2 className="text-2xl font-serif font-bold text-ink mb-6">Interactive Story Beats</h2>
-
-              {/* SVG path through current positions */}
-              <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ zIndex: 0 }} aria-hidden>
-                <defs>
-                  <linearGradient id="pathGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                    <stop offset="0%"   style={{ stopColor: "var(--brand-navy, #0B1B3B)", stopOpacity: 0.3 }} />
-                    <stop offset="50%"  style={{ stopColor: "var(--brand-gold, #D4AF37)", stopOpacity: 0.4 }} />
-                    <stop offset="100%" style={{ stopColor: "var(--brand-ink,  #0F172A)", stopOpacity: 0.3 }} />
-                  </linearGradient>
-                </defs>
-                <path d={pathD} fill="none" stroke="url(#pathGradient)" strokeWidth={3} strokeDasharray="8,4" vectorEffect="non-scaling-stroke" />
-              </svg>
-
-              {/* Nodes */}
-              {storyBeats.map((beat, index) => {
-                const Icon = ICONS[beat.iconKey] || Heart;
-                const isActive = activeNode === beat.id;
-                return (
-                  <div
-                    key={beat.id}
-                    className="absolute cursor-pointer transition-all duration-500 hover:scale-110"
-                    style={{
-                      left: `${beat.position.x}%`,
-                      top:  `${beat.position.y}%`,
-                      transform: "translate(-50%, -50%)",
-                      animation: `float ${3 + index * 0.5}s ease-in-out infinite`,
-                      animationDelay: `${index * 0.2}s`,
-                      zIndex: isActive ? 20 : 10,
-                    }}
-                    onClick={() => setActiveNode(beat.id)}
-                    role="button"
-                    tabIndex={0}
-                    onKeyDown={(ev) => {
-                      if (ev.key === "ArrowLeft")  nudgeBeat(beat.id, -1, 0, ev.shiftKey);
-                      if (ev.key === "ArrowRight") nudgeBeat(beat.id,  1, 0, ev.shiftKey);
-                      if (ev.key === "ArrowUp")    nudgeBeat(beat.id,  0,-1, ev.shiftKey);
-                      if (ev.key === "ArrowDown")  nudgeBeat(beat.id,  0, 1, ev.shiftKey);
-                    }}
-                    aria-pressed={isActive}
-                    aria-label={`Select beat ${beat.id}`}
-                  >
-                    <div className={`${getNodeSize(beat.size)} ${getColorClasses(beat.color)} rounded-2xl border-4 flex flex-col items-center justify-center shadow-glass transition-all duration-300 ${isActive ? "scale-125 shadow-2xl" : ""}`}>
-                      <Icon size={isActive ? 32 : 24} className="mb-1" />
-                      <span className="text-[10px] font-bold text-center px-1 leading-tight">{beat.title.split(" ")[0]}</span>
-                    </div>
-
-                    <div className={`absolute top-full mt-2 left-1/2 -translate-x-1/2 whitespace-nowrap transition-opacity duration-300 ${isActive ? "opacity-100" : "opacity-0"}`}>
-                      <div className="glass px-3 py-1 text-xs font-bold text-ink">Beat {beat.id}</div>
-                    </div>
-
-                    <div className={`absolute inset-0 ${getColorClasses(beat.color)} rounded-2xl opacity-20 transition-all duration-1000`} style={{ animation: isActive ? "pulse 2s ease-in-out infinite" : "none" }} aria-hidden />
-                  </div>
-                );
-              })}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Beat List & Editor */}
+          <div className="lg:col-span-2 space-y-4">
+            {/* Timeline Strip */}
+            <div 
+              className="rounded-xl p-4"
+              style={{ background: "rgba(255, 255, 255, 0.9)", border: `1px solid ${BRAND.navy}15` }}
+            >
+              <div className="flex items-center gap-2 overflow-x-auto pb-2">
+                {storyBeats.map((beat, index) => {
+                  const Icon = ICONS[beat.iconKey] || Heart;
+                  const isActive = activeNode === beat.id;
+                  return (
+                    <React.Fragment key={beat.id}>
+                      <button
+                        onClick={() => setActiveNode(beat.id)}
+                        className={`flex-shrink-0 ${getColorClasses(beat.color)} px-3 py-2 rounded-xl transition-all hover:scale-105 ${isActive ? "ring-2 ring-offset-1 scale-105" : ""}`}
+                        style={{ ringColor: BRAND.gold, minWidth: 100 }}
+                      >
+                        <Icon size={16} className="mx-auto mb-1" />
+                        <div className="text-[10px] font-bold text-center leading-tight truncate">
+                          {beat.title}
+                        </div>
+                      </button>
+                      {index < storyBeats.length - 1 && (
+                        <div className="w-6 h-0.5 flex-shrink-0 rounded" style={{ background: BRAND.mauve }} />
+                      )}
+                    </React.Fragment>
+                  );
+                })}
+              </div>
             </div>
-          </div>
 
-          {/* Content Editor */}
-          <div className="lg:col-span-1">
-            <div className="glass-soft p-6 sticky top-8">
+            {/* Beat Editor */}
+            <div 
+              className="rounded-xl p-6"
+              style={{ background: "rgba(255, 255, 255, 0.9)", border: `1px solid ${BRAND.navy}15` }}
+            >
               {activeNode ? (
-                <div className="space-y-4">
-                  {(() => {
-                    const beat = storyBeats.find((b) => b.id === activeNode);
-                    const Icon = ICONS[beat.iconKey] || Heart;
-                    return (
-                      <>
-                        <div className="flex items-center gap-3 mb-4">
-                          <div className={`w-12 h-12 ${getColorClasses(beat.color)} rounded-xl flex items-center justify-center shadow-soft`}>
+                (() => {
+                  const beat = storyBeats.find(b => b.id === activeNode);
+                  if (!beat) return null;
+                  const Icon = ICONS[beat.iconKey] || Heart;
+
+                  return (
+                    <div className="space-y-4">
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-12 h-12 ${getColorClasses(beat.color)} rounded-xl flex items-center justify-center`}>
                             <Icon size={24} />
                           </div>
                           <div>
-                            <div className="text-xs font-bold text-brand-navy">BEAT {beat.id}</div>
-                            <h3 className="text-lg font-serif font-bold text-ink leading-tight">{beat.title}</h3>
+                            <input
+                              value={beat.title}
+                              onChange={(e) => updateBeat(beat.id, { title: e.target.value })}
+                              className="text-lg font-bold bg-transparent border-none outline-none"
+                              style={{ color: BRAND.navy }}
+                            />
+                            <div className="text-xs text-slate-500">
+                              Beat {storyBeats.findIndex(b => b.id === beat.id) + 1} of {storyBeats.length}
+                            </div>
                           </div>
                         </div>
+                        <button
+                          onClick={() => deleteBeat(beat.id)}
+                          className="p-2 rounded-lg hover:bg-red-50 text-red-400 hover:text-red-600 transition-colors"
+                          title="Delete beat"
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </div>
 
-                        <textarea
-                          defaultValue={beat.content}
-                          onChange={(e) => debouncedUpdate({ id: beat.id, content: e.target.value })}
-                          className="w-full h-64 p-4 bg-white/60 border-2 border-border rounded-xl text-ink text-sm leading-relaxed focus:outline-none focus:ring-2 focus:ring-brand-navy focus:border-brand-navy resize-none shadow-inner-soft font-sans"
-                          placeholder="Describe this moment..."
-                        />
+                      {/* Beat properties */}
+                      <div className="flex flex-wrap gap-3">
+                        {/* Icon selector */}
+                        <select
+                          value={beat.iconKey}
+                          onChange={(e) => updateBeat(beat.id, { iconKey: e.target.value })}
+                          className="text-sm rounded-lg px-3 py-2"
+                          style={{ background: "white", border: `1px solid ${BRAND.navy}20` }}
+                        >
+                          {ICON_OPTIONS.map(opt => (
+                            <option key={opt.key} value={opt.key}>{opt.label}</option>
+                          ))}
+                        </select>
 
-                        <div className="text-xs text-muted text-right">{beat.content.length} characters</div>
+                        {/* Color selector */}
+                        <select
+                          value={beat.color}
+                          onChange={(e) => updateBeat(beat.id, { color: e.target.value })}
+                          className="text-sm rounded-lg px-3 py-2"
+                          style={{ background: "white", border: `1px solid ${BRAND.navy}20` }}
+                        >
+                          {COLOR_OPTIONS.map(opt => (
+                            <option key={opt.key} value={opt.key}>{opt.label}</option>
+                          ))}
+                        </select>
 
-                        {/* Word goal (250) */}
-                        <div className="mt-2 h-2 bg-white/50 rounded">
-                          <div
-                            className="h-2 rounded bg-brand-navy"
-                            style={{ width: `${Math.min(100, Math.round((countWords(beat.content) / 250) * 100))}%` }}
-                          />
+                        {/* Size selector */}
+                        <select
+                          value={beat.size}
+                          onChange={(e) => updateBeat(beat.id, { size: e.target.value })}
+                          className="text-sm rounded-lg px-3 py-2"
+                          style={{ background: "white", border: `1px solid ${BRAND.navy}20` }}
+                        >
+                          <option value="small">Small</option>
+                          <option value="medium">Medium</option>
+                          <option value="large">Large</option>
+                          <option value="xlarge">X-Large</option>
+                        </select>
+
+                        {/* Phase selector */}
+                        <select
+                          value={beat.phase || "rising"}
+                          onChange={(e) => updateBeat(beat.id, { phase: e.target.value })}
+                          className="text-sm rounded-lg px-3 py-2"
+                          style={{ background: "white", border: `1px solid ${BRAND.navy}20` }}
+                        >
+                          <option value="beginning">Beginning</option>
+                          <option value="rising">Rising Action</option>
+                          <option value="midpoint">Midpoint</option>
+                          <option value="falling">Falling Action</option>
+                          <option value="climax">Climax</option>
+                          <option value="resolution">Resolution</option>
+                        </select>
+                      </div>
+
+                      {/* Content editor */}
+                      <textarea
+                        defaultValue={beat.content}
+                        onChange={(e) => debouncedUpdate({ id: beat.id, content: e.target.value })}
+                        className="w-full h-40 p-4 rounded-xl text-sm leading-relaxed resize-none"
+                        style={{ 
+                          background: "white", 
+                          border: `1px solid ${BRAND.navy}15`,
+                          color: BRAND.ink,
+                        }}
+                        placeholder="Describe this story beat..."
+                      />
+
+                      <div className="flex items-center justify-between text-xs text-slate-500">
+                        <span>{countWords(beat.content)} words</span>
+                        <div className="flex items-center gap-2">
+                          <div 
+                            className="w-32 h-1.5 rounded-full overflow-hidden"
+                            style={{ background: `${BRAND.navy}15` }}
+                          >
+                            <div
+                              className="h-full rounded-full transition-all"
+                              style={{ 
+                                width: `${Math.min(100, (countWords(beat.content) / 250) * 100)}%`,
+                                background: BRAND.gold,
+                              }}
+                            />
+                          </div>
+                          <span>{Math.min(100, Math.round((countWords(beat.content) / 250) * 100))}%</span>
                         </div>
-                        <div className="text-[11px] text-muted text-right">{countWords(beat.content)} / 250 words</div>
-                      </>
-                    );
-                  })()}
-                </div>
+                      </div>
+                    </div>
+                  );
+                })()
               ) : (
                 <div className="text-center py-12">
-                  <Heart className="mx-auto text-brand-rose mb-4" size={48} />
-                  <p className="text-muted font-sans">Click on a story node to edit its content</p>
+                  <BookOpen size={48} className="mx-auto mb-4" style={{ color: BRAND.mauve }} />
+                  <p className="text-slate-500">Click on a story beat to edit its content</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Character Board */}
+          <div className="lg:col-span-1">
+            <div 
+              className="rounded-xl p-6 sticky top-20"
+              style={{ background: "rgba(255, 255, 255, 0.9)", border: `1px solid ${BRAND.navy}15` }}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-bold" style={{ color: BRAND.navy }}>Characters</h3>
+                <div className="flex items-center gap-2">
+                  {unimportedCount > 0 && (
+                    <button
+                      onClick={() => {
+                        const count = importCharactersFromStory();
+                        if (count > 0) {
+                          alert(`Imported ${count} character(s) from your manuscript!`);
+                        }
+                      }}
+                      className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium"
+                      style={{ background: `${BRAND.gold}20`, color: BRAND.gold }}
+                      title={`Import ${unimportedCount} character(s) from @char: tags`}
+                    >
+                      <RefreshCw size={12} />
+                      +{unimportedCount}
+                    </button>
+                  )}
+                  <button
+                    onClick={addCharacter}
+                    className="p-1.5 rounded-lg hover:bg-slate-100 transition-colors"
+                    title="Add character"
+                  >
+                    <Plus size={16} style={{ color: BRAND.navy }} />
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-2 max-h-[500px] overflow-y-auto">
+                {characters.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Users size={32} className="mx-auto mb-2" style={{ color: BRAND.mauve }} />
+                    <p className="text-sm text-slate-500 mb-2">No characters yet</p>
+                    {storyCharacters.length > 0 ? (
+                      <button
+                        onClick={importCharactersFromStory}
+                        className="text-sm font-medium"
+                        style={{ color: BRAND.gold }}
+                      >
+                        Import {storyCharacters.length} from manuscript →
+                      </button>
+                    ) : (
+                      <button
+                        onClick={addCharacter}
+                        className="text-sm font-medium"
+                        style={{ color: BRAND.gold }}
+                      >
+                        Add first character →
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  characters.map((char, idx) => (
+                    <div
+                      key={char.id}
+                      className="flex items-center gap-3 p-3 rounded-xl transition-all hover:shadow-md cursor-move"
+                      style={{ background: "white", border: `1px solid ${BRAND.navy}10` }}
+                      draggable
+                      onDragStart={() => setDragIndex(idx)}
+                      onDragOver={(e) => {
+                        e.preventDefault();
+                        e.dataTransfer.dropEffect = "move";
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault();
+                        if (dragIndex === null || dragIndex === idx) return;
+                        setCharacters(prev => {
+                          const next = [...prev];
+                          const [moved] = next.splice(dragIndex, 1);
+                          next.splice(idx, 0, moved);
+                          return next;
+                        });
+                        setDragIndex(null);
+                      }}
+                    >
+                      <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold text-sm ${char.bg}`}>
+                        {char.initials}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <input
+                          value={char.name}
+                          onChange={(e) => updateCharacter(char.id, { 
+                            name: e.target.value,
+                            initials: getInitials(e.target.value),
+                          })}
+                          className="w-full text-sm font-semibold bg-transparent border-none outline-none truncate"
+                          style={{ color: BRAND.navy }}
+                        />
+                        <input
+                          value={char.role}
+                          onChange={(e) => updateCharacter(char.id, { role: e.target.value })}
+                          className="w-full text-xs text-slate-500 bg-transparent border-none outline-none truncate"
+                          placeholder="Role..."
+                        />
+                      </div>
+                      <button
+                        onClick={() => deleteCharacter(char.id)}
+                        className="p-1 rounded hover:bg-red-50 text-slate-300 hover:text-red-400 transition-colors"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {storyCharacters.length > 0 && (
+                <div className="mt-4 pt-4 border-t border-slate-100">
+                  <p className="text-xs text-slate-400">
+                    {storyCharacters.length} character{storyCharacters.length !== 1 ? 's' : ''} found in manuscript via @char: tags
+                  </p>
                 </div>
               )}
             </div>
           </div>
         </div>
-
-        {/* Character Board (4x4) */}
-        <div className="glass-soft p-6 mt-8">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-2xl font-serif font-bold text-ink">Character Board (4x4)</h2>
-            <p className="text-xs text-muted">Drag cards to reorder</p>
-          </div>
-
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {characters.map((c, idx) => (
-              <div
-                key={c.id}
-                className="rounded-2xl border-2 shadow-soft bg-white/60 border-border p-4 flex items-center gap-3 cursor-move select-none transition-transform duration-200 hover:scale-[1.02]"
-                draggable
-                onDragStart={() => setDragIndex(idx)}
-                onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; }}
-                onDrop={(e) => {
-                  e.preventDefault();
-                  if (dragIndex === null || dragIndex === idx) return;
-                  setCharacters((prev) => {
-                    const next = [...prev];
-                    const [moved] = next.splice(dragIndex, 1);
-                    next.splice(idx, 0, moved);
-                    return next;
-                  });
-                  setDragIndex(null);
-                }}
-              >
-                <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-white font-bold ${c.bg}`}>
-                  {c.initials}
-                </div>
-                <div className="min-w-0">
-                  <div className="text-sm font-semibold text-ink truncate">{c.name}</div>
-                  <div className="text-[11px] text-muted truncate">{c.role}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Timeline Bar */}
-        <div className="glass-soft p-6 mt-8">
-          <div className="flex items-center gap-3">
-            {storyBeats.map((beat, index) => {
-              const Icon = ICONS[beat.iconKey] || Heart;
-              const isActive = activeNode === beat.id;
-              return (
-                <React.Fragment key={beat.id}>
-                  <button
-                    onClick={() => setActiveNode(beat.id)}
-                    className={`flex-1 ${getColorClasses(beat.color)} p-4 rounded-xl transition-all duration-300 hover:scale-105 ${isActive ? "ring-4 ring-brand-navy/50 scale-105" : ""}`}
-                    aria-label={`Jump to beat ${beat.id}`}
-                  >
-                    <Icon size={20} className="mx-auto mb-2" />
-                    <div className="text-[10px] font-bold text-center leading-tight">{beat.title}</div>
-                  </button>
-                  {index < storyBeats.length - 1 && <div className="w-4 h-1 bg-border rounded-full flex-shrink-0" />}
-                </React.Fragment>
-              );
-            })}
-          </div>
-        </div>
       </div>
-
-      {/* Keyframes */}
-      <style>{`
-        @keyframes float {
-          0%, 100% { transform: translate(-50%, -50%) translateY(0); }
-          50% { transform: translate(-50%, -50%) translateY(-10px); }
-        }
-        @keyframes pulse {
-          0%, 100% { transform: scale(1); opacity: 0.2; }
-          50% { transform: scale(1.2); opacity: 0.1; }
-        }
-      `}</style>
     </div>
   );
 }
+
