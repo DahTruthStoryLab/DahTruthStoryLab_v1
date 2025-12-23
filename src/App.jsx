@@ -97,6 +97,9 @@ const NarrativeArc = lazy(() =>
   import("./components/storylab/NarrativeArc.jsx")
 );
 const Cover = lazy(() => import("./pages/Cover.tsx"));
+const WorkshopHub = lazy(() =>
+  import("./components/storylab/WorkshopHub.jsx")
+);
 
 // =========================
 // Global UI helpers
@@ -195,7 +198,10 @@ export default function App() {
               >
                 <Route index element={<StoryLabLanding />} />
                 <Route path="narrative-arc" element={<NarrativeArc />} />
-                <Route path="workshop" element={<WorkshopCohort />} />
+                <Route path="hub" element={<WorkshopHub />} />           {/* NEW */}
+                <Route path="workshop" element={<WorkshopHub />} />      {/* CHANGED */}
+                <Route path="community" element={<WorkshopCohort />} />  {/* NEW */}
+                <Route path="plot-builder" element={<PlotBuilder />} />  {/* NEW */}
                 <Route
                   path="workshop/priorities"
                   element={<PriorityCards />}
@@ -214,12 +220,6 @@ export default function App() {
                 />
                 <Route path="prompts" element={<StoryPromptsWorkshop />} />
               </Route>
-
-              {/* Typo/alias redirect for old /storylab base (no hyphen) */}
-              <Route
-                path="/storylab/*"
-                element={<Navigate to="/story-lab" replace />}
-              />
 
               {/* TOP-LEVEL PUBLISHING PAGES (src/pages/*.tsx) */}
               <Route
@@ -325,11 +325,6 @@ export default function App() {
                 element={<Navigate to="/publishing-prep" replace />}
               />
 
-              <Route 
-                path="/story-lab/plot-builder" 
-                element={<PlotBuilder />} 
-                />
-              
               {/* Project */}
               <Route
                 path="/project"
