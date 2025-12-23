@@ -206,20 +206,66 @@ function extractCharactersFromHtml(html) {
 
   const source = String(html);
 
+  // A small “stop list” for single-word junk tags
+  const STOP_WORDS = new Set([
+    "the","a","an","and","but","or","for","nor","on","at","to","from","by","in","of","with","as",
+    "is","was","were","be","been","being","have","has","had","do","does","did",
+    "i","you","he","she","it","we","they","me","him","her","us","them","my","your","his","our","their",
+    "this","that","these","those","who","what","where","when","why","how",
+    "monday","tuesday","wednesday","thursday","friday","saturday","sunday",
+    "january","february","march","april","may","june","july","august","september","october","november","december",
+  ]);
+
+  const cleanName = (raw) => {
+    if (!raw) return "";
+    let s = String(raw).replace(/\s+/g, " ").trim();
+
+    // Remove leading/trailing quotes/brackets
+    s = s.replace(/^[“"'\(\[\{]+/, "").replace(/[”"'\)\]\}]+$/, "");
+
+    // Strip trailing punctuation (common in prose)
+    s = s.replace(/[.,!?;:]+$/g, "").trim();
+
+    // Hard cap (prevents “name + sentence” situations)
+    if (s.length > 60) s = s.slice(0, 60).trim();
+
+    // If it’s a single stop word, reject
+    const lower = s.toLowerCase();
+    if (!s.includes(" ") && STOP_WORDS.has(lower)) return "";
+
+    // Reject if it looks like it contains too many words (tuneable)
+    const wordCount = s.split(" ").filter(Boolean).length;
+    if (wordCount > 4) return ""; // “Marcus was waiting when…” becomes rejected
+
+    // Reject if it starts with a lowercase letter (usually junk)
+    if (s && /^[a-z]/.test(s)) return "";
+
+    return s;
+  };
+
+  // 1) Tagged spans (your editor’s rendered tags)
   const spanRegex =
-    /<span[^>]*class="[^"]*dt-character-tag[^"]*"[^>]*>@char:\s*([^<]+)<\/span>/gi;
+    /<span[^>]*class="[^"]*dt-character-tag[^"]*"[^>]*>\s*@char:\s*([^<]+)\s*<\/span>/gi;
+
   let m;
   while ((m = spanRegex.exec(source)) !== null) {
-    const raw = m[1] || "";
-    const cleaned = raw.replace(/\s+/g, " ").trim();
-    if (cleaned) set.add(cleaned);
+    const name = cleanName(m[1]);
+    if (name) set.add(name);
   }
 
-  const rawTagRegex = /@char:\s*([A-Za-z0-9 .'-]+)/gi;
+  // 2) Raw @char: tags in plain HTML/text
+  // Capture up to 60 chars, but STOP at:
+  // - newline
+  // - HTML tag start
+  // - common punctuation that ends a name
+  // - double spaces (often separates tag from prose)
+  const rawTagRegex =
+    /@char:\s*([^\n<]{1,60}?)(?=\s{2,}|[.,!?;:\)\]\}"]|\n|<|$)/gi;
+
   let r;
   while ((r = rawTagRegex.exec(source)) !== null) {
-    const cleaned = (r[1] || "").replace(/\s+/g, " ").trim();
-    if (cleaned) set.add(cleaned);
+    const name = cleanName(r[1]);
+    if (name) set.add(name);
   }
 
   return set;
