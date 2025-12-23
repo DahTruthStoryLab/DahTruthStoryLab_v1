@@ -1,7 +1,8 @@
 // src/components/storylab/PriorityCards.jsx
-// UPDATED: Now uses project-specific storage keys for multi-manuscript support
+// Priority Cards - Track character wants, fears, needs, and secrets
+// Uses direct localStorage with project-aware keys
 
-import React, { useState, useCallback, useEffect, useMemo, useRef } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { 
   Plus, 
@@ -20,67 +21,76 @@ import {
   User,
   Target,
   AlertCircle,
-  Heart,
-  Eye,
-  RefreshCw,
+  Save,
 } from "lucide-react";
 import { runAssistant } from "../../lib/api";
-import BackToLanding, { BackToLandingFab } from "./BackToLanding";
 
-// Brand colors
+/* ============================================
+   BRAND COLORS
+   ============================================ */
 const BRAND = {
   navy: "#1e3a5f",
+  navyLight: "#2d4a6f",
   gold: "#d4af37",
+  goldLight: "#f5e6b3",
+  goldDark: "#b8960c",
   mauve: "#b8a9c9",
+  rose: "#e8b4b8",
+  cream: "#fefdfb",
 };
 
 /* ============================================
-   PROJECT-AWARE STORAGE UTILITIES
+   PROJECT-AWARE STORAGE
    ============================================ */
-
-// Base storage keys
-const STORYLAB_KEY_BASE = "dahtruth-story-lab-toc-v3";
 const PRIORITIES_KEY_BASE = "dahtruth-priorities-v2";
+const CHAPTERS_KEY_BASE = "dahtruth-story-lab-toc-v3";
 
-/**
- * Get the currently selected project ID from localStorage
- */
 function getSelectedProjectId() {
   try {
-    // Check direct key first
     const stored = localStorage.getItem('dahtruth-selected-project-id');
     if (stored) return stored;
-    
-    // Fallback: check project store
     const projectData = localStorage.getItem('dahtruth-project-store');
     if (projectData) {
       const parsed = JSON.parse(projectData);
       return parsed.selectedProjectId || parsed.currentProjectId || 'default';
     }
-    
     return 'default';
   } catch {
     return 'default';
   }
 }
 
-/**
- * Get project-specific storage key
- * For 'default' project, returns base key (backwards compatibility)
- * For other projects, returns baseKey-projectId
- */
 function getProjectKey(baseKey) {
   const projectId = getSelectedProjectId();
-  if (projectId === 'default') {
-    return baseKey; // Backwards compatibility
-  }
-  return `${baseKey}-${projectId}`;
+  return projectId === 'default' ? baseKey : `${baseKey}-${projectId}`;
 }
 
-// Load chapters from localStorage (PROJECT-AWARE)
+function loadPriorities() {
+  try {
+    const key = getProjectKey(PRIORITIES_KEY_BASE);
+    console.log(`[PriorityCards] Loading from key: ${key}`);
+    const raw = localStorage.getItem(key);
+    if (!raw) return [];
+    return JSON.parse(raw);
+  } catch {
+    return [];
+  }
+}
+
+function savePriorities(priorities) {
+  try {
+    const key = getProjectKey(PRIORITIES_KEY_BASE);
+    localStorage.setItem(key, JSON.stringify(priorities));
+    console.log(`[PriorityCards] Saved to key: ${key}`);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function loadChapters() {
   try {
-    const key = getProjectKey(STORYLAB_KEY_BASE);
+    const key = getProjectKey(CHAPTERS_KEY_BASE);
     const raw = localStorage.getItem(key);
     if (!raw) return [];
     const data = JSON.parse(raw);
@@ -90,35 +100,6 @@ function loadChapters() {
   }
 }
 
-// Load priorities from localStorage (PROJECT-AWARE)
-function loadPriorities() {
-  try {
-    const key = getProjectKey(PRIORITIES_KEY_BASE);
-    const raw = localStorage.getItem(key);
-    console.log(`[PriorityCards] Loading from key: ${key}`);
-    if (!raw) return [];
-    const data = JSON.parse(raw);
-    return Array.isArray(data) ? data : [];
-  } catch (e) {
-    console.error("[PriorityCards] Error loading priorities:", e);
-    return [];
-  }
-}
-
-// Save priorities to localStorage (PROJECT-AWARE)
-function savePriorities(priorities) {
-  try {
-    const key = getProjectKey(PRIORITIES_KEY_BASE);
-    localStorage.setItem(key, JSON.stringify(priorities));
-    console.log(`[PriorityCards] Saved to key: ${key}`, priorities.length, "items");
-    return true;
-  } catch (e) {
-    console.error("[PriorityCards] Error saving priorities:", e);
-    return false;
-  }
-}
-
-// Generate unique ID
 function uid() {
   return Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
 }
@@ -137,32 +118,64 @@ function extractCharacters(text = "") {
   return [...new Set(names)];
 }
 
-/* ---------------------------
-   Page banner (light/glass)
----------------------------- */
-const PageBanner = ({ currentProjectId }) => (
-  <div className="mx-auto mb-8">
-    <div className="relative mx-auto max-w-3xl rounded-2xl border border-border bg-white/80 backdrop-blur-xl px-6 py-6 text-center shadow overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-gold/10 pointer-events-none" />
-      <div className="relative z-10">
-        <div className="mx-auto mb-3 inline-flex items-center justify-center rounded-xl border border-border bg-white/70 px-4 py-1.5">
-          <ListChecks size={14} className="mr-2 text-muted" />
-          <span className="text-xs font-semibold tracking-wide text-muted">DahTruth · StoryLab</span>
+/* ============================================
+   SAVING BADGE
+   ============================================ */
+function SavingBadge({ state }) {
+  return (
+    <span className={`text-xs px-3 py-1.5 rounded-full font-medium ${
+      state === "saving" 
+        ? "bg-amber-100 text-amber-700 border border-amber-200" 
+        : "bg-emerald-100 text-emerald-700 border border-emerald-200"
+    }`}>
+      {state === "saving" ? "Saving…" : "✓ Saved"}
+    </span>
+  );
+}
+
+/* ============================================
+   PAGE BANNER
+   ============================================ */
+const PageBanner = ({ projectId, cardCount }) => (
+  <div 
+    className="rounded-3xl p-8 mb-8 text-white text-center relative overflow-hidden"
+    style={{
+      background: `linear-gradient(135deg, ${BRAND.navy} 0%, ${BRAND.navyLight} 30%, ${BRAND.mauve} 70%, ${BRAND.rose} 100%)`,
+    }}
+  >
+    {/* Decorative elements */}
+    <div className="absolute top-0 left-0 w-64 h-64 rounded-full opacity-10" style={{ background: BRAND.gold, filter: 'blur(80px)' }} />
+    <div className="absolute bottom-0 right-0 w-96 h-96 rounded-full opacity-10" style={{ background: BRAND.rose, filter: 'blur(100px)' }} />
+    
+    <div className="relative z-10">
+      {/* Icon trio */}
+      <div className="flex items-center justify-center gap-3 mb-4">
+        <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: `${BRAND.gold}40` }}>
+          <Target size={24} style={{ color: BRAND.goldLight }} />
         </div>
-        <h1 className="text-3xl font-extrabold text-ink mb-2">Priority Cards</h1>
-        <p className="mt-1 text-sm text-muted max-w-xl mx-auto">
-          Drag to reorder · Inline edit · Autosave · <span style={{ color: BRAND.gold }}>✨ AI-powered suggestions</span>
-        </p>
-        {/* Debug: show current project */}
-        <p className="text-xs text-slate-400 mt-2">Project: {currentProjectId}</p>
+        <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg" style={{ background: `linear-gradient(135deg, ${BRAND.gold}, ${BRAND.goldDark})` }}>
+          <ListChecks size={28} className="text-white" />
+        </div>
+        <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: `${BRAND.mauve}50` }}>
+          <Sparkles size={24} style={{ color: BRAND.cream }} />
+        </div>
+      </div>
+
+      <h1 className="text-3xl font-bold mb-2">Priority Cards</h1>
+      <p className="text-white/70 max-w-xl mx-auto">
+        Track character wants, fears, needs, and secrets. Use AI to analyze chapters or add cards manually.
+      </p>
+      
+      <div className="mt-4 text-xs text-white/40">
+        Project: {projectId} · {cardCount} cards
       </div>
     </div>
   </div>
 );
 
-/* ------------------------------------------------
-   AI Suggestions Panel
-------------------------------------------------- */
+/* ============================================
+   AI SUGGESTIONS PANEL
+   ============================================ */
 const SuggestionsPanel = ({ suggestions, onAccept, onReject, onAcceptAll, onClose, isLoading, error }) => {
   if (!isLoading && !error && suggestions.length === 0) return null;
 
@@ -229,10 +242,6 @@ const SuggestionsPanel = ({ suggestions, onAccept, onReject, onAcceptAll, onClos
                                  BRAND.navy
                         }}
                       >
-                        {suggestion.type === "Want" && <Target size={10} className="inline mr-1" />}
-                        {suggestion.type === "Fear" && <AlertCircle size={10} className="inline mr-1" />}
-                        {suggestion.type === "Need" && <Heart size={10} className="inline mr-1" />}
-                        {suggestion.type === "Secret" && <Eye size={10} className="inline mr-1" />}
                         {suggestion.type}
                       </span>
                     </div>
@@ -267,7 +276,7 @@ const SuggestionsPanel = ({ suggestions, onAccept, onReject, onAcceptAll, onClos
             <button
               onClick={onAcceptAll}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all hover:scale-105"
-              style={{ background: `linear-gradient(135deg, ${BRAND.gold}, #B8960C)` }}
+              style={{ background: `linear-gradient(135deg, ${BRAND.gold}, ${BRAND.goldDark})` }}
             >
               <Check size={16} />
               Accept All
@@ -279,28 +288,23 @@ const SuggestionsPanel = ({ suggestions, onAccept, onReject, onAcceptAll, onClos
   );
 };
 
-/* ------------------------------------------------
-   Chapter Selector + AI Analyze Button
-------------------------------------------------- */
-const AIAnalyzer = ({ onAnalyze, isAnalyzing, currentProjectId }) => {
+/* ============================================
+   CHAPTER ANALYZER
+   ============================================ */
+const AIAnalyzer = ({ onAnalyze, isAnalyzing }) => {
   const [chapters, setChapters] = useState([]);
   const [selectedChapterId, setSelectedChapterId] = useState("");
   const [isOpen, setIsOpen] = useState(false);
-  const [aiProvider, setAiProvider] = useState("openai"); // "openai" or "anthropic"
   const dropdownRef = useRef(null);
 
-  // Load chapters on mount and when project changes
   useEffect(() => {
     const loaded = loadChapters();
     setChapters(loaded);
     if (loaded.length > 0) {
       setSelectedChapterId(loaded[0].id);
-    } else {
-      setSelectedChapterId("");
     }
-  }, [currentProjectId]); // Re-run when project changes
+  }, []);
 
-  // Listen for project changes
   useEffect(() => {
     const handleChange = () => {
       const loaded = loadChapters();
@@ -314,7 +318,6 @@ const AIAnalyzer = ({ onAnalyze, isAnalyzing, currentProjectId }) => {
     };
   }, []);
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
@@ -331,17 +334,17 @@ const AIAnalyzer = ({ onAnalyze, isAnalyzing, currentProjectId }) => {
     if (!selectedChapter) return;
     const plainText = stripHtml(selectedChapter.content || "");
     const characters = extractCharacters(selectedChapter.content || "");
-    onAnalyze(plainText, selectedChapter.title, characters, aiProvider);
+    onAnalyze(plainText, selectedChapter.title, characters);
   };
 
   if (chapters.length === 0) {
     return (
-      <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-center">
-        <BookOpen size={24} className="mx-auto text-slate-400 mb-2" />
-        <p className="text-sm text-slate-500">No chapters found. Import a manuscript first.</p>
+      <div className="bg-white rounded-2xl border border-slate-200 p-6 text-center mb-6">
+        <BookOpen size={32} className="mx-auto text-slate-300 mb-3" />
+        <p className="text-slate-500 mb-2">No chapters found</p>
         <Link 
           to="/compose" 
-          className="text-sm font-medium mt-2 inline-block"
+          className="text-sm font-medium"
           style={{ color: BRAND.gold }}
         >
           Go to Writer →
@@ -351,13 +354,26 @@ const AIAnalyzer = ({ onAnalyze, isAnalyzing, currentProjectId }) => {
   }
 
   return (
-    <div className="bg-gradient-to-r from-slate-50 to-white border border-slate-200 rounded-2xl p-4">
+    <div className="bg-white rounded-2xl border border-slate-200 p-5 mb-6">
+      <div className="flex items-center gap-3 mb-4">
+        <div 
+          className="w-10 h-10 rounded-xl flex items-center justify-center"
+          style={{ background: `${BRAND.navy}15` }}
+        >
+          <Sparkles size={20} style={{ color: BRAND.navy }} />
+        </div>
+        <div>
+          <h3 className="font-bold text-slate-800">AI Chapter Analysis</h3>
+          <p className="text-sm text-slate-500">Select a chapter to extract character priorities</p>
+        </div>
+      </div>
+
       <div className="flex items-center gap-3 flex-wrap">
         {/* Chapter Selector */}
         <div className="relative" ref={dropdownRef}>
           <button
             onClick={() => setIsOpen(!isOpen)}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-slate-200 hover:border-slate-300 text-sm font-medium text-slate-700 min-w-[200px] justify-between"
+            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 hover:border-slate-300 text-sm font-medium text-slate-700 min-w-[220px] justify-between"
           >
             <div className="flex items-center gap-2">
               <BookOpen size={16} className="text-slate-400" />
@@ -386,7 +402,6 @@ const AIAnalyzer = ({ onAnalyze, isAnalyzing, currentProjectId }) => {
                   </span>
                   <div className="flex-1 min-w-0">
                     <div className="font-medium text-slate-700 truncate">{chapter.title}</div>
-                    <div className="text-xs text-slate-400">{chapter.wordCount || 0} words</div>
                   </div>
                   {chapter.id === selectedChapterId && (
                     <Check size={16} style={{ color: BRAND.gold }} />
@@ -397,39 +412,12 @@ const AIAnalyzer = ({ onAnalyze, isAnalyzing, currentProjectId }) => {
           )}
         </div>
 
-        {/* AI Provider Toggle */}
-        <div className="flex items-center gap-1 bg-white border border-slate-200 rounded-xl p-1">
-          <button
-            onClick={() => setAiProvider("openai")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-              aiProvider === "openai"
-                ? "bg-emerald-500 text-white shadow-sm"
-                : "text-slate-500 hover:bg-slate-50"
-            }`}
-            title="Use OpenAI (GPT-4)"
-          >
-            OpenAI
-          </button>
-          <button
-            onClick={() => setAiProvider("anthropic")}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-              aiProvider === "anthropic"
-                ? "text-white shadow-sm"
-                : "text-slate-500 hover:bg-slate-50"
-            }`}
-            style={aiProvider === "anthropic" ? { background: BRAND.navy } : {}}
-            title="Use Anthropic (Claude)"
-          >
-            Claude
-          </button>
-        </div>
-
         {/* Analyze Button */}
         <button
           onClick={handleAnalyze}
           disabled={!selectedChapter || isAnalyzing}
-          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
-          style={{ background: `linear-gradient(135deg, ${BRAND.navy}, #2d4a6f)` }}
+          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-all hover:scale-105 disabled:opacity-50 disabled:hover:scale-100"
+          style={{ background: `linear-gradient(135deg, ${BRAND.navy}, ${BRAND.navyLight})` }}
         >
           {isAnalyzing ? (
             <>
@@ -443,64 +431,35 @@ const AIAnalyzer = ({ onAnalyze, isAnalyzing, currentProjectId }) => {
             </>
           )}
         </button>
-
-        {/* Help text */}
-        <span className="text-xs text-slate-500">
-          AI will suggest character priorities based on the selected chapter
-        </span>
       </div>
     </div>
   );
 };
 
-/* ------------------------------------------------
-   DraggableCard - Internal component for cards
-------------------------------------------------- */
-const DraggableCard = ({ card, index, isDragging, onEdit, onDelete, moveCard }) => {
-  const dragRef = useRef(null);
-  const dragItem = useRef(null);
-  const dragOverItem = useRef(null);
-
-  const handleDragStart = (e) => {
-    dragItem.current = index;
-    e.dataTransfer.effectAllowed = "move";
-  };
-
-  const handleDragEnter = (e) => {
-    dragOverItem.current = index;
-    if (dragItem.current !== null && dragItem.current !== dragOverItem.current) {
-      moveCard(dragItem.current, dragOverItem.current);
-      dragItem.current = dragOverItem.current;
-    }
-  };
-
-  const handleDragEnd = (e) => {
-    dragItem.current = null;
-    dragOverItem.current = null;
-  };
-
-  // Priority color coding
+/* ============================================
+   PRIORITY CARD
+   ============================================ */
+function PriorityCard({ card, index, onEdit, onDelete, onDragStart, onDragOver, onDragEnd, isDragging }) {
   const priorityColor = card.priority === "High" ? "text-red-500" :
                         card.priority === "Medium" ? "text-amber-500" : "text-slate-400";
 
   return (
     <div
-      ref={dragRef}
       draggable
-      onDragStart={handleDragStart}
-      onDragEnter={handleDragEnter}
-      onDragEnd={handleDragEnd}
-      className={`bg-white/80 backdrop-blur-xl border border-border rounded-2xl p-4 shadow-sm transition-all ${
-        isDragging ? "opacity-50 rotate-[0.5deg] shadow-lg" : "hover:shadow-md"
+      onDragStart={() => onDragStart(index)}
+      onDragOver={(e) => { e.preventDefault(); onDragOver(index); }}
+      onDragEnd={onDragEnd}
+      className={`bg-white rounded-2xl border border-slate-200 p-4 shadow-sm transition-all ${
+        isDragging ? "opacity-50 scale-95" : "hover:shadow-md"
       }`}
     >
       <div className="flex items-start gap-3">
-        <div className="cursor-grab active:cursor-grabbing pt-1 text-muted" title="Drag to reorder">
-          <GripVertical />
+        <div className="cursor-grab active:cursor-grabbing pt-1 text-slate-300" title="Drag to reorder">
+          <GripVertical size={18} />
         </div>
 
         <div className="flex-1">
-          {/* Character badge if present */}
+          {/* Character badge */}
           {card.character && (
             <div className="flex items-center gap-1 mb-2">
               <User size={12} className="text-slate-400" />
@@ -511,17 +470,17 @@ const DraggableCard = ({ card, index, isDragging, onEdit, onDelete, moveCard }) 
           <input
             value={card.title}
             onChange={(e) => onEdit(card.id, { title: e.target.value })}
-            className="w-full bg-transparent border-b border-border focus:border-primary outline-none text-ink text-base"
+            className="w-full bg-transparent border-b border-slate-200 focus:border-amber-400 outline-none text-slate-800 font-medium"
             placeholder="Priority title"
           />
 
-          <div className="mt-2 flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs bg-white/70">
-              <Tag className="h-3 w-3" />
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-xs bg-slate-50">
+              <Tag size={12} className="text-slate-400" />
               <select
                 value={card.scope}
                 onChange={(e) => onEdit(card.id, { scope: e.target.value })}
-                className="bg-transparent outline-none"
+                className="bg-transparent outline-none text-slate-600"
               >
                 <option>Character</option>
                 <option>Plot</option>
@@ -530,12 +489,12 @@ const DraggableCard = ({ card, index, isDragging, onEdit, onDelete, moveCard }) 
               </select>
             </span>
 
-            <span className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs bg-white/70">
-              <Flag className={`h-3 w-3 ${priorityColor}`} />
+            <span className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-xs bg-slate-50">
+              <Flag size={12} className={priorityColor} />
               <select
                 value={card.priority}
                 onChange={(e) => onEdit(card.id, { priority: e.target.value })}
-                className="bg-transparent outline-none"
+                className="bg-transparent outline-none text-slate-600"
               >
                 <option>High</option>
                 <option>Medium</option>
@@ -543,12 +502,12 @@ const DraggableCard = ({ card, index, isDragging, onEdit, onDelete, moveCard }) 
               </select>
             </span>
 
-            <span className="inline-flex items-center gap-1 rounded-md border border-border px-2 py-1 text-xs bg-white/70">
-              <CheckCircle className="h-3 w-3 text-emerald-600" />
+            <span className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-xs bg-slate-50">
+              <CheckCircle size={12} className="text-emerald-500" />
               <select
                 value={card.status}
                 onChange={(e) => onEdit(card.id, { status: e.target.value })}
-                className="bg-transparent outline-none"
+                className="bg-transparent outline-none text-slate-600"
               >
                 <option>Open</option>
                 <option>In Session</option>
@@ -559,7 +518,7 @@ const DraggableCard = ({ card, index, isDragging, onEdit, onDelete, moveCard }) 
             {/* Priority type badge */}
             {card.priorityType && (
               <span 
-                className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs"
+                className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium"
                 style={{ 
                   background: card.priorityType === "Want" ? `${BRAND.gold}15` :
                              card.priorityType === "Fear" ? "#fef2f2" :
@@ -574,78 +533,62 @@ const DraggableCard = ({ card, index, isDragging, onEdit, onDelete, moveCard }) 
                 {card.priorityType}
               </span>
             )}
+
+            {/* AI source badge */}
+            {card.source === "AI Suggestion" && (
+              <span className="inline-flex items-center gap-1 text-xs text-amber-600">
+                <Sparkles size={10} />
+                AI
+              </span>
+            )}
           </div>
         </div>
 
         <button
           onClick={() => onDelete(card.id)}
-          className="bg-white/70 border border-border p-2 rounded-lg text-muted hover:text-ink transition-colors"
+          className="p-2 rounded-lg hover:bg-red-50 text-slate-300 hover:text-red-500 transition-colors"
           title="Delete"
         >
-          <Trash2 className="h-4 w-4" />
+          <Trash2 size={16} />
         </button>
       </div>
     </div>
   );
-};
+}
 
-/* ------------------------------------------------
-   PriorityCards (single export — no duplicates)
-------------------------------------------------- */
+/* ============================================
+   MAIN COMPONENT
+   ============================================ */
 export default function PriorityCards() {
-  // ============================================
-  // Track current project ID for multi-manuscript support
-  // ============================================
   const [currentProjectId, setCurrentProjectId] = useState(getSelectedProjectId);
-  
-  // Initialize priorities directly from localStorage
   const [priorities, setPriorities] = useState(() => loadPriorities());
-  const [dragging, setDragging] = useState(null);
-  const [selectedId, setSelectedId] = useState(null);
-  const [saving, setSaving] = useState("idle"); // "idle" or "saving"
+  const [saving, setSaving] = useState("idle");
+  const [draggingIndex, setDraggingIndex] = useState(null);
   
   // AI Analysis state
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [suggestions, setSuggestions] = useState([]);
   const [analysisError, setAnalysisError] = useState(null);
   const [showSuggestions, setShowSuggestions] = useState(false);
-  
-  // Items array (same as priorities)
-  const items = priorities;
 
-  // ============================================
-  // Listen for project changes and reload ALL data
-  // ============================================
+  // Project switch listener
   useEffect(() => {
-    const handleProjectSwitch = () => {
-      const newProjectId = getSelectedProjectId();
-      
-      if (newProjectId !== currentProjectId) {
-        console.log(`[PriorityCards] Project switched: ${currentProjectId} → ${newProjectId}`);
-        setCurrentProjectId(newProjectId);
-        
-        // Reload priorities from new project's storage
-        const newPriorities = loadPriorities();
-        setPriorities(newPriorities);
-        
-        // Reset UI state
-        setSelectedId(null);
-        setSuggestions([]);
-        setShowSuggestions(false);
+    const handleSwitch = () => {
+      const newId = getSelectedProjectId();
+      if (newId !== currentProjectId) {
+        setCurrentProjectId(newId);
+        setPriorities(loadPriorities());
       }
     };
-    
-    // Listen for project switch events
-    window.addEventListener("project:switch", handleProjectSwitch);
-    window.addEventListener("storage", handleProjectSwitch);
-    
+    window.addEventListener("project:switch", handleSwitch);
+    window.addEventListener("storage", handleSwitch);
     return () => {
-      window.removeEventListener("project:switch", handleProjectSwitch);
-      window.removeEventListener("storage", handleProjectSwitch);
+      window.removeEventListener("project:switch", handleSwitch);
+      window.removeEventListener("storage", handleSwitch);
     };
   }, [currentProjectId]);
 
-  // Save priorities whenever they change (with debounce)
+  // Auto-save with debounce
   useEffect(() => {
     setSaving("saving");
     const id = setTimeout(() => {
@@ -655,15 +598,8 @@ export default function PriorityCards() {
     return () => clearTimeout(id);
   }, [priorities]);
 
-  // Manual save function
-  const saveNow = useCallback(() => {
-    setSaving("saving");
-    savePriorities(priorities);
-    setTimeout(() => setSaving("idle"), 300);
-  }, [priorities]);
-
-  // Add new priority card (memoized)
-  const add = useCallback(() => {
+  // Add new card
+  const addCard = useCallback(() => {
     setPriorities(prev => [...prev, {
       id: uid(),
       title: "New priority",
@@ -674,72 +610,43 @@ export default function PriorityCards() {
     }]);
   }, []);
 
-  // Delete priority card by id (memoized)
-  const del = useCallback((id) => {
-    setPriorities(prev => prev.filter((c) => c.id !== id));
-    if (selectedId === id) {
-      setSelectedId(null);
-    }
-  }, [selectedId]);
-
-  // Edit priority card fields (memoized)
-  const edit = useCallback((id, patch) => {
-    setPriorities(prev => prev.map(item => 
-      item.id === id ? { ...item, ...patch } : item
-    ));
+  // Delete card
+  const deleteCard = useCallback((id) => {
+    setPriorities(prev => prev.filter(c => c.id !== id));
   }, []);
 
-  // Enhanced moveCard function for drag-and-drop reordering (memoized)
-  const moveCard = useCallback((fromIndex, toIndex) => {
-    if (fromIndex === toIndex) return;
+  // Edit card
+  const editCard = useCallback((id, patch) => {
+    setPriorities(prev => prev.map(c => c.id === id ? { ...c, ...patch } : c));
+  }, []);
+
+  // Drag handlers
+  const handleDragStart = useCallback((index) => {
+    setDraggingIndex(index);
+  }, []);
+
+  const handleDragOver = useCallback((overIndex) => {
+    if (draggingIndex === null || draggingIndex === overIndex) return;
     setPriorities(prev => {
-      const result = [...prev];
-      const [removed] = result.splice(fromIndex, 1);
-      result.splice(toIndex, 0, removed);
-      return result;
+      const copy = [...prev];
+      const [moved] = copy.splice(draggingIndex, 1);
+      copy.splice(overIndex, 0, moved);
+      return copy;
     });
+    setDraggingIndex(overIndex);
+  }, [draggingIndex]);
+
+  const handleDragEnd = useCallback(() => {
+    setDraggingIndex(null);
   }, []);
 
-  // Drag & drop handlers (keeping for compatibility)
-  const onDragStart = useCallback((id) => {
-    setDragging(id);
-    setSelectedId(id);
-  }, []);
-
-  const onDragOver = useCallback((e, overId) => {
-    e.preventDefault();
-    if (!dragging || dragging === overId) return;
-    setPriorities(prev => {
-      const a = prev.findIndex((c) => c.id === dragging);
-      const b = prev.findIndex((c) => c.id === overId);
-      if (a !== -1 && b !== -1) {
-        const result = [...prev];
-        const [moved] = result.splice(a, 1);
-        result.splice(b, 0, moved);
-        return result;
-      }
-      return prev;
-    });
-  }, [dragging]);
-
-  const onDragEnd = useCallback(() => {
-    setDragging(null);
-  }, []);
-
-  // Select card handler
-  const selectCard = useCallback((id) => {
-    setSelectedId(id);
-  }, []);
-
-  // ============ AI Analysis Functions ============
-  
-  const analyzeChapter = useCallback(async (chapterText, chapterTitle, characters, provider = "openai") => {
+  // AI Analysis
+  const analyzeChapter = useCallback(async (chapterText, chapterTitle, characters) => {
     setIsAnalyzing(true);
     setAnalysisError(null);
     setSuggestions([]);
     setShowSuggestions(true);
 
-    // Limit text to ~4000 chars for API
     const truncatedText = chapterText.slice(0, 4000);
     const charList = characters.length > 0 ? characters.join(", ") : "any characters you can identify";
 
@@ -757,53 +664,37 @@ Chapter: "${chapterTitle}"
 ${truncatedText}
 ---
 
-Respond ONLY with a JSON array of suggestions. Each suggestion should have:
+Respond ONLY with a JSON array. Each suggestion should have:
 - "character": character name
 - "type": "Want", "Fear", "Need", or "Secret"
-- "title": brief description of the priority (under 15 words)
-- "reason": a short quote or evidence from the text (under 20 words)
+- "title": brief description (under 15 words)
+- "reason": short quote or evidence (under 20 words)
 
-Example format:
-[
-  {"character": "Grace", "type": "Want", "title": "To protect her family from financial ruin", "reason": "She counted the bills again, hands trembling"},
-  {"character": "Marcus", "type": "Fear", "title": "Being seen as weak by his community", "reason": "He couldn't let them see him break"}
-]
-
-Return 4-8 suggestions total. JSON array only, no other text.`;
+Return 4-8 suggestions. JSON array only.`;
 
     try {
-      const result = await runAssistant(prompt, "clarify", "", provider);
-      
+      const result = await runAssistant(prompt, "clarify", "", "anthropic");
       const responseText = result?.result || result?.text || result?.output || result || "";
       
-      // Try to parse JSON from response
-      let parsed = [];
-      try {
-        // Find JSON array in response
-        const jsonMatch = responseText.match(/\[[\s\S]*\]/);
-        if (jsonMatch) {
-          parsed = JSON.parse(jsonMatch[0]);
+      const jsonMatch = responseText.match(/\[[\s\S]*\]/);
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setSuggestions(parsed);
+        } else {
+          setAnalysisError("No character priorities found in this chapter.");
         }
-      } catch (parseErr) {
-        console.error("Failed to parse AI response:", parseErr);
-        setAnalysisError("Couldn't parse AI suggestions. Please try again.");
-        return;
-      }
-
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        setSuggestions(parsed);
       } else {
-        setAnalysisError("No character priorities found in this chapter. Try a chapter with more character development.");
+        setAnalysisError("Couldn't parse AI suggestions. Please try again.");
       }
     } catch (err) {
       console.error("AI analysis error:", err);
-      setAnalysisError(`Failed to analyze chapter with ${provider === "anthropic" ? "Claude" : "OpenAI"}. Please try again or switch providers.`);
+      setAnalysisError("Failed to analyze chapter. Please try again.");
     } finally {
       setIsAnalyzing(false);
     }
   }, []);
 
-  // Accept a single suggestion
   const acceptSuggestion = useCallback((suggestion) => {
     setPriorities(prev => [...prev, {
       id: uid(),
@@ -816,21 +707,17 @@ Return 4-8 suggestions total. JSON array only, no other text.`;
       done: false,
       source: "AI Suggestion",
     }]);
-    
-    // Remove from suggestions
     setSuggestions(prev => prev.filter(s => 
       !(s.character === suggestion.character && s.type === suggestion.type && s.title === suggestion.title)
     ));
   }, []);
 
-  // Reject a suggestion
   const rejectSuggestion = useCallback((index) => {
     setSuggestions(prev => prev.filter((_, i) => i !== index));
   }, []);
 
-  // Accept all suggestions
   const acceptAllSuggestions = useCallback(() => {
-    const newPriorities = suggestions.map(suggestion => ({
+    const newCards = suggestions.map(suggestion => ({
       id: uid(),
       title: suggestion.title,
       character: suggestion.character,
@@ -841,153 +728,149 @@ Return 4-8 suggestions total. JSON array only, no other text.`;
       done: false,
       source: "AI Suggestion",
     }));
-    setPriorities(prev => [...prev, ...newPriorities]);
+    setPriorities(prev => [...prev, ...newCards]);
     setSuggestions([]);
     setShowSuggestions(false);
-  }, [commit, suggestions]);
+  }, [suggestions]);
 
-  // Close suggestions panel
   const closeSuggestions = useCallback(() => {
     setShowSuggestions(false);
     setSuggestions([]);
     setAnalysisError(null);
   }, []);
 
+  const saveNow = () => {
+    setSaving("saving");
+    savePriorities(priorities);
+    setTimeout(() => setSaving("idle"), 300);
+  };
+
   return (
-    <div className="min-h-screen bg-base text-ink">
-      {/* Global back bar with quick jump to Workshop Hub */}
-      <BackToLanding
-        title="Priority Cards"
-        rightSlot={
-          <Link
-            to="/story-lab/workshop"
-            className="inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium bg-white/70 border border-border hover:bg-white"
-            title="Open Workshop Hub"
-          >
-            Workshop Hub
-          </Link>
-        }
-      />
-
-      <div className="mx-auto max-w-6xl px-6 py-8">
-        <PageBanner currentProjectId={currentProjectId} />
-
-        <div className="space-y-4">
-          {/* AI Chapter Analyzer */}
-          <AIAnalyzer 
-            onAnalyze={analyzeChapter} 
-            isAnalyzing={isAnalyzing} 
-            currentProjectId={currentProjectId}
-          />
-
-          {/* AI Suggestions Panel */}
-          {showSuggestions && (
-            <SuggestionsPanel
-              suggestions={suggestions}
-              onAccept={acceptSuggestion}
-              onReject={rejectSuggestion}
-              onAcceptAll={acceptAllSuggestions}
-              onClose={closeSuggestions}
-              isLoading={isAnalyzing}
-              error={analysisError}
-            />
-          )}
-
-          {/* Controls */}
-          <div className="flex items-center justify-between bg-white/80 backdrop-blur-xl border border-border rounded-2xl px-4 py-3">
-            <div className="flex items-center gap-3">
-              <div className="rounded-xl px-3 py-1 border border-border bg-white/60">
-                Priority Cards
-                {selectedId && <span className="ml-2 text-xs text-muted">• Selected</span>}
-              </div>
-              <span className="text-sm text-muted">Drag to reorder · Inline edit</span>
-            </div>
-            <button
-              onClick={add}
-              className="rounded-lg px-3 py-2 border border-border bg-white hover:bg-white/90 text-sm transition-colors"
-              title="Add card"
+    <div className="min-h-screen" style={{ background: `linear-gradient(180deg, ${BRAND.cream} 0%, #f1f5f9 100%)` }}>
+      {/* Navigation */}
+      <div className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-slate-200 shadow-sm">
+        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Link
+              to="/story-lab"
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-100 transition-colors"
             >
-              <Plus className="h-4 w-4 inline mr-1" /> Add Card
-            </button>
-          </div>
-
-          {/* Cards Grid - Using DraggableCard component */}
-          <div className="grid gap-3">
-            {items.map((card, index) => (
-              <DraggableCard
-                key={card.id}
-                card={card}
-                index={index}
-                isDragging={dragging === card.id}
-                onEdit={edit}
-                onDelete={del}
-                moveCard={moveCard}
-              />
-            ))}
-
-            {items.length === 0 && (
-              <div className="text-center py-12 bg-white/60 rounded-2xl border border-dashed border-slate-300">
-                <ListChecks size={40} className="mx-auto text-slate-300 mb-3" />
-                <p className="text-slate-500 mb-2">No priority cards yet</p>
-                <p className="text-sm text-slate-400 mb-4">
-                  Use AI to analyze a chapter, or add cards manually
-                </p>
-                <button
-                  onClick={add}
-                  className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border border-slate-200 bg-white hover:bg-slate-50"
-                >
-                  <Plus size={16} />
-                  Add Card Manually
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* Stats footer */}
-          {items.length > 0 && (
-            <div className="bg-white/80 backdrop-blur-xl border border-border rounded-2xl px-4 py-3 text-sm text-muted">
-              <div className="flex items-center justify-between flex-wrap gap-2">
-                <span>Total Cards: {items.length}</span>
-                <div className="flex items-center gap-4">
-                  <span>
-                    {items.filter(c => c.status === "Done").length} Done · {" "}
-                    {items.filter(c => c.status === "In Session").length} In Session · {" "}
-                    {items.filter(c => c.status === "Open").length} Open
-                  </span>
-                  {items.some(c => c.source === "AI Suggestion") && (
-                    <span className="flex items-center gap-1 text-amber-600">
-                      <Sparkles size={12} />
-                      {items.filter(c => c.source === "AI Suggestion").length} from AI
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* Save Button */}
-          <div className="mt-6 flex items-center justify-between">
-            <span className={`text-xs px-3 py-1.5 rounded-full font-medium ${
-              saving === "saving" 
-                ? "bg-amber-100 text-amber-700 border border-amber-200" 
-                : "bg-emerald-100 text-emerald-700 border border-emerald-200"
-            }`}>
-              {saving === "saving" ? "Saving…" : "✓ Saved"}
+              ← Landing
+            </Link>
+            <span className="text-slate-300">|</span>
+            <span className="text-sm font-semibold" style={{ color: BRAND.navy }}>
+              Priority Cards
             </span>
-            <button
-              onClick={saveNow}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white shadow-lg transition-all hover:scale-105"
-              style={{ background: `linear-gradient(135deg, ${BRAND.navy}, #2d4a6f)` }}
+          </div>
+          <div className="flex items-center gap-3">
+            <SavingBadge state={saving} />
+            <Link
+              to="/story-lab/workshop"
+              className="flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium text-white transition-all hover:scale-105"
+              style={{ background: `linear-gradient(135deg, ${BRAND.gold}, ${BRAND.goldDark})` }}
             >
-              <CheckCircle size={16} />
-              Save Now
-            </button>
+              Workshop Hub
+            </Link>
           </div>
         </div>
       </div>
 
-      {/* Mobile "Back to Landing" button */}
-      <BackToLandingFab />
+      <div className="max-w-4xl mx-auto px-4 py-8">
+        <PageBanner projectId={currentProjectId} cardCount={priorities.length} />
+
+        {/* AI Analyzer */}
+        <AIAnalyzer onAnalyze={analyzeChapter} isAnalyzing={isAnalyzing} />
+
+        {/* AI Suggestions */}
+        {showSuggestions && (
+          <SuggestionsPanel
+            suggestions={suggestions}
+            onAccept={acceptSuggestion}
+            onReject={rejectSuggestion}
+            onAcceptAll={acceptAllSuggestions}
+            onClose={closeSuggestions}
+            isLoading={isAnalyzing}
+            error={analysisError}
+          />
+        )}
+
+        {/* Add Card Button */}
+        <div className="flex items-center justify-between mb-4">
+          <span className="text-sm text-slate-500">{priorities.length} priority cards</span>
+          <button
+            onClick={addCard}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border border-slate-200 bg-white hover:bg-slate-50 transition-colors"
+          >
+            <Plus size={16} />
+            Add Card
+          </button>
+        </div>
+
+        {/* Cards Grid */}
+        <div className="space-y-3">
+          {priorities.map((card, index) => (
+            <PriorityCard
+              key={card.id}
+              card={card}
+              index={index}
+              onEdit={editCard}
+              onDelete={deleteCard}
+              onDragStart={handleDragStart}
+              onDragOver={handleDragOver}
+              onDragEnd={handleDragEnd}
+              isDragging={draggingIndex === index}
+            />
+          ))}
+
+          {priorities.length === 0 && (
+            <div className="text-center py-16 bg-white rounded-2xl border border-dashed border-slate-300">
+              <ListChecks size={48} className="mx-auto text-slate-300 mb-4" />
+              <p className="text-slate-500 font-medium mb-2">No priority cards yet</p>
+              <p className="text-sm text-slate-400 mb-4">
+                Use AI to analyze a chapter, or add cards manually
+              </p>
+              <button
+                onClick={addCard}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border border-slate-200 bg-white hover:bg-slate-50"
+              >
+                <Plus size={16} />
+                Add Card Manually
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Stats Footer */}
+        {priorities.length > 0 && (
+          <div className="mt-6 bg-white rounded-2xl border border-slate-200 px-5 py-4">
+            <div className="flex items-center justify-between flex-wrap gap-3 text-sm">
+              <div className="flex items-center gap-4 text-slate-500">
+                <span>{priorities.filter(c => c.status === "Done").length} Done</span>
+                <span>{priorities.filter(c => c.status === "In Session").length} In Session</span>
+                <span>{priorities.filter(c => c.status === "Open").length} Open</span>
+              </div>
+              {priorities.some(c => c.source === "AI Suggestion") && (
+                <span className="flex items-center gap-1 text-amber-600">
+                  <Sparkles size={14} />
+                  {priorities.filter(c => c.source === "AI Suggestion").length} from AI
+                </span>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Save Button */}
+        <div className="mt-8 flex justify-end">
+          <button
+            onClick={saveNow}
+            className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white shadow-lg transition-all hover:scale-105"
+            style={{ background: `linear-gradient(135deg, ${BRAND.navy}, ${BRAND.navyLight})` }}
+          >
+            <Save size={16} />
+            Save Now
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
