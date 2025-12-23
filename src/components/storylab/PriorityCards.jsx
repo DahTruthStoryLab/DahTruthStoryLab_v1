@@ -24,7 +24,6 @@ import {
   Eye,
   RefreshCw,
 } from "lucide-react";
-import { loadProject, saveProject, ensureWorkshopFields, uid } from "../../lib/storylab/projectStore";
 import { runAssistant } from "../../lib/api";
 import BackToLanding, { BackToLandingFab } from "./BackToLanding";
 
@@ -39,8 +38,9 @@ const BRAND = {
    PROJECT-AWARE STORAGE UTILITIES
    ============================================ */
 
-// Base storage key for chapters
+// Base storage keys
 const STORYLAB_KEY_BASE = "dahtruth-story-lab-toc-v3";
+const PRIORITIES_KEY_BASE = "dahtruth-priorities-v2";
 
 /**
  * Get the currently selected project ID from localStorage
@@ -88,6 +88,39 @@ function loadChapters() {
   } catch {
     return [];
   }
+}
+
+// Load priorities from localStorage (PROJECT-AWARE)
+function loadPriorities() {
+  try {
+    const key = getProjectKey(PRIORITIES_KEY_BASE);
+    const raw = localStorage.getItem(key);
+    console.log(`[PriorityCards] Loading from key: ${key}`);
+    if (!raw) return [];
+    const data = JSON.parse(raw);
+    return Array.isArray(data) ? data : [];
+  } catch (e) {
+    console.error("[PriorityCards] Error loading priorities:", e);
+    return [];
+  }
+}
+
+// Save priorities to localStorage (PROJECT-AWARE)
+function savePriorities(priorities) {
+  try {
+    const key = getProjectKey(PRIORITIES_KEY_BASE);
+    localStorage.setItem(key, JSON.stringify(priorities));
+    console.log(`[PriorityCards] Saved to key: ${key}`, priorities.length, "items");
+    return true;
+  } catch (e) {
+    console.error("[PriorityCards] Error saving priorities:", e);
+    return false;
+  }
+}
+
+// Generate unique ID
+function uid() {
+  return Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
 }
 
 // Extract plain text from HTML
@@ -561,12 +594,12 @@ const DraggableCard = ({ card, index, isDragging, onEdit, onDelete, moveCard }) 
 ------------------------------------------------- */
 export default function PriorityCards() {
   // ============================================
-  // KEY FIX: Track current project ID for multi-manuscript support
+  // Track current project ID for multi-manuscript support
   // ============================================
   const [currentProjectId, setCurrentProjectId] = useState(getSelectedProjectId);
   
-  // Initialize project state with workshop fields
-  const [project, setProject] = useState(() => ensureWorkshopFields(loadProject()));
+  // Initialize priorities directly from localStorage
+  const [priorities, setPriorities] = useState(() => loadPriorities());
   const [dragging, setDragging] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
   
@@ -576,14 +609,11 @@ export default function PriorityCards() {
   const [analysisError, setAnalysisError] = useState(null);
   const [showSuggestions, setShowSuggestions] = useState(false);
   
-  // Memoized items array
-  const items = useMemo(() => 
-    Array.isArray(project.priorities) ? project.priorities : [], 
-    [project.priorities]
-  );
+  // Items array (same as priorities)
+  const items = priorities;
 
   // ============================================
-  // KEY FIX: Listen for project changes and reload ALL data
+  // Listen for project changes and reload ALL data
   // ============================================
   useEffect(() => {
     const handleProjectSwitch = () => {
@@ -593,9 +623,9 @@ export default function PriorityCards() {
         console.log(`[PriorityCards] Project switched: ${currentProjectId} → ${newProjectId}`);
         setCurrentProjectId(newProjectId);
         
-        // Reload project data from new project's storage
-        const newProject = ensureWorkshopFields(loadProject());
-        setProject(newProject);
+        // Reload priorities from new project's storage
+        const newPriorities = loadPriorities();
+        setPriorities(newPriorities);
         
         // Reset UI state
         setSelectedId(null);
@@ -614,65 +644,48 @@ export default function PriorityCards() {
     };
   }, [currentProjectId]);
 
-  // Commit changes to project store and trigger updates (memoized callback)
-  const commit = useCallback((mutator) => {
-    const copy = JSON.parse(JSON.stringify(project));
-    mutator(copy);
-    ensureWorkshopFields(copy);
-    saveProject(copy);
-    setProject(copy);
-    try { 
-      window.dispatchEvent(new Event("project:change")); 
-    } catch {}
-  }, [project]);
-
-  // Persist whenever project changes
+  // Save priorities whenever they change
   useEffect(() => {
-    saveProject(project);
-  }, [project]);
+    savePriorities(priorities);
+  }, [priorities]);
 
   // Add new priority card (memoized)
   const add = useCallback(() => {
-    commit((p) => {
-      p.priorities.push({
-        id: uid(),
-        title: "New priority",
-        scope: "Character",
-        priority: "Medium",
-        status: "Open",
-        done: false,
-      });
-    });
-  }, [commit]);
+    setPriorities(prev => [...prev, {
+      id: uid(),
+      title: "New priority",
+      scope: "Character",
+      priority: "Medium",
+      status: "Open",
+      done: false,
+    }]);
+  }, []);
 
   // Delete priority card by id (memoized)
   const del = useCallback((id) => {
-    commit((p) => { 
-      p.priorities = p.priorities.filter((c) => c.id !== id); 
-    });
+    setPriorities(prev => prev.filter((c) => c.id !== id));
     if (selectedId === id) {
       setSelectedId(null);
     }
-  }, [commit, selectedId]);
+  }, [selectedId]);
 
   // Edit priority card fields (memoized)
   const edit = useCallback((id, patch) => {
-    commit((p) => {
-      const it = p.priorities.find((x) => x.id === id);
-      if (it) Object.assign(it, patch);
-    });
-  }, [commit]);
+    setPriorities(prev => prev.map(item => 
+      item.id === id ? { ...item, ...patch } : item
+    ));
+  }, []);
 
   // Enhanced moveCard function for drag-and-drop reordering (memoized)
   const moveCard = useCallback((fromIndex, toIndex) => {
     if (fromIndex === toIndex) return;
-    commit((p) => {
-      const result = [...p.priorities];
+    setPriorities(prev => {
+      const result = [...prev];
       const [removed] = result.splice(fromIndex, 1);
       result.splice(toIndex, 0, removed);
-      p.priorities = result;
+      return result;
     });
-  }, [commit]);
+  }, []);
 
   // Drag & drop handlers (keeping for compatibility)
   const onDragStart = useCallback((id) => {
@@ -683,15 +696,18 @@ export default function PriorityCards() {
   const onDragOver = useCallback((e, overId) => {
     e.preventDefault();
     if (!dragging || dragging === overId) return;
-    commit((p) => {
-      const a = p.priorities.findIndex((c) => c.id === dragging);
-      const b = p.priorities.findIndex((c) => c.id === overId);
+    setPriorities(prev => {
+      const a = prev.findIndex((c) => c.id === dragging);
+      const b = prev.findIndex((c) => c.id === overId);
       if (a !== -1 && b !== -1) {
-        const [moved] = p.priorities.splice(a, 1);
-        p.priorities.splice(b, 0, moved);
+        const result = [...prev];
+        const [moved] = result.splice(a, 1);
+        result.splice(b, 0, moved);
+        return result;
       }
+      return prev;
     });
-  }, [dragging, commit]);
+  }, [dragging]);
 
   const onDragEnd = useCallback(() => {
     setDragging(null);
@@ -776,25 +792,23 @@ Return 4-8 suggestions total. JSON array only, no other text.`;
 
   // Accept a single suggestion
   const acceptSuggestion = useCallback((suggestion) => {
-    commit((p) => {
-      p.priorities.push({
-        id: uid(),
-        title: suggestion.title,
-        character: suggestion.character,
-        priorityType: suggestion.type,
-        scope: "Character",
-        priority: suggestion.type === "Fear" ? "High" : "Medium",
-        status: "Open",
-        done: false,
-        source: "AI Suggestion",
-      });
-    });
+    setPriorities(prev => [...prev, {
+      id: uid(),
+      title: suggestion.title,
+      character: suggestion.character,
+      priorityType: suggestion.type,
+      scope: "Character",
+      priority: suggestion.type === "Fear" ? "High" : "Medium",
+      status: "Open",
+      done: false,
+      source: "AI Suggestion",
+    }]);
     
     // Remove from suggestions
     setSuggestions(prev => prev.filter(s => 
       !(s.character === suggestion.character && s.type === suggestion.type && s.title === suggestion.title)
     ));
-  }, [commit]);
+  }, []);
 
   // Reject a suggestion
   const rejectSuggestion = useCallback((index) => {
@@ -803,21 +817,18 @@ Return 4-8 suggestions total. JSON array only, no other text.`;
 
   // Accept all suggestions
   const acceptAllSuggestions = useCallback(() => {
-    commit((p) => {
-      suggestions.forEach(suggestion => {
-        p.priorities.push({
-          id: uid(),
-          title: suggestion.title,
-          character: suggestion.character,
-          priorityType: suggestion.type,
-          scope: "Character",
-          priority: suggestion.type === "Fear" ? "High" : "Medium",
-          status: "Open",
-          done: false,
-          source: "AI Suggestion",
-        });
-      });
-    });
+    const newPriorities = suggestions.map(suggestion => ({
+      id: uid(),
+      title: suggestion.title,
+      character: suggestion.character,
+      priorityType: suggestion.type,
+      scope: "Character",
+      priority: suggestion.type === "Fear" ? "High" : "Medium",
+      status: "Open",
+      done: false,
+      source: "AI Suggestion",
+    }));
+    setPriorities(prev => [...prev, ...newPriorities]);
     setSuggestions([]);
     setShowSuggestions(false);
   }, [commit, suggestions]);
@@ -948,4 +959,3 @@ Return 4-8 suggestions total. JSON array only, no other text.`;
     </div>
   );
 }
-
