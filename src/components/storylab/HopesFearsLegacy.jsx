@@ -1,5 +1,6 @@
 // src/components/storylab/HopesFearsLegacy.jsx
-// REDESIGNED: Want • Wound • Worth framework with bullet points and rich colors
+// Hopes • Fears • Legacy - Character motivation tracker with bullet points
+// Uses direct localStorage for project-aware data persistence
 
 import React, { useEffect, useState, useMemo, useRef } from "react";
 import { Link } from "react-router-dom";
@@ -22,11 +23,6 @@ import {
   Gem,
   Swords
 } from "lucide-react";
-import {
-  loadProject,
-  saveProject,
-  ensureWorkshopFields,
-} from "../../lib/storylab/projectStore";
 
 /* ============================================
    BRAND COLORS
@@ -49,6 +45,7 @@ const BRAND = {
    ============================================ */
 
 const STORYLAB_KEY_BASE = "dahtruth-story-lab-toc-v3";
+const HFL_KEY_BASE = "dahtruth-hfl-data-v2";
 
 function getSelectedProjectId() {
   try {
@@ -73,6 +70,34 @@ function getProjectKey(baseKey) {
     return baseKey;
   }
   return `${baseKey}-${projectId}`;
+}
+
+// Load HFL data directly from localStorage
+function loadHflData() {
+  try {
+    const key = getProjectKey(HFL_KEY_BASE);
+    const raw = localStorage.getItem(key);
+    console.log(`[HFL] Loading from key: ${key}`, raw);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch (e) {
+    console.error("[HFL] Error loading data:", e);
+    return null;
+  }
+}
+
+// Save HFL data directly to localStorage
+function saveHflData(data) {
+  try {
+    const key = getProjectKey(HFL_KEY_BASE);
+    const json = JSON.stringify(data);
+    localStorage.setItem(key, json);
+    console.log(`[HFL] Saved to key: ${key}`, data);
+    return true;
+  } catch (e) {
+    console.error("[HFL] Error saving data:", e);
+    return false;
+  }
 }
 
 function loadChapters() {
@@ -352,16 +377,16 @@ function CharacterCard({
     <div className="rounded-2xl overflow-hidden shadow-lg border border-slate-200/50">
       {/* Character Header - Centered */}
       <div 
-        className="px-6 py-6 text-white text-center"
+        className="px-6 py-6 text-center"
         style={{ background: roleGradient }}
       >
         {/* Role Icon & Label */}
         <div className="flex items-center justify-center gap-3 mb-4">
           <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
-            <RoleIcon size={22} />
+            <RoleIcon size={22} className="text-white" />
           </div>
           <div className="text-left">
-            <h3 className="font-bold text-xl">{roleLabel}</h3>
+            <h3 className="font-bold text-xl text-white">{roleLabel}</h3>
             <p className="text-white/70 text-xs">
               {roleKey === "protagonist" && "The hero driving the story"}
               {roleKey === "antagonist" && "The opposing force or change agent"}
@@ -449,7 +474,6 @@ function CharacterCard({
    ============================================ */
 export default function HopesFearsLegacy() {
   const [currentProjectId, setCurrentProjectId] = useState(getSelectedProjectId);
-  const [project, setProject] = useState(() => ensureWorkshopFields(loadProject()));
   const [chapters, setChapters] = useState(() => loadChapters());
   const [saving, setSaving] = useState("idle");
 
@@ -463,14 +487,22 @@ export default function HopesFearsLegacy() {
     secondary: "",
   };
 
+  const DEFAULT_DATA = {
+    roles: { ...DEFAULT_ROLES },
+    characters: {},
+  };
+
   const [hfl, setHfl] = useState(() => {
-    const saved = project.hfl || {};
+    const saved = loadHflData();
     
-    console.log("[HopesFearsLegacy] Loading saved data:", saved);
+    if (!saved) {
+      console.log("[HFL] No saved data, using defaults");
+      return { ...DEFAULT_DATA };
+    }
     
     // Check if this is the NEW format (has 'roles' key)
     if (saved.roles && saved.characters) {
-      console.log("[HopesFearsLegacy] Detected NEW format");
+      console.log("[HFL] Loaded data:", saved);
       return {
         roles: saved.roles,
         characters: saved.characters,
@@ -479,7 +511,7 @@ export default function HopesFearsLegacy() {
     
     // Check if this is the OLD format (protagonist is an object with 'name' property)
     if (saved.protagonist && typeof saved.protagonist === 'object' && 'name' in saved.protagonist) {
-      console.log("[HopesFearsLegacy] Detected OLD format, migrating...");
+      console.log("[HFL] Detected OLD format, migrating...");
       const migratedCharacters = {};
       const migratedRoles = { protagonist: "", antagonist: "", secondary: "" };
       
@@ -501,26 +533,18 @@ export default function HopesFearsLegacy() {
       };
     }
     
-    // Empty/new - return defaults
-    console.log("[HopesFearsLegacy] No saved data, using defaults");
-    return {
-      roles: { ...DEFAULT_ROLES },
-      characters: {},
-    };
+    // Unknown format - return defaults
+    console.log("[HFL] Unknown format, using defaults");
+    return { ...DEFAULT_DATA };
   });
 
   const manuscriptCharacters = useMemo(() => {
     return extractCharactersFromChapters(chapters);
   }, [chapters]);
 
+  // Save data directly to localStorage
   const commit = (next) => {
-    console.log("[HopesFearsLegacy] Saving data:", next);
-    const copy = JSON.parse(JSON.stringify(project));
-    copy.hfl = next;
-    ensureWorkshopFields(copy);
-    saveProject(copy);
-    setProject(copy);
-    console.log("[HopesFearsLegacy] Data saved to project");
+    saveHflData(next);
     try {
       window.dispatchEvent(new Event("project:change"));
     } catch {}
@@ -531,17 +555,18 @@ export default function HopesFearsLegacy() {
       const newProjectId = getSelectedProjectId();
       
       if (newProjectId !== currentProjectId) {
-        console.log(`[HopesFearsLegacy] Project switched: ${currentProjectId} → ${newProjectId}`);
+        console.log(`[HFL] Project switched: ${currentProjectId} → ${newProjectId}`);
         setCurrentProjectId(newProjectId);
         
-        const newProject = ensureWorkshopFields(loadProject());
-        setProject(newProject);
+        // Load data for the new project
+        const saved = loadHflData();
+        console.log("[HFL] Project switch - loaded:", saved);
         
-        const saved = newProject.hfl || {};
-        console.log("[HopesFearsLegacy] Project switch - loading:", saved);
-        
+        if (!saved) {
+          setHfl({ ...DEFAULT_DATA });
+        }
         // Check if this is the NEW format (has 'roles' key)
-        if (saved.roles && saved.characters) {
+        else if (saved.roles && saved.characters) {
           setHfl({
             roles: saved.roles,
             characters: saved.characters,
@@ -568,10 +593,7 @@ export default function HopesFearsLegacy() {
         }
         // Empty/new
         else {
-          setHfl({
-            roles: { ...DEFAULT_ROLES },
-            characters: {},
-          });
+          setHfl({ ...DEFAULT_DATA });
         }
         
         setChapters(loadChapters());
