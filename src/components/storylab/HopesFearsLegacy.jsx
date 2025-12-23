@@ -124,7 +124,7 @@ function SavingBadge({ state }) {
 /* ============================================
    CHARACTER SELECTOR
    ============================================ */
-function CharacterSelector({ value, onChange, characters, placeholder = "Select character...", accentColor }) {
+function CharacterSelector({ value, onChange, characters, placeholder = "Select character...", accentColor, darkBackground = false }) {
   const [isOpen, setIsOpen] = useState(false);
   const [customInput, setCustomInput] = useState("");
   const dropdownRef = useRef(null);
@@ -160,16 +160,19 @@ function CharacterSelector({ value, onChange, characters, placeholder = "Select 
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center justify-between gap-2 px-4 py-3 rounded-xl bg-white/90 border-2 hover:bg-white text-left transition-all shadow-sm"
-        style={{ borderColor: value ? accentColor : '#e2e8f0' }}
+        className="w-full flex items-center justify-between gap-2 px-4 py-3 rounded-xl border-2 text-left transition-all shadow-sm"
+        style={{ 
+          borderColor: value ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.3)',
+          background: 'rgba(255,255,255,0.15)',
+        }}
       >
         <div className="flex items-center gap-2">
-          <User size={18} style={{ color: accentColor }} />
-          <span className={value ? "text-slate-800 font-semibold" : "text-slate-400"}>
+          <User size={18} className="text-white/70" />
+          <span className={value ? "text-white font-semibold" : "text-white/60"}>
             {value || placeholder}
           </span>
         </div>
-        <ChevronDown size={18} className={`text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        <ChevronDown size={18} className={`text-white/70 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </button>
 
       {isOpen && (
@@ -180,7 +183,7 @@ function CharacterSelector({ value, onChange, characters, placeholder = "Select 
               value={customInput}
               onChange={(e) => setCustomInput(e.target.value)}
               placeholder="Type custom name + Enter"
-              className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 focus:outline-none focus:ring-2"
+              className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 focus:outline-none focus:ring-2 text-slate-800"
               style={{ focusRingColor: accentColor }}
               autoFocus
             />
@@ -463,9 +466,20 @@ export default function HopesFearsLegacy() {
   const [hfl, setHfl] = useState(() => {
     const saved = project.hfl || {};
     
-    // Migration: convert old format to new format
-    if (saved.protagonist && typeof saved.protagonist === 'object' && saved.protagonist.name !== undefined) {
-      // Old format detected - migrate it
+    console.log("[HopesFearsLegacy] Loading saved data:", saved);
+    
+    // Check if this is the NEW format (has 'roles' key)
+    if (saved.roles && saved.characters) {
+      console.log("[HopesFearsLegacy] Detected NEW format");
+      return {
+        roles: saved.roles,
+        characters: saved.characters,
+      };
+    }
+    
+    // Check if this is the OLD format (protagonist is an object with 'name' property)
+    if (saved.protagonist && typeof saved.protagonist === 'object' && 'name' in saved.protagonist) {
+      console.log("[HopesFearsLegacy] Detected OLD format, migrating...");
       const migratedCharacters = {};
       const migratedRoles = { protagonist: "", antagonist: "", secondary: "" };
       
@@ -487,10 +501,11 @@ export default function HopesFearsLegacy() {
       };
     }
     
-    // New format or empty
+    // Empty/new - return defaults
+    console.log("[HopesFearsLegacy] No saved data, using defaults");
     return {
-      roles: saved.roles || { ...DEFAULT_ROLES },
-      characters: saved.characters || {},
+      roles: { ...DEFAULT_ROLES },
+      characters: {},
     };
   });
 
@@ -499,11 +514,13 @@ export default function HopesFearsLegacy() {
   }, [chapters]);
 
   const commit = (next) => {
+    console.log("[HopesFearsLegacy] Saving data:", next);
     const copy = JSON.parse(JSON.stringify(project));
     copy.hfl = next;
     ensureWorkshopFields(copy);
     saveProject(copy);
     setProject(copy);
+    console.log("[HopesFearsLegacy] Data saved to project");
     try {
       window.dispatchEvent(new Event("project:change"));
     } catch {}
@@ -521,9 +538,17 @@ export default function HopesFearsLegacy() {
         setProject(newProject);
         
         const saved = newProject.hfl || {};
+        console.log("[HopesFearsLegacy] Project switch - loading:", saved);
         
-        // Migration check for new project too
-        if (saved.protagonist && typeof saved.protagonist === 'object' && saved.protagonist.name !== undefined) {
+        // Check if this is the NEW format (has 'roles' key)
+        if (saved.roles && saved.characters) {
+          setHfl({
+            roles: saved.roles,
+            characters: saved.characters,
+          });
+        }
+        // Check if this is the OLD format
+        else if (saved.protagonist && typeof saved.protagonist === 'object' && 'name' in saved.protagonist) {
           const migratedCharacters = {};
           const migratedRoles = { protagonist: "", antagonist: "", secondary: "" };
           
@@ -540,10 +565,12 @@ export default function HopesFearsLegacy() {
           });
           
           setHfl({ roles: migratedRoles, characters: migratedCharacters });
-        } else {
+        }
+        // Empty/new
+        else {
           setHfl({
-            roles: saved.roles || { ...DEFAULT_ROLES },
-            characters: saved.characters || {},
+            roles: { ...DEFAULT_ROLES },
+            characters: {},
           });
         }
         
@@ -756,8 +783,8 @@ export default function HopesFearsLegacy() {
             roleKey="antagonist"
             roleLabel="Antagonist / Catalyst"
             roleIcon={Swords}
-            roleColor="#7c6992"
-            roleGradient="linear-gradient(135deg, #6b5b7a 0%, #8b7a9e 100%)"
+            roleColor="#5c4a6e"
+            roleGradient="linear-gradient(135deg, #4a3a5c 0%, #6b5a7e 100%)"
             characterName={hfl.roles.antagonist}
             characterData={hfl.characters[hfl.roles.antagonist] || { hopes: [], fears: [], legacy: [] }}
             characters={allCharacters}
@@ -770,8 +797,8 @@ export default function HopesFearsLegacy() {
             roleKey="secondary"
             roleLabel="Secondary Lead"
             roleIcon={Users}
-            roleColor="#b07d8a"
-            roleGradient={`linear-gradient(135deg, #a07080 0%, #c99ba6 100%)`}
+            roleColor="#8b5a6a"
+            roleGradient={`linear-gradient(135deg, #7a4a5a 0%, #9b6a7a 100%)`}
             characterName={hfl.roles.secondary}
             characterData={hfl.characters[hfl.roles.secondary] || { hopes: [], fears: [], legacy: [] }}
             characters={allCharacters}
