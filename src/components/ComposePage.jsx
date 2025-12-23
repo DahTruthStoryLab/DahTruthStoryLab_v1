@@ -62,7 +62,8 @@ import {
 
 const CURRENT_STORY_KEY = "currentStory";
 const USER_PROJECTS_KEY = "userProjects";
-const PUBLISHING_DRAFT_KEY = "publishingDraft";
+const PUBLISHING_DRAFT_KEY = "publishingDraft"; 
+const [detectedCharacters, setDetectedCharacters] = useState([]);
 
 const DEBUG_IMPORT = false;
 
@@ -1839,6 +1840,11 @@ export default function ComposePage() {
     setView("editor");
     setEditorViewMode("editor");
   };
+
+  const refreshDetectedCharacters = useCallback(() => {
+  const results = regexScanForCharacters(chapters);
+  setDetectedCharacters(results);
+}, [chapters]);
 
   const switchToPageView = () => {
     if (!selectedId && chapters.length > 0) {
