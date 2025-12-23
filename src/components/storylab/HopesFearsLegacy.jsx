@@ -361,7 +361,7 @@ function CharacterCard({
             <h3 className="font-bold text-xl">{roleLabel}</h3>
             <p className="text-white/70 text-xs">
               {roleKey === "protagonist" && "The hero driving the story"}
-              {roleKey === "antagonist" && "The opposing force"}
+              {roleKey === "antagonist" && "The opposing force or change agent"}
               {roleKey === "secondary" && "Key supporting character"}
             </p>
           </div>
@@ -751,13 +751,13 @@ export default function HopesFearsLegacy() {
             onEditCharacter={editCharacter}
           />
 
-          {/* Antagonist */}
+          {/* Antagonist/Catalyst */}
           <CharacterCard
             roleKey="antagonist"
-            roleLabel="Antagonist"
+            roleLabel="Antagonist / Catalyst"
             roleIcon={Swords}
-            roleColor="#991b1b"
-            roleGradient="linear-gradient(135deg, #7f1d1d 0%, #b91c1c 100%)"
+            roleColor="#7c6992"
+            roleGradient="linear-gradient(135deg, #6b5b7a 0%, #8b7a9e 100%)"
             characterName={hfl.roles.antagonist}
             characterData={hfl.characters[hfl.roles.antagonist] || { hopes: [], fears: [], legacy: [] }}
             characters={allCharacters}
@@ -770,8 +770,8 @@ export default function HopesFearsLegacy() {
             roleKey="secondary"
             roleLabel="Secondary Lead"
             roleIcon={Users}
-            roleColor={BRAND.mauve}
-            roleGradient={`linear-gradient(135deg, ${BRAND.mauve} 0%, #9f8bb8 100%)`}
+            roleColor="#b07d8a"
+            roleGradient={`linear-gradient(135deg, #a07080 0%, #c99ba6 100%)`}
             characterName={hfl.roles.secondary}
             characterData={hfl.characters[hfl.roles.secondary] || { hopes: [], fears: [], legacy: [] }}
             characters={allCharacters}
