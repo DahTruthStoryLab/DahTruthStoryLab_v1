@@ -26,6 +26,7 @@ import {
   ArrowRight,
   Play,
   Calendar,
+  Layers,
 } from "lucide-react";
 
 /* ---------------------------
@@ -92,6 +93,15 @@ const JOURNEY_STEPS = [
 ---------------------------- */
 const STORY_TOOLS = [
   {
+    id: "plot-builder",
+    title: "Plot Builder",
+    blurb: "Build story blocks: stakes, obstacles, turning points.",
+    icon: Layers,
+    route: `${BASE}/plot-builder`,
+    color: "#dc2626",
+    isNew: true,
+  },
+  {
     id: "narrative-arc",
     title: "Narrative Arc",
     blurb: "Map emotional beats and story structure.",
@@ -117,6 +127,7 @@ const NAV_ITEMS = [
   { to: `${BASE}/workshop/roadmap`, icon: MapIcon, label: "Roadmap" },
   { to: `${BASE}/workshop/clothesline`, icon: LayoutGrid, label: "Clothesline" },
   { divider: true },
+  { to: `${BASE}/plot-builder`, icon: Layers, label: "Plot Builder", isNew: true },
   { to: `${BASE}/narrative-arc`, icon: Sparkles, label: "Narrative Arc" },
   { to: `${BASE}/prompts`, icon: Feather, label: "Prompts" },
   { to: `${BASE}/community`, icon: Users, label: "Community" },
@@ -239,7 +250,7 @@ function PinnedSidebar() {
             <Link
               key={item.to}
               to={item.to}
-              className={`flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all ${
+              className={`flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all relative ${
                 pathname === item.to
                   ? "bg-gradient-to-r from-slate-100 to-slate-50 shadow-sm"
                   : "hover:bg-slate-50"
@@ -255,6 +266,14 @@ function PinnedSidebar() {
                 }}
               />
               <span className="text-sm font-medium truncate">{item.label}</span>
+              {item.isNew && (
+                <span 
+                  className="absolute right-2 text-[10px] font-bold px-1.5 py-0.5 rounded text-white"
+                  style={{ background: "#dc2626" }}
+                >
+                  NEW
+                </span>
+              )}
             </Link>
           )
         )}
@@ -363,7 +382,7 @@ function MobileSidebar({ open, setOpen }) {
                     key={item.to}
                     to={item.to}
                     onClick={() => setOpen(false)}
-                    className={`flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all ${
+                    className={`flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all relative ${
                       pathname === item.to ? "bg-slate-100" : "hover:bg-slate-50"
                     }`}
                   >
@@ -377,6 +396,14 @@ function MobileSidebar({ open, setOpen }) {
                     >
                       {item.label}
                     </span>
+                    {item.isNew && (
+                      <span 
+                        className="text-[10px] font-bold px-1.5 py-0.5 rounded text-white"
+                        style={{ background: "#dc2626" }}
+                      >
+                        NEW
+                      </span>
+                    )}
                   </Link>
                 )
               )}
@@ -567,23 +594,32 @@ function StoryToolsSection({ navigate }) {
         <p className="text-slate-500 text-sm">Additional resources for your craft</p>
       </div>
 
-      <div className="grid sm:grid-cols-2 gap-3">
+      <div className="grid sm:grid-cols-3 gap-3">
         {STORY_TOOLS.map((tool) => (
           <button
             key={tool.id}
             onClick={() => navigate(tool.route)}
-            className="group rounded-xl p-4 text-left transition-all hover:shadow-md"
+            className="group rounded-xl p-4 text-left transition-all hover:shadow-md relative"
             style={{
               background: "rgba(255, 255, 255, 0.8)",
-              border: "1px solid rgba(30, 58, 95, 0.1)",
+              border: `1px solid ${tool.color ? `${tool.color}25` : "rgba(30, 58, 95, 0.1)"}`,
             }}
           >
+            {/* NEW badge */}
+            {tool.isNew && (
+              <span 
+                className="absolute top-2 right-2 text-[10px] font-bold px-1.5 py-0.5 rounded text-white"
+                style={{ background: "#dc2626" }}
+              >
+                NEW
+              </span>
+            )}
             <div className="flex items-start gap-3">
               <div
                 className="w-10 h-10 rounded-lg flex items-center justify-center"
-                style={{ background: `${BRAND.navy}08` }}
+                style={{ background: tool.color ? `${tool.color}15` : `${BRAND.navy}08` }}
               >
-                <tool.icon size={20} style={{ color: BRAND.navy }} />
+                <tool.icon size={20} style={{ color: tool.color || BRAND.navy }} />
               </div>
               <div>
                 <h3 className="font-semibold text-sm" style={{ color: BRAND.navy }}>
@@ -620,10 +656,10 @@ function WorkshopCommunitySection({ navigate }) {
           </div>
           <div className="flex-1">
             <h3 className="text-lg font-bold mb-1" style={{ color: BRAND.navy }}>
-              Workshop Community
+              Workshop Hub
             </h3>
             <p className="text-sm text-slate-600">
-              Connect with your cohort, share writing for critique, manage sessions, and collaborate on your story journey together.
+              Access all your story development tools, connect with your cohort, and track your writing journey.
             </p>
           </div>
           <ChevronRight
