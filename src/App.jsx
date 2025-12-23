@@ -21,7 +21,8 @@ import {
   MouseTransition,
 } from "dnd-multi-backend";
 import { HTML5Backend } from "react-dnd-html5-backend";
-import { TouchBackend } from "react-dnd-touch-backend";
+import { TouchBackend } from "react-dnd-touch-backend"; 
+import PlotBuilder from "./components/storylab/PlotBuilder";
 
 // Global user context
 import { UserProvider } from "./lib/userStore.jsx";
@@ -324,6 +325,11 @@ export default function App() {
                 element={<Navigate to="/publishing-prep" replace />}
               />
 
+              <Route 
+                path="/story-lab/plot-builder" 
+                element={<PlotBuilder />} 
+                />
+              
               {/* Project */}
               <Route
                 path="/project"
