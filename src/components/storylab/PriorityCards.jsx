@@ -602,6 +602,7 @@ export default function PriorityCards() {
   const [priorities, setPriorities] = useState(() => loadPriorities());
   const [dragging, setDragging] = useState(null);
   const [selectedId, setSelectedId] = useState(null);
+  const [saving, setSaving] = useState("idle"); // "idle" or "saving"
   
   // AI Analysis state
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -644,9 +645,21 @@ export default function PriorityCards() {
     };
   }, [currentProjectId]);
 
-  // Save priorities whenever they change
+  // Save priorities whenever they change (with debounce)
   useEffect(() => {
+    setSaving("saving");
+    const id = setTimeout(() => {
+      savePriorities(priorities);
+      setSaving("idle");
+    }, 500);
+    return () => clearTimeout(id);
+  }, [priorities]);
+
+  // Manual save function
+  const saveNow = useCallback(() => {
+    setSaving("saving");
     savePriorities(priorities);
+    setTimeout(() => setSaving("idle"), 300);
   }, [priorities]);
 
   // Add new priority card (memoized)
@@ -951,6 +964,25 @@ Return 4-8 suggestions total. JSON array only, no other text.`;
               </div>
             </div>
           )}
+
+          {/* Save Button */}
+          <div className="mt-6 flex items-center justify-between">
+            <span className={`text-xs px-3 py-1.5 rounded-full font-medium ${
+              saving === "saving" 
+                ? "bg-amber-100 text-amber-700 border border-amber-200" 
+                : "bg-emerald-100 text-emerald-700 border border-emerald-200"
+            }`}>
+              {saving === "saving" ? "Saving…" : "✓ Saved"}
+            </span>
+            <button
+              onClick={saveNow}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white shadow-lg transition-all hover:scale-105"
+              style={{ background: `linear-gradient(135deg, ${BRAND.navy}, #2d4a6f)` }}
+            >
+              <CheckCircle size={16} />
+              Save Now
+            </button>
+          </div>
         </div>
       </div>
 
