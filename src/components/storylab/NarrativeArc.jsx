@@ -242,7 +242,7 @@ function saveCharacters(chars) {
 }
 
 /* ============================================
-   Character Card (Trello-style)
+   Character Card (Trello-style) - Enhanced Colors
    ============================================ */
 function CharacterCard({ char, index, onUpdate, onDelete, onDragStart, onDragOver, onDrop, isDragging }) {
   const [isEditing, setIsEditing] = useState(false);
@@ -254,26 +254,36 @@ function CharacterCard({ char, index, onUpdate, onDelete, onDragStart, onDragOve
       onDragStart={() => onDragStart(index)}
       onDragOver={(e) => { e.preventDefault(); onDragOver(index); }}
       onDrop={(e) => { e.preventDefault(); onDrop(index); }}
-      className={`bg-white rounded-2xl shadow-md border-2 transition-all hover:shadow-lg ${
+      className={`rounded-2xl shadow-lg overflow-hidden transition-all hover:shadow-xl ${
         isDragging ? "opacity-50 scale-95" : "hover:scale-[1.02]"
       }`}
-      style={{ borderColor: `${roleColor.bg}30` }}
+      style={{ 
+        border: `3px solid ${roleColor.bg}`,
+        background: `linear-gradient(180deg, ${roleColor.bg}08 0%, ${roleColor.bg}15 100%)`,
+      }}
     >
-      {/* Header */}
+      {/* Header - Bolder gradient */}
       <div 
-        className="px-4 py-4 rounded-t-2xl"
-        style={{ background: `linear-gradient(135deg, ${roleColor.bg} 0%, ${roleColor.bg}dd 100%)` }}
+        className="px-4 py-5 relative overflow-hidden"
+        style={{ background: `linear-gradient(135deg, ${roleColor.bg} 0%, ${roleColor.bg}cc 50%, ${roleColor.bg}99 100%)` }}
       >
-        <div className="flex items-center gap-3">
-          <div className="cursor-grab active:cursor-grabbing text-white/50">
-            <GripVertical size={16} />
+        {/* Decorative circle */}
+        <div 
+          className="absolute -top-8 -right-8 w-24 h-24 rounded-full opacity-20"
+          style={{ background: "#fff" }}
+        />
+        
+        <div className="relative flex items-center gap-3">
+          <div className="cursor-grab active:cursor-grabbing text-white/60 hover:text-white/90">
+            <GripVertical size={18} />
           </div>
           <div 
-            className="w-12 h-12 rounded-xl flex items-center justify-center text-lg font-bold shadow-lg"
+            className="w-14 h-14 rounded-xl flex items-center justify-center text-xl font-bold shadow-xl"
             style={{ 
-              background: "rgba(255,255,255,0.2)", 
-              color: roleColor.text === "#fff" ? "#fff" : roleColor.bg,
-              border: "2px solid rgba(255,255,255,0.3)",
+              background: "rgba(255,255,255,0.25)", 
+              color: "#fff",
+              border: "3px solid rgba(255,255,255,0.4)",
+              backdropFilter: "blur(4px)",
             }}
           >
             {char.initials}
@@ -289,32 +299,49 @@ function CharacterCard({ char, index, onUpdate, onDelete, onDragStart, onDragOve
                 onBlur={() => setIsEditing(false)}
                 onKeyDown={(e) => e.key === "Enter" && setIsEditing(false)}
                 autoFocus
-                className="w-full bg-white/20 rounded px-2 py-1 text-white font-bold outline-none"
+                className="w-full bg-white/30 rounded-lg px-3 py-1.5 text-white font-bold outline-none text-lg"
+                placeholder="Character name"
               />
             ) : (
               <h4 
-                className="font-bold truncate cursor-pointer hover:underline"
-                style={{ color: roleColor.text }}
+                className="font-bold text-lg truncate cursor-pointer hover:underline text-white"
                 onClick={() => setIsEditing(true)}
               >
                 {char.name}
               </h4>
             )}
-            <span className="text-xs opacity-80" style={{ color: roleColor.text }}>
+            <div 
+              className="inline-block mt-1 text-xs font-semibold px-2 py-0.5 rounded-full"
+              style={{ 
+                background: "rgba(255,255,255,0.25)",
+                color: "#fff",
+              }}
+            >
               {char.role}
-            </span>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Body */}
-      <div className="px-4 py-3">
-        <div className="mb-3">
-          <label className="text-[10px] uppercase tracking-wide text-slate-400 font-medium">Role</label>
+      {/* Body - Tinted background */}
+      <div className="px-4 py-4">
+        {/* Role selector with colored accent */}
+        <div className="mb-4">
+          <label 
+            className="text-[10px] uppercase tracking-wider font-bold mb-1.5 block"
+            style={{ color: roleColor.bg }}
+          >
+            Role
+          </label>
           <select
             value={char.role}
             onChange={(e) => onUpdate(char.id, { role: e.target.value })}
-            className="w-full mt-1 text-sm rounded-lg px-3 py-2 bg-slate-50 border border-slate-200 outline-none"
+            className="w-full text-sm rounded-xl px-3 py-2.5 outline-none font-medium transition-all"
+            style={{ 
+              background: "#fff",
+              border: `2px solid ${roleColor.bg}30`,
+              color: BRAND.ink,
+            }}
           >
             {ROLE_OPTIONS.map(role => (
               <option key={role} value={role}>{role}</option>
@@ -322,27 +349,46 @@ function CharacterCard({ char, index, onUpdate, onDelete, onDragStart, onDragOve
           </select>
         </div>
 
-        <div className="mb-3">
-          <label className="text-[10px] uppercase tracking-wide text-slate-400 font-medium">Notes</label>
+        {/* Notes with colored border */}
+        <div className="mb-4">
+          <label 
+            className="text-[10px] uppercase tracking-wider font-bold mb-1.5 block"
+            style={{ color: roleColor.bg }}
+          >
+            Notes
+          </label>
           <textarea
             value={char.notes || ""}
             onChange={(e) => onUpdate(char.id, { notes: e.target.value })}
             placeholder="Character notes..."
-            className="w-full mt-1 text-sm rounded-lg px-3 py-2 bg-slate-50 border border-slate-200 outline-none resize-none h-16"
+            className="w-full text-sm rounded-xl px-3 py-2.5 outline-none resize-none h-20 transition-all"
+            style={{ 
+              background: "#fff",
+              border: `2px solid ${roleColor.bg}30`,
+              color: BRAND.ink,
+            }}
           />
         </div>
 
-        <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+        {/* Action buttons with role color */}
+        <div 
+          className="flex items-center justify-between pt-3 mt-2"
+          style={{ borderTop: `2px solid ${roleColor.bg}20` }}
+        >
           <button
             onClick={() => setIsEditing(true)}
-            className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-700"
+            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-all hover:scale-105"
+            style={{ 
+              background: `${roleColor.bg}15`,
+              color: roleColor.bg,
+            }}
           >
             <Edit3 size={12} />
             Edit
           </button>
           <button
             onClick={() => onDelete(char.id)}
-            className="flex items-center gap-1 text-xs text-red-400 hover:text-red-600"
+            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 transition-all hover:scale-105"
           >
             <Trash2 size={12} />
             Remove
@@ -610,19 +656,20 @@ export default function NarrativeArc() {
           </div>
         </div>
 
-        {/* Timeline */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 mb-8">
-          <div className="flex items-center gap-2 overflow-x-auto pb-2">
+        {/* Timeline - Centered */}
+        <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-8">
+          <h3 className="text-center text-sm font-semibold text-slate-500 mb-4 uppercase tracking-wide">Story Timeline</h3>
+          <div className="flex items-center justify-center gap-3 overflow-x-auto pb-2 flex-wrap">
             {storyBeats.map((beat, index) => {
               const Icon = ICONS[beat.iconKey] || Heart;
               const isActive = activeNode === beat.id;
               return (
                 <React.Fragment key={beat.id}>
-                  <button onClick={() => setActiveNode(beat.id)} className={`flex-shrink-0 ${getColorClasses(beat.color)} px-3 py-2 rounded-xl transition-all hover:scale-105 ${isActive ? "ring-2 ring-offset-1 scale-105" : ""}`} style={{ ringColor: BRAND.gold, minWidth: 100 }}>
-                    <Icon size={16} className="mx-auto mb-1" />
-                    <div className="text-[10px] font-bold text-center truncate">{beat.title}</div>
+                  <button onClick={() => setActiveNode(beat.id)} className={`flex-shrink-0 ${getColorClasses(beat.color)} px-4 py-3 rounded-xl transition-all hover:scale-105 shadow-md ${isActive ? "ring-2 ring-offset-2 scale-105 shadow-lg" : ""}`} style={{ ringColor: BRAND.gold, minWidth: 110 }}>
+                    <Icon size={20} className="mx-auto mb-1.5" />
+                    <div className="text-xs font-bold text-center truncate">{beat.title}</div>
                   </button>
-                  {index < storyBeats.length - 1 && <div className="w-6 h-0.5 flex-shrink-0 rounded" style={{ background: BRAND.mauve }} />}
+                  {index < storyBeats.length - 1 && <div className="w-8 h-1 flex-shrink-0 rounded-full" style={{ background: `linear-gradient(90deg, ${BRAND.mauve}, ${BRAND.gold})` }} />}
                 </React.Fragment>
               );
             })}
@@ -728,3 +775,4 @@ export default function NarrativeArc() {
     </div>
   );
 }
+
