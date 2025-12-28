@@ -18,6 +18,7 @@ import {
   Star,
   Zap,
   TrendingUp,
+  MessageSquare,
 } from "lucide-react";
 
 /* ============================================
@@ -90,6 +91,17 @@ const MODULES = [
     color: BRAND.navy,
     gradient: `linear-gradient(135deg, ${BRAND.ink} 0%, ${BRAND.navy} 100%)`,
     category: "Structure",
+  },
+  {
+    id: "dialogue-lab",
+    title: "Dialogue Lab",
+    description: "Write, analyze, and enhance character dialogue with AI-powered feedback.",
+    icon: MessageSquare,
+    path: "/story-lab/dialogue-lab",
+    color: "#0891b2",
+    gradient: "linear-gradient(135deg, #0e7490 0%, #0891b2 50%, #06b6d4 100%)",
+    category: "Writing",
+    isNew: true,
   },
   {
     id: "clothesline",
@@ -299,6 +311,10 @@ export default function WorkshopHub() {
                 <span>Structure</span>
               </div>
               <div className="flex items-center gap-2">
+                <MessageSquare size={14} className="text-cyan-400" />
+                <span>Dialogue</span>
+              </div>
+              <div className="flex items-center gap-2">
                 <Sparkles size={14} style={{ color: BRAND.mauve }} />
                 <span>AI Tools</span>
               </div>
@@ -353,7 +369,12 @@ export default function WorkshopHub() {
             </div>
             <span className="text-slate-300">→</span>
             <div className="flex items-center gap-2">
-              <span className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold" style={{ background: "#6366f1" }}>5</span>
+              <span className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold" style={{ background: "#0891b2" }}>5</span>
+              <span className="text-slate-600">Dialogue Lab</span>
+            </div>
+            <span className="text-slate-300">→</span>
+            <div className="flex items-center gap-2">
+              <span className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold" style={{ background: "#6366f1" }}>6</span>
               <span className="text-slate-600">Clothesline</span>
             </div>
           </div>
@@ -362,3 +383,4 @@ export default function WorkshopHub() {
     </div>
   );
 }
+
