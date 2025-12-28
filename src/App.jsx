@@ -29,6 +29,7 @@ import { UserProvider } from "./lib/userStore.jsx";
 
 // force-load API bootstrap (adds window.__API_BASE__)
 import "./lib/api";
+import DialogueLab from "./components/storylab/DialogueLab";
 
 // =========================
 // DnD Backend Configuration
@@ -187,24 +188,28 @@ export default function App() {
                 }
               />
 
-              {/* STORY-LAB (layout + nested routes) */}
-              <Route
-                path="/story-lab/*"
-                element={
-                  <ProtectedRoute>
-                    <StoryLabLayout />
-                  </ProtectedRoute>
-                }
-              >
-                <Route index element={<StoryLabLanding />} />
-                <Route path="narrative-arc" element={<NarrativeArc />} />
-                <Route path="hub" element={<WorkshopHub />} />           {/* NEW */}
-                <Route path="workshop" element={<WorkshopHub />} />      {/* CHANGED */}
-                <Route path="community" element={<WorkshopCohort />} />  {/* NEW */}
-                <Route path="plot-builder" element={<PlotBuilder />} />  {/* NEW */}
+             {/* STORY-LAB (layout + nested routes) */}
                 <Route
-                  path="workshop/priorities"
-                  element={<PriorityCards />}
+                  path="/story-lab/*"
+                  element={
+                    <ProtectedRoute>
+                      <StoryLabLayout />
+                    </ProtectedRoute>
+                  }
+                >
+                  <Route index element={<StoryLabLanding />} />
+                  <Route path="narrative-arc" element={<NarrativeArc />} />
+                  <Route path="hub" element={<WorkshopHub />} />
+                  <Route path="workshop" element={<WorkshopHub />} />
+                  <Route path="community" element={<WorkshopCohort />} />
+                  <Route path="plot-builder" element={<PlotBuilder />} />
+                  <Route path="dialogue-lab" element={<DialogueLab />} />   {/* ADD THIS */}
+                  <Route
+                    path="workshop/priorities"
+                    element={<PriorityCards />}
+                  />
+                  {/* ... rest of routes */}
+                </Route>
                 />
                 <Route
                   path="workshop/roadmap"
