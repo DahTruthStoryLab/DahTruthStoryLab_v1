@@ -159,6 +159,93 @@ function extractCharactersFromChapters(chapters = []) {
   return Array.from(charSet).sort();
 }
 
+/**
+ * Extract which chapters each character appears in
+ * Returns: { "Marcus": [0, 2, 5], "Grace": [1, 3, 4] }
+ */
+function extractCharacterAppearances(chapters = []) {
+  const appearances = {};
+  const charPattern = /@char:\s*([A-Za-z][A-Za-z\s.'-]*)/gi;
+  
+  chapters.forEach((ch, chapterIndex) => {
+    const content = ch.content || ch.text || ch.textHTML || "";
+    let match;
+    while ((match = charPattern.exec(content)) !== null) {
+      const name = match[1].trim();
+      if (name) {
+        if (!appearances[name]) {
+          appearances[name] = [];
+        }
+        if (!appearances[name].includes(chapterIndex)) {
+          appearances[name].push(chapterIndex);
+        }
+      }
+    }
+  });
+  
+  return appearances;
+}
+
+/**
+ * Map a chapter index to a story phase based on position in manuscript
+ */
+function mapChapterToPhase(chapterIndex, totalChapters, storyBeats) {
+  if (totalChapters === 0) return null;
+  
+  // Calculate position as percentage through the story
+  const position = (chapterIndex / Math.max(1, totalChapters - 1)) * 100;
+  
+  // Find the closest beat based on x position
+  let closestBeat = storyBeats[0];
+  let closestDistance = Math.abs(position - (storyBeats[0]?.position?.x || 0));
+  
+  storyBeats.forEach(beat => {
+    const distance = Math.abs(position - (beat.position?.x || 0));
+    if (distance < closestDistance) {
+      closestDistance = distance;
+      closestBeat = beat;
+    }
+  });
+  
+  return closestBeat;
+}
+
+/**
+ * Get the first appearance phase for a character
+ */
+function getFirstAppearancePhase(characterName, chapters, storyBeats) {
+  const appearances = extractCharacterAppearances(chapters);
+  const charAppearances = appearances[characterName] || [];
+  
+  if (charAppearances.length === 0 || storyBeats.length === 0) return null;
+  
+  const firstChapter = Math.min(...charAppearances);
+  const beat = mapChapterToPhase(firstChapter, chapters.length, storyBeats);
+  
+  return beat ? { beat, chapterIndex: firstChapter } : null;
+}
+
+/**
+ * Get all phases a character appears in
+ */
+function getCharacterPhases(characterName, chapters, storyBeats) {
+  const appearances = extractCharacterAppearances(chapters);
+  const charAppearances = appearances[characterName] || [];
+  
+  const phases = new Set();
+  const beatIds = new Set();
+  
+  charAppearances.forEach(chapterIndex => {
+    const beat = mapChapterToPhase(chapterIndex, chapters.length, storyBeats);
+    if (beat) {
+      phases.add(beat.phase || beat.title);
+      beatIds.add(beat.id);
+    }
+  });
+  
+  return { phases: Array.from(phases), beatIds: Array.from(beatIds), chapterIndices: charAppearances };
+}
+
 function getInitials(name) {
   return name.split(/\s+/).map(word => word[0]).join('').toUpperCase().slice(0, 2);
 }
@@ -242,9 +329,23 @@ function saveCharacters(chars) {
 }
 
 /* ============================================
-   Character Card (Trello-style) - Enhanced Colors
+   Character Card (Trello-style) - With Arc Integration
    ============================================ */
-function CharacterCard({ char, index, onUpdate, onDelete, onDragStart, onDragOver, onDrop, isDragging }) {
+function CharacterCard({ 
+  char, 
+  index, 
+  onUpdate, 
+  onDelete, 
+  onDragStart, 
+  onDragOver, 
+  onDrop, 
+  isDragging,
+  isSelected,
+  onSelect,
+  firstAppearance,
+  appearanceCount,
+  totalChapters
+}) {
   const [isEditing, setIsEditing] = useState(false);
   const roleColor = ROLE_COLORS[char.role] || ROLE_COLORS["Character"];
 
@@ -254,12 +355,14 @@ function CharacterCard({ char, index, onUpdate, onDelete, onDragStart, onDragOve
       onDragStart={() => onDragStart(index)}
       onDragOver={(e) => { e.preventDefault(); onDragOver(index); }}
       onDrop={(e) => { e.preventDefault(); onDrop(index); }}
-      className={`rounded-2xl shadow-lg overflow-hidden transition-all hover:shadow-xl ${
+      onClick={() => onSelect && onSelect(char.id)}
+      className={`rounded-2xl shadow-lg overflow-hidden transition-all cursor-pointer ${
         isDragging ? "opacity-50 scale-95" : "hover:scale-[1.02]"
-      }`}
+      } ${isSelected ? "ring-4 ring-offset-2 shadow-xl scale-[1.02]" : "hover:shadow-xl"}`}
       style={{ 
         border: `3px solid ${roleColor.bg}`,
         background: `linear-gradient(180deg, ${roleColor.bg}08 0%, ${roleColor.bg}15 100%)`,
+        ringColor: BRAND.gold,
       }}
     >
       {/* Header - Bolder gradient */}
@@ -272,6 +375,13 @@ function CharacterCard({ char, index, onUpdate, onDelete, onDragStart, onDragOve
           className="absolute -top-8 -right-8 w-24 h-24 rounded-full opacity-20"
           style={{ background: "#fff" }}
         />
+        
+        {/* Selected indicator */}
+        {isSelected && (
+          <div className="absolute top-2 right-2 bg-white/30 rounded-full p-1">
+            <Check size={14} className="text-white" />
+          </div>
+        )}
         
         <div className="relative flex items-center gap-3">
           <div className="cursor-grab active:cursor-grabbing text-white/60 hover:text-white/90">
@@ -298,6 +408,7 @@ function CharacterCard({ char, index, onUpdate, onDelete, onDragStart, onDragOve
                 })}
                 onBlur={() => setIsEditing(false)}
                 onKeyDown={(e) => e.key === "Enter" && setIsEditing(false)}
+                onClick={(e) => e.stopPropagation()}
                 autoFocus
                 className="w-full bg-white/30 rounded-lg px-3 py-1.5 text-white font-bold outline-none text-lg"
                 placeholder="Character name"
@@ -305,7 +416,7 @@ function CharacterCard({ char, index, onUpdate, onDelete, onDragStart, onDragOve
             ) : (
               <h4 
                 className="font-bold text-lg truncate cursor-pointer hover:underline text-white"
-                onClick={() => setIsEditing(true)}
+                onClick={(e) => { e.stopPropagation(); setIsEditing(true); }}
               >
                 {char.name}
               </h4>
@@ -323,6 +434,26 @@ function CharacterCard({ char, index, onUpdate, onDelete, onDragStart, onDragOve
         </div>
       </div>
 
+      {/* Arc Appearance Banner */}
+      {firstAppearance && (
+        <div 
+          className="px-4 py-2 flex items-center justify-between"
+          style={{ background: `${BRAND.gold}20`, borderBottom: `2px solid ${BRAND.gold}30` }}
+        >
+          <div className="flex items-center gap-2">
+            <Sparkles size={14} style={{ color: BRAND.gold }} />
+            <span className="text-xs font-bold" style={{ color: BRAND.gold }}>
+              Enters at {firstAppearance.beat?.title || firstAppearance.beat?.phase}
+            </span>
+          </div>
+          {appearanceCount > 0 && totalChapters > 0 && (
+            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-white" style={{ color: BRAND.navy }}>
+              {appearanceCount}/{totalChapters} chapters
+            </span>
+          )}
+        </div>
+      )}
+
       {/* Body - Tinted background */}
       <div className="px-4 py-4">
         {/* Role selector with colored accent */}
@@ -336,6 +467,7 @@ function CharacterCard({ char, index, onUpdate, onDelete, onDragStart, onDragOve
           <select
             value={char.role}
             onChange={(e) => onUpdate(char.id, { role: e.target.value })}
+            onClick={(e) => e.stopPropagation()}
             className="w-full text-sm rounded-xl px-3 py-2.5 outline-none font-medium transition-all"
             style={{ 
               background: "#fff",
@@ -360,6 +492,7 @@ function CharacterCard({ char, index, onUpdate, onDelete, onDragStart, onDragOve
           <textarea
             value={char.notes || ""}
             onChange={(e) => onUpdate(char.id, { notes: e.target.value })}
+            onClick={(e) => e.stopPropagation()}
             placeholder="Character notes..."
             className="w-full text-sm rounded-xl px-3 py-2.5 outline-none resize-none h-20 transition-all"
             style={{ 
@@ -376,7 +509,7 @@ function CharacterCard({ char, index, onUpdate, onDelete, onDragStart, onDragOve
           style={{ borderTop: `2px solid ${roleColor.bg}20` }}
         >
           <button
-            onClick={() => setIsEditing(true)}
+            onClick={(e) => { e.stopPropagation(); setIsEditing(true); }}
             className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg transition-all hover:scale-105"
             style={{ 
               background: `${roleColor.bg}15`,
@@ -387,7 +520,7 @@ function CharacterCard({ char, index, onUpdate, onDelete, onDragStart, onDragOve
             Edit
           </button>
           <button
-            onClick={() => onDelete(char.id)}
+            onClick={(e) => { e.stopPropagation(); onDelete(char.id); }}
             className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 transition-all hover:scale-105"
           >
             <Trash2 size={12} />
@@ -409,11 +542,25 @@ export default function NarrativeArc() {
   const [storyBeats, setStoryBeats] = useState(() => loadBeats());
   const [characters, setCharacters] = useState(() => loadCharacters());
   const [dragIndex, setDragIndex] = useState(null);
+  const [selectedCharacterId, setSelectedCharacterId] = useState(null);
 
   const bookTitle = storyLabData?.book?.title || "Untitled Story";
   const chapters = storyLabData?.chapters || [];
   
   const storyCharacters = useMemo(() => extractCharactersFromChapters(chapters), [chapters]);
+  
+  // Character appearances in chapters
+  const characterAppearances = useMemo(() => extractCharacterAppearances(chapters), [chapters]);
+  
+  // Get highlighted beat IDs when a character is selected
+  const highlightedBeatIds = useMemo(() => {
+    if (!selectedCharacterId) return new Set();
+    const selectedChar = characters.find(c => c.id === selectedCharacterId);
+    if (!selectedChar) return new Set();
+    
+    const { beatIds } = getCharacterPhases(selectedChar.name, chapters, storyBeats);
+    return new Set(beatIds);
+  }, [selectedCharacterId, characters, chapters, storyBeats]);
 
   // Project switching
   useEffect(() => {
@@ -626,11 +773,12 @@ export default function NarrativeArc() {
             {storyBeats.map((beat, index) => {
               const Icon = ICONS[beat.iconKey] || Heart;
               const isActive = activeNode === beat.id;
+              const isHighlighted = highlightedBeatIds.has(beat.id);
               return (
                 <div
                   key={beat.id}
                   className="absolute cursor-move group"
-                  style={{ left: `${beat.position.x}%`, top: `${beat.position.y}%`, transform: "translate(-50%, -50%)", zIndex: isActive ? 20 : 10 }}
+                  style={{ left: `${beat.position.x}%`, top: `${beat.position.y}%`, transform: "translate(-50%, -50%)", zIndex: isActive ? 20 : (isHighlighted ? 15 : 10) }}
                   draggable
                   onDragStart={(e) => { e.dataTransfer.effectAllowed = "move"; e.dataTransfer.setData("beatId", beat.id); e.currentTarget.style.opacity = "0.5"; }}
                   onDragEnd={(e) => { e.currentTarget.style.opacity = "1"; }}
@@ -643,7 +791,25 @@ export default function NarrativeArc() {
                   }}
                   tabIndex={0}
                 >
-                  <div className={`${getNodeSize(beat.size)} ${getColorClasses(beat.color)} rounded-2xl flex flex-col items-center justify-center shadow-lg border-4 border-white/50 transition-all group-hover:scale-110 ${isActive ? "scale-110 ring-4 ring-offset-2" : ""}`} style={{ ringColor: BRAND.gold }}>
+                  {/* Highlight glow when character is selected */}
+                  {isHighlighted && (
+                    <div 
+                      className="absolute inset-0 rounded-2xl animate-pulse"
+                      style={{ 
+                        background: `radial-gradient(circle, ${BRAND.gold}60 0%, transparent 70%)`,
+                        transform: 'scale(1.8)',
+                        zIndex: -1,
+                      }}
+                    />
+                  )}
+                  <div 
+                    className={`${getNodeSize(beat.size)} ${getColorClasses(beat.color)} rounded-2xl flex flex-col items-center justify-center shadow-lg border-4 transition-all group-hover:scale-110 ${isActive ? "scale-110 ring-4 ring-offset-2" : ""} ${isHighlighted ? "scale-115 ring-4 ring-offset-2" : ""}`} 
+                    style={{ 
+                      ringColor: isHighlighted ? BRAND.gold : BRAND.gold,
+                      borderColor: isHighlighted ? BRAND.gold : "rgba(255,255,255,0.5)",
+                      boxShadow: isHighlighted ? `0 0 20px ${BRAND.gold}80, 0 4px 15px rgba(0,0,0,0.2)` : undefined,
+                    }}
+                  >
                     <Icon size={isActive ? 24 : 18} />
                     <span className="text-[8px] font-bold mt-1 text-center px-1">{beat.title.split(" ")[0]}</span>
                   </div>
@@ -663,9 +829,23 @@ export default function NarrativeArc() {
             {storyBeats.map((beat, index) => {
               const Icon = ICONS[beat.iconKey] || Heart;
               const isActive = activeNode === beat.id;
+              const isHighlighted = highlightedBeatIds.has(beat.id);
               return (
                 <React.Fragment key={beat.id}>
-                  <button onClick={() => setActiveNode(beat.id)} className={`flex-shrink-0 ${getColorClasses(beat.color)} px-4 py-3 rounded-xl transition-all hover:scale-105 shadow-md ${isActive ? "ring-2 ring-offset-2 scale-105 shadow-lg" : ""}`} style={{ ringColor: BRAND.gold, minWidth: 110 }}>
+                  <button 
+                    onClick={() => setActiveNode(beat.id)} 
+                    className={`flex-shrink-0 ${getColorClasses(beat.color)} px-4 py-3 rounded-xl transition-all hover:scale-105 shadow-md ${isActive ? "ring-2 ring-offset-2 scale-105 shadow-lg" : ""} ${isHighlighted ? "ring-4 ring-offset-2 scale-110" : ""}`} 
+                    style={{ 
+                      ringColor: BRAND.gold, 
+                      minWidth: 110,
+                      boxShadow: isHighlighted ? `0 0 15px ${BRAND.gold}80` : undefined,
+                    }}
+                  >
+                    {isHighlighted && (
+                      <div className="flex items-center justify-center mb-1">
+                        <Sparkles size={12} style={{ color: BRAND.gold }} />
+                      </div>
+                    )}
                     <Icon size={20} className="mx-auto mb-1.5" />
                     <div className="text-xs font-bold text-center truncate">{beat.title}</div>
                   </button>
@@ -733,9 +913,17 @@ export default function NarrativeArc() {
           <div className="flex items-center justify-between mb-6">
             <div>
               <h2 className="text-xl font-bold" style={{ color: BRAND.navy }}>Character Cast</h2>
-              <p className="text-sm text-slate-500">Drag to reorder · Click name to edit</p>
+              <p className="text-sm text-slate-500">Click a character to see where they appear in the arc</p>
             </div>
             <div className="flex items-center gap-2">
+              {selectedCharacterId && (
+                <button 
+                  onClick={() => setSelectedCharacterId(null)} 
+                  className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium hover:scale-105 transition-all bg-slate-100 text-slate-600"
+                >
+                  <X size={14} /> Clear Selection
+                </button>
+              )}
               {unimportedCount > 0 && (
                 <button onClick={() => { const c = importCharactersFromStory(); if (c > 0) alert(`Imported ${c} character(s)!`); }} className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium hover:scale-105 transition-all" style={{ background: `${BRAND.gold}20`, color: BRAND.gold }}>
                   <RefreshCw size={14} /> Import {unimportedCount}
@@ -759,9 +947,28 @@ export default function NarrativeArc() {
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-              {characters.map((char, idx) => (
-                <CharacterCard key={char.id} char={char} index={idx} onUpdate={updateCharacter} onDelete={deleteCharacter} onDragStart={handleCharDragStart} onDragOver={handleCharDragOver} onDrop={handleCharDrop} isDragging={dragIndex === idx} />
-              ))}
+              {characters.map((char, idx) => {
+                const firstAppearance = getFirstAppearancePhase(char.name, chapters, storyBeats);
+                const appearances = characterAppearances[char.name] || [];
+                return (
+                  <CharacterCard 
+                    key={char.id} 
+                    char={char} 
+                    index={idx} 
+                    onUpdate={updateCharacter} 
+                    onDelete={deleteCharacter} 
+                    onDragStart={handleCharDragStart} 
+                    onDragOver={handleCharDragOver} 
+                    onDrop={handleCharDrop} 
+                    isDragging={dragIndex === idx}
+                    isSelected={selectedCharacterId === char.id}
+                    onSelect={(id) => setSelectedCharacterId(selectedCharacterId === id ? null : id)}
+                    firstAppearance={firstAppearance}
+                    appearanceCount={appearances.length}
+                    totalChapters={chapters.length}
+                  />
+                );
+              })}
             </div>
           )}
 
