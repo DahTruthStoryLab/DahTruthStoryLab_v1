@@ -5,7 +5,7 @@ import React, { useMemo, useState, useEffect, useRef, useCallback } from "react"
 import { Link } from "react-router-dom";
 import { 
   Heart, Users, Plane, Sparkles, BookOpen, MapPin, 
-  ArrowLeft, Plus, Trash2, Save, Upload, Download,
+  ArrowLeft, ArrowRight, Plus, Trash2, Save, Upload, Download,
   User, Star, Shield, Zap, Target, Clock, AlertCircle,
   RefreshCw, ChevronDown, Check, X, GripVertical, Edit3
 } from "lucide-react";
@@ -342,9 +342,7 @@ function CharacterCard({
   isDragging,
   isSelected,
   onSelect,
-  firstAppearance,
-  appearanceCount,
-  totalChapters
+  assignedBeats = []
 }) {
   const [isEditing, setIsEditing] = useState(false);
   const roleColor = ROLE_COLORS[char.role] || ROLE_COLORS["Character"];
@@ -434,23 +432,36 @@ function CharacterCard({
         </div>
       </div>
 
-      {/* Arc Appearance Banner */}
-      {firstAppearance && (
+      {/* Arc Assignments Banner */}
+      {assignedBeats.length > 0 ? (
         <div 
-          className="px-4 py-2 flex items-center justify-between"
-          style={{ background: `${BRAND.gold}20`, borderBottom: `2px solid ${BRAND.gold}30` }}
+          className="px-4 py-3"
+          style={{ background: `${BRAND.gold}15`, borderBottom: `2px solid ${BRAND.gold}30` }}
         >
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 mb-2">
             <Sparkles size={14} style={{ color: BRAND.gold }} />
             <span className="text-xs font-bold" style={{ color: BRAND.gold }}>
-              Enters at {firstAppearance.beat?.title || firstAppearance.beat?.phase}
+              Appears in {assignedBeats.length} beat{assignedBeats.length !== 1 ? 's' : ''}
             </span>
           </div>
-          {appearanceCount > 0 && totalChapters > 0 && (
-            <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-white" style={{ color: BRAND.navy }}>
-              {appearanceCount}/{totalChapters} chapters
-            </span>
-          )}
+          <div className="flex flex-wrap gap-1">
+            {assignedBeats.map(beat => (
+              <span 
+                key={beat.id}
+                className="text-[10px] font-medium px-2 py-1 rounded-full"
+                style={{ background: `${BRAND.navy}15`, color: BRAND.navy }}
+              >
+                {beat.title}
+              </span>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <div 
+          className="px-4 py-2 text-center"
+          style={{ background: `${BRAND.mauve}10`, borderBottom: `1px solid ${BRAND.mauve}20` }}
+        >
+          <span className="text-[10px] text-slate-400">Not assigned to any beats yet</span>
         </div>
       )}
 
@@ -552,15 +563,28 @@ export default function NarrativeArc() {
   // Character appearances in chapters
   const characterAppearances = useMemo(() => extractCharacterAppearances(chapters), [chapters]);
   
-  // Get highlighted beat IDs when a character is selected
+  // Get highlighted beat IDs when a character is selected (uses manual assignments)
   const highlightedBeatIds = useMemo(() => {
     if (!selectedCharacterId) return new Set();
-    const selectedChar = characters.find(c => c.id === selectedCharacterId);
-    if (!selectedChar) return new Set();
     
-    const { beatIds } = getCharacterPhases(selectedChar.name, chapters, storyBeats);
+    // Find beats where this character has been manually assigned
+    const beatIds = storyBeats
+      .filter(beat => {
+        const assigned = beat.assignedCharacters || [];
+        return assigned.some(ac => ac.characterId === selectedCharacterId);
+      })
+      .map(beat => beat.id);
+    
     return new Set(beatIds);
-  }, [selectedCharacterId, characters, chapters, storyBeats]);
+  }, [selectedCharacterId, storyBeats]);
+  
+  // Get beats a character is assigned to (for character card display)
+  const getCharacterBeats = useCallback((characterId) => {
+    return storyBeats.filter(beat => {
+      const assigned = beat.assignedCharacters || [];
+      return assigned.some(ac => ac.characterId === characterId);
+    });
+  }, [storyBeats]);
 
   // Project switching
   useEffect(() => {
@@ -856,54 +880,243 @@ export default function NarrativeArc() {
           </div>
         </div>
 
-        {/* Beat Editor */}
+        {/* BEAT EDITOR - Story Craft Focus */}
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-8">
           {activeNode ? (() => {
             const beat = storyBeats.find(b => b.id === activeNode);
             if (!beat) return null;
             const Icon = ICONS[beat.iconKey] || Heart;
+            const assignedChars = beat.assignedCharacters || [];
+            
+            // Get characters not yet assigned to this beat
+            const availableChars = characters.filter(c => 
+              !assignedChars.some(ac => ac.characterId === c.id)
+            );
+            
             return (
-              <div className="space-y-4">
+              <div className="space-y-6">
+                {/* Beat Header */}
                 <div className="flex items-start justify-between gap-4">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-12 h-12 ${getColorClasses(beat.color)} rounded-xl flex items-center justify-center`}><Icon size={24} /></div>
+                  <div className="flex items-center gap-4">
+                    <div className={`w-14 h-14 ${getColorClasses(beat.color)} rounded-xl flex items-center justify-center shadow-lg`}>
+                      <Icon size={28} />
+                    </div>
                     <div>
-                      <input value={beat.title} onChange={(e) => updateBeat(beat.id, { title: e.target.value })} className="text-lg font-bold bg-transparent border-none outline-none" style={{ color: BRAND.navy }} />
-                      <div className="text-xs text-slate-500">Beat {storyBeats.findIndex(b => b.id === beat.id) + 1} of {storyBeats.length}</div>
+                      <input 
+                        value={beat.title} 
+                        onChange={(e) => updateBeat(beat.id, { title: e.target.value })} 
+                        className="text-xl font-bold bg-transparent border-none outline-none" 
+                        style={{ color: BRAND.navy }} 
+                      />
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: `${BRAND.mauve}30`, color: BRAND.navy }}>
+                          {beat.phase || "rising"}
+                        </span>
+                        <span className="text-xs text-slate-400">
+                          Beat {storyBeats.findIndex(b => b.id === beat.id) + 1} of {storyBeats.length}
+                        </span>
+                      </div>
                     </div>
                   </div>
-                  <button onClick={() => deleteBeat(beat.id)} className="p-2 rounded-lg hover:bg-red-50 text-red-400 hover:text-red-600"><Trash2 size={18} /></button>
-                </div>
-                <div className="flex flex-wrap gap-3">
-                  <select value={beat.iconKey} onChange={(e) => updateBeat(beat.id, { iconKey: e.target.value })} className="text-sm rounded-lg px-3 py-2 bg-slate-50 border border-slate-200">
-                    {ICON_OPTIONS.map(opt => <option key={opt.key} value={opt.key}>{opt.label}</option>)}
-                  </select>
-                  <select value={beat.color} onChange={(e) => updateBeat(beat.id, { color: e.target.value })} className="text-sm rounded-lg px-3 py-2 bg-slate-50 border border-slate-200">
-                    {COLOR_OPTIONS.map(opt => <option key={opt.key} value={opt.key}>{opt.label}</option>)}
-                  </select>
-                  <select value={beat.size} onChange={(e) => updateBeat(beat.id, { size: e.target.value })} className="text-sm rounded-lg px-3 py-2 bg-slate-50 border border-slate-200">
-                    <option value="small">Small</option><option value="medium">Medium</option><option value="large">Large</option><option value="xlarge">X-Large</option>
-                  </select>
-                  <select value={beat.phase || "rising"} onChange={(e) => updateBeat(beat.id, { phase: e.target.value })} className="text-sm rounded-lg px-3 py-2 bg-slate-50 border border-slate-200">
-                    <option value="beginning">Beginning</option><option value="rising">Rising Action</option><option value="midpoint">Midpoint</option><option value="falling">Falling Action</option><option value="climax">Climax</option><option value="resolution">Resolution</option>
-                  </select>
-                </div>
-                <textarea defaultValue={beat.content} onChange={(e) => debouncedUpdate({ id: beat.id, content: e.target.value })} className="w-full h-40 p-4 rounded-xl text-sm bg-slate-50 border border-slate-200 outline-none resize-none" placeholder="Describe this story beat..." />
-                <div className="flex items-center justify-between text-xs text-slate-500">
-                  <span>{countWords(beat.content)} words</span>
                   <div className="flex items-center gap-2">
-                    <div className="w-32 h-1.5 rounded-full overflow-hidden bg-slate-200">
-                      <div className="h-full rounded-full" style={{ width: `${Math.min(100, (countWords(beat.content) / 250) * 100)}%`, background: BRAND.gold }} />
+                    <select value={beat.color} onChange={(e) => updateBeat(beat.id, { color: e.target.value })} className="text-xs rounded-lg px-2 py-1.5 bg-slate-50 border border-slate-200">
+                      {COLOR_OPTIONS.map(opt => <option key={opt.key} value={opt.key}>{opt.label}</option>)}
+                    </select>
+                    <button onClick={() => deleteBeat(beat.id)} className="p-2 rounded-lg hover:bg-red-50 text-red-400 hover:text-red-600">
+                      <Trash2 size={18} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* What Happens - Scene Description */}
+                <div>
+                  <label className="text-xs uppercase tracking-wider font-bold mb-2 block" style={{ color: BRAND.navy }}>
+                    What Happens in This Scene
+                  </label>
+                  <textarea 
+                    defaultValue={beat.content} 
+                    onChange={(e) => debouncedUpdate({ id: beat.id, content: e.target.value })} 
+                    className="w-full h-24 p-4 rounded-xl text-sm bg-slate-50 border border-slate-200 outline-none resize-none" 
+                    placeholder="Describe what happens at this beat..." 
+                  />
+                </div>
+
+                {/* Horizontal Divider */}
+                <div className="border-t-2 border-dashed" style={{ borderColor: `${BRAND.gold}40` }} />
+
+                {/* CHARACTERS IN THIS SCENE */}
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <label className="text-xs uppercase tracking-wider font-bold" style={{ color: BRAND.navy }}>
+                      Characters in This Scene
+                    </label>
+                    {availableChars.length > 0 && (
+                      <select
+                        value=""
+                        onChange={(e) => {
+                          if (e.target.value) {
+                            const newAssigned = [...assignedChars, { characterId: e.target.value, purpose: "" }];
+                            updateBeat(beat.id, { assignedCharacters: newAssigned });
+                          }
+                        }}
+                        className="text-xs rounded-lg px-3 py-1.5 border border-slate-200"
+                        style={{ background: `${BRAND.gold}10` }}
+                      >
+                        <option value="">+ Add Character</option>
+                        {availableChars.map(c => (
+                          <option key={c.id} value={c.id}>{c.name}</option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+
+                  {assignedChars.length === 0 ? (
+                    <div className="text-center py-8 border-2 border-dashed border-slate-200 rounded-xl">
+                      <Users size={32} className="mx-auto mb-2" style={{ color: BRAND.mauve }} />
+                      <p className="text-sm text-slate-500">No characters assigned to this beat yet</p>
+                      <p className="text-xs text-slate-400 mt-1">Add characters to define their purpose in this scene</p>
                     </div>
-                    <span>{Math.min(100, Math.round((countWords(beat.content) / 250) * 100))}%</span>
+                  ) : (
+                    <div className="space-y-3">
+                      {assignedChars.map((ac, idx) => {
+                        const char = characters.find(c => c.id === ac.characterId);
+                        if (!char) return null;
+                        const roleColor = ROLE_COLORS[char.role] || ROLE_COLORS["Character"];
+                        
+                        return (
+                          <div 
+                            key={ac.characterId} 
+                            className="rounded-xl p-4 border-2"
+                            style={{ 
+                              background: `linear-gradient(135deg, ${roleColor.bg}08 0%, ${roleColor.bg}15 100%)`,
+                              borderColor: `${roleColor.bg}30`,
+                            }}
+                          >
+                            <div className="flex items-start gap-3">
+                              <div 
+                                className="w-10 h-10 rounded-lg flex items-center justify-center text-sm font-bold flex-shrink-0"
+                                style={{ background: roleColor.bg, color: roleColor.text }}
+                              >
+                                {char.initials}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between mb-2">
+                                  <div>
+                                    <span className="font-bold text-sm" style={{ color: BRAND.navy }}>{char.name}</span>
+                                    <span className="ml-2 text-xs px-2 py-0.5 rounded-full" style={{ background: `${roleColor.bg}20`, color: roleColor.bg }}>
+                                      {char.role}
+                                    </span>
+                                  </div>
+                                  <button
+                                    onClick={() => {
+                                      const newAssigned = assignedChars.filter(a => a.characterId !== ac.characterId);
+                                      updateBeat(beat.id, { assignedCharacters: newAssigned });
+                                    }}
+                                    className="p-1 rounded hover:bg-red-50 text-slate-300 hover:text-red-400"
+                                  >
+                                    <X size={16} />
+                                  </button>
+                                </div>
+                                <div>
+                                  <label className="text-[10px] uppercase tracking-wide text-slate-400 font-medium">
+                                    Purpose in this scene
+                                  </label>
+                                  <input
+                                    value={ac.purpose}
+                                    onChange={(e) => {
+                                      const newAssigned = assignedChars.map(a => 
+                                        a.characterId === ac.characterId 
+                                          ? { ...a, purpose: e.target.value }
+                                          : a
+                                      );
+                                      updateBeat(beat.id, { assignedCharacters: newAssigned });
+                                    }}
+                                    placeholder="What is their role here? How do they impact the protagonist?"
+                                    className="w-full mt-1 text-sm rounded-lg px-3 py-2 bg-white border border-slate-200 outline-none"
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+
+                {/* Horizontal Divider */}
+                <div className="border-t-2 border-dashed" style={{ borderColor: `${BRAND.gold}40` }} />
+
+                {/* PROTAGONIST'S GROWTH */}
+                <div>
+                  <label className="text-xs uppercase tracking-wider font-bold mb-4 block flex items-center gap-2" style={{ color: BRAND.navy }}>
+                    <Heart size={14} style={{ color: BRAND.rose }} />
+                    Protagonist's Internal Journey
+                  </label>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* Before */}
+                    <div 
+                      className="rounded-xl p-4"
+                      style={{ background: `linear-gradient(135deg, ${BRAND.navy}08 0%, ${BRAND.navy}15 100%)`, border: `2px solid ${BRAND.navy}20` }}
+                    >
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold" style={{ background: BRAND.navy, color: "#fff" }}>
+                          B
+                        </div>
+                        <span className="text-xs font-bold uppercase tracking-wide" style={{ color: BRAND.navy }}>Before This Beat</span>
+                      </div>
+                      <textarea
+                        value={beat.protagonistBefore || ""}
+                        onChange={(e) => updateBeat(beat.id, { protagonistBefore: e.target.value })}
+                        placeholder="What does the protagonist believe? What are they unaware of? What's their emotional state?"
+                        className="w-full h-24 text-sm rounded-lg px-3 py-2 bg-white border border-slate-200 outline-none resize-none"
+                      />
+                    </div>
+
+                    {/* After */}
+                    <div 
+                      className="rounded-xl p-4"
+                      style={{ background: `linear-gradient(135deg, ${BRAND.gold}08 0%, ${BRAND.gold}15 100%)`, border: `2px solid ${BRAND.gold}30` }}
+                    >
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold" style={{ background: BRAND.gold, color: BRAND.ink }}>
+                          A
+                        </div>
+                        <span className="text-xs font-bold uppercase tracking-wide" style={{ color: BRAND.gold }}>After This Beat</span>
+                      </div>
+                      <textarea
+                        value={beat.protagonistAfter || ""}
+                        onChange={(e) => updateBeat(beat.id, { protagonistAfter: e.target.value })}
+                        placeholder="How have they changed? What new awareness do they have? What shift occurred?"
+                        className="w-full h-24 text-sm rounded-lg px-3 py-2 bg-white border border-slate-200 outline-none resize-none"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Growth Arrow */}
+                  <div className="flex items-center justify-center mt-4">
+                    <div className="flex items-center gap-2 px-4 py-2 rounded-full" style={{ background: `${BRAND.mauve}20` }}>
+                      <span className="text-xs font-medium" style={{ color: BRAND.navy }}>Growth</span>
+                      <ArrowRight size={14} style={{ color: BRAND.gold }} />
+                      <span className="text-xs font-medium" style={{ color: BRAND.gold }}>Transformation</span>
+                    </div>
                   </div>
                 </div>
               </div>
             );
           })() : (
-            <div className="text-center py-12">
-              <BookOpen size={48} className="mx-auto mb-4" style={{ color: BRAND.mauve }} />
-              <p className="text-slate-500">Click on a story beat to edit</p>
+            <div className="text-center py-16">
+              <div 
+                className="w-20 h-20 rounded-2xl flex items-center justify-center mx-auto mb-4"
+                style={{ background: `linear-gradient(135deg, ${BRAND.mauve}30 0%, ${BRAND.rose}30 100%)` }}
+              >
+                <BookOpen size={40} style={{ color: BRAND.navy }} />
+              </div>
+              <h3 className="text-lg font-bold mb-2" style={{ color: BRAND.navy }}>Select a Story Beat</h3>
+              <p className="text-slate-500 text-sm max-w-md mx-auto">
+                Click on a beat in the arc above or timeline to define which characters appear and how they impact your protagonist's journey.
+              </p>
             </div>
           )}
         </div>
@@ -948,8 +1161,7 @@ export default function NarrativeArc() {
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {characters.map((char, idx) => {
-                const firstAppearance = getFirstAppearancePhase(char.name, chapters, storyBeats);
-                const appearances = characterAppearances[char.name] || [];
+                const assignedBeats = getCharacterBeats(char.id);
                 return (
                   <CharacterCard 
                     key={char.id} 
@@ -963,9 +1175,7 @@ export default function NarrativeArc() {
                     isDragging={dragIndex === idx}
                     isSelected={selectedCharacterId === char.id}
                     onSelect={(id) => setSelectedCharacterId(selectedCharacterId === id ? null : id)}
-                    firstAppearance={firstAppearance}
-                    appearanceCount={appearances.length}
-                    totalChapters={chapters.length}
+                    assignedBeats={assignedBeats}
                   />
                 );
               })}
