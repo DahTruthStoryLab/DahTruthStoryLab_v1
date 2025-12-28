@@ -7,7 +7,8 @@ import {
   Heart, Users, Plane, Sparkles, BookOpen, MapPin, 
   ArrowLeft, ArrowRight, Plus, Trash2, Save, Upload, Download,
   User, Star, Shield, Zap, Target, Clock, AlertCircle,
-  RefreshCw, ChevronDown, Check, X, GripVertical, Edit3
+  RefreshCw, ChevronDown, ChevronUp, Check, X, GripVertical, Edit3,
+  HelpCircle, Lightbulb
 } from "lucide-react";
 
 /* ============================================
@@ -544,6 +545,160 @@ function CharacterCard({
 }
 
 /* ============================================
+   Instructions Panel (Collapsible)
+   ============================================ */
+function InstructionsPanel() {
+  const [isOpen, setIsOpen] = useState(true);
+
+  const steps = [
+    {
+      number: 1,
+      title: "Understand the Arc",
+      description: "The Narrative Arc represents your protagonist's emotional journey through the story. Each beat is a pivotal moment where they grow or change.",
+      icon: BookOpen,
+    },
+    {
+      number: 2,
+      title: "Define Your Beats",
+      description: "Click on each beat in the canvas or timeline. Describe what happens in that scene. Think about the external events AND internal shifts.",
+      icon: Target,
+    },
+    {
+      number: 3,
+      title: "Assign Characters to Beats",
+      description: "Add characters to each scene and define their PURPOSE. Ask: Why is this character here? How do they impact the protagonist?",
+      icon: Users,
+    },
+    {
+      number: 4,
+      title: "Track Protagonist Growth",
+      description: "For each beat, capture your protagonist's internal state BEFORE and AFTER. What did they believe? What changed? This is the heart of character development.",
+      icon: Heart,
+    },
+    {
+      number: 5,
+      title: "See the Full Picture",
+      description: "Click any character card below to see which beats they appear in (highlighted in gold). This helps you ensure every character serves your story's arc.",
+      icon: Sparkles,
+    },
+  ];
+
+  return (
+    <div 
+      className="rounded-2xl mb-8 overflow-hidden"
+      style={{ 
+        background: `linear-gradient(135deg, ${BRAND.gold}08 0%, ${BRAND.mauve}12 100%)`,
+        border: `2px solid ${BRAND.gold}30`,
+      }}
+    >
+      {/* Header - Always visible */}
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full px-6 py-4 flex items-center justify-between hover:bg-white/30 transition-colors"
+      >
+        <div className="flex items-center gap-3">
+          <div 
+            className="w-10 h-10 rounded-xl flex items-center justify-center"
+            style={{ background: `${BRAND.gold}25` }}
+          >
+            <Lightbulb size={20} style={{ color: BRAND.gold }} />
+          </div>
+          <div className="text-left">
+            <h3 className="font-bold" style={{ color: BRAND.navy }}>How to Use the Narrative Arc</h3>
+            <p className="text-xs text-slate-500">A guide to mapping your protagonist's journey</p>
+          </div>
+        </div>
+        <div 
+          className="p-2 rounded-lg"
+          style={{ background: `${BRAND.navy}10` }}
+        >
+          {isOpen ? (
+            <ChevronUp size={20} style={{ color: BRAND.navy }} />
+          ) : (
+            <ChevronDown size={20} style={{ color: BRAND.navy }} />
+          )}
+        </div>
+      </button>
+
+      {/* Content - Collapsible */}
+      {isOpen && (
+        <div className="px-6 pb-6">
+          {/* Key Concept */}
+          <div 
+            className="rounded-xl p-4 mb-6"
+            style={{ background: `${BRAND.navy}08`, border: `1px solid ${BRAND.navy}15` }}
+          >
+            <div className="flex items-start gap-3">
+              <HelpCircle size={20} style={{ color: BRAND.navy }} className="flex-shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-semibold" style={{ color: BRAND.navy }}>The Core Idea</p>
+                <p className="text-sm text-slate-600 mt-1">
+                  Every story is about <strong>transformation</strong>. Your protagonist starts the story believing one thing, 
+                  and through the events of the plot, they're forced to grow, change, and become someone new. 
+                  The other characters in your story exist to <strong>catalyze that transformation</strong> — 
+                  each one should push your protagonist closer to (or further from) their ultimate growth.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Steps */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {steps.map((step) => (
+              <div 
+                key={step.number}
+                className="rounded-xl p-4 bg-white"
+                style={{ border: `1px solid ${BRAND.mauve}30` }}
+              >
+                <div className="flex items-start gap-3">
+                  <div 
+                    className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                    style={{ background: `${BRAND.gold}20` }}
+                  >
+                    <span className="text-sm font-bold" style={{ color: BRAND.gold }}>{step.number}</span>
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <step.icon size={14} style={{ color: BRAND.navy }} />
+                      <span className="text-sm font-bold" style={{ color: BRAND.navy }}>{step.title}</span>
+                    </div>
+                    <p className="text-xs text-slate-500 leading-relaxed">{step.description}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Example */}
+          <div 
+            className="rounded-xl p-4 mt-6"
+            style={{ background: `linear-gradient(135deg, ${BRAND.rose}15 0%, ${BRAND.mauve}15 100%)`, border: `1px solid ${BRAND.rose}30` }}
+          >
+            <p className="text-xs font-bold uppercase tracking-wide mb-2" style={{ color: BRAND.navy }}>
+              Example: Midpoint Beat
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+              <div>
+                <p className="font-semibold text-slate-600 mb-1">Scene:</p>
+                <p className="text-slate-500">"Elena discovers Marcus has been lying about his past. The truth shatters her trust."</p>
+              </div>
+              <div>
+                <p className="font-semibold text-slate-600 mb-1">Marcus's Purpose:</p>
+                <p className="text-slate-500">"His betrayal forces Elena to question everything she thought she knew about love."</p>
+              </div>
+              <div>
+                <p className="font-semibold text-slate-600 mb-1">Elena's Growth:</p>
+                <p className="text-slate-500"><strong>Before:</strong> "Trust is given freely." <strong>After:</strong> "Trust must be earned."</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ============================================
    Main Component
    ============================================ */
 export default function NarrativeArc() {
@@ -762,6 +917,9 @@ export default function NarrativeArc() {
             </div>
           </div>
         </div>
+
+        {/* HOW TO USE THIS TOOL - Instructions */}
+        <InstructionsPanel />
 
         {/* Canvas */}
         <div className="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 mb-8">
