@@ -131,7 +131,32 @@ function getInitials(name) {
 }
 
 /* ============================================
-   AI Analysis Hook (mock - can connect to real API)
+   API Helper (matches aiService.js pattern)
+   ============================================ */
+const API_BASE = import.meta.env.VITE_API_BASE;
+
+async function jsonFetch(path, payload) {
+  const url = `${API_BASE}/${path}`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload || {}),
+  });
+
+  const ct = res.headers.get("content-type") || "";
+  const isJson = ct.includes("application/json");
+  const body = isJson ? await res.json() : await res.text();
+
+  if (!res.ok) {
+    const msg = isJson ? (body?.error || JSON.stringify(body)) : body?.slice(0, 300);
+    throw new Error(`API ${res.status} ${res.statusText} at ${url}: ${msg}`);
+  }
+  if (!isJson) throw new Error(`Expected JSON from ${url}, got: ${body?.slice(0, 200)}`);
+  return body;
+}
+
+/* ============================================
+   AI Analysis Hook (uses Lambda backend)
    ============================================ */
 function useDialogueAI() {
   const [isLoading, setIsLoading] = useState(false);
@@ -142,16 +167,7 @@ function useDialogueAI() {
     setError(null);
     
     try {
-      // Call Anthropic API
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 1500,
-          messages: [{
-            role: "user",
-            content: `You are a dialogue coach for fiction writers. Analyze this dialogue between two characters.
+      const prompt = `You are a dialogue coach for fiction writers. Analyze this dialogue between two characters.
 
 CHARACTER A: ${characterA.name} (${characterA.role})
 - WANTS: ${stakes.characterA.wants || "Not specified"}
@@ -177,13 +193,16 @@ Provide analysis in this exact JSON format:
   "suggestions": ["suggestion 1", "suggestion 2"]
 }
 
-Respond ONLY with the JSON, no other text.`
-          }]
-        })
+Respond ONLY with the JSON, no other text.`;
+
+      const data = await jsonFetch("assistant", {
+        text: prompt,
+        action: "dialogue-analyze",
+        instructions: "Analyze dialogue and return JSON analysis.",
       });
       
-      const data = await response.json();
-      const text = data.content?.[0]?.text || "";
+      // Parse the response - Lambda returns improvedHtml
+      const text = data.improvedHtml || "";
       const clean = text.replace(/```json|```/g, "").trim();
       const parsed = JSON.parse(clean);
       setIsLoading(false);
@@ -201,15 +220,7 @@ Respond ONLY with the JSON, no other text.`
     setError(null);
     
     try {
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 2000,
-          messages: [{
-            role: "user",
-            content: `You are a dialogue coach for fiction writers. Enhance this dialogue.
+      const prompt = `You are a dialogue coach for fiction writers. Enhance this dialogue.
 
 CHARACTER A: ${characterA.name} (${characterA.role})
 - WANTS: ${stakes.characterA.wants || "Not specified"}
@@ -224,15 +235,16 @@ ${dialogue}
 
 INSTRUCTION: ${instruction || "Enhance the subtext, make it less on-the-nose, and ensure each character has a distinct voice."}
 
-Provide the enhanced dialogue. Keep the same format and approximate length. Just output the enhanced dialogue, nothing else.`
-          }]
-        })
+Provide the enhanced dialogue. Keep the same format and approximate length. Just output the enhanced dialogue, nothing else.`;
+
+      const data = await jsonFetch("assistant", {
+        text: prompt,
+        action: "dialogue-enhance",
+        instructions: "Enhance dialogue with better subtext and voice.",
       });
       
-      const data = await response.json();
-      const text = data.content?.[0]?.text || "";
       setIsLoading(false);
-      return text;
+      return data.improvedHtml || "";
     } catch (err) {
       console.error("AI Enhancement error:", err);
       setError("Failed to enhance dialogue. Please try again.");
@@ -246,15 +258,7 @@ Provide the enhanced dialogue. Keep the same format and approximate length. Just
     setError(null);
     
     try {
-      const response = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 2000,
-          messages: [{
-            role: "user",
-            content: `You are a fiction writer. Generate a dialogue scene between two characters.
+      const prompt = `You are a fiction writer. Generate a dialogue scene between two characters.
 
 CHARACTER A: ${characterA.name} (${characterA.role})
 - WANTS: ${stakes.characterA.wants || "Something from the other character"}
@@ -280,15 +284,16 @@ Format as:
 ${characterA.name}: "dialogue"
 ${characterB.name}: "dialogue"
 
-Just output the dialogue, nothing else.`
-          }]
-        })
+Just output the dialogue, nothing else.`;
+
+      const data = await jsonFetch("assistant", {
+        text: prompt,
+        action: "dialogue-generate",
+        instructions: "Generate dialogue scene with subtext and distinct voices.",
       });
       
-      const data = await response.json();
-      const text = data.content?.[0]?.text || "";
       setIsLoading(false);
-      return text;
+      return data.improvedHtml || "";
     } catch (err) {
       console.error("AI Generation error:", err);
       setError("Failed to generate dialogue. Please try again.");
