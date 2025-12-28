@@ -10,9 +10,8 @@ import {
   Calendar,
   Layers,
   UploadCloud,
-  Store,
+  CreditCard,
   User,
-  Info,
   Home,
   ChevronRight,
   Menu,
@@ -127,8 +126,7 @@ const menuItems = [
 
   // Supporting / meta
   { icon: User,       label: "Profile",           path: "/profile" },
-  { icon: Info,       label: "About",             path: "/about" },
-  { icon: Store,      label: "Store",             path: "/store" },
+  { icon: CreditCard, label: "Plans",             path: "/plans" },
 ];
 
 // --------- Sidebar ---------
