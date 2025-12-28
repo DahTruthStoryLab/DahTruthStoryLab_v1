@@ -4,8 +4,8 @@ import {
   PenLine, Users, Building2, Crown, Infinity, BookOpen
 } from "lucide-react";
 
-// 👉 Add this: read API base from env (set in Amplify) or fallback to "" for dev proxy
-const API_BASE = process.env.VITE_API_BASE || "";
+// 👉 Fixed: use import.meta.env for Vite (not process.env)
+const API_BASE = import.meta.env.VITE_API_BASE || "";
 
 const FEATURE_LIST = [
   "Cloud sync & backups",
