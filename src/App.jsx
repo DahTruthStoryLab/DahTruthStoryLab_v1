@@ -188,41 +188,26 @@ export default function App() {
                 }
               />
 
-            {/* STORY-LAB (layout + nested routes) */}
-                <Route
-                  path="/story-lab/*"
-                  element={
-                    <ProtectedRoute>
-                      <StoryLabLayout />
-                    </ProtectedRoute>
-                  }
-                >
-                  <Route index element={<StoryLabLanding />} />
-                  <Route path="narrative-arc" element={<NarrativeArc />} />
-                  <Route path="hub" element={<WorkshopHub />} />
-                  <Route path="workshop" element={<WorkshopHub />} />
-                  <Route path="community" element={<WorkshopCohort />} />
-                  <Route path="plot-builder" element={<PlotBuilder />} />
-                  <Route path="dialogue-lab" element={<DialogueLab />} />
-                  <Route path="workshop/priorities" element={<PriorityCards />} />
-                  <Route path="workshop/roadmap" element={<CharacterRoadmap />} />
-                  <Route path="workshop/clothesline" element={<Clothesline />} />
-                  <Route path="workshop/hfl" element={<HopesFearsLegacy />} />
-                  <Route path="prompts" element={<StoryPromptsWorkshop />} />
-                </Route>
-                />
-                <Route
-                  path="workshop/roadmap"
-                  element={<CharacterRoadmap />}
-                />
-                <Route
-                  path="workshop/clothesline"
-                  element={<Clothesline />}
-                />
-                <Route
-                  path="workshop/hfl"
-                  element={<HopesFearsLegacy />}
-                />
+              {/* STORY-LAB (layout + nested routes) */}
+              <Route
+                path="/story-lab/*"
+                element={
+                  <ProtectedRoute>
+                    <StoryLabLayout />
+                  </ProtectedRoute>
+                }
+              >
+                <Route index element={<StoryLabLanding />} />
+                <Route path="narrative-arc" element={<NarrativeArc />} />
+                <Route path="hub" element={<WorkshopHub />} />
+                <Route path="workshop" element={<WorkshopHub />} />
+                <Route path="community" element={<WorkshopCohort />} />
+                <Route path="plot-builder" element={<PlotBuilder />} />
+                <Route path="dialogue-lab" element={<DialogueLab />} />
+                <Route path="workshop/priorities" element={<PriorityCards />} />
+                <Route path="workshop/roadmap" element={<CharacterRoadmap />} />
+                <Route path="workshop/clothesline" element={<Clothesline />} />
+                <Route path="workshop/hfl" element={<HopesFearsLegacy />} />
                 <Route path="prompts" element={<StoryPromptsWorkshop />} />
               </Route>
 
