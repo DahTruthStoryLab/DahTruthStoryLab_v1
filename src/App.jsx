@@ -188,7 +188,7 @@ export default function App() {
                 }
               />
 
-             {/* STORY-LAB (layout + nested routes) */}
+            {/* STORY-LAB (layout + nested routes) */}
                 <Route
                   path="/story-lab/*"
                   element={
@@ -203,12 +203,12 @@ export default function App() {
                   <Route path="workshop" element={<WorkshopHub />} />
                   <Route path="community" element={<WorkshopCohort />} />
                   <Route path="plot-builder" element={<PlotBuilder />} />
-                  <Route path="dialogue-lab" element={<DialogueLab />} />   {/* ADD THIS */}
-                  <Route
-                    path="workshop/priorities"
-                    element={<PriorityCards />}
-                  />
-                  {/* ... rest of routes */}
+                  <Route path="dialogue-lab" element={<DialogueLab />} />
+                  <Route path="workshop/priorities" element={<PriorityCards />} />
+                  <Route path="workshop/roadmap" element={<CharacterRoadmap />} />
+                  <Route path="workshop/clothesline" element={<Clothesline />} />
+                  <Route path="workshop/hfl" element={<HopesFearsLegacy />} />
+                  <Route path="prompts" element={<StoryPromptsWorkshop />} />
                 </Route>
                 />
                 <Route
