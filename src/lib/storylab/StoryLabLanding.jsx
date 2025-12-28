@@ -109,6 +109,15 @@ const STORY_TOOLS = [
     route: `${BASE}/narrative-arc`,
   },
   {
+    id: "dialogue-lab",
+    title: "Dialogue Lab",
+    blurb: "Write, analyze, and enhance character dialogue.",
+    icon: MessageSquare,
+    route: `${BASE}/dialogue-lab`,
+    color: "#0891b2",
+    isNew: true,
+  },
+  {
     id: "prompts",
     title: "Story Prompts",
     blurb: "Context-aware sparks for stuck scenes.",
@@ -129,6 +138,7 @@ const NAV_ITEMS = [
   { divider: true },
   { to: `${BASE}/plot-builder`, icon: Layers, label: "Plot Builder", isNew: true },
   { to: `${BASE}/narrative-arc`, icon: Sparkles, label: "Narrative Arc" },
+  { to: `${BASE}/dialogue-lab`, icon: MessageSquare, label: "Dialogue Lab", isNew: true },
   { to: `${BASE}/prompts`, icon: Feather, label: "Prompts" },
   { to: `${BASE}/community`, icon: Users, label: "Community" },
 ];
@@ -594,7 +604,7 @@ function StoryToolsSection({ navigate }) {
         <p className="text-slate-500 text-sm">Additional resources for your craft</p>
       </div>
 
-      <div className="grid sm:grid-cols-3 gap-3">
+      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
         {STORY_TOOLS.map((tool) => (
           <button
             key={tool.id}
@@ -794,3 +804,4 @@ export default function StoryLabLanding() {
     </div>
   );
 }
+
