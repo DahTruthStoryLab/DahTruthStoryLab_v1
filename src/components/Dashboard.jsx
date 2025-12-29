@@ -1,6 +1,7 @@
 // src/components/Dashboard.js
 import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
+import { useUser } from "../lib/userStore";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import {
   Plus,
@@ -390,37 +391,64 @@ const Sidebar = ({ isOpen, onClose, authorName, authorAvatar, navigate, userNove
 // --------- Main Dashboard ---------
 export default function Dashboard() {
   const navigate = useNavigate();
+  const { user } = useUser(); // Get authenticated user from context
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [greeting, setGreeting] = useState("");
   const [authorName, setAuthorName] = useState("New Author");
   const [authorAvatar, setAuthorAvatar] = useState("");
   const [userNovels, setUserNovels] = useState([]);
 
-  // live refresh profile + sidebar projects on storage changes
+  // Update profile from authenticated user context
   useEffect(() => {
-    const refresh = () => {
+    if (user) {
+      // Get name from user context
+      const name = user.displayName || 
+                   user.author || 
+                   (user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : null) ||
+                   user.firstName ||
+                   user.username ||
+                   user.email?.split("@")[0] ||
+                   "New Author";
+      
+      setAuthorName(name);
+      setAuthorAvatar(user.avatarUrl || "");
+    } else {
+      // Fallback to readAuthorProfile for backwards compatibility
       const profile = readAuthorProfile();
       setAuthorName(profile.name);
       setAuthorAvatar(profile.avatarUrl);
+    }
+  }, [user]);
 
-      // Greeting logic here so we don't get "Good Morning, New"
-      const name = profile.name && profile.name !== "New Author" ? profile.name : "";
-      const hour = new Date().getHours();
-      let g;
+  // Update greeting based on author name
+  useEffect(() => {
+    const name = authorName && authorName !== "New Author" ? authorName : "";
+    const hour = new Date().getHours();
+    let g;
 
-      if (!name) {
-        g = "Welcome to DahTruth Story Lab";
-      } else {
-        const firstName = name.split(" ")[0];
-        if (hour < 12) g = `Good Morning, ${firstName}`;
-        else if (hour < 17) g = `Good Afternoon, ${firstName}`;
-        else g = `Good Evening, ${firstName}`;
-      }
-      setGreeting(g);
+    if (!name) {
+      g = "Welcome to DahTruth Story Lab";
+    } else {
+      const firstName = name.split(" ")[0];
+      if (hour < 12) g = `Good Morning, ${firstName}`;
+      else if (hour < 17) g = `Good Afternoon, ${firstName}`;
+      else g = `Good Evening, ${firstName}`;
+    }
+    setGreeting(g);
+  }, [authorName]);
 
+  // Load projects - user specific
+  useEffect(() => {
+    const loadProjects = () => {
       try {
-        const projectData = localStorage.getItem("userProjects");
-        const novelsData = localStorage.getItem("userNovels");
+        // Try to get user-specific projects first
+        const userId = localStorage.getItem("dt_user_id") || "default";
+        const userProjectsKey = `userProjects_${userId}`;
+        const userNovelsKey = `userNovels_${userId}`;
+        
+        // Check user-specific keys first, then fall back to generic keys
+        const projectData = localStorage.getItem(userProjectsKey) || localStorage.getItem("userProjects");
+        const novelsData = localStorage.getItem(userNovelsKey) || localStorage.getItem("userNovels");
 
         if (projectData) {
           setUserNovels(JSON.parse(projectData));
@@ -444,21 +472,24 @@ export default function Dashboard() {
           }
         }
       } catch (err) {
-        console.error("Failed to refresh sidebar projects:", err);
+        console.error("Failed to load projects:", err);
+        setUserNovels([]);
       }
     };
 
-    refresh();
-    window.addEventListener("storage", refresh);
-    window.addEventListener("profile:updated", refresh);
-    window.addEventListener("project:change", refresh);
+    loadProjects();
+    window.addEventListener("storage", loadProjects);
+    window.addEventListener("profile:updated", loadProjects);
+    window.addEventListener("project:change", loadProjects);
+    window.addEventListener("auth:change", loadProjects);
 
     return () => {
-      window.removeEventListener("storage", refresh);
-      window.removeEventListener("profile:updated", refresh);
-      window.removeEventListener("project:change", refresh);
+      window.removeEventListener("storage", loadProjects);
+      window.removeEventListener("profile:updated", loadProjects);
+      window.removeEventListener("project:change", loadProjects);
+      window.removeEventListener("auth:change", loadProjects);
     };
-  }, []);
+  }, [user]);
 
   // simple stats
   const goal = 25000,
@@ -857,3 +888,4 @@ export default function Dashboard() {
     </div>
   );
 }
+
