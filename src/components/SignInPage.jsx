@@ -10,6 +10,60 @@ import {
 const lc = (s='') => s.trim().toLowerCase();
 const LOGO_SRC = "/DahTruthLogo.png"; // place DahTruthLogo.png in /public
 
+// Helper function to save authenticated user's info
+async function saveAuthenticatedUser(cognitoUser) {
+  try {
+    // Get full user attributes from Cognito
+    const attributes = await Auth.userAttributes(cognitoUser);
+    const attrMap = {};
+    attributes.forEach(attr => {
+      attrMap[attr.Name] = attr.Value;
+    });
+
+    // Get the user ID (sub is the unique Cognito user ID)
+    const userId = attrMap.sub || cognitoUser.username;
+    
+    // Save user ID for user-specific storage keys
+    localStorage.setItem("dt_user_id", userId);
+    
+    // Build user profile object
+    const userProfile = {
+      id: userId,
+      username: cognitoUser.username,
+      email: attrMap.email || "",
+      emailVerified: attrMap.email_verified === "true",
+      firstName: attrMap.given_name || attrMap.name?.split(" ")[0] || "",
+      lastName: attrMap.family_name || attrMap.name?.split(" ").slice(1).join(" ") || "",
+      displayName: attrMap.name || attrMap.preferred_username || cognitoUser.username,
+      phone: attrMap.phone_number || "",
+      avatarUrl: attrMap.picture || "",
+      createdAt: attrMap.created_at || new Date().toISOString(),
+      lastLogin: new Date().toISOString(),
+    };
+
+    // Save to user-specific profile key
+    const profileKey = `dt_user_profile_${userId}`;
+    localStorage.setItem(profileKey, JSON.stringify(userProfile));
+    
+    // Also save to dt_auth_user for quick auth checks
+    localStorage.setItem("dt_auth_user", JSON.stringify({
+      id: userId,
+      username: cognitoUser.username,
+      email: attrMap.email,
+    }));
+
+    // Dispatch event so other components know user changed
+    window.dispatchEvent(new Event("auth:change"));
+    window.dispatchEvent(new Event("profile:updated"));
+
+    console.log("[Auth] User saved:", userId, userProfile.displayName);
+    return userProfile;
+  } catch (err) {
+    console.error("[Auth] Failed to save user info:", err);
+    return null;
+  }
+}
+
 export default function SignInPage() {
   const navigate = useNavigate();
   const [mode, setMode] = useState('signin'); // 'signin' | 'forgot' | 'reset' | 'newpwd'
@@ -54,16 +108,24 @@ export default function SignInPage() {
         setMsg('Set a new password to finish signing in.');
         return;
       }
-      await Auth.currentAuthenticatedUser({ bypassCache: true });
+      
+      // Get the fully authenticated user
+      const authenticatedUser = await Auth.currentAuthenticatedUser({ bypassCache: true });
+      
+      // Save user info to localStorage
+      await saveAuthenticatedUser(authenticatedUser);
+      
+      // Clean up temporary registration data
       localStorage.removeItem('currentUser');
+      
       navigate('/dashboard');
     } catch (e) {
       console.log('[SignIn error]', e);
       if (e?.code === 'UserNotConfirmedException') setErr('Please confirm your email first. Check your inbox for the code.');
-      else if (e?.code === 'NotAuthorizedException') setErr('Incorrect credentials. Try again or use “Forgot password”.');
+      else if (e?.code === 'NotAuthorizedException') setErr('Incorrect credentials. Try again or use "Forgot password".');
       else if (e?.code === 'UserNotFoundException') setErr(`No account found for that ${idMode}.`);
       else if (e?.code === 'TooManyRequestsException') setErr('Too many attempts. Please wait a few minutes and try again.');
-      else if (e?.code === 'PasswordResetRequiredException') setErr('Password reset required. Use “Forgot password”.');
+      else if (e?.code === 'PasswordResetRequiredException') setErr('Password reset required. Use "Forgot password".');
       else setErr(e?.message || e?.code || 'Sign-in failed.');
     } finally {
       setLoading(false);
@@ -79,7 +141,11 @@ export default function SignInPage() {
     setLoading(true);
     try {
       await Auth.completeNewPassword(challengedUser, newPassword);
-      await Auth.currentAuthenticatedUser({ bypassCache: true });
+      const authenticatedUser = await Auth.currentAuthenticatedUser({ bypassCache: true });
+      
+      // Save user info to localStorage
+      await saveAuthenticatedUser(authenticatedUser);
+      
       navigate('/dashboard');
     } catch (e) {
       console.log('[CompleteNewPassword error]', e);
@@ -128,7 +194,7 @@ export default function SignInPage() {
     } catch (e) {
       console.log('[Forgot submit error]', e);
       if (e?.code === 'CodeMismatchException') setErr('Invalid code. Please check and try again.');
-      else if (e?.code === 'ExpiredCodeException') setErr('Code expired. Click “Resend code”.');
+      else if (e?.code === 'ExpiredCodeException') setErr('Code expired. Click "Resend code".');
       else if (e?.code === 'InvalidPasswordException') setErr('Password must meet complexity rules.');
       else setErr(e?.message || e?.code || 'Could not set new password.');
     } finally {
@@ -459,3 +525,4 @@ export default function SignInPage() {
     </div>
   );
 }
+
