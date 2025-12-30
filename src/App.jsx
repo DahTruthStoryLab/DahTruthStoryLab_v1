@@ -371,6 +371,15 @@ export default function App() {
                 }
               />
 
+              <Route
+                path="/about"
+                element={
+                  <ProtectedRoute>
+                    <AboutPage />
+                  </ProtectedRoute>
+                }
+              />
+              
               {/* Fallback */}
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
