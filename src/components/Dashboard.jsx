@@ -18,8 +18,8 @@ import {
   Menu,
   X,
   FileText,
+  Info,
 } from "lucide-react";
-{ icon: Info, label: "About", path: "/about" },
 
 // --------- Demo/Default Data ---------
 const writingActivity = [
@@ -129,6 +129,7 @@ const menuItems = [
   // Supporting / meta
   { icon: User,       label: "Profile",           path: "/profile" },
   { icon: CreditCard, label: "Plans",             path: "/plans" },
+  { icon: Info,       label: "About",             path: "/about" },
 ];
 
 // --------- Sidebar ---------
