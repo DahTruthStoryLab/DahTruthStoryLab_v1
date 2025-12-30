@@ -19,6 +19,7 @@ import {
   X,
   FileText,
 } from "lucide-react";
+{ icon: Info, label: "About", path: "/about" },
 
 // --------- Demo/Default Data ---------
 const writingActivity = [
