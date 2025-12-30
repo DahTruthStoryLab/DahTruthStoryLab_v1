@@ -101,7 +101,7 @@ const Cover = lazy(() => import("./pages/Cover.tsx"));
 const WorkshopHub = lazy(() =>
   import("./components/storylab/WorkshopHub.jsx")
 );
-
+const AboutPage = lazy(() => import("./components/AboutPage.jsx"));
 // =========================
 // Global UI helpers
 // =========================
