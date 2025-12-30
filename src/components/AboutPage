@@ -2,7 +2,7 @@ import React from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Heart, Target, Eye, Sparkles, Users, Building, 
-  Calendar, MapPin, ArrowLeft, Mail
+  Calendar, MapPin, ArrowLeft, Mail, BookOpen, Briefcase
 } from "lucide-react";
 
 // Brand colors (matching your CSS variables)
@@ -64,62 +64,6 @@ export default function AboutPage() {
             className="w-24 h-1 mx-auto rounded-full"
             style={{ backgroundColor: COLORS.gold }}
           />
-        </div>
-
-        {/* Founder Photo & Intro */}
-        <div 
-          className="rounded-2xl p-8 mb-10 shadow-lg"
-          style={{ 
-            backgroundColor: COLORS.white,
-            border: `1px solid ${COLORS.borderStrong}`,
-          }}
-        >
-          <div className="flex flex-col md:flex-row gap-8 items-center">
-            {/* Photo placeholder - replace src with actual photo */}
-            <div className="flex-shrink-0">
-              <div 
-                className="w-48 h-48 rounded-2xl overflow-hidden shadow-lg"
-                style={{ border: `3px solid ${COLORS.gold}` }}
-              >
-                <img
-                  src="/assets/founder-photo.jpg"
-                  alt="Jacqueline Session Ausby, Founder"
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    e.currentTarget.parentElement.innerHTML = `
-                      <div class="w-full h-full flex items-center justify-center" style="background: linear-gradient(135deg, ${COLORS.accent} 0%, ${COLORS.primary} 100%);">
-                        <span style="color: white; font-size: 4rem; font-family: 'EB Garamond', Georgia, serif;">J</span>
-                      </div>
-                    `;
-                  }}
-                />
-              </div>
-            </div>
-            
-            {/* Intro Text */}
-            <div className="flex-1 text-center md:text-left">
-              <h2 
-                className="text-2xl font-bold mb-2"
-                style={{ 
-                  fontFamily: "'EB Garamond', Georgia, serif",
-                  color: COLORS.text,
-                }}
-              >
-                Jacqueline Session Ausby
-              </h2>
-              <p 
-                className="text-sm font-medium mb-4"
-                style={{ color: COLORS.gold }}
-              >
-                Founder & CEO
-              </p>
-              <p style={{ color: COLORS.subtext, lineHeight: 1.7 }}>
-                Writer and executive-leadership specialist with more than 30 years of professional experience. 
-                Jacqueline founded DAHTRUTH with a vision to democratize storytelling through accessible technology 
-                and community engagement.
-              </p>
-            </div>
-          </div>
         </div>
 
         {/* Company Info */}
@@ -197,6 +141,204 @@ export default function AboutPage() {
           </div>
         </div>
 
+        {/* Management Team Section */}
+        <div className="mb-10">
+          <div className="text-center mb-8">
+            <div className="flex items-center justify-center gap-3 mb-2">
+              <Sparkles size={24} color={COLORS.gold} />
+              <h2 
+                className="text-3xl font-bold"
+                style={{ 
+                  fontFamily: "'EB Garamond', Georgia, serif",
+                  color: COLORS.text,
+                }}
+              >
+                Management Team
+              </h2>
+              <Sparkles size={24} color={COLORS.gold} />
+            </div>
+            <p style={{ color: COLORS.subtext }}>
+              Two sisters, one vision
+            </p>
+          </div>
+
+          {/* Jacqueline Bio */}
+          <div 
+            className="rounded-2xl p-8 mb-6 shadow-lg"
+            style={{ 
+              backgroundColor: COLORS.white,
+              border: `1px solid ${COLORS.borderStrong}`,
+            }}
+          >
+            <div className="flex flex-col md:flex-row gap-8">
+              {/* Photo */}
+              <div className="flex-shrink-0 mx-auto md:mx-0">
+                <div 
+                  className="w-48 h-48 rounded-2xl overflow-hidden shadow-lg"
+                  style={{ border: `3px solid ${COLORS.gold}` }}
+                >
+                  <img
+                    src="/assets/jacqueline-photo.jpg"
+                    alt="Jacqueline Session Ausby"
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none';
+                      e.currentTarget.nextSibling.style.display = 'flex';
+                    }}
+                  />
+                  <div 
+                    className="w-full h-full items-center justify-center hidden"
+                    style={{ 
+                      background: `linear-gradient(135deg, ${COLORS.gold} 0%, #B8962E 100%)`,
+                    }}
+                  >
+                    <span style={{ color: "white", fontSize: "4rem", fontFamily: "'EB Garamond', Georgia, serif" }}>J</span>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Bio Content */}
+              <div className="flex-1">
+                <div className="flex items-center gap-3 mb-1">
+                  <BookOpen size={20} color={COLORS.gold} />
+                  <span 
+                    className="text-xs font-semibold uppercase tracking-wider"
+                    style={{ color: COLORS.gold }}
+                  >
+                    Author, CEO & Founder
+                  </span>
+                </div>
+                <h3 
+                  className="text-2xl font-bold mb-4"
+                  style={{ 
+                    fontFamily: "'EB Garamond', Georgia, serif",
+                    color: COLORS.text,
+                  }}
+                >
+                  Jacqueline Session Ausby
+                </h3>
+                
+                <div className="space-y-4 text-sm" style={{ color: COLORS.text, lineHeight: 1.8 }}>
+                  <p>
+                    Jacqueline Session Ausby is an author, creative entrepreneur, and leadership specialist with over 
+                    30 years of experience providing executive support to senior leaders across corporate and government 
+                    sectors. Her career includes a decade at Deloitte where she managed the CEO Executive Transition Lab 
+                    Program, delivering sessions for CEOs, BU Leaders, and Government officials worldwide. Now at GSK, 
+                    she supports R&D executives while continuing to mentor creative professionals.
+                  </p>
+                  
+                  <p>
+                    Jacqueline combines corporate precision with creative purpose. Her background in English Writing (B.A.) 
+                    and Creative Writing (M.A.) shapes the philosophy behind DAHTRUTH: to turn every story into strategy 
+                    and every writer into a leader.
+                  </p>
+                  
+                  <p>
+                    She has published <em>That Sommer Day in Sodom</em> and <em>Grace & Mercy for the Unrighteous</em>, 
+                    and is currently completing two novellas—<em>Promise Me June</em> and <em>Raising Daisy</em>. She founded 
+                    DahTruth.com in 2017 as a platform for faith-based and social-commentary writing, which has since evolved 
+                    into DAHTRUTH Story Lab.
+                  </p>
+                  
+                  <p 
+                    className="italic pt-2"
+                    style={{ 
+                      color: COLORS.accent,
+                      borderTop: `1px solid ${COLORS.border}`,
+                    }}
+                  >
+                    "Her vision for DAHTRUTH is to spark a 21st-century Harlem Renaissance that uplifts urban voices 
+                    while embracing diversity worldwide."
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Crystal Bio */}
+          <div 
+            className="rounded-2xl p-8 shadow-lg"
+            style={{ 
+              backgroundColor: COLORS.white,
+              border: `1px solid ${COLORS.borderStrong}`,
+            }}
+          >
+            <div className="flex flex-col md:flex-row gap-8">
+              {/* Photo */}
+              <div className="flex-shrink-0 mx-auto md:mx-0">
+                <div 
+                  className="w-48 h-48 rounded-2xl overflow-hidden shadow-lg"
+                  style={{ border: `3px solid ${COLORS.accent}` }}
+                >
+                  <img
+                    src="/assets/crystal-photo.jpg"
+                    alt="Crystal Session"
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      e.currentTarget.style.display = 'none';
+                      e.currentTarget.nextSibling.style.display = 'flex';
+                    }}
+                  />
+                  <div 
+                    className="w-full h-full items-center justify-center hidden"
+                    style={{ 
+                      background: `linear-gradient(135deg, ${COLORS.accent} 0%, #264A75 100%)`,
+                    }}
+                  >
+                    <span style={{ color: "white", fontSize: "4rem", fontFamily: "'EB Garamond', Georgia, serif" }}>C</span>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Bio Content */}
+              <div className="flex-1">
+                <div className="flex items-center gap-3 mb-1">
+                  <Briefcase size={20} color={COLORS.accent} />
+                  <span 
+                    className="text-xs font-semibold uppercase tracking-wider"
+                    style={{ color: COLORS.accent }}
+                  >
+                    Operations Director & COO
+                  </span>
+                </div>
+                <h3 
+                  className="text-2xl font-bold mb-4"
+                  style={{ 
+                    fontFamily: "'EB Garamond', Georgia, serif",
+                    color: COLORS.text,
+                  }}
+                >
+                  Crystal Session
+                </h3>
+                
+                <div className="space-y-4 text-sm" style={{ color: COLORS.text, lineHeight: 1.8 }}>
+                  <p>
+                    Crystal Session brings over 30 years of experience in sales and customer relations within the 
+                    insurance industry, serving agents and agencies throughout the region. Her background in client 
+                    support and business operations makes her a natural fit for DAHTRUTH's logistical and customer-care needs.
+                  </p>
+                  
+                  <p>
+                    Crystal manages event planning, vendor relations, and participant coordination for workshops and retreats. 
+                    Her leadership ensures each event runs with professional excellence and hospitality.
+                  </p>
+                  
+                  <p 
+                    className="italic pt-2"
+                    style={{ 
+                      color: COLORS.accent,
+                      borderTop: `1px solid ${COLORS.border}`,
+                    }}
+                  >
+                    "She is deeply committed to mentoring young professionals and supporting DAHTRUTH's mission to 
+                    create space for voices that might otherwise go unheard."
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Mission & Vision */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
           
@@ -267,7 +409,7 @@ export default function AboutPage() {
           </div>
         </div>
 
-        {/* Core Values / Tagline */}
+        {/* Tagline Banner */}
         <div 
           className="rounded-2xl p-8 mb-10 text-center shadow-lg"
           style={{ 
