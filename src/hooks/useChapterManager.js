@@ -1,6 +1,6 @@
 // src/hooks/useChapterManager.js
-// Manages chapter state, CRUD operations, and localStorage persistence
-// NOW: Uses project-specific storage via useProjectStore
+// Manages chapter state, CRUD operations, and storage persistence
+// NOW: Uses IndexedDB via storage wrapper for large manuscript support
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import {
@@ -9,6 +9,7 @@ import {
   saveCurrentProjectData,
   getProjectStorageKey,
 } from "./useProjectStore";
+import { storage } from "../lib/storage";
 
 // -------- Helpers --------
 
@@ -19,7 +20,7 @@ const loadState = () => {
     if (data) return data;
 
     // Fallback: try legacy key for backwards compatibility
-    const legacyRaw = localStorage.getItem("dahtruth-story-lab-toc-v3");
+    const legacyRaw = storage.getItem("dahtruth-story-lab-toc-v3");
     return legacyRaw ? JSON.parse(legacyRaw) : null;
   } catch {
     return null;
@@ -35,11 +36,11 @@ const saveState = (state) => {
     // that might still be reading from there (like StoryLab modules)
     const projectId = getCurrentProjectId();
     if (projectId) {
-      localStorage.setItem("dahtruth-story-lab-toc-v3", JSON.stringify(state));
+      storage.setItem("dahtruth-story-lab-toc-v3", JSON.stringify(state));
       
       // Save currentStory as JSON object for StoryLab sidebar
       const totalWords = (state.chapters || []).reduce((sum, ch) => sum + (ch.wordCount || 0), 0);
-      localStorage.setItem("currentStory", JSON.stringify({
+      storage.setItem("currentStory", JSON.stringify({
         id: projectId,
         title: state.book?.title || "Untitled",
         status: "Draft",
