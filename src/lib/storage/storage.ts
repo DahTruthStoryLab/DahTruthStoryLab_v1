@@ -1,47 +1,19 @@
 // src/lib/storage/storage.ts
-// Storage service - uses localStorage with IndexedDB as overflow for large items
-// This fixes the quota exceeded error while maintaining synchronous reads
+// Storage service - uses memory cache + localStorage + IndexedDB overflow
+// Memory cache ensures synchronous reads always work
 
 import { db, initDB, isIndexedDBAvailable, StorageEntry } from './db';
 
 /* ============================================================================
-   OVERFLOW TRACKING
-   We track which keys are "too big" for localStorage and stored in IndexedDB
+   MEMORY CACHE - Source of truth for synchronous reads
    ============================================================================ */
 
-const OVERFLOW_REGISTRY_KEY = 'dahtruth_indexeddb_overflow_keys';
-
-function getOverflowKeys(): Set<string> {
-  try {
-    const raw = localStorage.getItem(OVERFLOW_REGISTRY_KEY);
-    return raw ? new Set(JSON.parse(raw)) : new Set();
-  } catch {
-    return new Set();
-  }
-}
-
-function addOverflowKey(key: string): void {
-  const keys = getOverflowKeys();
-  keys.add(key);
-  try {
-    localStorage.setItem(OVERFLOW_REGISTRY_KEY, JSON.stringify([...keys]));
-  } catch {
-    // If we can't even save the registry, just continue
-  }
-}
-
-function removeOverflowKey(key: string): void {
-  const keys = getOverflowKeys();
-  keys.delete(key);
-  try {
-    localStorage.setItem(OVERFLOW_REGISTRY_KEY, JSON.stringify([...keys]));
-  } catch {
-    // Continue anyway
-  }
-}
+const memoryCache = new Map<string, string>();
+let isHydrated = false;
+let hydrationPromise: Promise<void> | null = null;
 
 /* ============================================================================
-   INDEXEDDB HELPERS (for overflow items only)
+   INDEXEDDB HELPERS
    ============================================================================ */
 
 let dbReady = false;
@@ -101,76 +73,127 @@ async function removeFromIndexedDB(key: string): Promise<void> {
 }
 
 /* ============================================================================
+   HYDRATION - Load IndexedDB data into memory cache on startup
+   ============================================================================ */
+
+async function hydrateFromIndexedDB(): Promise<void> {
+  if (isHydrated) return;
+  
+  if (!await ensureDB()) {
+    isHydrated = true;
+    return;
+  }
+  
+  try {
+    console.log('[Storage] Hydrating from IndexedDB...');
+    const allEntries = await db.storage.toArray();
+    
+    for (const entry of allEntries) {
+      // Only add to cache if not already there (localStorage takes precedence)
+      if (!memoryCache.has(entry.key)) {
+        memoryCache.set(entry.key, entry.value);
+      }
+    }
+    
+    console.log(`[Storage] Hydrated ${allEntries.length} items from IndexedDB`);
+  } catch (err) {
+    console.error('[Storage] Hydration failed:', err);
+  }
+  
+  isHydrated = true;
+}
+
+/**
+ * Initialize storage - call this before app renders
+ * Loads all localStorage into memory cache, then hydrates from IndexedDB
+ */
+export async function initStorage(): Promise<void> {
+  if (hydrationPromise) return hydrationPromise;
+  
+  hydrationPromise = (async () => {
+    // First, load all localStorage into memory cache (instant)
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key) {
+        const value = localStorage.getItem(key);
+        if (value !== null) {
+          memoryCache.set(key, value);
+        }
+      }
+    }
+    console.log(`[Storage] Loaded ${memoryCache.size} items from localStorage`);
+    
+    // Then hydrate from IndexedDB (may have overflow items)
+    await hydrateFromIndexedDB();
+    
+    console.log('[Storage] Storage ready');
+  })();
+  
+  return hydrationPromise;
+}
+
+// Start hydration immediately on module load
+initStorage();
+
+/* ============================================================================
    MAIN STORAGE API (Synchronous - drop-in localStorage replacement)
    ============================================================================ */
 
 export const storage = {
   /**
-   * Get item - checks localStorage first, then IndexedDB for overflow items
+   * Get item - checks memory cache first, then localStorage
    */
   getItem(key: string): string | null {
-    // First, try localStorage (synchronous, fast)
+    // 1. Check memory cache (has both localStorage + IndexedDB data after hydration)
+    if (memoryCache.has(key)) {
+      return memoryCache.get(key)!;
+    }
+    
+    // 2. Check localStorage directly (in case hydration hasn't run yet)
     const localValue = localStorage.getItem(key);
     if (localValue !== null) {
+      memoryCache.set(key, localValue);
       return localValue;
     }
     
-    // Check if this key is in IndexedDB overflow
-    const overflowKeys = getOverflowKeys();
-    if (overflowKeys.has(key)) {
-      // This is an overflow item - we need to fetch async
-      // For now, return null and let the app handle it
-      // The app should call getItemAsync for large items
-      console.debug(`[Storage] Key "${key}" is in IndexedDB overflow, use getItemAsync()`);
-      
-      // Try to load it async and cache it for next time
-      getFromIndexedDB(key).then((value) => {
-        if (value !== null) {
-          // Try to put it back in localStorage for faster access
-          try {
-            localStorage.setItem(key, value);
-            removeOverflowKey(key);
-          } catch {
-            // Still too big, keep in overflow
-          }
-        }
-      });
-    }
-    
+    // 3. Not found
     return null;
   },
 
   /**
-   * Set item - tries localStorage first, falls back to IndexedDB if quota exceeded
+   * Set item - writes to memory cache + tries localStorage, overflows to IndexedDB
    */
   setItem(key: string, value: string): void {
+    // Always update memory cache first (ensures sync reads work)
+    memoryCache.set(key, value);
+    
+    // Try to save to localStorage
     try {
       localStorage.setItem(key, value);
-      // Success! Remove from overflow registry if it was there
-      removeOverflowKey(key);
     } catch (e) {
-      // localStorage quota exceeded - use IndexedDB
-      console.log(`[Storage] localStorage quota exceeded for "${key}", using IndexedDB`);
+      // localStorage quota exceeded - save to IndexedDB instead
+      console.log(`[Storage] localStorage quota exceeded for "${key}", saving to IndexedDB`);
       
-      // Mark this key as overflow
-      addOverflowKey(key);
+      // Remove from localStorage if it was partially there
+      try {
+        localStorage.removeItem(key);
+      } catch {}
       
-      // Store in IndexedDB (async, but we don't wait)
+      // Save to IndexedDB (async, but memory cache already has it)
       setToIndexedDB(key, value).then((success) => {
         if (!success) {
           console.error(`[Storage] Failed to save "${key}" to IndexedDB`);
-          alert(`Failed to save data. Your manuscript may be too large. Please try again or contact support.`);
         }
       });
     }
   },
 
   /**
-   * Remove item from both localStorage and IndexedDB
+   * Remove item from all stores
    */
   removeItem(key: string): void {
+    memoryCache.delete(key);
     localStorage.removeItem(key);
-    removeOverflowKey(key);
     removeFromIndexedDB(key);
   },
 
@@ -178,54 +201,49 @@ export const storage = {
    * Clear all storage
    */
   clear(): void {
+    memoryCache.clear();
     localStorage.clear();
     ensureDB().then(() => {
       db.storage.clear().catch(() => {});
     });
   },
+
+  /**
+   * Get number of items (for debugging)
+   */
+  get length(): number {
+    return memoryCache.size;
+  },
+
+  /**
+   * Get key at index (for debugging)
+   */
+  key(index: number): string | null {
+    const keys = Array.from(memoryCache.keys());
+    return keys[index] ?? null;
+  },
 };
 
 /* ============================================================================
-   ASYNC API (for when you know you're dealing with large items)
+   ASYNC API (for explicit async usage)
    ============================================================================ */
 
-/**
- * Get item async - checks both localStorage and IndexedDB
- */
 export async function getItemAsync(key: string): Promise<string | null> {
-  // Try localStorage first
-  const localValue = localStorage.getItem(key);
-  if (localValue !== null) {
-    return localValue;
-  }
-  
-  // Try IndexedDB
-  return await getFromIndexedDB(key);
+  await initStorage(); // Ensure hydrated
+  return storage.getItem(key);
 }
 
-/**
- * Set item async - tries localStorage, falls back to IndexedDB
- */
-export async function setItemAsync(key: string, value: string): Promise<boolean> {
-  try {
-    localStorage.setItem(key, value);
-    removeOverflowKey(key);
-    return true;
-  } catch {
-    // localStorage quota exceeded
-    addOverflowKey(key);
-    return await setToIndexedDB(key, value);
-  }
+export async function setItemAsync(key: string, value: string): Promise<void> {
+  await initStorage();
+  storage.setItem(key, value);
 }
 
 /* ============================================================================
-   MIGRATION (run once to move any stuck IndexedDB data back to localStorage)
+   MIGRATION HELPER
    ============================================================================ */
 
 export async function runMigrationIfNeeded(): Promise<void> {
-  // This version doesn't need complex migration
-  // Data stays in localStorage unless it overflows to IndexedDB
-  console.log('[Storage] Storage system ready');
+  await initStorage();
 }
 
 /* ============================================================================
