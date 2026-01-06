@@ -26,5 +26,3 @@ export {
   migrateFromLocalStorage,
   runMigrationIfNeeded,
 } from './storage';
-
-export { default as storage } from './storage';
