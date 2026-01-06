@@ -7,7 +7,7 @@ frontend:
         - nvm use 18
         - corepack enable
         - corepack prepare pnpm@9 --activate
-        - pnpm i --frozen-lockfile
+        - pnpm i --no-frozen-lockfile
     build:
       commands:
         - |
