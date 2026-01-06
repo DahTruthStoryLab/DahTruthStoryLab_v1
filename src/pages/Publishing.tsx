@@ -24,6 +24,8 @@ import {
   chaptersKeyForProject,
 } from "../lib/projectsSync";
 
+import { storage } from "../lib/storage";
+
 /* ---------- Theme via CSS variables (from your brand.css) ---------- */
 const theme = {
   bg: "var(--brand-bg)",
