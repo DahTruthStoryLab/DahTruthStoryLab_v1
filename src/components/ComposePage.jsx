@@ -16,7 +16,7 @@ import { documentParser } from "../utils/documentParser";
 import { rateLimiter } from "../utils/rateLimiter";
 import { createPortal } from "react-dom";
 
-import { runAssistant } from "../lib/api";
+import { storage } from "../lib/storage";
 import {
   Sparkles,
   Search,
