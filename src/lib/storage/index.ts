@@ -5,24 +5,16 @@ export { db, initDB, isIndexedDBAvailable, getStorageEstimate } from './db';
 export type { StorageEntry, ProjectEntry, BlobEntry } from './db';
 
 export {
-  // Async operations (preferred)
-  getItem,
-  setItem,
-  removeItem,
-  getKeys,
-  clear,
-  
-  // Project operations
-  saveProject,
-  loadProject,
-  deleteProject,
-  listProjectIds,
-  
-  // Sync wrapper (for backwards compatibility)
+  // Sync wrapper (main API)
   storage,
   
+  // Initialization
+  initStorage,
+  
+  // Async operations
+  getItemAsync,
+  setItemAsync,
+  
   // Migration
-  needsMigration,
-  migrateFromLocalStorage,
   runMigrationIfNeeded,
 } from './storage';
