@@ -1,5 +1,6 @@
 // src/lib/projectsService.ts
-// Handles all project persistence operations (localStorage + S3)
+// Handles all project persistence operations (IndexedDB + S3)
+// Updated to use IndexedDB for large manuscript support
 
 import type {
   Project,
@@ -11,6 +12,7 @@ import type {
 import { createEmptyProject, createProjectIndexEntry } from "../types/project";
 import { API_BASE } from "./api";
 import { getLocalAuthorId } from "./authorService";
+import { storage, runMigrationIfNeeded } from "./storage";
 
 /* ============================================================================
    CONSTANTS
@@ -24,18 +26,23 @@ const CURRENT_PROJECT_ID_KEY = "dahtruth_current_project_id";
 // Debounce delay for auto-save (ms)
 const AUTO_SAVE_DELAY = 3000;
 
+// Run migration on module load
+runMigrationIfNeeded().catch(err => {
+  console.error('[projectsService] Migration failed:', err);
+});
+
 /* ============================================================================
-   LOCAL STORAGE OPERATIONS
+   LOCAL STORAGE OPERATIONS (Now uses IndexedDB via storage wrapper)
    ============================================================================ */
 
 /**
- * Get project index from localStorage
+ * Get project index from storage
  */
 export function getLocalProjectIndex(): ProjectIndexEntry[] {
   if (typeof window === "undefined") return [];
   
   try {
-    const raw = localStorage.getItem(PROJECTS_INDEX_KEY);
+    const raw = storage.getItem(PROJECTS_INDEX_KEY);
     if (!raw) return [];
     
     const parsed = JSON.parse(raw);
@@ -47,27 +54,27 @@ export function getLocalProjectIndex(): ProjectIndexEntry[] {
 }
 
 /**
- * Save project index to localStorage
+ * Save project index to storage
  */
 export function setLocalProjectIndex(entries: ProjectIndexEntry[]): void {
   if (typeof window === "undefined") return;
   
   try {
-    localStorage.setItem(PROJECTS_INDEX_KEY, JSON.stringify(entries));
+    storage.setItem(PROJECTS_INDEX_KEY, JSON.stringify(entries));
   } catch (err) {
     console.error("[projectsService] Failed to save project index:", err);
   }
 }
 
 /**
- * Get a single project from localStorage cache
+ * Get a single project from storage cache
  */
 export function getLocalProject(projectId: string): Project | null {
   if (typeof window === "undefined") return null;
   
   try {
     const key = `${PROJECTS_CACHE_KEY}_${projectId}`;
-    const raw = localStorage.getItem(key);
+    const raw = storage.getItem(key);
     if (!raw) return null;
     
     return JSON.parse(raw) as Project;
@@ -78,19 +85,19 @@ export function getLocalProject(projectId: string): Project | null {
 }
 
 /**
- * Save a single project to localStorage cache
+ * Save a single project to storage cache
  */
 export function setLocalProject(project: Project): void {
   if (typeof window === "undefined") return;
   
   try {
     const key = `${PROJECTS_CACHE_KEY}_${project.id}`;
-    localStorage.setItem(key, JSON.stringify(project));
+    storage.setItem(key, JSON.stringify(project));
     
     // Also update the current project if it matches
-    const currentId = localStorage.getItem(CURRENT_PROJECT_ID_KEY);
+    const currentId = storage.getItem(CURRENT_PROJECT_ID_KEY);
     if (currentId === project.id) {
-      localStorage.setItem(CURRENT_PROJECT_KEY, JSON.stringify(project));
+      storage.setItem(CURRENT_PROJECT_KEY, JSON.stringify(project));
     }
   } catch (err) {
     console.error("[projectsService] Failed to save project to cache:", err);
@@ -98,27 +105,27 @@ export function setLocalProject(project: Project): void {
 }
 
 /**
- * Remove a project from localStorage cache
+ * Remove a project from storage cache
  */
 export function removeLocalProject(projectId: string): void {
   if (typeof window === "undefined") return;
   
   try {
     const key = `${PROJECTS_CACHE_KEY}_${projectId}`;
-    localStorage.removeItem(key);
+    storage.removeItem(key);
   } catch (err) {
     console.error("[projectsService] Failed to remove project from cache:", err);
   }
 }
 
 /**
- * Get the currently active project from localStorage
+ * Get the currently active project from storage
  */
 export function getCurrentProject(): Project | null {
   if (typeof window === "undefined") return null;
   
   try {
-    const raw = localStorage.getItem(CURRENT_PROJECT_KEY);
+    const raw = storage.getItem(CURRENT_PROJECT_KEY);
     if (!raw) return null;
     
     return JSON.parse(raw) as Project;
@@ -136,12 +143,12 @@ export function setCurrentProject(project: Project | null): void {
   
   try {
     if (project) {
-      localStorage.setItem(CURRENT_PROJECT_KEY, JSON.stringify(project));
-      localStorage.setItem(CURRENT_PROJECT_ID_KEY, project.id);
+      storage.setItem(CURRENT_PROJECT_KEY, JSON.stringify(project));
+      storage.setItem(CURRENT_PROJECT_ID_KEY, project.id);
       setLocalProject(project); // Also cache it
     } else {
-      localStorage.removeItem(CURRENT_PROJECT_KEY);
-      localStorage.removeItem(CURRENT_PROJECT_ID_KEY);
+      storage.removeItem(CURRENT_PROJECT_KEY);
+      storage.removeItem(CURRENT_PROJECT_ID_KEY);
     }
   } catch (err) {
     console.error("[projectsService] Failed to set current project:", err);
@@ -155,7 +162,7 @@ export function getCurrentProjectId(): string | null {
   if (typeof window === "undefined") return null;
   
   try {
-    return localStorage.getItem(CURRENT_PROJECT_ID_KEY);
+    return storage.getItem(CURRENT_PROJECT_ID_KEY);
   } catch {
     return null;
   }
