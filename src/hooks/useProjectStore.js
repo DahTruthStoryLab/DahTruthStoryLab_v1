@@ -1,7 +1,9 @@
 // src/hooks/useProjectStore.js
 // Central project management - create, switch, delete projects with isolated storage
+// Updated to use IndexedDB via storage wrapper for large manuscript support
 
 import { useState, useEffect, useCallback } from "react";
+import { storage } from "../lib/storage";
 
 // Storage keys
 const PROJECTS_LIST_KEY = "dahtruth-projects-list";
@@ -24,7 +26,7 @@ function getProjectDataKey(projectId) {
 // Load projects list
 function loadProjectsList() {
   try {
-    const raw = localStorage.getItem(PROJECTS_LIST_KEY);
+    const raw = storage.getItem(PROJECTS_LIST_KEY);
     if (!raw) return [];
     return JSON.parse(raw);
   } catch {
@@ -35,7 +37,7 @@ function loadProjectsList() {
 // Save projects list
 function saveProjectsList(projects) {
   try {
-    localStorage.setItem(PROJECTS_LIST_KEY, JSON.stringify(projects));
+    storage.setItem(PROJECTS_LIST_KEY, JSON.stringify(projects));
     window.dispatchEvent(new Event("projects:change"));
   } catch (err) {
     console.error("Failed to save projects list:", err);
@@ -45,7 +47,7 @@ function saveProjectsList(projects) {
 // Load current project ID
 function loadCurrentProjectId() {
   try {
-    return localStorage.getItem(CURRENT_PROJECT_KEY) || null;
+    return storage.getItem(CURRENT_PROJECT_KEY) || null;
   } catch {
     return null;
   }
@@ -54,7 +56,7 @@ function loadCurrentProjectId() {
 // Save current project ID
 function saveCurrentProjectId(projectId) {
   try {
-    localStorage.setItem(CURRENT_PROJECT_KEY, projectId);
+    storage.setItem(CURRENT_PROJECT_KEY, projectId);
     
     // Load project data and sync to legacy keys
     const data = loadProjectData(projectId);
@@ -64,10 +66,10 @@ function saveCurrentProjectId(projectId) {
       const chapterCount = (data.chapters || []).length;
       
       // Update legacy storage key
-      localStorage.setItem(LEGACY_STORAGE_KEY, JSON.stringify(data));
+      storage.setItem(LEGACY_STORAGE_KEY, JSON.stringify(data));
       
       // Update currentStory for StoryLab sidebar
-      localStorage.setItem("currentStory", JSON.stringify({
+      storage.setItem("currentStory", JSON.stringify({
         id: projectId,
         title: title,
         status: "Draft",
@@ -88,7 +90,7 @@ function saveCurrentProjectId(projectId) {
 function loadProjectData(projectId) {
   try {
     const key = getProjectDataKey(projectId);
-    const raw = localStorage.getItem(key);
+    const raw = storage.getItem(key);
     if (!raw) return null;
     return JSON.parse(raw);
   } catch {
@@ -100,7 +102,7 @@ function loadProjectData(projectId) {
 function saveProjectData(projectId, data) {
   try {
     const key = getProjectDataKey(projectId);
-    localStorage.setItem(key, JSON.stringify(data));
+    storage.setItem(key, JSON.stringify(data));
     
     // Also update the project metadata (updatedAt, wordCount)
     const projects = loadProjectsList();
@@ -125,10 +127,10 @@ function saveProjectData(projectId, data) {
     const currentId = loadCurrentProjectId();
     if (projectId === currentId) {
       // Update legacy storage key for backwards compatibility
-      localStorage.setItem(LEGACY_STORAGE_KEY, JSON.stringify(data));
+      storage.setItem(LEGACY_STORAGE_KEY, JSON.stringify(data));
       
       // Update currentStory for StoryLab sidebar
-      localStorage.setItem("currentStory", JSON.stringify({
+      storage.setItem("currentStory", JSON.stringify({
         id: projectId,
         title: title,
         status: "Draft",
@@ -160,7 +162,7 @@ function syncToUserProjects(projects) {
       wordCount: p.wordCount,
       chapterCount: p.chapterCount,
     }));
-    localStorage.setItem("userProjects", JSON.stringify(userProjects));
+    storage.setItem("userProjects", JSON.stringify(userProjects));
   } catch (err) {
     console.error("Failed to sync userProjects:", err);
   }
@@ -170,7 +172,7 @@ function syncToUserProjects(projects) {
 function deleteProjectData(projectId) {
   try {
     const key = getProjectDataKey(projectId);
-    localStorage.removeItem(key);
+    storage.removeItem(key);
   } catch (err) {
     console.error("Failed to delete project data:", err);
   }
@@ -178,19 +180,19 @@ function deleteProjectData(projectId) {
 
 // Migrate legacy data to new format (run once)
 function migrateLegacyData() {
-  const migrated = localStorage.getItem("dahtruth-migration-complete");
+  const migrated = storage.getItem("dahtruth-migration-complete");
   if (migrated) return null;
 
   try {
-    const legacyRaw = localStorage.getItem(LEGACY_STORAGE_KEY);
+    const legacyRaw = storage.getItem(LEGACY_STORAGE_KEY);
     if (!legacyRaw) {
-      localStorage.setItem("dahtruth-migration-complete", "true");
+      storage.setItem("dahtruth-migration-complete", "true");
       return null;
     }
 
     const legacyData = JSON.parse(legacyRaw);
     if (!legacyData || !legacyData.chapters || legacyData.chapters.length === 0) {
-      localStorage.setItem("dahtruth-migration-complete", "true");
+      storage.setItem("dahtruth-migration-complete", "true");
       return null;
     }
 
@@ -215,13 +217,13 @@ function migrateLegacyData() {
     saveProjectsList([project]);
     saveCurrentProjectId(projectId);
 
-    localStorage.setItem("dahtruth-migration-complete", "true");
+    storage.setItem("dahtruth-migration-complete", "true");
     console.log(`[Migration] Migrated legacy project: "${title}" (${legacyData.chapters.length} chapters)`);
 
     return projectId;
   } catch (err) {
     console.error("Migration failed:", err);
-    localStorage.setItem("dahtruth-migration-complete", "true");
+    storage.setItem("dahtruth-migration-complete", "true");
     return null;
   }
 }
@@ -299,9 +301,9 @@ export function useProjectStore() {
     // Create default project data
     const data = createDefaultProjectData(title);
     
-    // Save to project-specific key
+    // Save to project-specific key (now uses IndexedDB)
     const key = getProjectDataKey(projectId);
-    localStorage.setItem(key, JSON.stringify(data));
+    storage.setItem(key, JSON.stringify(data));
 
     // Add to projects list
     const updated = [...projects, project];
@@ -357,9 +359,9 @@ export function useProjectStore() {
       tocOutline: parsedDocument.tableOfContents || [],
     };
 
-    // Save to project-specific key
+    // Save to project-specific key (now uses IndexedDB for large manuscripts)
     const key = getProjectDataKey(projectId);
-    localStorage.setItem(key, JSON.stringify(data));
+    storage.setItem(key, JSON.stringify(data));
 
     // Add to projects list
     const updated = [...projects, project];
