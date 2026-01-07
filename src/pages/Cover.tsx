@@ -19,6 +19,24 @@ const theme = {
   gold: "var(--brand-gold, #facc15)",
 };
 
+// Preset color swatches for quick selection
+const COLOR_SWATCHES = [
+  // Whites & Lights
+  "#ffffff", "#f9fafb", "#f3f4f6", "#e5e7eb", "#d1d5db",
+  // Golds & Yellows
+  "#d4af37", "#facc15", "#fbbf24", "#f59e0b", "#eab308",
+  // Reds & Pinks
+  "#ef4444", "#dc2626", "#b91c1c", "#f43f5e", "#ec4899",
+  // Blues
+  "#3b82f6", "#2563eb", "#1d4ed8", "#1e3a5f", "#0f172a",
+  // Purples & Mauves
+  "#8b5cf6", "#7c3aed", "#6366f1", "#b8a9c9", "#a855f7",
+  // Greens
+  "#22c55e", "#16a34a", "#15803d", "#10b981", "#059669",
+  // Neutrals & Blacks
+  "#111827", "#1f2937", "#374151", "#4b5563", "#000000",
+];
+
 const GENRE_PRESETS = [
   {
     key: "general",
@@ -193,35 +211,107 @@ const styles = {
     color: "#ffffff",
     cursor: "pointer",
   },
-  colorPickerRow: {
-    display: "flex",
-    alignItems: "center",
-    gap: 8,
-    marginBottom: 8,
-  },
-  colorInput: {
-    width: 40,
-    height: 32,
-    padding: 0,
-    border: `1px solid ${theme.border}`,
-    borderRadius: 6,
-    cursor: "pointer",
-    background: "transparent",
-  },
-  colorLabel: {
-    fontSize: 12,
-    color: theme.text,
-    flex: 1,
-  },
-  colorHexInput: {
-    width: 80,
-    padding: "4px 8px",
-    fontSize: 11,
-    borderRadius: 6,
-    border: `1px solid ${theme.border}`,
-    fontFamily: "monospace",
-  },
 };
+
+// Color Picker Component with swatches + hex input
+function ColorPickerField({ label, value, onChange }) {
+  const [showSwatches, setShowSwatches] = useState(false);
+
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <div style={{ ...styles.label, marginBottom: 6 }}>{label}</div>
+      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        {/* Color preview box that opens swatches */}
+        <button
+          type="button"
+          onClick={() => setShowSwatches(!showSwatches)}
+          style={{
+            width: 36,
+            height: 36,
+            borderRadius: 8,
+            border: "2px solid #e2e8f0",
+            background: value,
+            cursor: "pointer",
+            flexShrink: 0,
+          }}
+          title="Click to choose color"
+        />
+
+        {/* Hex input */}
+        <input
+          type="text"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="#ffffff"
+          style={{
+            flex: 1,
+            padding: "8px 10px",
+            fontSize: 13,
+            fontFamily: "monospace",
+            borderRadius: 8,
+            border: `1px solid ${theme.border}`,
+            background: theme.white,
+          }}
+        />
+
+        {/* Native color picker as backup */}
+        <input
+          type="color"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          style={{
+            width: 36,
+            height: 36,
+            padding: 0,
+            border: `1px solid ${theme.border}`,
+            borderRadius: 8,
+            cursor: "pointer",
+            background: "transparent",
+          }}
+          title="Open color picker"
+        />
+      </div>
+
+      {/* Color swatches dropdown */}
+      {showSwatches && (
+        <div
+          style={{
+            marginTop: 8,
+            padding: 8,
+            background: "#f8fafc",
+            borderRadius: 10,
+            border: `1px solid ${theme.border}`,
+          }}
+        >
+          <div style={{ fontSize: 10, color: theme.subtext, marginBottom: 6 }}>
+            Quick colors (click to select):
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+            {COLOR_SWATCHES.map((color) => (
+              <button
+                key={color}
+                type="button"
+                onClick={() => {
+                  onChange(color);
+                  setShowSwatches(false);
+                }}
+                style={{
+                  width: 24,
+                  height: 24,
+                  borderRadius: 4,
+                  border: value === color ? "2px solid #3b82f6" : "1px solid #d1d5db",
+                  background: color,
+                  cursor: "pointer",
+                }}
+                title={color}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export default function Cover() {
   const coverRef = useRef(null);
@@ -239,17 +329,17 @@ export default function Cover() {
   const [genrePresetKey, setGenrePresetKey] = useState("general");
   const [layoutKey, setLayoutKey] = useState("center");
 
-  // ✅ Custom colors (override preset colors)
+  // Custom colors (override preset colors)
   const [useCustomColors, setUseCustomColors] = useState(false);
   const [customTitleColor, setCustomTitleColor] = useState("#f9fafb");
   const [customSubtitleColor, setCustomSubtitleColor] = useState("#e5e7eb");
   const [customAuthorColor, setCustomAuthorColor] = useState("#e5e7eb");
   const [customTaglineColor, setCustomTaglineColor] = useState("#e5e7eb");
 
-  // ✅ Custom font
+  // Custom font
   const [customFontFamily, setCustomFontFamily] = useState("");
 
-  // ✅ Custom background (when no image)
+  // Custom background (when no image)
   const [customBgColor1, setCustomBgColor1] = useState("#111827");
   const [customBgColor2, setCustomBgColor2] = useState("#1e293b");
   const [useCustomBg, setUseCustomBg] = useState(false);
@@ -742,18 +832,18 @@ Story description: ${aiPrompt}`,
           </div>
         </div>
 
-        {/* BODY GRID */}
+        {/* BODY GRID - FIXED: removed maxHeight constraint on sidebar */}
         <div
           style={{
             padding: "18px 24px 24px",
             display: "grid",
-            gridTemplateColumns: "340px minmax(0, 1fr)",
+            gridTemplateColumns: "360px minmax(0, 1fr)",
             gap: 24,
             alignItems: "start",
           }}
         >
-          {/* LEFT: CONTROLS */}
-          <aside style={{ display: "flex", flexDirection: "column", gap: 14, maxHeight: "85vh", overflowY: "auto" }}>
+          {/* LEFT: CONTROLS - FIXED: no maxHeight, natural scroll */}
+          <aside style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             {/* Save / Load Designs */}
             <div style={styles.glassCard}>
               <h3 style={{ margin: "0 0 10px", fontSize: 15, fontWeight: 600, color: theme.text }}>
@@ -913,7 +1003,7 @@ Story description: ${aiPrompt}`,
               </div>
             </div>
 
-            {/* ✅ NEW: Colors & Fonts */}
+            {/* Colors & Fonts - Using new ColorPickerField */}
             <div style={styles.glassCard}>
               <h3 style={{ margin: "0 0 10px", fontSize: 15, fontWeight: 600, color: theme.text }}>
                 🎨 Colors & Fonts
@@ -941,70 +1031,27 @@ Story description: ${aiPrompt}`,
               </div>
 
               {useCustomColors && (
-                <div style={{ display: "grid", gap: 8, marginBottom: 12 }}>
-                  <div style={styles.colorPickerRow}>
-                    <input
-                      type="color"
-                      value={customTitleColor}
-                      onChange={(e) => setCustomTitleColor(e.target.value)}
-                      style={styles.colorInput}
-                    />
-                    <span style={styles.colorLabel}>Title</span>
-                    <input
-                      type="text"
-                      value={customTitleColor}
-                      onChange={(e) => setCustomTitleColor(e.target.value)}
-                      style={styles.colorHexInput}
-                    />
-                  </div>
-
-                  <div style={styles.colorPickerRow}>
-                    <input
-                      type="color"
-                      value={customSubtitleColor}
-                      onChange={(e) => setCustomSubtitleColor(e.target.value)}
-                      style={styles.colorInput}
-                    />
-                    <span style={styles.colorLabel}>Subtitle</span>
-                    <input
-                      type="text"
-                      value={customSubtitleColor}
-                      onChange={(e) => setCustomSubtitleColor(e.target.value)}
-                      style={styles.colorHexInput}
-                    />
-                  </div>
-
-                  <div style={styles.colorPickerRow}>
-                    <input
-                      type="color"
-                      value={customAuthorColor}
-                      onChange={(e) => setCustomAuthorColor(e.target.value)}
-                      style={styles.colorInput}
-                    />
-                    <span style={styles.colorLabel}>Author</span>
-                    <input
-                      type="text"
-                      value={customAuthorColor}
-                      onChange={(e) => setCustomAuthorColor(e.target.value)}
-                      style={styles.colorHexInput}
-                    />
-                  </div>
-
-                  <div style={styles.colorPickerRow}>
-                    <input
-                      type="color"
-                      value={customTaglineColor}
-                      onChange={(e) => setCustomTaglineColor(e.target.value)}
-                      style={styles.colorInput}
-                    />
-                    <span style={styles.colorLabel}>Tagline</span>
-                    <input
-                      type="text"
-                      value={customTaglineColor}
-                      onChange={(e) => setCustomTaglineColor(e.target.value)}
-                      style={styles.colorHexInput}
-                    />
-                  </div>
+                <div style={{ marginBottom: 12 }}>
+                  <ColorPickerField
+                    label="Title Color"
+                    value={customTitleColor}
+                    onChange={setCustomTitleColor}
+                  />
+                  <ColorPickerField
+                    label="Subtitle Color"
+                    value={customSubtitleColor}
+                    onChange={setCustomSubtitleColor}
+                  />
+                  <ColorPickerField
+                    label="Author Color"
+                    value={customAuthorColor}
+                    onChange={setCustomAuthorColor}
+                  />
+                  <ColorPickerField
+                    label="Tagline Color"
+                    value={customTaglineColor}
+                    onChange={setCustomTaglineColor}
+                  />
                 </div>
               )}
 
@@ -1036,25 +1083,17 @@ Story description: ${aiPrompt}`,
                 </label>
 
                 {useCustomBg && (
-                  <div style={{ display: "flex", gap: 8 }}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ ...styles.label, fontSize: 10 }}>Color 1</div>
-                      <input
-                        type="color"
-                        value={customBgColor1}
-                        onChange={(e) => setCustomBgColor1(e.target.value)}
-                        style={{ ...styles.colorInput, width: "100%" }}
-                      />
-                    </div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ ...styles.label, fontSize: 10 }}>Color 2</div>
-                      <input
-                        type="color"
-                        value={customBgColor2}
-                        onChange={(e) => setCustomBgColor2(e.target.value)}
-                        style={{ ...styles.colorInput, width: "100%" }}
-                      />
-                    </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                    <ColorPickerField
+                      label="Gradient Start"
+                      value={customBgColor1}
+                      onChange={setCustomBgColor1}
+                    />
+                    <ColorPickerField
+                      label="Gradient End"
+                      value={customBgColor2}
+                      onChange={setCustomBgColor2}
+                    />
                   </div>
                 )}
               </div>
@@ -1281,7 +1320,7 @@ Story description: ${aiPrompt}`,
           </aside>
 
           {/* RIGHT: PREVIEW */}
-          <section style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <section style={{ display: "flex", flexDirection: "column", gap: 12, position: "sticky", top: 24 }}>
             <div style={{ ...styles.glassCard, flex: 1, display: "flex", flexDirection: "column", minHeight: 700 }}>
               <div
                 style={{
