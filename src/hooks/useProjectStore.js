@@ -1,6 +1,9 @@
-// src/hooks/useProjectStore.js
+// ============================================================================
+// FILE: src/hooks/useProjectStore.js
+// ============================================================================
 // Central project management - create, switch, delete projects with isolated storage
 // UPDATED: Uses IndexedDB-backed storage wrapper for persistence
+// ============================================================================
 
 import { useState, useEffect, useCallback } from "react";
 import { storage } from "../lib/storage";
@@ -168,7 +171,9 @@ function syncToUserProjects(projects) {
   }
 }
 
-// ✅ NEW: Delete ALL data associated with a project
+// ============================================================================
+// NEW: Delete ALL data associated with a project
+// ============================================================================
 function deleteAllProjectData(projectId) {
   try {
     // Main project data key
@@ -286,9 +291,9 @@ function createDefaultProjectData(title = "Untitled Book") {
   };
 }
 
-// ============ Title Propagation ============
-
-// ✅ NEW: Propagate title change to all related storage keys
+// ============================================================================
+// NEW: Title Propagation - Updates title in ALL related storage keys
+// ============================================================================
 function propagateTitleChange(projectId, newTitle) {
   if (!projectId || !newTitle) return;
 
@@ -496,7 +501,7 @@ export function useProjectStore() {
     return true;
   }, [projects]);
 
-  // ✅ UPDATED: Delete a project and ALL related data
+  // UPDATED: Delete a project and ALL related data
   const deleteProject = useCallback((projectId) => {
     // Remove from list
     const updated = projects.filter((p) => p.id !== projectId);
@@ -522,7 +527,7 @@ export function useProjectStore() {
     return true;
   }, [projects, currentProjectId, switchProject, createProject]);
 
-  // ✅ UPDATED: Rename a project with full propagation
+  // UPDATED: Rename a project with full propagation
   const renameProject = useCallback((projectId, newTitle) => {
     // Update projects list
     const updated = projects.map((p) =>
@@ -603,5 +608,5 @@ export function getProjectStorageKey() {
   return getProjectDataKey(projectId);
 }
 
-// ✅ NEW: Export for use in other components
+// Export for use in other components
 export { propagateTitleChange, deleteAllProjectData };
