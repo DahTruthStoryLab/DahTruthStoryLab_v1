@@ -1,15 +1,22 @@
-// src/hooks/useChapterManager.js
+// ============================================================================
+// FILE: src/hooks/useChapterManager.js
+// ============================================================================
 // Manages chapter state, CRUD operations, and storage persistence
-// NOW: Uses IndexedDB via storage wrapper for large manuscript support
+// UPDATED: Uses IndexedDB-backed storage wrapper for persistence
+// ============================================================================
 
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { storage } from "../lib/storage";
 import {
   getCurrentProjectId,
   getCurrentProjectData,
   saveCurrentProjectData,
   getProjectStorageKey,
+  propagateTitleChange,
 } from "./useProjectStore";
-import { storage } from "../lib/storage";
+
+// Legacy key for backwards compat
+const LEGACY_STORAGE_KEY = "dahtruth-story-lab-toc-v3";
 
 // -------- Helpers --------
 
@@ -20,7 +27,7 @@ const loadState = () => {
     if (data) return data;
 
     // Fallback: try legacy key for backwards compatibility
-    const legacyRaw = storage.getItem("dahtruth-story-lab-toc-v3");
+    const legacyRaw = storage.getItem(LEGACY_STORAGE_KEY);
     return legacyRaw ? JSON.parse(legacyRaw) : null;
   } catch {
     return null;
@@ -33,10 +40,9 @@ const saveState = (state) => {
     const saved = saveCurrentProjectData(state);
     
     // Also save to legacy key for backwards compatibility with other components
-    // that might still be reading from there (like StoryLab modules)
     const projectId = getCurrentProjectId();
     if (projectId) {
-      storage.setItem("dahtruth-story-lab-toc-v3", JSON.stringify(state));
+      storage.setItem(LEGACY_STORAGE_KEY, JSON.stringify(state));
       
       // Save currentStory as JSON object for StoryLab sidebar
       const totalWords = (state.chapters || []).reduce((sum, ch) => sum + (ch.wordCount || 0), 0);
@@ -239,6 +245,23 @@ export function useChapterManager() {
     });
   }, []);
 
+  // ============================================================================
+  // NEW: Update book title with propagation to all storage keys
+  // ============================================================================
+  const updateBookTitle = useCallback((newTitle) => {
+    const trimmedTitle = (newTitle || "").trim() || "Untitled Book";
+    
+    setBook((prev) => ({ ...prev, title: trimmedTitle }));
+    
+    // Propagate to all storage keys
+    const currentProjId = projectId || getCurrentProjectId();
+    if (currentProjId) {
+      propagateTitleChange(currentProjId, trimmedTitle);
+    }
+    
+    console.log(`[ChapterManager] Book title updated: "${trimmedTitle}"`);
+  }, [projectId]);
+
   // Explicit save (used when user clicks Save)
   const saveProject = useCallback((overrides = {}) => {
     const current = loadState() || {};
@@ -255,7 +278,15 @@ export function useChapterManager() {
       settings: current.settings || { theme: "light", focusMode: false },
       tocOutline: current.tocOutline || [],
     });
-  }, [book, chapters]);
+    
+    // If book title changed, propagate it
+    if (overrides.book?.title && overrides.book.title !== book.title) {
+      const currentProjId = projectId || getCurrentProjectId();
+      if (currentProjId) {
+        propagateTitleChange(currentProjId, overrides.book.title);
+      }
+    }
+  }, [book, chapters, projectId]);
 
   // Load chapters from parsed document (for import INTO CURRENT project)
   const loadFromParsedDocument = useCallback((parsedDoc) => {
@@ -282,6 +313,12 @@ export function useChapterManager() {
       tocOutline: parsedDoc.tableOfContents || [],
     });
 
+    // Propagate title
+    const currentProjId = getCurrentProjectId();
+    if (currentProjId) {
+      propagateTitleChange(currentProjId, parsedDoc.title);
+    }
+
     return newChapters;
   }, []);
 
@@ -304,6 +341,9 @@ export function useChapterManager() {
     deleteChapter,
     moveChapter,
     saveProject,
+    
+    // NEW: Title update with propagation
+    updateBookTitle,
 
     // Import
     loadFromParsedDocument,
