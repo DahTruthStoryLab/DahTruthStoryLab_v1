@@ -144,7 +144,7 @@ function upsertUserProject({ title, ...rest }) {
     const t = title.trim();
     if (!t) return;
 
-    const raw = Storage.getItem(USER_PROJECTS_KEY);
+    const raw = storage.getItem(USER_PROJECTS_KEY);
     let arr = [];
     try {
       arr = raw ? JSON.parse(raw) : [];
@@ -169,7 +169,7 @@ function upsertUserProject({ title, ...rest }) {
       arr.push(base);
     }
 
-    Storage.setItem(USER_PROJECTS_KEY, JSON.stringify(arr));
+    storage.setItem(USER_PROJECTS_KEY, JSON.stringify(arr));
     window.dispatchEvent(new Event("project:change"));
   } catch (err) {
     console.error("Failed to update userProjects:", err);
@@ -1440,22 +1440,22 @@ export default function ComposePage() {
 
   useEffect(() => {
     try {
-      const stored = Storage.getItem("dt_activeAiTab");
+      const stored = storage.getItem("dt_activeAiTab");
       if (stored) setActiveAiTab(stored);
     } catch {}
   }, []);
 
   useEffect(() => {
     try {
-      if (activeAiTab) Storage.setItem("dt_activeAiTab", activeAiTab);
+      if (activeAiTab) storage.setItem("dt_activeAiTab", activeAiTab);
     } catch {}
   }, [activeAiTab]);
 
   // Check for pending character scan after reload
   useEffect(() => {
-    const pending = Storage.getItem("dt_pending_character_scan");
+    const pending = storage.getItem("dt_pending_character_scan");
     if (pending === "true" && chapters.length > 0) {
-      Storage.removeItem("dt_pending_character_scan");
+      storage.removeItem("dt_pending_character_scan");
       setTimeout(() => {
         if (
           window.confirm(
@@ -1936,7 +1936,7 @@ export default function ComposePage() {
 
       setBookTitle(parsed.title);
 
-      Storage.setItem("dt_pending_character_scan", "true");
+      storage.setItem("dt_pending_character_scan", "true");
 
       alert(`✅ Created new project "${parsed.title}" with ${parsed.chapters.length} chapter(s).`);
       window.location.reload();
@@ -2125,13 +2125,13 @@ export default function ComposePage() {
       const metaKey = `dahtruth_project_meta_${projectId}`;
       const draftKey = `publishingDraft_${projectId}`;
 
-      Storage.setItem(chaptersKey, JSON.stringify(normalizedForPublishing));
-      Storage.setItem(metaKey, JSON.stringify(meta));
-      Storage.setItem(draftKey, JSON.stringify(payload));
+      storage.setItem(chaptersKey, JSON.stringify(normalizedForPublishing));
+      storage.setItem(metaKey, JSON.stringify(meta));
+      storage.setItem(draftKey, JSON.stringify(payload));
 
-      Storage.setItem("dahtruth_chapters", JSON.stringify(normalizedForPublishing));
-      Storage.setItem("dahtruth_project_meta", JSON.stringify(meta));
-      Storage.setItem(PUBLISHING_DRAFT_KEY, JSON.stringify(payload));
+      storage.setItem("dahtruth_chapters", JSON.stringify(normalizedForPublishing));
+      storage.setItem("dahtruth_project_meta", JSON.stringify(meta));
+      storage.setItem(PUBLISHING_DRAFT_KEY, JSON.stringify(payload));
 
       upsertUserProject({ title: safeBookTitle });
       navigate("/publishing");
