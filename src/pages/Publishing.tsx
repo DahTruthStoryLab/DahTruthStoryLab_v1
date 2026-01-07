@@ -679,13 +679,13 @@ export default function Publishing(): JSX.Element {
     authorLast: "YourLastName",
   });
 
-  // ✅ Load meta from localStorage (project-scoped first, then legacy)
+  // ✅ Load meta from storage (project-scoped first, then legacy)
   useEffect(() => {
     if (!projectId) return;
 
     try {
       // 1) Prefer project-scoped publishing meta
-      const pubMetaRaw = Storage.getItem(
+      const pubMetaRaw = storage.getItem(
         publishingMetaKeyForProject(projectId)
       );
       if (pubMetaRaw) {
@@ -697,7 +697,7 @@ export default function Publishing(): JSX.Element {
       }
 
       // 2) Fall back to project-scoped project meta (from Compose)
-      const projMetaRaw = Storage.getItem(projectMetaKeyForProject(projectId));
+      const projMetaRaw = storage.getItem(projectMetaKeyForProject(projectId));
       if (projMetaRaw) {
         const parsed = JSON.parse(projMetaRaw);
         if (parsed && typeof parsed === "object") {
@@ -707,7 +707,7 @@ export default function Publishing(): JSX.Element {
       }
 
       // 3) Legacy fallbacks (old behavior)
-      const legacyPub = Storage.getItem(PUBLISHING_META_KEY);
+      const legacyPub = storage.getItem(PUBLISHING_META_KEY);
       if (legacyPub) {
         const parsed = JSON.parse(legacyPub);
         if (parsed && typeof parsed === "object") {
@@ -716,7 +716,7 @@ export default function Publishing(): JSX.Element {
         }
       }
 
-      const legacy = Storage.getItem(META_KEY);
+      const legacy = storage.getItem(META_KEY);
       if (!legacy) return;
       const parsed = JSON.parse(legacy);
       if (parsed && typeof parsed === "object") {
@@ -733,12 +733,12 @@ export default function Publishing(): JSX.Element {
 
     try {
       // Project-scoped
-      Storage.setItem(projectMetaKeyForProject(projectId), JSON.stringify(meta));
-      Storage.setItem(publishingMetaKeyForProject(projectId), JSON.stringify(meta));
+      storage.setItem(projectMetaKeyForProject(projectId), JSON.stringify(meta));
+      storage.setItem(publishingMetaKeyForProject(projectId), JSON.stringify(meta));
 
       // Legacy (optional for backwards compatibility)
-      Storage.setItem(META_KEY, JSON.stringify(meta));
-      Storage.setItem(PUBLISHING_META_KEY, JSON.stringify(meta));
+      storage.setItem(META_KEY, JSON.stringify(meta));
+      storage.setItem(PUBLISHING_META_KEY, JSON.stringify(meta));
     } catch {
       // ignore storage errors
     }
@@ -795,7 +795,7 @@ export default function Publishing(): JSX.Element {
       }
 
       // 2) Fall back to per-project chapters key written by Compose send-to-publishing
-      const perProjectChaptersRaw = Storage.getItem(
+      const perProjectChaptersRaw = storage.getItem(
         chaptersKeyForProject(projectId)
       );
       if (perProjectChaptersRaw) {
@@ -820,7 +820,7 @@ export default function Publishing(): JSX.Element {
       }
 
       // 3) Legacy fallback
-      const saved = Storage.getItem(STORAGE_KEY);
+      const saved = storage.getItem(STORAGE_KEY);
       if (!saved) return;
 
       const parsedCh = JSON.parse(saved) as any[];
@@ -855,14 +855,14 @@ export default function Publishing(): JSX.Element {
       if (!chapters.length) return;
 
       // project-scoped
-      Storage.setItem(
+      storage.setItem(
         publishingChaptersKeyForProject(projectId),
         JSON.stringify(chapters)
       );
 
       // legacy (optional)
-      Storage.setItem(STORAGE_KEY, JSON.stringify(chapters));
-      Storage.setItem(PUBLISHING_CHAPTERS_KEY, JSON.stringify(chapters));
+      storage.setItem(STORAGE_KEY, JSON.stringify(chapters));
+      storage.setItem(PUBLISHING_CHAPTERS_KEY, JSON.stringify(chapters));
     } catch (err) {
       console.error("Failed to persist chapters from Publishing:", err);
     }
@@ -889,7 +889,7 @@ export default function Publishing(): JSX.Element {
     if (!projectId) return;
 
     try {
-      const raw = Storage.getItem(publishingMatterKeyForProject(projectId));
+      const raw = storage.getItem(publishingMatterKeyForProject(projectId));
       if (!raw) return;
       const parsed = JSON.parse(raw);
       if (parsed && typeof parsed === "object") {
@@ -905,13 +905,13 @@ export default function Publishing(): JSX.Element {
     if (!projectId) return;
 
     try {
-      Storage.setItem(
+      storage.setItem(
         publishingMatterKeyForProject(projectId),
         JSON.stringify(matter)
       );
 
       // legacy optional
-      Storage.setItem(PUBLISHING_MATTER_KEY, JSON.stringify(matter));
+      storage.setItem(PUBLISHING_MATTER_KEY, JSON.stringify(matter));
     } catch {
       /* ignore */
     }
@@ -1221,9 +1221,9 @@ export default function Publishing(): JSX.Element {
 
     try {
       if (compiledPlain) {
-        Storage.setItem(publishingManuscriptKeyForProject(projectId), compiledPlain);
+        storage.setItem(publishingManuscriptKeyForProject(projectId), compiledPlain);
         // legacy optional:
-        Storage.setItem("dahtruth_publishing_manuscript", compiledPlain);
+        storage.setItem("dahtruth_publishing_manuscript", compiledPlain);
       }
     } catch {
       /* ignore */
@@ -1346,19 +1346,19 @@ export default function Publishing(): JSX.Element {
 
     try {
       if (projectId) {
-        Storage.removeItem(publishingDraftKeyForProject(projectId));
-        Storage.removeItem(publishingChaptersKeyForProject(projectId));
-        Storage.removeItem(publishingMetaKeyForProject(projectId));
-        Storage.removeItem(publishingMatterKeyForProject(projectId));
-        Storage.removeItem(publishingManuscriptKeyForProject(projectId));
+        storage.removeItem(publishingDraftKeyForProject(projectId));
+        storage.removeItem(publishingChaptersKeyForProject(projectId));
+        storage.removeItem(publishingMetaKeyForProject(projectId));
+        storage.removeItem(publishingMatterKeyForProject(projectId));
+        storage.removeItem(publishingManuscriptKeyForProject(projectId));
       }
 
       // legacy optional
-      Storage.removeItem(PUBLISHING_DRAFT_KEY);
-      Storage.removeItem(PUBLISHING_CHAPTERS_KEY);
-      Storage.removeItem(PUBLISHING_META_KEY);
-      Storage.removeItem(PUBLISHING_MATTER_KEY);
-      Storage.removeItem("dahtruth_publishing_manuscript");
+      storage.removeItem(PUBLISHING_DRAFT_KEY);
+      storage.removeItem(PUBLISHING_CHAPTERS_KEY);
+      storage.removeItem(PUBLISHING_META_KEY);
+      storage.removeItem(PUBLISHING_MATTER_KEY);
+      storage.removeItem("dahtruth_publishing_manuscript");
     } catch (err) {
       console.error("Failed to clear publishing draft: ", err);
     }
