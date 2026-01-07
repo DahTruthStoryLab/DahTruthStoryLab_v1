@@ -17,6 +17,7 @@ import { rateLimiter } from "../utils/rateLimiter";
 import { createPortal } from "react-dom";
 
 import { storage } from "../lib/storage";
+import { runAssistant } from "../lib/api";
 import {
   Sparkles,
   Search,
@@ -998,6 +999,94 @@ Return ONLY the JSON array, no other text.`;
 }
 
 /* =============================================================================
+   EDITABLE BOOK TITLE COMPONENT - NEW!
+============================================================================= */
+function EditableBookTitle({ title, onSave }) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [editValue, setEditValue] = useState(title);
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    setEditValue(title);
+  }, [title]);
+
+  useEffect(() => {
+    if (isEditing && inputRef.current) {
+      inputRef.current.focus();
+      inputRef.current.select();
+    }
+  }, [isEditing]);
+
+  const handleSave = () => {
+    const trimmed = editValue.trim();
+    if (trimmed && trimmed !== title) {
+      onSave(trimmed);
+    }
+    setIsEditing(false);
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      handleSave();
+    } else if (e.key === "Escape") {
+      setEditValue(title);
+      setIsEditing(false);
+    }
+  };
+
+  if (isEditing) {
+    return (
+      <div className="flex items-center gap-2">
+        <input
+          ref={inputRef}
+          type="text"
+          value={editValue}
+          onChange={(e) => setEditValue(e.target.value)}
+          onBlur={handleSave}
+          onKeyDown={handleKeyDown}
+          className="bg-white/20 border border-white/40 rounded px-2 py-1 text-white text-sm font-medium focus:outline-none focus:ring-2 focus:ring-amber-400 max-w-[200px]"
+          style={{ fontFamily: "'EB Garamond', Georgia, serif" }}
+        />
+        <button
+          onClick={handleSave}
+          className="p-1 rounded hover:bg-white/20"
+          title="Save title"
+        >
+          <Check size={14} className="text-amber-300" />
+        </button>
+        <button
+          onClick={() => {
+            setEditValue(title);
+            setIsEditing(false);
+          }}
+          className="p-1 rounded hover:bg-white/20"
+          title="Cancel"
+        >
+          <X size={14} className="text-white/70" />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <button
+      onClick={() => setIsEditing(true)}
+      className="group flex items-center gap-2 px-2 py-1 rounded hover:bg-white/10 transition-colors"
+      title="Click to edit book title"
+    >
+      <span
+        className="text-white font-medium text-sm max-w-[180px] truncate"
+        style={{ fontFamily: "'EB Garamond', Georgia, serif" }}
+      >
+        {title || "Untitled Book"}
+      </span>
+      <Edit3 size={12} className="text-amber-300 opacity-0 group-hover:opacity-100 transition-opacity" />
+    </button>
+  );
+}
+
+/* =============================================================================
    PROJECT DROPDOWN COMPONENT
 ============================================================================= */
 function ProjectDropdown({ currentProject, projects, onSwitch, onCreate, onImportNew }) {
@@ -1021,7 +1110,7 @@ function ProjectDropdown({ currentProject, projects, onSwitch, onCreate, onImpor
         className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium bg-white/20 hover:bg-white/30 text-white transition-colors"
       >
         <BookOpen size={16} />
-        <span className="max-w-[180px] truncate">{currentProject?.title || "No Project"}</span>
+        <span className="max-w-[120px] truncate">{currentProject?.title || "No Project"}</span>
         <ChevronDown size={14} className={`transition-transform ${isOpen ? "rotate-180" : ""}`} />
       </button>
 
@@ -1328,9 +1417,16 @@ function DropdownDivider() {
 export default function ComposePage() {
   const navigate = useNavigate();
 
-  // Project management
-  const { projects, currentProjectId, currentProject, createProject, createProjectFromImport, switchProject } =
-    useProjectStore();
+  // Project management - now includes renameProject for title sync
+  const { 
+    projects, 
+    currentProjectId, 
+    currentProject, 
+    createProject, 
+    createProjectFromImport, 
+    switchProject,
+    renameProject,  // ✅ NEW: for title propagation
+  } = useProjectStore();
 
   const {
     book,
@@ -1343,6 +1439,7 @@ export default function ComposePage() {
     deleteChapter,
     moveChapter,
     saveProject,
+    updateBookTitle,  // ✅ NEW: for title propagation
   } = useChapterManager();
 
   const chapters = useMemo(
@@ -1366,6 +1463,26 @@ export default function ComposePage() {
     if (currentProject?.title) setBookTitle(currentProject.title);
     else if (book?.title) setBookTitle(book.title);
   }, [currentProject, book]);
+
+  // ✅ NEW: Handle book title change with propagation
+  const handleBookTitleChange = useCallback((newTitle) => {
+    const trimmed = (newTitle || "").trim();
+    if (!trimmed) return;
+    
+    setBookTitle(trimmed);
+    
+    // Propagate to all storage keys via useProjectStore
+    if (currentProjectId) {
+      renameProject(currentProjectId, trimmed);
+    }
+    
+    // Also update via useChapterManager (updates book object)
+    if (updateBookTitle) {
+      updateBookTitle(trimmed);
+    }
+    
+    console.log(`[ComposePage] Book title updated: "${trimmed}"`);
+  }, [currentProjectId, renameProject, updateBookTitle]);
 
   const { characters, characterCount } = useMemo(
     () => computeCharactersFromChapters(chapters || []),
@@ -1415,7 +1532,7 @@ export default function ComposePage() {
   // Character suggestion modal state
   const [showCharacterSuggestion, setShowCharacterSuggestion] = useState(false);
 
-  // ✅ detected characters state (safe + inside component)
+  // detected characters state
   const [detectedCharacters, setDetectedCharacters] = useState([]);
 
   const hasChapter = !!selectedId && !!selectedChapter;
@@ -1856,7 +1973,13 @@ export default function ComposePage() {
         return;
       }
 
-      if (parsed.title && parsed.title !== bookTitle) setBookTitle(parsed.title);
+      if (parsed.title && parsed.title !== bookTitle) {
+        setBookTitle(parsed.title);
+        // ✅ Also propagate the new title
+        if (currentProjectId) {
+          renameProject(currentProjectId, parsed.title);
+        }
+      }
 
       const existing = Array.isArray(chapters) ? chapters : [];
       const isSingleBlank =
@@ -2048,13 +2171,13 @@ export default function ComposePage() {
     setEditorViewMode("pages");
   };
 
-  // ✅ refresh detected candidates (regex scan)
+  // refresh detected candidates (regex scan)
   const refreshDetectedCharacters = useCallback(() => {
     const results = regexScanForCharacters(chapters || []);
     setDetectedCharacters(results || []);
   }, [chapters]);
 
-  // Optional: keep it continuously updated
+  // Keep it continuously updated
   useEffect(() => {
     refreshDetectedCharacters();
   }, [refreshDetectedCharacters]);
@@ -2197,7 +2320,7 @@ export default function ComposePage() {
       >
         <div className="max-w-[1800px] mx-auto px-4 py-3">
           <div className="flex items-center justify-between flex-wrap gap-3">
-            {/* Left: Title + Project Dropdown */}
+            {/* Left: Title + Project Dropdown + EDITABLE BOOK TITLE */}
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-3">
                 <PenLine size={24} className="text-amber-300" />
@@ -2211,6 +2334,15 @@ export default function ComposePage() {
                 onCreate={handleCreateNewProject}
                 onImportNew={triggerNewProjectImport}
               />
+
+              {/* ✅ NEW: Editable Book Title */}
+              <div className="hidden md:flex items-center gap-2 border-l border-white/20 pl-4">
+                <span className="text-white/60 text-xs">Title:</span>
+                <EditableBookTitle
+                  title={bookTitle}
+                  onSave={handleBookTitleChange}
+                />
+              </div>
             </div>
 
             {/* Center: Story Info */}
