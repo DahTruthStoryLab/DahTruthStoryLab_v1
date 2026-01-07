@@ -3,6 +3,8 @@ import React, { useEffect, useRef, useState } from "react";
 import PageShell from "../components/layout/PageShell.tsx";
 import { uploadImage } from "../lib/uploads";
 import { toPng } from "html-to-image";
+import { storage } from "../lib/storage";
+import { getSelectedProjectId } from "../lib/projectsSync";
 
 const theme = {
   bg: "var(--brand-bg, #0f172a)",
@@ -69,6 +71,37 @@ const GENRE_PRESETS = [
       "radial-gradient(circle at top, rgba(96,165,250,0.4), transparent 60%)",
     fontFamily: "'Garamond', 'Times New Roman', serif",
   },
+  {
+    key: "urban",
+    label: "Urban Fiction",
+    bg: "linear-gradient(145deg, #1e3a5f, #0f172a)",
+    titleColor: "#d4af37",
+    subtitleColor: "#e5e7eb",
+    authorColor: "#d4af37",
+    overlay: "rgba(15,23,42,0.5)",
+    fontFamily: "Georgia, 'Times New Roman', serif",
+  },
+  {
+    key: "inspirational",
+    label: "Inspirational / Faith",
+    bg: "linear-gradient(145deg, #1e3a5f, #b8a9c9)",
+    titleColor: "#ffffff",
+    subtitleColor: "#e5e7eb",
+    authorColor: "#d4af37",
+    overlay: "rgba(30,58,95,0.4)",
+    fontFamily: "Georgia, 'Times New Roman', serif",
+  },
+];
+
+const FONT_FAMILIES = [
+  { key: "georgia", label: "Georgia", value: "Georgia, 'Times New Roman', serif" },
+  { key: "times", label: "Times New Roman", value: "'Times New Roman', Times, serif" },
+  { key: "garamond", label: "Garamond", value: "Garamond, 'Times New Roman', serif" },
+  { key: "playfair", label: "Playfair Display", value: "'Playfair Display', Georgia, serif" },
+  { key: "impact", label: "Impact", value: "Impact, 'Arial Black', sans-serif" },
+  { key: "arial", label: "Arial", value: "Arial, Helvetica, sans-serif" },
+  { key: "palatino", label: "Palatino", value: "'Palatino Linotype', 'Book Antiqua', Palatino, serif" },
+  { key: "bookman", label: "Bookman", value: "'Bookman Old Style', serif" },
 ];
 
 const LAYOUTS = [
@@ -80,28 +113,34 @@ const LAYOUTS = [
 const TRIM_PRESETS = [
   { key: "6x9", label: '6" × 9" (most common)', wIn: 6, hIn: 9 },
   { key: "5x8", label: '5" × 8"', wIn: 5, hIn: 8 },
+  { key: "5.5x8.5", label: '5.5" × 8.5"', wIn: 5.5, hIn: 8.5 },
   { key: "8.5x11", label: '8.5" × 11"', wIn: 8.5, hIn: 11 },
 ];
 
-// Design save/load helpers
+// Project-scoped storage keys
+const coverDesignsKeyForProject = (projectId) =>
+  `dahtruth_cover_designs_${projectId}`;
+
+const coverImageUrlKeyForProject = (projectId) =>
+  `dahtruth_cover_image_url_${projectId}`;
+
+const coverImageMetaKeyForProject = (projectId) =>
+  `dahtruth_cover_image_meta_${projectId}`;
+
+const coverSettingsKeyForProject = (projectId) =>
+  `dahtruth_cover_settings_${projectId}`;
+
+// Legacy keys (for backwards compatibility)
 const COVER_DESIGNS_KEY = "dahtruth_cover_designs_v1";
+const COVER_IMAGE_URL_KEY = "dahtruth_cover_image_url";
+const COVER_IMAGE_META_KEY = "dahtruth_cover_image_meta";
 
 function safeJsonParse(value, fallback) {
   try {
-    return JSON.parse(value);
+    return value ? JSON.parse(value) : fallback;
   } catch {
     return fallback;
   }
-}
-
-function loadDesigns() {
-  if (typeof window === "undefined") return [];
-  return safeJsonParse(localStorage.getItem(COVER_DESIGNS_KEY), []);
-}
-
-function saveDesigns(designs) {
-  if (typeof window === "undefined") return;
-  localStorage.setItem(COVER_DESIGNS_KEY, JSON.stringify(designs));
 }
 
 const styles = {
@@ -154,88 +193,247 @@ const styles = {
     color: "#ffffff",
     cursor: "pointer",
   },
+  colorPickerRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 8,
+  },
+  colorInput: {
+    width: 40,
+    height: 32,
+    padding: 0,
+    border: `1px solid ${theme.border}`,
+    borderRadius: 6,
+    cursor: "pointer",
+    background: "transparent",
+  },
+  colorLabel: {
+    fontSize: 12,
+    color: theme.text,
+    flex: 1,
+  },
+  colorHexInput: {
+    width: 80,
+    padding: "4px 8px",
+    fontSize: 11,
+    borderRadius: 6,
+    border: `1px solid ${theme.border}`,
+    fontFamily: "monospace",
+  },
 };
 
 export default function Cover() {
-  // ✅ MUST be inside the component
   const coverRef = useRef(null);
 
+  // Project ID
+  const [projectId, setProjectId] = useState("");
+
+  // Text content
   const [title, setTitle] = useState("Working Title");
   const [subtitle, setSubtitle] = useState("Optional subtitle");
   const [author, setAuthor] = useState("Your Name");
+  const [tagline, setTagline] = useState("A NOVEL");
+
+  // Preset & layout
   const [genrePresetKey, setGenrePresetKey] = useState("general");
   const [layoutKey, setLayoutKey] = useState("center");
 
+  // ✅ Custom colors (override preset colors)
+  const [useCustomColors, setUseCustomColors] = useState(false);
+  const [customTitleColor, setCustomTitleColor] = useState("#f9fafb");
+  const [customSubtitleColor, setCustomSubtitleColor] = useState("#e5e7eb");
+  const [customAuthorColor, setCustomAuthorColor] = useState("#e5e7eb");
+  const [customTaglineColor, setCustomTaglineColor] = useState("#e5e7eb");
+
+  // ✅ Custom font
+  const [customFontFamily, setCustomFontFamily] = useState("");
+
+  // ✅ Custom background (when no image)
+  const [customBgColor1, setCustomBgColor1] = useState("#111827");
+  const [customBgColor2, setCustomBgColor2] = useState("#1e293b");
+  const [useCustomBg, setUseCustomBg] = useState(false);
+
+  // Cover image
   const [coverImageUrl, setCoverImageUrl] = useState("");
   const [coverImageUploading, setCoverImageUploading] = useState(false);
   const [coverImageFit, setCoverImageFit] = useState("cover");
   const [coverImageFilter, setCoverImageFilter] = useState("soft-dark");
 
+  // UI state
   const [designMode, setDesignMode] = useState("upload");
   const [aiPrompt, setAiPrompt] = useState("");
   const [aiBusy, setAiBusy] = useState(false);
   const [coverLoaded, setCoverLoaded] = useState(false);
 
-  // ✅ NEW: Trim size and DPI for print-ready export
+  // Export settings
   const [trimKey, setTrimKey] = useState("6x9");
   const [dpi, setDpi] = useState(300);
 
-  // ✅ NEW: Save/Load designs
+  // Save/Load designs
   const [designs, setDesigns] = useState([]);
   const [selectedDesignId, setSelectedDesignId] = useState("");
   const [designName, setDesignName] = useState("");
-
-  const COVER_IMAGE_URL_KEY = "dahtruth_cover_image_url";
-  const COVER_IMAGE_META_KEY = "dahtruth_cover_image_meta";
 
   const selectedPreset =
     GENRE_PRESETS.find((p) => p.key === genrePresetKey) || GENRE_PRESETS[0];
 
   const selectedTrim = TRIM_PRESETS.find((t) => t.key === trimKey) || TRIM_PRESETS[0];
 
+  // Determine actual colors to use
+  const activeTitleColor = useCustomColors ? customTitleColor : selectedPreset.titleColor;
+  const activeSubtitleColor = useCustomColors ? customSubtitleColor : selectedPreset.subtitleColor;
+  const activeAuthorColor = useCustomColors ? customAuthorColor : selectedPreset.authorColor;
+  const activeTaglineColor = useCustomColors ? customTaglineColor : selectedPreset.subtitleColor;
+  const activeFontFamily = customFontFamily || selectedPreset.fontFamily;
+
+  // Determine background
+  const activeBackground = coverImageUrl
+    ? `url(${coverImageUrl})`
+    : useCustomBg
+    ? `linear-gradient(145deg, ${customBgColor1}, ${customBgColor2})`
+    : selectedPreset.bg;
+
   let justifyContent = "center";
   if (layoutKey === "top") justifyContent = "flex-start";
   if (layoutKey === "bottom") justifyContent = "flex-end";
 
+  // Initialize project ID
   useEffect(() => {
     try {
-      const savedUrl = localStorage.getItem(COVER_IMAGE_URL_KEY);
+      const id = getSelectedProjectId() || "default";
+      setProjectId(id);
+    } catch (e) {
+      console.error("Failed to get project ID:", e);
+      setProjectId("default");
+    }
+  }, []);
+
+  // Load saved cover data when project changes
+  useEffect(() => {
+    if (!projectId) return;
+
+    try {
+      // Load cover image URL (project-scoped first, then legacy)
+      let savedUrl = storage.getItem(coverImageUrlKeyForProject(projectId));
+      if (!savedUrl) savedUrl = storage.getItem(COVER_IMAGE_URL_KEY);
       if (savedUrl) setCoverImageUrl(savedUrl);
 
-      const savedMeta = localStorage.getItem(COVER_IMAGE_META_KEY);
+      // Load cover image meta
+      let savedMeta = storage.getItem(coverImageMetaKeyForProject(projectId));
+      if (!savedMeta) savedMeta = storage.getItem(COVER_IMAGE_META_KEY);
       if (savedMeta) {
-        const meta = JSON.parse(savedMeta);
-        if (meta?.fit) setCoverImageFit(meta.fit);
-        if (meta?.filter) setCoverImageFilter(meta.filter);
+        const meta = safeJsonParse(savedMeta, {});
+        if (meta.fit) setCoverImageFit(meta.fit);
+        if (meta.filter) setCoverImageFilter(meta.filter);
       }
-    } catch {
-      // ignore
+
+      // Load cover settings (colors, fonts, etc.)
+      const savedSettings = storage.getItem(coverSettingsKeyForProject(projectId));
+      if (savedSettings) {
+        const settings = safeJsonParse(savedSettings, {});
+        if (settings.title) setTitle(settings.title);
+        if (settings.subtitle) setSubtitle(settings.subtitle);
+        if (settings.author) setAuthor(settings.author);
+        if (settings.tagline) setTagline(settings.tagline);
+        if (settings.genrePresetKey) setGenrePresetKey(settings.genrePresetKey);
+        if (settings.layoutKey) setLayoutKey(settings.layoutKey);
+        if (settings.trimKey) setTrimKey(settings.trimKey);
+
+        // Custom colors
+        if (typeof settings.useCustomColors === "boolean") setUseCustomColors(settings.useCustomColors);
+        if (settings.customTitleColor) setCustomTitleColor(settings.customTitleColor);
+        if (settings.customSubtitleColor) setCustomSubtitleColor(settings.customSubtitleColor);
+        if (settings.customAuthorColor) setCustomAuthorColor(settings.customAuthorColor);
+        if (settings.customTaglineColor) setCustomTaglineColor(settings.customTaglineColor);
+
+        // Custom font
+        if (settings.customFontFamily) setCustomFontFamily(settings.customFontFamily);
+
+        // Custom background
+        if (typeof settings.useCustomBg === "boolean") setUseCustomBg(settings.useCustomBg);
+        if (settings.customBgColor1) setCustomBgColor1(settings.customBgColor1);
+        if (settings.customBgColor2) setCustomBgColor2(settings.customBgColor2);
+      }
+
+      // Load saved designs
+      let savedDesigns = storage.getItem(coverDesignsKeyForProject(projectId));
+      if (!savedDesigns) savedDesigns = storage.getItem(COVER_DESIGNS_KEY);
+      const designsArray = safeJsonParse(savedDesigns, []);
+      setDesigns(Array.isArray(designsArray) ? designsArray : []);
+
+    } catch (e) {
+      console.error("Failed to load cover data:", e);
     } finally {
       setCoverLoaded(true);
     }
-  }, []);
+  }, [projectId]);
 
+  // Auto-save cover settings when they change
   useEffect(() => {
-    if (!coverLoaded) return;
+    if (!coverLoaded || !projectId) return;
 
     try {
-      if (coverImageUrl) localStorage.setItem(COVER_IMAGE_URL_KEY, coverImageUrl);
-      else localStorage.removeItem(COVER_IMAGE_URL_KEY);
+      const settings = {
+        title,
+        subtitle,
+        author,
+        tagline,
+        genrePresetKey,
+        layoutKey,
+        trimKey,
+        useCustomColors,
+        customTitleColor,
+        customSubtitleColor,
+        customAuthorColor,
+        customTaglineColor,
+        customFontFamily,
+        useCustomBg,
+        customBgColor1,
+        customBgColor2,
+      };
 
-      localStorage.setItem(
-        COVER_IMAGE_META_KEY,
+      storage.setItem(coverSettingsKeyForProject(projectId), JSON.stringify(settings));
+
+      // Save image URL
+      if (coverImageUrl) {
+        storage.setItem(coverImageUrlKeyForProject(projectId), coverImageUrl);
+      } else {
+        storage.removeItem(coverImageUrlKeyForProject(projectId));
+      }
+
+      // Save image meta
+      storage.setItem(
+        coverImageMetaKeyForProject(projectId),
         JSON.stringify({ fit: coverImageFit, filter: coverImageFilter })
       );
-    } catch {
-      // ignore
-    }
-  }, [coverLoaded, coverImageUrl, coverImageFit, coverImageFilter]);
 
-  // ✅ Load saved designs on page load
-  useEffect(() => {
-    const saved = loadDesigns();
-    setDesigns(Array.isArray(saved) ? saved : []);
-  }, []);
+    } catch (e) {
+      console.error("Failed to save cover settings:", e);
+    }
+  }, [
+    coverLoaded,
+    projectId,
+    title,
+    subtitle,
+    author,
+    tagline,
+    genrePresetKey,
+    layoutKey,
+    trimKey,
+    useCustomColors,
+    customTitleColor,
+    customSubtitleColor,
+    customAuthorColor,
+    customTaglineColor,
+    customFontFamily,
+    useCustomBg,
+    customBgColor1,
+    customBgColor2,
+    coverImageUrl,
+    coverImageFit,
+    coverImageFilter,
+  ]);
 
   const handleCoverFileChange = async (event) => {
     const input = event.target;
@@ -257,30 +455,42 @@ export default function Cover() {
 
   const handleClearCoverImage = () => {
     setCoverImageUrl("");
-    try {
-      localStorage.removeItem(COVER_IMAGE_URL_KEY);
-    } catch {
-      // ignore
-    }
   };
 
-  // ✅ Design save/load functions
+  // Apply preset colors to custom colors (for starting point)
+  const applyPresetToCustom = () => {
+    setCustomTitleColor(selectedPreset.titleColor);
+    setCustomSubtitleColor(selectedPreset.subtitleColor);
+    setCustomAuthorColor(selectedPreset.authorColor);
+    setCustomTaglineColor(selectedPreset.subtitleColor);
+    setUseCustomColors(true);
+  };
+
+  // Build current design object for saving
   const buildCurrentDesign = () => {
     return {
       id: crypto?.randomUUID ? crypto.randomUUID() : String(Date.now()),
       name: (designName || title || "Untitled").trim(),
       createdAt: new Date().toISOString(),
-
-      // cover fields
       title,
       subtitle,
       author,
+      tagline,
       genrePresetKey,
       layoutKey,
-
       coverImageUrl,
       coverImageFit,
       coverImageFilter,
+      useCustomColors,
+      customTitleColor,
+      customSubtitleColor,
+      customAuthorColor,
+      customTaglineColor,
+      customFontFamily,
+      useCustomBg,
+      customBgColor1,
+      customBgColor2,
+      trimKey,
     };
   };
 
@@ -289,21 +499,37 @@ export default function Cover() {
     setTitle(d.title ?? "Working Title");
     setSubtitle(d.subtitle ?? "");
     setAuthor(d.author ?? "Your Name");
+    setTagline(d.tagline ?? "A NOVEL");
     setGenrePresetKey(d.genrePresetKey ?? "general");
     setLayoutKey(d.layoutKey ?? "center");
-
     setCoverImageUrl(d.coverImageUrl ?? "");
     setCoverImageFit(d.coverImageFit ?? "cover");
     setCoverImageFilter(d.coverImageFilter ?? "soft-dark");
+    setUseCustomColors(d.useCustomColors ?? false);
+    setCustomTitleColor(d.customTitleColor ?? "#f9fafb");
+    setCustomSubtitleColor(d.customSubtitleColor ?? "#e5e7eb");
+    setCustomAuthorColor(d.customAuthorColor ?? "#e5e7eb");
+    setCustomTaglineColor(d.customTaglineColor ?? "#e5e7eb");
+    setCustomFontFamily(d.customFontFamily ?? "");
+    setUseCustomBg(d.useCustomBg ?? false);
+    setCustomBgColor1(d.customBgColor1 ?? "#111827");
+    setCustomBgColor2(d.customBgColor2 ?? "#1e293b");
+    if (d.trimKey) setTrimKey(d.trimKey);
   };
 
   const handleSaveDesign = () => {
     const next = buildCurrentDesign();
     const updated = [next, ...designs];
     setDesigns(updated);
-    saveDesigns(updated);
+
+    // Save to storage
+    if (projectId) {
+      storage.setItem(coverDesignsKeyForProject(projectId), JSON.stringify(updated));
+    }
+
     setSelectedDesignId(next.id);
     setDesignName("");
+    alert("✅ Design saved!");
   };
 
   const handleLoadDesign = (id) => {
@@ -314,13 +540,19 @@ export default function Cover() {
 
   const handleDeleteDesign = () => {
     if (!selectedDesignId) return;
+    if (!window.confirm("Delete this saved design?")) return;
+
     const updated = designs.filter((d) => d.id !== selectedDesignId);
     setDesigns(updated);
-    saveDesigns(updated);
+
+    if (projectId) {
+      storage.setItem(coverDesignsKeyForProject(projectId), JSON.stringify(updated));
+    }
+
     setSelectedDesignId("");
   };
 
-  // ✅ UPDATED: Print-sized export (inches × DPI)
+  // Export PNG
   const handleExportPNG = async () => {
     if (!coverRef.current) return;
 
@@ -350,9 +582,7 @@ export default function Cover() {
 
   const handleAiDesignSuggest = async () => {
     if (!aiPrompt.trim()) {
-      alert(
-        "Add a few words about your story (e.g. 'dark historical thriller in Philly')."
-      );
+      alert("Add a few words about your story (e.g. 'dark historical thriller in Philly').");
       return;
     }
 
@@ -369,9 +599,12 @@ export default function Cover() {
 
 You MUST respond with ONLY a valid JSON object (no markdown, no explanation) in this exact format:
 {
-  "genre": "general" | "romance" | "thriller" | "memoir" | "fantasy",
+  "genre": "general" | "romance" | "thriller" | "memoir" | "fantasy" | "urban" | "inspirational",
   "layout": "center" | "top" | "bottom",
   "filter": "soft-dark" | "soft-blur" | "none",
+  "titleColor": "#hexcolor",
+  "subtitleColor": "#hexcolor",
+  "authorColor": "#hexcolor",
   "reasoning": "Brief explanation of why these choices fit the story"
 }
 
@@ -398,11 +631,20 @@ Story description: ${aiPrompt}`,
         if (suggestions.layout && LAYOUTS.find((l) => l.key === suggestions.layout)) {
           setLayoutKey(suggestions.layout);
         }
-        if (
-          suggestions.filter &&
-          ["soft-dark", "soft-blur", "none"].includes(suggestions.filter)
-        ) {
+        if (suggestions.filter && ["soft-dark", "soft-blur", "none"].includes(suggestions.filter)) {
           setCoverImageFilter(suggestions.filter);
+        }
+
+        // Apply custom colors if AI suggested them
+        if (suggestions.titleColor || suggestions.subtitleColor || suggestions.authorColor) {
+          setUseCustomColors(true);
+          if (suggestions.titleColor) setCustomTitleColor(suggestions.titleColor);
+          if (suggestions.subtitleColor) setCustomSubtitleColor(suggestions.subtitleColor);
+          if (suggestions.authorColor) setCustomAuthorColor(suggestions.authorColor);
+        }
+
+        if (suggestions.reasoning) {
+          alert(`AI Suggestion: ${suggestions.reasoning}`);
         }
       } else {
         throw new Error(data.error || "Unknown error from AI");
@@ -423,7 +665,7 @@ Story description: ${aiPrompt}`,
       : "transparent"
     : selectedPreset.overlay;
 
-  // Calculate cover preview size - larger to fill space better
+  // Preview size
   const COVER_PREVIEW_WIDTH = 420;
   const coverPreviewHeight = Math.round(COVER_PREVIEW_WIDTH * (selectedTrim.hIn / selectedTrim.wIn));
 
@@ -439,7 +681,7 @@ Story description: ${aiPrompt}`,
         {/* HEADER */}
         <div
           style={{
-            background: "linear-gradient(135deg, #0f172a, #4c1d95)",
+            background: "linear-gradient(135deg, #1e3a5f, #b8a9c9)",
             color: "#ffffff",
             padding: "16px 24px",
           }}
@@ -471,8 +713,6 @@ Story description: ${aiPrompt}`,
                     gap: 4,
                     marginBottom: 2,
                   }}
-                  onMouseOver={(e) => (e.currentTarget.style.color = "#ffffff")}
-                  onMouseOut={(e) => (e.currentTarget.style.color = "rgba(255,255,255,0.8)")}
                 >
                   ← Back to Publishing Suite
                 </a>
@@ -488,43 +728,36 @@ Story description: ${aiPrompt}`,
                   Cover Designer
                 </h1>
                 <div style={{ fontSize: 11, opacity: 0.9 }}>
-                  Build a story-aware cover with live preview. Export print-ready
-                  images for your KDP upload.
+                  Build a story-aware cover with live preview. Export print-ready images.
                 </div>
               </div>
             </div>
 
-            <div
-              style={{
-                textAlign: "right",
-                fontSize: 11,
-                opacity: 0.9,
-              }}
-            >
+            <div style={{ textAlign: "right", fontSize: 11, opacity: 0.9 }}>
               <div>
                 Currently editing: <strong>{title || "Untitled Project"}</strong>
               </div>
-              <div>Tip: keep it simple, bold, and readable at thumbnail size.</div>
+              <div>Changes auto-save to your project.</div>
             </div>
           </div>
         </div>
 
-        {/* BODY GRID - adjusted for larger preview */}
+        {/* BODY GRID */}
         <div
           style={{
             padding: "18px 24px 24px",
             display: "grid",
-            gridTemplateColumns: "320px minmax(0, 1fr)",
+            gridTemplateColumns: "340px minmax(0, 1fr)",
             gap: 24,
             alignItems: "start",
           }}
         >
-          {/* LEFT: CONTROLS - narrower */}
-          <aside style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+          {/* LEFT: CONTROLS */}
+          <aside style={{ display: "flex", flexDirection: "column", gap: 14, maxHeight: "85vh", overflowY: "auto" }}>
             {/* Save / Load Designs */}
             <div style={styles.glassCard}>
               <h3 style={{ margin: "0 0 10px", fontSize: 15, fontWeight: 600, color: theme.text }}>
-                Save & Load
+                💾 Save & Load Designs
               </h3>
 
               <div style={{ display: "grid", gap: 10 }}>
@@ -539,7 +772,7 @@ Story description: ${aiPrompt}`,
                 </div>
 
                 <button type="button" onClick={handleSaveDesign} style={styles.btnPrimary}>
-                  Save this design
+                  Save Current Design
                 </button>
 
                 <div>
@@ -558,35 +791,40 @@ Story description: ${aiPrompt}`,
                   </select>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={handleDeleteDesign}
-                  disabled={!selectedDesignId}
-                  style={{
-                    ...styles.btn,
-                    border: "1px solid #ef4444",
-                    color: "#b91c1c",
-                    background: "#fef2f2",
-                    opacity: !selectedDesignId ? 0.6 : 1,
-                    cursor: !selectedDesignId ? "not-allowed" : "pointer",
-                  }}
-                >
-                  Delete selected design
-                </button>
-
-                <div style={{ fontSize: 10, color: theme.subtext }}>
-                  Saved locally in this browser (no public links, no S3 needed yet).
-                </div>
+                {selectedDesignId && (
+                  <button
+                    type="button"
+                    onClick={handleDeleteDesign}
+                    style={{
+                      ...styles.btn,
+                      border: "1px solid #ef4444",
+                      color: "#b91c1c",
+                      background: "#fef2f2",
+                    }}
+                  >
+                    Delete Selected Design
+                  </button>
+                )}
               </div>
             </div>
 
-            {/* Text basics */}
+            {/* Text & Metadata */}
             <div style={styles.glassCard}>
               <h3 style={{ margin: "0 0 10px", fontSize: 15, fontWeight: 600, color: theme.text }}>
-                Text & Metadata
+                ✏️ Text & Metadata
               </h3>
 
               <div style={{ display: "grid", gap: 10 }}>
+                <div>
+                  <div style={styles.label}>Tagline (above title)</div>
+                  <input
+                    style={styles.input}
+                    value={tagline}
+                    onChange={(e) => setTagline(e.target.value)}
+                    placeholder="A NOVEL"
+                  />
+                </div>
+
                 <div>
                   <div style={styles.label}>Title</div>
                   <input
@@ -619,15 +857,14 @@ Story description: ${aiPrompt}`,
               </div>
             </div>
 
-            {/* Presets & layout */}
+            {/* Mood & Layout */}
             <div style={styles.glassCard}>
               <h3 style={{ margin: "0 0 10px", fontSize: 15, fontWeight: 600, color: theme.text }}>
-                Mood & Layout
+                🎭 Mood & Layout
               </h3>
 
-              <div style={{ marginBottom: 10 }}>
+              <div style={{ marginBottom: 12 }}>
                 <div style={{ ...styles.label, marginBottom: 6 }}>Genre / Mood Preset</div>
-
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                   {GENRE_PRESETS.map((preset) => (
                     <button
@@ -636,11 +873,11 @@ Story description: ${aiPrompt}`,
                       onClick={() => setGenrePresetKey(preset.key)}
                       style={{
                         ...styles.btn,
-                        fontSize: 11,
-                        borderRadius: 999,
+                        fontSize: 10,
+                        padding: "5px 9px",
                         border:
                           genrePresetKey === preset.key
-                            ? `1px solid ${theme.accent}`
+                            ? `2px solid ${theme.accent}`
                             : `1px solid ${theme.border}`,
                         background: genrePresetKey === preset.key ? "#eef2ff" : "#ffffff",
                       }}
@@ -653,7 +890,6 @@ Story description: ${aiPrompt}`,
 
               <div>
                 <div style={{ ...styles.label, marginBottom: 6 }}>Title Block Layout</div>
-
                 <div style={{ display: "flex", gap: 6 }}>
                   {LAYOUTS.map((layout) => (
                     <button
@@ -665,7 +901,7 @@ Story description: ${aiPrompt}`,
                         flex: 1,
                         border:
                           layoutKey === layout.key
-                            ? `1px solid ${theme.accent}`
+                            ? `2px solid ${theme.accent}`
                             : `1px solid ${theme.border}`,
                         background: layoutKey === layout.key ? "#eef2ff" : "#ffffff",
                       }}
@@ -677,13 +913,159 @@ Story description: ${aiPrompt}`,
               </div>
             </div>
 
-            {/* Background Image + AI Design */}
+            {/* ✅ NEW: Colors & Fonts */}
             <div style={styles.glassCard}>
-              <h3 style={{ margin: "0 0 8px", fontSize: 15, fontWeight: 600, color: theme.text }}>
-                Background Image & AI Design
+              <h3 style={{ margin: "0 0 10px", fontSize: 15, fontWeight: 600, color: theme.text }}>
+                🎨 Colors & Fonts
               </h3>
 
-              {/* Tabs */}
+              <div style={{ marginBottom: 12 }}>
+                <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+                  <input
+                    type="checkbox"
+                    checked={useCustomColors}
+                    onChange={(e) => setUseCustomColors(e.target.checked)}
+                  />
+                  <span style={{ fontSize: 12, color: theme.text }}>Use custom colors (override preset)</span>
+                </label>
+
+                {!useCustomColors && (
+                  <button
+                    type="button"
+                    onClick={applyPresetToCustom}
+                    style={{ ...styles.btn, fontSize: 10, marginTop: 6 }}
+                  >
+                    Copy preset colors to customize
+                  </button>
+                )}
+              </div>
+
+              {useCustomColors && (
+                <div style={{ display: "grid", gap: 8, marginBottom: 12 }}>
+                  <div style={styles.colorPickerRow}>
+                    <input
+                      type="color"
+                      value={customTitleColor}
+                      onChange={(e) => setCustomTitleColor(e.target.value)}
+                      style={styles.colorInput}
+                    />
+                    <span style={styles.colorLabel}>Title</span>
+                    <input
+                      type="text"
+                      value={customTitleColor}
+                      onChange={(e) => setCustomTitleColor(e.target.value)}
+                      style={styles.colorHexInput}
+                    />
+                  </div>
+
+                  <div style={styles.colorPickerRow}>
+                    <input
+                      type="color"
+                      value={customSubtitleColor}
+                      onChange={(e) => setCustomSubtitleColor(e.target.value)}
+                      style={styles.colorInput}
+                    />
+                    <span style={styles.colorLabel}>Subtitle</span>
+                    <input
+                      type="text"
+                      value={customSubtitleColor}
+                      onChange={(e) => setCustomSubtitleColor(e.target.value)}
+                      style={styles.colorHexInput}
+                    />
+                  </div>
+
+                  <div style={styles.colorPickerRow}>
+                    <input
+                      type="color"
+                      value={customAuthorColor}
+                      onChange={(e) => setCustomAuthorColor(e.target.value)}
+                      style={styles.colorInput}
+                    />
+                    <span style={styles.colorLabel}>Author</span>
+                    <input
+                      type="text"
+                      value={customAuthorColor}
+                      onChange={(e) => setCustomAuthorColor(e.target.value)}
+                      style={styles.colorHexInput}
+                    />
+                  </div>
+
+                  <div style={styles.colorPickerRow}>
+                    <input
+                      type="color"
+                      value={customTaglineColor}
+                      onChange={(e) => setCustomTaglineColor(e.target.value)}
+                      style={styles.colorInput}
+                    />
+                    <span style={styles.colorLabel}>Tagline</span>
+                    <input
+                      type="text"
+                      value={customTaglineColor}
+                      onChange={(e) => setCustomTaglineColor(e.target.value)}
+                      style={styles.colorHexInput}
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div style={{ marginBottom: 12 }}>
+                <div style={styles.label}>Font Family</div>
+                <select
+                  style={styles.input}
+                  value={customFontFamily}
+                  onChange={(e) => setCustomFontFamily(e.target.value)}
+                >
+                  <option value="">Use preset font</option>
+                  {FONT_FAMILIES.map((f) => (
+                    <option key={f.key} value={f.value}>
+                      {f.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Custom background (when no image) */}
+              <div>
+                <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", marginBottom: 8 }}>
+                  <input
+                    type="checkbox"
+                    checked={useCustomBg}
+                    onChange={(e) => setUseCustomBg(e.target.checked)}
+                  />
+                  <span style={{ fontSize: 12, color: theme.text }}>Custom gradient background</span>
+                </label>
+
+                {useCustomBg && (
+                  <div style={{ display: "flex", gap: 8 }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ ...styles.label, fontSize: 10 }}>Color 1</div>
+                      <input
+                        type="color"
+                        value={customBgColor1}
+                        onChange={(e) => setCustomBgColor1(e.target.value)}
+                        style={{ ...styles.colorInput, width: "100%" }}
+                      />
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ ...styles.label, fontSize: 10 }}>Color 2</div>
+                      <input
+                        type="color"
+                        value={customBgColor2}
+                        onChange={(e) => setCustomBgColor2(e.target.value)}
+                        style={{ ...styles.colorInput, width: "100%" }}
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Background Image & AI */}
+            <div style={styles.glassCard}>
+              <h3 style={{ margin: "0 0 8px", fontSize: 15, fontWeight: 600, color: theme.text }}>
+                🖼️ Background Image
+              </h3>
+
               <div
                 style={{
                   display: "inline-flex",
@@ -701,16 +1083,12 @@ Story description: ${aiPrompt}`,
                     padding: "4px 10px",
                     border: "none",
                     cursor: "pointer",
-                    background:
-                      designMode === "upload"
-                        ? "var(--brand-highlight, rgba(148,163,184,0.25))"
-                        : "#fff",
+                    background: designMode === "upload" ? theme.gold : "#fff",
                     fontWeight: designMode === "upload" ? 600 : 400,
                   }}
                 >
                   Upload
                 </button>
-
                 <button
                   type="button"
                   onClick={() => setDesignMode("ai")}
@@ -718,10 +1096,7 @@ Story description: ${aiPrompt}`,
                     padding: "4px 10px",
                     border: "none",
                     cursor: "pointer",
-                    background:
-                      designMode === "ai"
-                        ? "var(--brand-highlight, rgba(148,163,184,0.25))"
-                        : "#fff",
+                    background: designMode === "ai" ? theme.gold : "#fff",
                     fontWeight: designMode === "ai" ? 600 : 400,
                   }}
                 >
@@ -729,137 +1104,83 @@ Story description: ${aiPrompt}`,
                 </button>
               </div>
 
-              {/* Upload tab */}
               {designMode === "upload" && (
                 <div style={{ display: "grid", gap: 10 }}>
-                  <div>
-                    <div style={styles.label}>Cover background image</div>
-                    <label
-                      style={{
-                        ...styles.btn,
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 6,
-                        fontSize: 11,
-                      }}
-                    >
-                      📁 {coverImageUploading ? "Uploading…" : "Choose image file"}
-                      <input
-                        type="file"
-                        accept="image/*"
-                        style={{ display: "none" }}
-                        onChange={handleCoverFileChange}
-                        disabled={coverImageUploading}
-                      />
-                    </label>
-
-                    {coverImageUrl && (
-                      <p
-                        style={{
-                          fontSize: 10,
-                          marginTop: 6,
-                          color: theme.subtext,
-                          wordBreak: "break-all",
-                        }}
-                      >
-                        Image set. It will appear behind your text in the preview.
-                      </p>
-                    )}
-                  </div>
+                  <label
+                    style={{
+                      ...styles.btn,
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 6,
+                      fontSize: 11,
+                    }}
+                  >
+                    📁 {coverImageUploading ? "Uploading…" : "Choose image file"}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      style={{ display: "none" }}
+                      onChange={handleCoverFileChange}
+                      disabled={coverImageUploading}
+                    />
+                  </label>
 
                   {coverImageUrl && (
                     <>
+                      <p style={{ fontSize: 10, color: theme.subtext }}>
+                        ✅ Image set. It appears behind your text.
+                      </p>
+
                       <div>
                         <div style={{ ...styles.label, marginBottom: 4 }}>Image fit</div>
                         <div style={{ display: "flex", gap: 6 }}>
-                          <button
-                            type="button"
-                            onClick={() => setCoverImageFit("cover")}
-                            style={{
-                              ...styles.btn,
-                              flex: 1,
-                              fontSize: 11,
-                              border:
-                                coverImageFit === "cover"
-                                  ? `1px solid ${theme.accent}`
-                                  : `1px solid ${theme.border}`,
-                              background: coverImageFit === "cover" ? "#eef2ff" : "#ffffff",
-                            }}
-                          >
-                            Fill cover
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => setCoverImageFit("contain")}
-                            style={{
-                              ...styles.btn,
-                              flex: 1,
-                              fontSize: 11,
-                              border:
-                                coverImageFit === "contain"
-                                  ? `1px solid ${theme.accent}`
-                                  : `1px solid ${theme.border}`,
-                              background: coverImageFit === "contain" ? "#eef2ff" : "#ffffff",
-                            }}
-                          >
-                            Fit inside
-                          </button>
+                          {["cover", "contain"].map((fit) => (
+                            <button
+                              key={fit}
+                              type="button"
+                              onClick={() => setCoverImageFit(fit)}
+                              style={{
+                                ...styles.btn,
+                                flex: 1,
+                                fontSize: 11,
+                                border:
+                                  coverImageFit === fit
+                                    ? `2px solid ${theme.accent}`
+                                    : `1px solid ${theme.border}`,
+                                background: coverImageFit === fit ? "#eef2ff" : "#ffffff",
+                              }}
+                            >
+                              {fit === "cover" ? "Fill cover" : "Fit inside"}
+                            </button>
+                          ))}
                         </div>
                       </div>
 
                       <div>
-                        <div style={{ ...styles.label, marginBottom: 4 }}>
-                          Overlay & readability
-                        </div>
+                        <div style={{ ...styles.label, marginBottom: 4 }}>Overlay</div>
                         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                          <button
-                            type="button"
-                            onClick={() => setCoverImageFilter("soft-dark")}
-                            style={{
-                              ...styles.btn,
-                              fontSize: 11,
-                              border:
-                                coverImageFilter === "soft-dark"
-                                  ? `1px solid ${theme.accent}`
-                                  : `1px solid ${theme.border}`,
-                              background: coverImageFilter === "soft-dark" ? "#eef2ff" : "#ffffff",
-                            }}
-                          >
-                            Soft dark overlay
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => setCoverImageFilter("soft-blur")}
-                            style={{
-                              ...styles.btn,
-                              fontSize: 11,
-                              border:
-                                coverImageFilter === "soft-blur"
-                                  ? `1px solid ${theme.accent}`
-                                  : `1px solid ${theme.border}`,
-                              background: coverImageFilter === "soft-blur" ? "#eef2ff" : "#ffffff",
-                            }}
-                          >
-                            Soft blur
-                          </button>
-
-                          <button
-                            type="button"
-                            onClick={() => setCoverImageFilter("none")}
-                            style={{
-                              ...styles.btn,
-                              fontSize: 11,
-                              border:
-                                coverImageFilter === "none"
-                                  ? `1px solid ${theme.accent}`
-                                  : `1px solid ${theme.border}`,
-                              background: coverImageFilter === "none" ? "#eef2ff" : "#ffffff",
-                            }}
-                          >
-                            No overlay
-                          </button>
+                          {[
+                            { key: "soft-dark", label: "Dark" },
+                            { key: "soft-blur", label: "Light" },
+                            { key: "none", label: "None" },
+                          ].map((f) => (
+                            <button
+                              key={f.key}
+                              type="button"
+                              onClick={() => setCoverImageFilter(f.key)}
+                              style={{
+                                ...styles.btn,
+                                fontSize: 11,
+                                border:
+                                  coverImageFilter === f.key
+                                    ? `2px solid ${theme.accent}`
+                                    : `1px solid ${theme.border}`,
+                                background: coverImageFilter === f.key ? "#eef2ff" : "#ffffff",
+                              }}
+                            >
+                              {f.label}
+                            </button>
+                          ))}
                         </div>
                       </div>
 
@@ -867,7 +1188,6 @@ Story description: ${aiPrompt}`,
                         type="button"
                         onClick={handleClearCoverImage}
                         style={{
-                          marginTop: 4,
                           fontSize: 11,
                           padding: "4px 8px",
                           borderRadius: 999,
@@ -884,23 +1204,20 @@ Story description: ${aiPrompt}`,
                 </div>
               )}
 
-              {/* AI Design tab */}
               {designMode === "ai" && (
                 <div style={{ display: "grid", gap: 8 }}>
-                  <div style={styles.label}>Tell the AI about your story</div>
+                  <div style={styles.label}>Describe your story</div>
                   <textarea
                     rows={3}
                     value={aiPrompt}
                     onChange={(e) => setAiPrompt(e.target.value)}
-                    placeholder="Example: Dark, moody historical thriller in South Philadelphia with family secrets."
+                    placeholder="Example: Dark, moody urban fiction about family secrets in South Philadelphia."
                     style={{
                       resize: "vertical",
                       padding: 8,
                       fontSize: 11,
                       borderRadius: 8,
                       border: `1px solid ${theme.border}`,
-                      fontFamily:
-                        "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
                     }}
                   />
                   <button
@@ -909,26 +1226,19 @@ Story description: ${aiPrompt}`,
                     onClick={handleAiDesignSuggest}
                     style={{
                       ...styles.btnPrimary,
-                      fontSize: 12,
-                      padding: "7px 12px",
                       opacity: aiBusy ? 0.7 : 1,
-                      cursor: aiBusy ? "wait" : "pointer",
                     }}
                   >
-                    {aiBusy ? "Thinking…" : "Suggest palette & layout"}
+                    {aiBusy ? "Thinking…" : "✨ Suggest Design"}
                   </button>
-                  <p style={{ margin: 0, fontSize: 10, color: theme.subtext }}>
-                    Today this assistant adjusts your mood preset, overlay, and layout based on your
-                    description. Later, we can connect it to real AI-generated artwork.
-                  </p>
                 </div>
               )}
             </div>
 
-            {/* ✅ NEW: Export Settings */}
+            {/* Export Settings */}
             <div style={styles.glassCard}>
               <h3 style={{ margin: "0 0 10px", fontSize: 15, fontWeight: 600, color: theme.text }}>
-                Export Settings
+                📦 Export Settings
               </h3>
 
               <div style={{ display: "grid", gap: 10 }}>
@@ -964,13 +1274,13 @@ Story description: ${aiPrompt}`,
                 </button>
 
                 <p style={{ margin: 0, fontSize: 10, color: theme.subtext }}>
-                  KDP requires 300 DPI for print. Use 150 DPI for quick drafts.
+                  KDP requires 300 DPI for print covers.
                 </p>
               </div>
             </div>
           </aside>
 
-          {/* RIGHT: PREVIEW - larger */}
+          {/* RIGHT: PREVIEW */}
           <section style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             <div style={{ ...styles.glassCard, flex: 1, display: "flex", flexDirection: "column", minHeight: 700 }}>
               <div
@@ -979,31 +1289,20 @@ Story description: ${aiPrompt}`,
                   justifyContent: "space-between",
                   alignItems: "center",
                   marginBottom: 16,
-                  gap: 8,
                 }}
               >
                 <div style={{ fontSize: 14, fontWeight: 600, color: theme.text }}>
                   Live Preview
-                  <span
-                    style={{
-                      display: "inline-block",
-                      marginLeft: 8,
-                      fontSize: 12,
-                      fontWeight: 400,
-                      color: theme.subtext,
-                    }}
-                  >
-                    {selectedTrim.label} ratio
+                  <span style={{ marginLeft: 8, fontSize: 12, fontWeight: 400, color: theme.subtext }}>
+                    {selectedTrim.label}
                   </span>
                 </div>
-
-                <div style={{ fontSize: 11, color: theme.subtext, textAlign: "right" }}>
-                  Use <strong>Export Settings</strong> to download print-ready PNG.
+                <div style={{ fontSize: 11, color: theme.subtext }}>
+                  Auto-saves as you edit
                 </div>
               </div>
 
               <div style={{ display: "flex", justifyContent: "center", alignItems: "center", flex: 1, padding: "20px 0" }}>
-                {/* ✅ attach ref to the actual cover - LARGER SIZE */}
                 <div
                   ref={coverRef}
                   style={{
@@ -1013,9 +1312,8 @@ Story description: ${aiPrompt}`,
                     position: "relative",
                     overflow: "hidden",
                     border: "1px solid rgba(15,23,42,0.6)",
-                    backgroundImage: coverImageUrl
-                      ? `url(${coverImageUrl})`
-                      : selectedPreset.bg,
+                    backgroundImage: coverImageUrl ? `url(${coverImageUrl})` : undefined,
+                    background: coverImageUrl ? undefined : activeBackground,
                     backgroundSize: coverImageUrl
                       ? coverImageFit === "cover"
                         ? "cover"
@@ -1023,8 +1321,7 @@ Story description: ${aiPrompt}`,
                       : "cover",
                     backgroundPosition: "center",
                     backgroundRepeat: "no-repeat",
-                    boxShadow:
-                      "0 30px 80px rgba(15, 23, 42, 0.5), 0 0 0 1px rgba(15,23,42,0.3)",
+                    boxShadow: "0 30px 80px rgba(15, 23, 42, 0.5)",
                     display: "flex",
                     flexDirection: "column",
                     justifyContent,
@@ -1044,23 +1341,24 @@ Story description: ${aiPrompt}`,
                       position: "relative",
                       zIndex: 1,
                       textAlign: "center",
-                      fontFamily: selectedPreset.fontFamily,
-                      color: selectedPreset.titleColor,
+                      fontFamily: activeFontFamily,
                       display: "flex",
                       flexDirection: "column",
                       gap: 10,
                     }}
                   >
-                    <div
-                      style={{
-                        fontSize: 20,
-                        letterSpacing: 4,
-                        textTransform: "uppercase",
-                        color: selectedPreset.subtitleColor,
-                      }}
-                    >
-                      A NOVEL
-                    </div>
+                    {tagline && (
+                      <div
+                        style={{
+                          fontSize: 20,
+                          letterSpacing: 4,
+                          textTransform: "uppercase",
+                          color: activeTaglineColor,
+                        }}
+                      >
+                        {tagline}
+                      </div>
+                    )}
 
                     <div
                       style={{
@@ -1068,6 +1366,7 @@ Story description: ${aiPrompt}`,
                         lineHeight: 1.1,
                         fontWeight: 700,
                         textTransform: "uppercase",
+                        color: activeTitleColor,
                       }}
                     >
                       {title || "YOUR TITLE HERE"}
@@ -1078,7 +1377,7 @@ Story description: ${aiPrompt}`,
                         style={{
                           fontSize: 16,
                           marginTop: 8,
-                          color: selectedPreset.subtitleColor,
+                          color: activeSubtitleColor,
                           maxWidth: 320,
                           marginInline: "auto",
                         }}
@@ -1093,7 +1392,7 @@ Story description: ${aiPrompt}`,
                         marginTop: 32,
                         letterSpacing: 4,
                         textTransform: "uppercase",
-                        color: selectedPreset.authorColor,
+                        color: activeAuthorColor,
                       }}
                     >
                       {author || "AUTHOR NAME"}
@@ -1123,7 +1422,7 @@ Story description: ${aiPrompt}`,
             </div>
 
             <div style={{ fontSize: 11, color: theme.subtext, textAlign: "right" }}>
-              Coming soon: spine/back design and full AI cover concepts.
+              Coming soon: spine/back design and full AI cover generation.
             </div>
           </section>
         </div>
