@@ -755,7 +755,7 @@ export default function Publishing(): JSX.Element {
 
     try {
       // 1) Prefer per-project publishingDraft saved by ComposePage
-      const draftRaw = Storage.getItem(publishingDraftKeyForProject(projectId));
+      const draftRaw = storage.getItem(publishingDraftKeyForProject(projectId));
 
       if (draftRaw) {
         const parsed = JSON.parse(draftRaw) as { book?: any; chapters?: any[] };
