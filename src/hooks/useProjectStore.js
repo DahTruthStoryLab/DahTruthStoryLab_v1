@@ -1,6 +1,6 @@
 // src/hooks/useProjectStore.js
 // Central project management - create, switch, delete projects with isolated storage
-// Updated to use IndexedDB via storage wrapper for large manuscript support
+// UPDATED: Uses IndexedDB-backed storage wrapper for persistence
 
 import { useState, useEffect, useCallback } from "react";
 import { storage } from "../lib/storage";
@@ -168,11 +168,47 @@ function syncToUserProjects(projects) {
   }
 }
 
-// Delete project data
-function deleteProjectData(projectId) {
+// ✅ NEW: Delete ALL data associated with a project
+function deleteAllProjectData(projectId) {
   try {
+    // Main project data key
     const key = getProjectDataKey(projectId);
     storage.removeItem(key);
+    
+    // All possible project-related keys to clean up
+    const keysToDelete = [
+      // Project data
+      `dahtruth-project-${projectId}`,
+      `dahtruth_project_${projectId}`,
+      `dahtruth_project_meta_${projectId}`,
+      
+      // Cover data
+      `dahtruth_cover_designs_${projectId}`,
+      `dahtruth_cover_settings_${projectId}`,
+      `dahtruth_cover_image_url_${projectId}`,
+      `dahtruth_cover_image_meta_${projectId}`,
+      
+      // Publishing data
+      `publishingDraft_${projectId}`,
+      `dt_publishing_meta_${projectId}`,
+      
+      // Chapters data (various formats)
+      `dahtruth_chapters_${projectId}`,
+      `chapters_${projectId}`,
+      
+      // Character data
+      `dahtruth_characters_${projectId}`,
+    ];
+    
+    keysToDelete.forEach(k => {
+      try {
+        storage.removeItem(k);
+      } catch (e) {
+        // Ignore errors for non-existent keys
+      }
+    });
+    
+    console.log(`[ProjectStore] Deleted all data for project: ${projectId}`);
   } catch (err) {
     console.error("Failed to delete project data:", err);
   }
@@ -250,6 +286,72 @@ function createDefaultProjectData(title = "Untitled Book") {
   };
 }
 
+// ============ Title Propagation ============
+
+// ✅ NEW: Propagate title change to all related storage keys
+function propagateTitleChange(projectId, newTitle) {
+  if (!projectId || !newTitle) return;
+
+  const keysToUpdate = [
+    `dahtruth_project_meta_${projectId}`,
+    `dt_publishing_meta_${projectId}`,
+    `dahtruth_cover_settings_${projectId}`,
+    `publishingDraft_${projectId}`,
+  ];
+
+  keysToUpdate.forEach((key) => {
+    try {
+      const raw = storage.getItem(key);
+      if (raw) {
+        const data = JSON.parse(raw);
+        if (data && typeof data === "object") {
+          if ("title" in data) {
+            data.title = newTitle;
+          }
+          if (data.book && typeof data.book === "object") {
+            data.book.title = newTitle;
+          }
+          storage.setItem(key, JSON.stringify(data));
+        }
+      }
+    } catch (err) {
+      console.error(`Failed to update title in ${key}:`, err);
+    }
+  });
+
+  // Also update currentStory if it matches this project
+  try {
+    const currentStoryRaw = storage.getItem("currentStory");
+    if (currentStoryRaw) {
+      const currentStory = JSON.parse(currentStoryRaw);
+      if (currentStory && currentStory.id === projectId) {
+        currentStory.title = newTitle;
+        storage.setItem("currentStory", JSON.stringify(currentStory));
+      }
+    }
+  } catch (err) {
+    console.error("Failed to update currentStory:", err);
+  }
+
+  // Update userProjects
+  try {
+    const userProjectsRaw = storage.getItem("userProjects");
+    if (userProjectsRaw) {
+      const userProjects = JSON.parse(userProjectsRaw);
+      if (Array.isArray(userProjects)) {
+        const updated = userProjects.map(p => 
+          p.id === projectId ? { ...p, title: newTitle } : p
+        );
+        storage.setItem("userProjects", JSON.stringify(updated));
+      }
+    }
+  } catch (err) {
+    console.error("Failed to update userProjects:", err);
+  }
+
+  console.log(`[ProjectStore] Title propagated for project ${projectId}: "${newTitle}"`);
+}
+
 // ============ Main Hook ============
 
 export function useProjectStore() {
@@ -261,7 +363,7 @@ export function useProjectStore() {
   const [projects, setProjects] = useState(() => loadProjectsList());
   const [currentProjectId, setCurrentProjectId] = useState(() => loadCurrentProjectId());
 
-  // Sync with localStorage changes
+  // Sync with storage changes
   useEffect(() => {
     const sync = () => {
       setProjects(loadProjectsList());
@@ -301,7 +403,7 @@ export function useProjectStore() {
     // Create default project data
     const data = createDefaultProjectData(title);
     
-    // Save to project-specific key (now uses IndexedDB)
+    // Save to project-specific key
     const key = getProjectDataKey(projectId);
     storage.setItem(key, JSON.stringify(data));
 
@@ -359,7 +461,7 @@ export function useProjectStore() {
       tocOutline: parsedDocument.tableOfContents || [],
     };
 
-    // Save to project-specific key (now uses IndexedDB for large manuscripts)
+    // Save to project-specific key
     const key = getProjectDataKey(projectId);
     storage.setItem(key, JSON.stringify(data));
 
@@ -394,15 +496,18 @@ export function useProjectStore() {
     return true;
   }, [projects]);
 
-  // Delete a project
+  // ✅ UPDATED: Delete a project and ALL related data
   const deleteProject = useCallback((projectId) => {
     // Remove from list
     const updated = projects.filter((p) => p.id !== projectId);
     saveProjectsList(updated);
     setProjects(updated);
 
-    // Delete project data
-    deleteProjectData(projectId);
+    // Delete ALL project-related data
+    deleteAllProjectData(projectId);
+
+    // Update userProjects to remove this project
+    syncToUserProjects(updated);
 
     // If we deleted the current project, switch to another or create new
     if (currentProjectId === projectId) {
@@ -417,8 +522,9 @@ export function useProjectStore() {
     return true;
   }, [projects, currentProjectId, switchProject, createProject]);
 
-  // Rename a project
+  // ✅ UPDATED: Rename a project with full propagation
   const renameProject = useCallback((projectId, newTitle) => {
+    // Update projects list
     const updated = projects.map((p) =>
       p.id === projectId
         ? { ...p, title: newTitle, updatedAt: new Date().toISOString() }
@@ -433,6 +539,12 @@ export function useProjectStore() {
       data.book = { ...data.book, title: newTitle };
       saveProjectData(projectId, data);
     }
+
+    // Propagate title to all related storage keys
+    propagateTitleChange(projectId, newTitle);
+
+    // Sync to userProjects
+    syncToUserProjects(updated);
 
     return true;
   }, [projects]);
@@ -468,8 +580,6 @@ export function useProjectStore() {
 
 // ============ Standalone Functions for Direct Use ============
 
-// These can be imported directly without the hook
-
 export function getCurrentProjectId() {
   return loadCurrentProjectId();
 }
@@ -489,6 +599,9 @@ export function saveCurrentProjectData(data) {
 
 export function getProjectStorageKey() {
   const projectId = loadCurrentProjectId();
-  if (!projectId) return LEGACY_STORAGE_KEY; // Fallback for compatibility
+  if (!projectId) return LEGACY_STORAGE_KEY;
   return getProjectDataKey(projectId);
 }
+
+// ✅ NEW: Export for use in other components
+export { propagateTitleChange, deleteAllProjectData };
