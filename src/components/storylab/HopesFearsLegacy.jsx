@@ -1,5 +1,6 @@
 // src/components/storylab/HopesFearsLegacy.jsx
-// Hopes • Fears • Legacy - Character motivation tracker with bullet points
+// Hopes • Fears • Legacy - Character/Subject motivation tracker
+// UPDATED: Supports Fiction, Non-Fiction, Poetry, and Memoir genres
 // Uses direct localStorage for project-aware data persistence
 
 import React, { useEffect, useState, useMemo, useRef } from "react";
@@ -21,7 +22,18 @@ import {
   X,
   Flame,
   Gem,
-  Swords
+  Swords,
+  FileText,
+  Feather,
+  BookMarked,
+  Lightbulb,
+  AlertTriangle,
+  Award,
+  Eye,
+  MessageSquare,
+  Compass,
+  Clock,
+  Layers,
 } from "lucide-react";
 
 /* ============================================
@@ -41,11 +53,98 @@ const BRAND = {
 };
 
 /* ============================================
+   GENRE CONFIGURATIONS
+   ============================================ */
+const GENRE_CONFIG = {
+  fiction: {
+    id: "fiction",
+    label: "Fiction",
+    icon: BookOpen,
+    description: "Novels, short stories, creative writing",
+    entityLabel: "Character",
+    entityLabelPlural: "Characters",
+    roles: [
+      { id: "protagonist", label: "Protagonist", icon: Star, description: "The hero driving the story" },
+      { id: "antagonist", label: "Antagonist / Catalyst", icon: Swords, description: "The opposing force or change agent" },
+      { id: "secondary", label: "Secondary Lead", icon: Users, description: "Key supporting character" },
+    ],
+    columns: [
+      { id: "hopes", label: "Hopes", icon: Sparkles, color: BRAND.gold, bgColor: `${BRAND.goldLight}30`, placeholder: "What are they dreaming of?" },
+      { id: "fears", label: "Fears", icon: Flame, color: BRAND.roseDark, bgColor: `${BRAND.rose}25`, placeholder: "What terrifies them?" },
+      { id: "legacy", label: "Legacy", icon: Gem, color: BRAND.navy, bgColor: `${BRAND.mauve}20`, placeholder: "What will they leave behind?" },
+    ],
+    tagPattern: /@char:\s*([A-Za-z][A-Za-z\s.'-]*)/gi,
+    tagInstruction: "Tag characters in your chapters with @char: Name",
+  },
+  nonfiction: {
+    id: "nonfiction",
+    label: "Non-Fiction",
+    icon: FileText,
+    description: "Essays, guides, research, arguments",
+    entityLabel: "Subject",
+    entityLabelPlural: "Subjects",
+    roles: [
+      { id: "main", label: "Main Thesis", icon: Target, description: "Your central argument or claim" },
+      { id: "supporting", label: "Supporting Point", icon: Layers, description: "Key evidence or sub-argument" },
+      { id: "counter", label: "Counter-Argument", icon: MessageSquare, description: "Opposing view to address" },
+    ],
+    columns: [
+      { id: "purpose", label: "Purpose", icon: Lightbulb, color: BRAND.gold, bgColor: `${BRAND.goldLight}30`, placeholder: "What change do you want to create?" },
+      { id: "obstacles", label: "Obstacles", icon: AlertTriangle, color: BRAND.roseDark, bgColor: `${BRAND.rose}25`, placeholder: "What resistance will readers have?" },
+      { id: "impact", label: "Impact", icon: Award, color: BRAND.navy, bgColor: `${BRAND.mauve}20`, placeholder: "What will readers take away?" },
+    ],
+    tagPattern: /@topic:\s*([A-Za-z][A-Za-z\s.'-]*)/gi,
+    tagInstruction: "Tag key topics with @topic: Subject Name",
+  },
+  poetry: {
+    id: "poetry",
+    label: "Poetry",
+    icon: Feather,
+    description: "Poems, verse, lyrical writing",
+    entityLabel: "Theme",
+    entityLabelPlural: "Themes",
+    roles: [
+      { id: "central", label: "Central Image", icon: Eye, description: "The dominant visual or metaphor" },
+      { id: "voice", label: "Voice / Speaker", icon: MessageSquare, description: "Who is speaking and why" },
+      { id: "form", label: "Form / Structure", icon: Layers, description: "The shape and constraints" },
+    ],
+    columns: [
+      { id: "vision", label: "Vision", icon: Eye, color: BRAND.gold, bgColor: `${BRAND.goldLight}30`, placeholder: "What image or feeling do you want to evoke?" },
+      { id: "tension", label: "Tension", icon: Flame, color: BRAND.roseDark, bgColor: `${BRAND.rose}25`, placeholder: "What conflict or contrast drives the piece?" },
+      { id: "resonance", label: "Resonance", icon: Sparkles, color: BRAND.navy, bgColor: `${BRAND.mauve}20`, placeholder: "What will linger with the reader?" },
+    ],
+    tagPattern: /@theme:\s*([A-Za-z][A-Za-z\s.'-]*)/gi,
+    tagInstruction: "Tag themes with @theme: Theme Name",
+  },
+  memoir: {
+    id: "memoir",
+    label: "Memoir",
+    icon: BookMarked,
+    description: "Personal narrative, autobiography, essays",
+    entityLabel: "Life Thread",
+    entityLabelPlural: "Life Threads",
+    roles: [
+      { id: "self", label: "Past Self", icon: Clock, description: "Who you were at that time" },
+      { id: "others", label: "Key Figure", icon: Users, description: "Important person in your story" },
+      { id: "present", label: "Present Self", icon: Compass, description: "Who you are now, looking back" },
+    ],
+    columns: [
+      { id: "aspirations", label: "Aspirations", icon: Sparkles, color: BRAND.gold, bgColor: `${BRAND.goldLight}30`, placeholder: "What did you hope for then?" },
+      { id: "fears", label: "Fears", icon: Flame, color: BRAND.roseDark, bgColor: `${BRAND.rose}25`, placeholder: "What were you afraid of?" },
+      { id: "lessons", label: "Lessons", icon: Lightbulb, color: BRAND.navy, bgColor: `${BRAND.mauve}20`, placeholder: "What did you learn?" },
+    ],
+    tagPattern: /@person:\s*([A-Za-z][A-Za-z\s.'-]*)/gi,
+    tagInstruction: "Tag key people with @person: Name",
+  },
+};
+
+/* ============================================
    PROJECT-AWARE STORAGE UTILITIES
    ============================================ */
 
 const STORYLAB_KEY_BASE = "dahtruth-story-lab-toc-v3";
 const HFL_KEY_BASE = "dahtruth-hfl-data-v2";
+const GENRE_KEY_BASE = "dahtruth-project-genre";
 
 function getSelectedProjectId() {
   try {
@@ -70,6 +169,29 @@ function getProjectKey(baseKey) {
     return baseKey;
   }
   return `${baseKey}-${projectId}`;
+}
+
+// Load/save genre for project
+function loadProjectGenre() {
+  try {
+    const key = getProjectKey(GENRE_KEY_BASE);
+    const raw = localStorage.getItem(key);
+    if (raw && GENRE_CONFIG[raw]) return raw;
+    return "fiction"; // Default
+  } catch {
+    return "fiction";
+  }
+}
+
+function saveProjectGenre(genre) {
+  try {
+    const key = getProjectKey(GENRE_KEY_BASE);
+    localStorage.setItem(key, genre);
+    window.dispatchEvent(new Event("project:change"));
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 // Load HFL data directly from localStorage
@@ -112,20 +234,21 @@ function loadChapters() {
   }
 }
 
-function extractCharactersFromChapters(chapters = []) {
-  const charSet = new Set();
-  const charPattern = /@char:\s*([A-Za-z][A-Za-z\s.'-]*)/gi;
+function extractEntitiesFromChapters(chapters = [], pattern) {
+  const entitySet = new Set();
 
   chapters.forEach((ch) => {
     const content = ch.content || ch.text || ch.textHTML || "";
     let match;
-    while ((match = charPattern.exec(content)) !== null) {
+    // Reset regex for each chapter
+    const regex = new RegExp(pattern.source, pattern.flags);
+    while ((match = regex.exec(content)) !== null) {
       const name = match[1].trim();
-      if (name) charSet.add(name);
+      if (name) entitySet.add(name);
     }
   });
 
-  return Array.from(charSet).sort();
+  return Array.from(entitySet).sort();
 }
 
 /* ============================================
@@ -147,14 +270,91 @@ function SavingBadge({ state }) {
 }
 
 /* ============================================
-   CHARACTER SELECTOR
+   GENRE SELECTOR
    ============================================ */
-function CharacterSelector({ value, onChange, characters, placeholder = "Select character...", accentColor, darkBackground = false }) {
+function GenreSelector({ value, onChange }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef(null);
+
+  useEffect(() => {
+    const handleClick = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  const current = GENRE_CONFIG[value] || GENRE_CONFIG.fiction;
+  const Icon = current.icon;
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        className="flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 transition-all hover:shadow-md"
+        style={{ 
+          borderColor: `${BRAND.gold}60`,
+          background: `${BRAND.gold}15`,
+        }}
+      >
+        <Icon size={18} style={{ color: BRAND.gold }} />
+        <span className="font-semibold" style={{ color: BRAND.navy }}>{current.label}</span>
+        <ChevronDown size={16} className={`transition-transform ${isOpen ? 'rotate-180' : ''}`} style={{ color: BRAND.navy }} />
+      </button>
+
+      {isOpen && (
+        <div className="absolute top-full left-0 mt-2 z-50 bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden min-w-[280px]">
+          <div className="p-2 bg-slate-50 border-b border-slate-100">
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Writing Type</span>
+          </div>
+          {Object.values(GENRE_CONFIG).map((genre) => {
+            const GenreIcon = genre.icon;
+            const isSelected = value === genre.id;
+            return (
+              <button
+                key={genre.id}
+                type="button"
+                onClick={() => {
+                  onChange(genre.id);
+                  setIsOpen(false);
+                }}
+                className={`w-full flex items-start gap-3 px-4 py-3 text-left transition-colors ${
+                  isSelected ? 'bg-amber-50' : 'hover:bg-slate-50'
+                }`}
+              >
+                <div 
+                  className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
+                  style={{ background: isSelected ? `${BRAND.gold}25` : '#f1f5f9' }}
+                >
+                  <GenreIcon size={20} style={{ color: isSelected ? BRAND.gold : '#64748b' }} />
+                </div>
+                <div className="flex-1">
+                  <div className="font-semibold text-sm" style={{ color: BRAND.navy }}>
+                    {genre.label}
+                  </div>
+                  <div className="text-xs text-slate-500">{genre.description}</div>
+                </div>
+                {isSelected && <Check size={18} style={{ color: BRAND.gold }} />}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ============================================
+   ENTITY SELECTOR (Character/Subject/Theme)
+   ============================================ */
+function EntitySelector({ value, onChange, entities, placeholder, accentColor, genreConfig }) {
   const [isOpen, setIsOpen] = useState(false);
   const [customInput, setCustomInput] = useState("");
   const dropdownRef = useRef(null);
 
-  // Close on outside click
   useEffect(() => {
     const handleClick = (e) => {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
@@ -207,21 +407,21 @@ function CharacterSelector({ value, onChange, characters, placeholder = "Select 
               type="text"
               value={customInput}
               onChange={(e) => setCustomInput(e.target.value)}
-              placeholder="Type custom name + Enter"
+              placeholder={`Type custom ${genreConfig.entityLabel.toLowerCase()} + Enter`}
               className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 focus:outline-none focus:ring-2 text-slate-800"
-              style={{ focusRingColor: accentColor }}
               autoFocus
             />
           </form>
 
           <div className="max-h-[200px] overflow-y-auto">
-            {characters.length === 0 ? (
+            {entities.length === 0 ? (
               <div className="px-4 py-4 text-sm text-slate-400 text-center">
                 <BookOpen size={20} className="mx-auto mb-2 opacity-50" />
-                No @char: tags found
+                No {genreConfig.entityLabelPlural.toLowerCase()} found via tags
+                <div className="text-xs mt-1">{genreConfig.tagInstruction}</div>
               </div>
             ) : (
-              characters.map((name) => (
+              entities.map((name) => (
                 <button
                   key={name}
                   type="button"
@@ -327,7 +527,6 @@ function BulletSection({ title, icon: Icon, items = [], onUpdate, accentColor, b
             placeholder={placeholder}
             disabled={disabled}
             className="flex-1 px-3 py-2 text-sm rounded-lg border border-slate-200 bg-white focus:outline-none focus:ring-2 disabled:bg-slate-100 disabled:cursor-not-allowed"
-            style={{ '--tw-ring-color': accentColor }}
           />
           <button
             onClick={addItem}
@@ -344,24 +543,24 @@ function BulletSection({ title, icon: Icon, items = [], onUpdate, accentColor, b
 }
 
 /* ============================================
-   CHARACTER CARD
+   ENTITY CARD (Character/Subject/Theme)
    ============================================ */
-function CharacterCard({ 
+function EntityCard({ 
   roleKey, 
-  roleLabel, 
-  roleIcon: RoleIcon, 
-  roleColor,
-  roleGradient,
-  characterName,
-  characterData,
-  characters,
-  onAssignCharacter,
-  onEditCharacter 
+  role,
+  entityName,
+  entityData,
+  allEntities,
+  onAssignEntity,
+  onEditEntity,
+  genreConfig,
 }) {
-  // Ensure arrays exist
-  const hopes = Array.isArray(characterData.hopes) ? characterData.hopes : [];
-  const fears = Array.isArray(characterData.fears) ? characterData.fears : [];
-  const legacy = Array.isArray(characterData.legacy) ? characterData.legacy : [];
+  const columns = genreConfig.columns;
+  
+  // Get data for each column
+  const col1Data = Array.isArray(entityData[columns[0].id]) ? entityData[columns[0].id] : [];
+  const col2Data = Array.isArray(entityData[columns[1].id]) ? entityData[columns[1].id] : [];
+  const col3Data = Array.isArray(entityData[columns[2].id]) ? entityData[columns[2].id] : [];
 
   // Generate initials from name
   const getInitials = (name) => {
@@ -373,95 +572,90 @@ function CharacterCard({
     return name.slice(0, 2).toUpperCase();
   };
 
+  const RoleIcon = role.icon;
+  const roleGradient = roleKey === "protagonist" || roleKey === "main" || roleKey === "central" || roleKey === "self"
+    ? `linear-gradient(135deg, ${BRAND.navy} 0%, ${BRAND.navyLight} 100%)`
+    : roleKey === "antagonist" || roleKey === "counter" || roleKey === "voice" || roleKey === "others"
+    ? "linear-gradient(135deg, #4a3a5c 0%, #6b5a7e 100%)"
+    : `linear-gradient(135deg, #7a4a5a 0%, #9b6a7a 100%)`;
+
   return (
     <div className="rounded-2xl overflow-hidden shadow-lg border border-slate-200/50">
-      {/* Character Header - Centered */}
-      <div 
-        className="px-6 py-6 text-center"
-        style={{ background: roleGradient }}
-      >
-        {/* Role Icon & Label */}
+      {/* Header */}
+      <div className="px-6 py-6 text-center" style={{ background: roleGradient }}>
         <div className="flex items-center justify-center gap-3 mb-4">
           <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
             <RoleIcon size={22} className="text-white" />
           </div>
           <div className="text-left">
-            <h3 className="font-bold text-xl text-white">{roleLabel}</h3>
-            <p className="text-white/70 text-xs">
-              {roleKey === "protagonist" && "The hero driving the story"}
-              {roleKey === "antagonist" && "The opposing force or change agent"}
-              {roleKey === "secondary" && "Key supporting character"}
-            </p>
+            <h3 className="font-bold text-xl text-white">{role.label}</h3>
+            <p className="text-white/70 text-xs">{role.description}</p>
           </div>
         </div>
 
-        {/* Character Name Display - Prominent */}
+        {/* Name Display */}
         <div className="flex flex-col items-center gap-3">
-          {/* Avatar/Initials Circle */}
           <div 
             className="w-20 h-20 rounded-full flex items-center justify-center text-2xl font-bold shadow-lg"
             style={{ 
-              background: characterName ? 'white' : 'rgba(255,255,255,0.2)',
-              color: characterName ? roleColor : 'rgba(255,255,255,0.5)'
+              background: entityName ? 'white' : 'rgba(255,255,255,0.2)',
+              color: entityName ? BRAND.navy : 'rgba(255,255,255,0.5)'
             }}
           >
-            {getInitials(characterName)}
+            {getInitials(entityName)}
           </div>
           
-          {/* Name Selector */}
           <div className="w-full max-w-xs">
-            <CharacterSelector
-              value={characterName}
-              onChange={(name) => onAssignCharacter(roleKey, name)}
-              characters={characters}
-              placeholder="Select character..."
-              accentColor={roleColor}
+            <EntitySelector
+              value={entityName}
+              onChange={(name) => onAssignEntity(roleKey, name)}
+              entities={allEntities}
+              placeholder={`Select ${genreConfig.entityLabel.toLowerCase()}...`}
+              accentColor={BRAND.gold}
+              genreConfig={genreConfig}
             />
           </div>
         </div>
       </div>
 
-      {/* Three Columns: Hopes | Fears | Legacy */}
+      {/* Three Columns */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-0 bg-gradient-to-b from-slate-50 to-white">
-        {/* HOPES */}
         <div className="border-r border-slate-100">
           <BulletSection
-            title="Hopes"
-            icon={Sparkles}
-            items={hopes}
-            onUpdate={(items) => onEditCharacter(characterName, "hopes", items)}
-            accentColor={BRAND.gold}
-            bgColor={`${BRAND.goldLight}30`}
-            placeholder={characterName ? "What are they dreaming of?" : "Select a character first..."}
-            disabled={!characterName}
+            title={columns[0].label}
+            icon={columns[0].icon}
+            items={col1Data}
+            onUpdate={(items) => onEditEntity(entityName, columns[0].id, items)}
+            accentColor={columns[0].color}
+            bgColor={columns[0].bgColor}
+            placeholder={entityName ? columns[0].placeholder : `Select a ${genreConfig.entityLabel.toLowerCase()} first...`}
+            disabled={!entityName}
           />
         </div>
 
-        {/* FEARS */}
         <div className="border-r border-slate-100">
           <BulletSection
-            title="Fears"
-            icon={Flame}
-            items={fears}
-            onUpdate={(items) => onEditCharacter(characterName, "fears", items)}
-            accentColor={BRAND.roseDark}
-            bgColor={`${BRAND.rose}25`}
-            placeholder={characterName ? "What terrifies them?" : "Select a character first..."}
-            disabled={!characterName}
+            title={columns[1].label}
+            icon={columns[1].icon}
+            items={col2Data}
+            onUpdate={(items) => onEditEntity(entityName, columns[1].id, items)}
+            accentColor={columns[1].color}
+            bgColor={columns[1].bgColor}
+            placeholder={entityName ? columns[1].placeholder : `Select a ${genreConfig.entityLabel.toLowerCase()} first...`}
+            disabled={!entityName}
           />
         </div>
 
-        {/* LEGACY */}
         <div>
           <BulletSection
-            title="Legacy"
-            icon={Gem}
-            items={legacy}
-            onUpdate={(items) => onEditCharacter(characterName, "legacy", items)}
-            accentColor={BRAND.navy}
-            bgColor={`${BRAND.mauve}20`}
-            placeholder={characterName ? "What will they leave behind?" : "Select a character first..."}
-            disabled={!characterName}
+            title={columns[2].label}
+            icon={columns[2].icon}
+            items={col3Data}
+            onUpdate={(items) => onEditEntity(entityName, columns[2].id, items)}
+            accentColor={columns[2].color}
+            bgColor={columns[2].bgColor}
+            placeholder={entityName ? columns[2].placeholder : `Select a ${genreConfig.entityLabel.toLowerCase()} first...`}
+            disabled={!entityName}
           />
         </div>
       </div>
@@ -474,25 +668,23 @@ function CharacterCard({
    ============================================ */
 export default function HopesFearsLegacy() {
   const [currentProjectId, setCurrentProjectId] = useState(getSelectedProjectId);
+  const [genre, setGenre] = useState(() => loadProjectGenre());
   const [chapters, setChapters] = useState(() => loadChapters());
   const [saving, setSaving] = useState("idle");
 
-  // NEW DATA STRUCTURE:
-  // - roles: { protagonist: "name", antagonist: "name", secondary: "name" }
-  // - characters: { "name": { hopes: [], fears: [], legacy: [] }, ... }
-  
-  const DEFAULT_ROLES = {
-    protagonist: "",
-    antagonist: "",
-    secondary: "",
-  };
+  const genreConfig = GENRE_CONFIG[genre] || GENRE_CONFIG.fiction;
+
+  // Data structure (genre-agnostic)
+  const DEFAULT_ROLES = {};
+  genreConfig.roles.forEach(r => { DEFAULT_ROLES[r.id] = ""; });
 
   const DEFAULT_DATA = {
     roles: { ...DEFAULT_ROLES },
-    characters: {},
+    entities: {},
+    genre: genre,
   };
 
-  const [hfl, setHfl] = useState(() => {
+  const [data, setData] = useState(() => {
     const saved = loadHflData();
     
     if (!saved) {
@@ -500,49 +692,53 @@ export default function HopesFearsLegacy() {
       return { ...DEFAULT_DATA };
     }
     
-    // Check if this is the NEW format (has 'roles' key)
-    if (saved.roles && saved.characters) {
-      console.log("[HFL] Loaded data:", saved);
+    // New format with 'roles' and 'entities'
+    if (saved.roles && saved.entities) {
       return {
         roles: saved.roles,
-        characters: saved.characters,
+        entities: saved.entities,
+        genre: saved.genre || genre,
       };
     }
     
-    // Check if this is the OLD format (protagonist is an object with 'name' property)
+    // Old format (fiction-specific with 'characters')
+    if (saved.roles && saved.characters) {
+      return {
+        roles: saved.roles,
+        entities: saved.characters,
+        genre: saved.genre || "fiction",
+      };
+    }
+    
+    // Legacy format migration
     if (saved.protagonist && typeof saved.protagonist === 'object' && 'name' in saved.protagonist) {
-      console.log("[HFL] Detected OLD format, migrating...");
-      const migratedCharacters = {};
+      console.log("[HFL] Migrating legacy format...");
+      const migratedEntities = {};
       const migratedRoles = { protagonist: "", antagonist: "", secondary: "" };
       
       ['protagonist', 'antagonist', 'secondary'].forEach(role => {
         const oldData = saved[role];
         if (oldData && oldData.name) {
           migratedRoles[role] = oldData.name;
-          migratedCharacters[oldData.name] = {
-            hopes: Array.isArray(oldData.hopes) ? oldData.hopes : (oldData.hopes ? [oldData.hopes] : []),
-            fears: Array.isArray(oldData.fears) ? oldData.fears : (oldData.fears ? [oldData.fears] : []),
-            legacy: Array.isArray(oldData.legacy) ? oldData.legacy : (oldData.legacy ? [oldData.legacy] : []),
+          migratedEntities[oldData.name] = {
+            hopes: Array.isArray(oldData.hopes) ? oldData.hopes : [],
+            fears: Array.isArray(oldData.fears) ? oldData.fears : [],
+            legacy: Array.isArray(oldData.legacy) ? oldData.legacy : [],
           };
         }
       });
       
-      return {
-        roles: migratedRoles,
-        characters: migratedCharacters,
-      };
+      return { roles: migratedRoles, entities: migratedEntities, genre: "fiction" };
     }
     
-    // Unknown format - return defaults
-    console.log("[HFL] Unknown format, using defaults");
     return { ...DEFAULT_DATA };
   });
 
-  const manuscriptCharacters = useMemo(() => {
-    return extractCharactersFromChapters(chapters);
-  }, [chapters]);
+  const manuscriptEntities = useMemo(() => {
+    return extractEntitiesFromChapters(chapters, genreConfig.tagPattern);
+  }, [chapters, genreConfig.tagPattern]);
 
-  // Save data directly to localStorage
+  // Save data
   const commit = (next) => {
     saveHflData(next);
     try {
@@ -550,6 +746,24 @@ export default function HopesFearsLegacy() {
     } catch {}
   };
 
+  // Handle genre change
+  const handleGenreChange = (newGenre) => {
+    setGenre(newGenre);
+    saveProjectGenre(newGenre);
+    
+    // Reset roles for new genre
+    const newConfig = GENRE_CONFIG[newGenre];
+    const newRoles = {};
+    newConfig.roles.forEach(r => { newRoles[r.id] = ""; });
+    
+    setData(prev => ({
+      ...prev,
+      roles: newRoles,
+      genre: newGenre,
+    }));
+  };
+
+  // Listen for project changes
   useEffect(() => {
     const handleProjectSwitch = () => {
       const newProjectId = getSelectedProjectId();
@@ -558,125 +772,106 @@ export default function HopesFearsLegacy() {
         console.log(`[HFL] Project switched: ${currentProjectId} → ${newProjectId}`);
         setCurrentProjectId(newProjectId);
         
-        // Load data for the new project
-        const saved = loadHflData();
-        console.log("[HFL] Project switch - loaded:", saved);
+        // Load genre
+        const loadedGenre = loadProjectGenre();
+        setGenre(loadedGenre);
         
+        // Load data
+        const saved = loadHflData();
         if (!saved) {
-          setHfl({ ...DEFAULT_DATA });
-        }
-        // Check if this is the NEW format (has 'roles' key)
-        else if (saved.roles && saved.characters) {
-          setHfl({
-            roles: saved.roles,
-            characters: saved.characters,
-          });
-        }
-        // Check if this is the OLD format
-        else if (saved.protagonist && typeof saved.protagonist === 'object' && 'name' in saved.protagonist) {
-          const migratedCharacters = {};
-          const migratedRoles = { protagonist: "", antagonist: "", secondary: "" };
-          
-          ['protagonist', 'antagonist', 'secondary'].forEach(role => {
-            const oldData = saved[role];
-            if (oldData && oldData.name) {
-              migratedRoles[role] = oldData.name;
-              migratedCharacters[oldData.name] = {
-                hopes: Array.isArray(oldData.hopes) ? oldData.hopes : [],
-                fears: Array.isArray(oldData.fears) ? oldData.fears : [],
-                legacy: Array.isArray(oldData.legacy) ? oldData.legacy : [],
-              };
-            }
-          });
-          
-          setHfl({ roles: migratedRoles, characters: migratedCharacters });
-        }
-        // Empty/new
-        else {
-          setHfl({ ...DEFAULT_DATA });
+          const cfg = GENRE_CONFIG[loadedGenre];
+          const roles = {};
+          cfg.roles.forEach(r => { roles[r.id] = ""; });
+          setData({ roles, entities: {}, genre: loadedGenre });
+        } else if (saved.roles && saved.entities) {
+          setData({ roles: saved.roles, entities: saved.entities, genre: saved.genre || loadedGenre });
+        } else if (saved.roles && saved.characters) {
+          setData({ roles: saved.roles, entities: saved.characters, genre: saved.genre || "fiction" });
+        } else {
+          const cfg = GENRE_CONFIG[loadedGenre];
+          const roles = {};
+          cfg.roles.forEach(r => { roles[r.id] = ""; });
+          setData({ roles, entities: {}, genre: loadedGenre });
         }
         
         setChapters(loadChapters());
       }
     };
     
-    window.addEventListener("project:switch", handleProjectSwitch);
+    window.addEventListener("project:change", handleProjectSwitch);
     window.addEventListener("storage", handleProjectSwitch);
     
     return () => {
-      window.removeEventListener("project:switch", handleProjectSwitch);
+      window.removeEventListener("project:change", handleProjectSwitch);
       window.removeEventListener("storage", handleProjectSwitch);
     };
   }, [currentProjectId]);
 
+  // Auto-save
   useEffect(() => {
     setSaving("saving");
     const id = setTimeout(() => {
-      commit(hfl);
+      commit(data);
       setSaving("idle");
     }, 600);
     return () => clearTimeout(id);
-  }, [hfl]);
+  }, [data]);
 
-  // Assign a character to a role
-  const assignRole = (role, characterName) => {
-    setHfl((prev) => {
+  // Assign entity to role
+  const assignRole = (role, entityName) => {
+    setData((prev) => {
       const newState = { ...prev, roles: { ...prev.roles } };
-      newState.roles[role] = characterName;
+      newState.roles[role] = entityName;
       
-      // If this character doesn't have data yet, initialize it
-      if (characterName && !newState.characters[characterName]) {
-        newState.characters = {
-          ...newState.characters,
-          [characterName]: { hopes: [], fears: [], legacy: [] }
-        };
+      if (entityName && !newState.entities[entityName]) {
+        const defaultEntity = {};
+        genreConfig.columns.forEach(col => { defaultEntity[col.id] = []; });
+        newState.entities = { ...newState.entities, [entityName]: defaultEntity };
       }
       
       return newState;
     });
   };
 
-  // Edit a character's data (by character name, not by role)
-  const editCharacter = (characterName, field, value) => {
-    if (!characterName) return;
+  // Edit entity data
+  const editEntity = (entityName, field, value) => {
+    if (!entityName) return;
     
-    setHfl((prev) => ({
-      ...prev,
-      characters: {
-        ...prev.characters,
-        [characterName]: {
-          ...(prev.characters[characterName] || { hopes: [], fears: [], legacy: [] }),
-          [field]: value,
+    setData((prev) => {
+      const defaultEntity = {};
+      genreConfig.columns.forEach(col => { defaultEntity[col.id] = []; });
+      
+      return {
+        ...prev,
+        entities: {
+          ...prev.entities,
+          [entityName]: {
+            ...(prev.entities[entityName] || defaultEntity),
+            [field]: value,
+          }
         }
-      }
-    }));
-  };
-
-  // Get character data for a role
-  const getCharacterData = (role) => {
-    const characterName = hfl.roles[role];
-    if (!characterName) return { name: "", hopes: [], fears: [], legacy: [] };
-    
-    const charData = hfl.characters[characterName] || { hopes: [], fears: [], legacy: [] };
-    return { name: characterName, ...charData };
+      };
+    });
   };
 
   const saveNow = () => {
     setSaving("saving");
-    commit(hfl);
+    commit(data);
     setTimeout(() => setSaving("idle"), 300);
   };
 
-  const refreshCharacters = () => {
+  const refreshEntities = () => {
     setChapters(loadChapters());
   };
 
-  // Get list of all characters (from manuscript + any already in our data)
-  const allCharacters = useMemo(() => {
-    const fromData = Object.keys(hfl.characters || {});
-    const combined = new Set([...manuscriptCharacters, ...fromData]);
+  // All entities (from manuscript + from data)
+  const allEntities = useMemo(() => {
+    const fromData = Object.keys(data.entities || {});
+    const combined = new Set([...manuscriptEntities, ...fromData]);
     return Array.from(combined).sort();
-  }, [manuscriptCharacters, hfl.characters]);
+  }, [manuscriptEntities, data.entities]);
+
+  const GenreIcon = genreConfig.icon;
 
   return (
     <div className="min-h-screen" style={{ background: `linear-gradient(180deg, ${BRAND.cream} 0%, #f1f5f9 100%)` }}>
@@ -692,7 +887,7 @@ export default function HopesFearsLegacy() {
             </Link>
             <span className="text-slate-300">|</span>
             <span className="text-sm font-semibold" style={{ color: BRAND.navy }}>
-              Hopes • Fears • Legacy
+              {genreConfig.columns[0].label} • {genreConfig.columns[1].label} • {genreConfig.columns[2].label}
             </span>
           </div>
           <div className="flex items-center gap-3">
@@ -716,66 +911,69 @@ export default function HopesFearsLegacy() {
             background: `linear-gradient(135deg, ${BRAND.navy} 0%, ${BRAND.navyLight} 30%, ${BRAND.mauve} 70%, ${BRAND.rose} 100%)`,
           }}
         >
-          {/* Decorative elements */}
           <div className="absolute top-0 left-0 w-64 h-64 rounded-full opacity-10" style={{ background: BRAND.gold, filter: 'blur(80px)' }} />
           <div className="absolute bottom-0 right-0 w-96 h-96 rounded-full opacity-10" style={{ background: BRAND.rose, filter: 'blur(100px)' }} />
           
           <div className="relative z-10">
+            {/* Genre Selector */}
+            <div className="flex justify-center mb-6">
+              <GenreSelector value={genre} onChange={handleGenreChange} />
+            </div>
+
             {/* Icon trio */}
             <div className="flex items-center justify-center gap-4 mb-6">
-              <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: `${BRAND.gold}40` }}>
-                <Sparkles size={26} style={{ color: BRAND.goldLight }} />
+              <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: `${genreConfig.columns[0].color}40` }}>
+                {React.createElement(genreConfig.columns[0].icon, { size: 26, style: { color: BRAND.goldLight } })}
               </div>
               <div className="w-16 h-16 rounded-2xl flex items-center justify-center shadow-lg" style={{ background: `linear-gradient(135deg, ${BRAND.gold}, ${BRAND.goldDark})` }}>
                 <Heart size={30} className="text-white" />
               </div>
-              <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: `${BRAND.mauve}50` }}>
-                <Gem size={26} style={{ color: BRAND.cream }} />
+              <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ background: `${genreConfig.columns[2].color}30` }}>
+                {React.createElement(genreConfig.columns[2].icon, { size: 26, style: { color: BRAND.cream } })}
               </div>
             </div>
 
             <h1 className="text-4xl font-bold mb-3">
-              <span style={{ color: BRAND.goldLight }}>Hopes</span>
+              <span style={{ color: BRAND.goldLight }}>{genreConfig.columns[0].label}</span>
               <span className="mx-3 opacity-50">•</span>
-              <span style={{ color: BRAND.rose }}>Fears</span>
+              <span style={{ color: BRAND.rose }}>{genreConfig.columns[1].label}</span>
               <span className="mx-3 opacity-50">•</span>
-              <span style={{ color: BRAND.cream }}>Legacy</span>
+              <span style={{ color: BRAND.cream }}>{genreConfig.columns[2].label}</span>
             </h1>
             
             <p className="text-white/80 max-w-2xl mx-auto text-lg">
-              Define what drives your characters. Their dreams, their obstacles, and what they leave behind.
+              {genre === "fiction" && "Define what drives your characters. Their dreams, their obstacles, and what they leave behind."}
+              {genre === "nonfiction" && "Clarify your purpose. What change do you want to create, and what impact will your work have?"}
+              {genre === "poetry" && "Explore your themes. What vision are you creating, what tension drives it, and what will resonate?"}
+              {genre === "memoir" && "Reflect on your journey. What did you hope for, fear, and ultimately learn?"}
             </p>
             
             <div className="mt-6 flex items-center justify-center gap-8 text-sm text-white/60">
-              <div className="flex items-center gap-2">
-                <Sparkles size={14} style={{ color: BRAND.gold }} />
-                <span>What they dream of</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Flame size={14} style={{ color: BRAND.rose }} />
-                <span>What holds them back</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Gem size={14} style={{ color: BRAND.mauve }} />
-                <span>What they leave behind</span>
-              </div>
+              {genreConfig.columns.map((col, idx) => (
+                <div key={col.id} className="flex items-center gap-2">
+                  {React.createElement(col.icon, { size: 14, style: { color: idx === 0 ? BRAND.gold : idx === 1 ? BRAND.rose : BRAND.mauve } })}
+                  <span>{col.placeholder.split("?")[0]}?</span>
+                </div>
+              ))}
             </div>
 
             <div className="mt-6 text-xs text-white/40">
-              Project: {currentProjectId}
+              Project: {currentProjectId} · {genreConfig.label}
             </div>
           </div>
         </div>
 
-        {/* Character count */}
-        {manuscriptCharacters.length > 0 && (
+        {/* Entity count */}
+        {manuscriptEntities.length > 0 && (
           <div className="flex items-center justify-between mb-6 px-2">
             <div className="flex items-center gap-2 text-sm text-slate-500">
               <BookOpen size={16} />
-              <span><strong>{manuscriptCharacters.length}</strong> characters found via @char: tags</span>
+              <span>
+                <strong>{manuscriptEntities.length}</strong> {genreConfig.entityLabelPlural.toLowerCase()} found via tags
+              </span>
             </div>
             <button
-              onClick={refreshCharacters}
+              onClick={refreshEntities}
               className="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-slate-700 transition-colors"
             >
               <RefreshCw size={14} />
@@ -784,49 +982,21 @@ export default function HopesFearsLegacy() {
           </div>
         )}
 
-        {/* Character Cards */}
+        {/* Entity Cards */}
         <div className="space-y-8">
-          {/* Protagonist */}
-          <CharacterCard
-            roleKey="protagonist"
-            roleLabel="Protagonist"
-            roleIcon={Star}
-            roleColor={BRAND.navy}
-            roleGradient={`linear-gradient(135deg, ${BRAND.navy} 0%, ${BRAND.navyLight} 100%)`}
-            characterName={hfl.roles.protagonist}
-            characterData={hfl.characters[hfl.roles.protagonist] || { hopes: [], fears: [], legacy: [] }}
-            characters={allCharacters}
-            onAssignCharacter={assignRole}
-            onEditCharacter={editCharacter}
-          />
-
-          {/* Antagonist/Catalyst */}
-          <CharacterCard
-            roleKey="antagonist"
-            roleLabel="Antagonist / Catalyst"
-            roleIcon={Swords}
-            roleColor="#5c4a6e"
-            roleGradient="linear-gradient(135deg, #4a3a5c 0%, #6b5a7e 100%)"
-            characterName={hfl.roles.antagonist}
-            characterData={hfl.characters[hfl.roles.antagonist] || { hopes: [], fears: [], legacy: [] }}
-            characters={allCharacters}
-            onAssignCharacter={assignRole}
-            onEditCharacter={editCharacter}
-          />
-
-          {/* Secondary Lead */}
-          <CharacterCard
-            roleKey="secondary"
-            roleLabel="Secondary Lead"
-            roleIcon={Users}
-            roleColor="#8b5a6a"
-            roleGradient={`linear-gradient(135deg, #7a4a5a 0%, #9b6a7a 100%)`}
-            characterName={hfl.roles.secondary}
-            characterData={hfl.characters[hfl.roles.secondary] || { hopes: [], fears: [], legacy: [] }}
-            characters={allCharacters}
-            onAssignCharacter={assignRole}
-            onEditCharacter={editCharacter}
-          />
+          {genreConfig.roles.map((role) => (
+            <EntityCard
+              key={role.id}
+              roleKey={role.id}
+              role={role}
+              entityName={data.roles[role.id] || ""}
+              entityData={data.entities[data.roles[role.id]] || {}}
+              allEntities={allEntities}
+              onAssignEntity={assignRole}
+              onEditEntity={editEntity}
+              genreConfig={genreConfig}
+            />
+          ))}
         </div>
 
         {/* Connection Info */}
@@ -845,13 +1015,13 @@ export default function HopesFearsLegacy() {
               <Sparkles size={22} className="text-white" />
             </div>
             <div>
-              <h4 className="font-bold text-slate-800 text-lg mb-2">How This Powers Your Story</h4>
+              <h4 className="font-bold text-slate-800 text-lg mb-2">How This Powers Your Writing</h4>
               <p className="text-sm text-slate-600 mb-3">
-                The character motivations you define here flow into every other StoryLab module:
+                The {genreConfig.entityLabel.toLowerCase()} motivations you define here flow into every other StoryLab module:
               </p>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 <div className="bg-white/80 rounded-lg px-3 py-2 text-xs">
-                  <strong className="block text-slate-700">Character Roadmap</strong>
+                  <strong className="block text-slate-700">Roadmap</strong>
                   <span className="text-slate-500">Milestones from arcs</span>
                 </div>
                 <div className="bg-white/80 rounded-lg px-3 py-2 text-xs">
@@ -869,6 +1039,21 @@ export default function HopesFearsLegacy() {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* Tagging Help */}
+        <div className="mt-6 p-4 rounded-xl bg-slate-50 border border-slate-200">
+          <h4 className="font-semibold text-sm mb-2" style={{ color: BRAND.navy }}>
+            💡 How to tag {genreConfig.entityLabelPlural.toLowerCase()}
+          </h4>
+          <p className="text-sm text-slate-600">
+            {genreConfig.tagInstruction}. For example: <code className="bg-white px-1.5 py-0.5 rounded border text-xs">
+              {genre === "fiction" && "@char: Grace Thompson"}
+              {genre === "nonfiction" && "@topic: Climate Change"}
+              {genre === "poetry" && "@theme: Loss and Renewal"}
+              {genre === "memoir" && "@person: Grandmother Rose"}
+            </code>
+          </p>
         </div>
 
         {/* Save Button */}
