@@ -1,5 +1,5 @@
 // src/components/storylab/PlotBuilder.jsx
-// FIXED: Correct project-switching logic with project:change event
+// FIXED: Uses storage service (not localStorage directly)
 // Plot Builder - Build story blocks organized by plot function
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
@@ -29,6 +29,7 @@ import {
   Target,
   RefreshCw,
 } from "lucide-react";
+import { storage } from "../../lib/storage/storage";
 import { runAssistant } from "../../lib/api";
 
 /* ============================================
@@ -100,7 +101,7 @@ const PLOT_GROUPS = [
 const STATUS_OPTIONS = ["Planned", "Drafted", "Complete"];
 
 /* ============================================
-   PROJECT-AWARE STORAGE
+   PROJECT-AWARE STORAGE (using storage service)
    ============================================ */
 const PLOT_KEY_BASE = "dahtruth-plot-builder-v1";
 const NARRATIVE_ARC_KEY_BASE = "dt_arc_chars_v2";
@@ -109,28 +110,28 @@ const PRIORITIES_KEY_BASE = "dahtruth-priorities-v2";
 
 function getSelectedProjectId() {
   try {
-    const stored = localStorage.getItem('dahtruth-selected-project-id');
+    const stored = storage.getItem("dahtruth-selected-project-id");
     if (stored) return stored;
-    const projectData = localStorage.getItem('dahtruth-project-store');
+    const projectData = storage.getItem("dahtruth-project-store");
     if (projectData) {
       const parsed = JSON.parse(projectData);
-      return parsed.selectedProjectId || parsed.currentProjectId || 'default';
+      return parsed.selectedProjectId || parsed.currentProjectId || "default";
     }
-    return 'default';
+    return "default";
   } catch {
-    return 'default';
+    return "default";
   }
 }
 
 function getProjectKey(baseKey) {
   const projectId = getSelectedProjectId();
-  return projectId === 'default' ? baseKey : `${baseKey}-${projectId}`;
+  return projectId === "default" ? baseKey : `${baseKey}-${projectId}`;
 }
 
 function loadPlotData() {
   try {
     const key = getProjectKey(PLOT_KEY_BASE);
-    const raw = localStorage.getItem(key);
+    const raw = storage.getItem(key);
     if (!raw) return { blocks: [] };
     return JSON.parse(raw);
   } catch {
@@ -141,7 +142,7 @@ function loadPlotData() {
 function savePlotData(data) {
   try {
     const key = getProjectKey(PLOT_KEY_BASE);
-    localStorage.setItem(key, JSON.stringify(data));
+    storage.setItem(key, JSON.stringify(data));
     console.log(`[PlotBuilder] Saved to key: ${key}`);
     window.dispatchEvent(new Event("project:change"));
     return true;
@@ -153,7 +154,7 @@ function savePlotData(data) {
 function loadCharactersFromNarrativeArc() {
   try {
     const key = getProjectKey(NARRATIVE_ARC_KEY_BASE);
-    const raw = localStorage.getItem(key);
+    const raw = storage.getItem(key);
     if (!raw) return [];
     const data = JSON.parse(raw);
     return Array.isArray(data) ? data : [];
@@ -165,7 +166,7 @@ function loadCharactersFromNarrativeArc() {
 function loadChapters() {
   try {
     const key = getProjectKey(CHAPTERS_KEY_BASE);
-    const raw = localStorage.getItem(key);
+    const raw = storage.getItem(key);
     if (!raw) return [];
     const data = JSON.parse(raw);
     return Array.isArray(data.chapters) ? data.chapters : [];
@@ -177,10 +178,10 @@ function loadChapters() {
 function saveChapters(chapters) {
   try {
     const key = getProjectKey(CHAPTERS_KEY_BASE);
-    const existing = localStorage.getItem(key);
+    const existing = storage.getItem(key);
     const data = existing ? JSON.parse(existing) : {};
     data.chapters = chapters;
-    localStorage.setItem(key, JSON.stringify(data));
+    storage.setItem(key, JSON.stringify(data));
     window.dispatchEvent(new Event("project:change"));
     return true;
   } catch {
@@ -191,7 +192,7 @@ function saveChapters(chapters) {
 function loadPriorities() {
   try {
     const key = getProjectKey(PRIORITIES_KEY_BASE);
-    const raw = localStorage.getItem(key);
+    const raw = storage.getItem(key);
     if (!raw) return [];
     return JSON.parse(raw);
   } catch {
@@ -202,7 +203,7 @@ function loadPriorities() {
 function savePriorities(priorities) {
   try {
     const key = getProjectKey(PRIORITIES_KEY_BASE);
-    localStorage.setItem(key, JSON.stringify(priorities));
+    storage.setItem(key, JSON.stringify(priorities));
     window.dispatchEvent(new Event("project:change"));
     return true;
   } catch {
@@ -813,7 +814,7 @@ JSON array only, no other text.`;
    MAIN COMPONENT
    ============================================ */
 export default function PlotBuilder() {
-  // ===== FIXED: Project ID tracking =====
+  // Project ID tracking
   const [currentProjectId, setCurrentProjectId] = useState(getSelectedProjectId);
   const [plotData, setPlotData] = useState(() => loadPlotData());
   const [characters, setCharacters] = useState(() => loadCharactersFromNarrativeArc());
@@ -825,10 +826,11 @@ export default function PlotBuilder() {
 
   const blocks = plotData.blocks || [];
 
-  // ===== FIXED: Project switching with correct event names =====
+  // Project switching
   useEffect(() => {
     const reloadAllData = () => {
-      console.log(`[PlotBuilder] Reloading data for project: ${getSelectedProjectId()}`);
+      const pid = getSelectedProjectId();
+      console.log(`[PlotBuilder] Reloading data for project: ${pid}`);
       setPlotData(loadPlotData());
       setCharacters(loadCharactersFromNarrativeArc());
       setChapters(loadChapters());
@@ -852,11 +854,11 @@ export default function PlotBuilder() {
     };
 
     // Listen for project changes and data updates
-    window.addEventListener("project:change", handleDataChange);
+    window.addEventListener("project:change", handleProjectChange);
     window.addEventListener("storage", handleProjectChange);
     
     return () => {
-      window.removeEventListener("project:change", handleDataChange);
+      window.removeEventListener("project:change", handleProjectChange);
       window.removeEventListener("storage", handleProjectChange);
     };
   }, [currentProjectId]);
@@ -1043,7 +1045,7 @@ export default function PlotBuilder() {
               </div>
             </div>
 
-            <h1 className="text-4xl font-bold mb-3">
+            <h1 className="text-4xl font-bold mb-3 text-white">
               <span className="text-red-300">Heat</span>
               <span className="mx-2 opacity-50">•</span>
               <span className="text-purple-300">Obstacles</span>
@@ -1076,7 +1078,7 @@ export default function PlotBuilder() {
               </div>
             </div>
 
-            <div className="mt-6 text-xs text-white/40">
+            <div className="mt-6 text-xs text-white/50">
               Project: {currentProjectId} · {blocks.length} blocks
             </div>
           </div>
