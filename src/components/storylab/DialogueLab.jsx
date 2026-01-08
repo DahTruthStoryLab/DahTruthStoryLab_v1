@@ -1,4 +1,5 @@
 // src/components/storylab/DialogueLab.jsx
+// FIXED: Correct project-switching logic with project:change event
 // Dialogue Lab - Write, Analyze, and Enhance Character Dialogue
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
@@ -100,6 +101,7 @@ const loadLocal = (key, fallback) => {
 const saveLocal = (key, value) => {
   try {
     localStorage.setItem(key, JSON.stringify(value));
+    window.dispatchEvent(new Event("project:change"));
   } catch {}
 };
 
@@ -512,6 +514,8 @@ function AnalysisResults({ analysis, onClose }) {
    Main Component
    ============================================ */
 export default function DialogueLab() {
+  // ===== FIXED: Project ID tracking =====
+  const [currentProjectId, setCurrentProjectId] = useState(getSelectedProjectId);
   const [characters, setCharacters] = useState(() => loadCharacters());
   const [chapters, setChapters] = useState(() => loadChapters());
   const [sessions, setSessions] = useState(() => loadDialogueSessions());
@@ -538,20 +542,48 @@ export default function DialogueLab() {
     saveDialogueSessions(sessions);
   }, [sessions]);
 
-  // Reload data on project switch
+  // ===== FIXED: Project switching with correct event names =====
   useEffect(() => {
-    const handleSwitch = () => {
+    const reloadAllData = () => {
+      console.log(`[DialogueLab] Reloading data for project: ${getSelectedProjectId()}`);
       setCharacters(loadCharacters());
       setChapters(loadChapters());
       setSessions(loadDialogueSessions());
+      // Reset session state
+      setSelectedChapterIdx(null);
+      setCharacterAId(null);
+      setCharacterBId(null);
+      setStakesA({ wants: "", hiding: "" });
+      setStakesB({ wants: "", hiding: "" });
+      setSceneContext({ location: "", justHappened: "" });
+      setDialogue("");
+      setAnalysis(null);
     };
-    window.addEventListener("project:switch", handleSwitch);
-    window.addEventListener("storage", handleSwitch);
+
+    const handleProjectChange = () => {
+      const newProjectId = getSelectedProjectId();
+      if (newProjectId !== currentProjectId) {
+        console.log(`[DialogueLab] Project switched: ${currentProjectId} → ${newProjectId}`);
+        setCurrentProjectId(newProjectId);
+        reloadAllData();
+      }
+    };
+
+    const handleDataChange = () => {
+      // Reload chapters and characters when other modules update
+      setCharacters(loadCharacters());
+      setChapters(loadChapters());
+    };
+
+    // Listen for project changes and data updates
+    window.addEventListener("project:change", handleDataChange);
+    window.addEventListener("storage", handleProjectChange);
+    
     return () => {
-      window.removeEventListener("project:switch", handleSwitch);
-      window.removeEventListener("storage", handleSwitch);
+      window.removeEventListener("project:change", handleDataChange);
+      window.removeEventListener("storage", handleProjectChange);
     };
-  }, []);
+  }, [currentProjectId]);
 
   const handleAnalyze = async () => {
     if (!characterA || !characterB || !dialogue.trim()) return;
@@ -652,6 +684,7 @@ export default function DialogueLab() {
               <div>
                 <h1 className="text-3xl font-bold">Dialogue Lab</h1>
                 <p className="text-white/70">Write, analyze, and enhance character dialogue</p>
+                <p className="text-white/40 text-xs mt-1">Project: {currentProjectId}</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -937,3 +970,4 @@ export default function DialogueLab() {
     </div>
   );
 }
+
