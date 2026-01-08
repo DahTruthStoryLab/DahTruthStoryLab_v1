@@ -1,4 +1,5 @@
 // src/components/ProjectPage.jsx
+// FIXED: Complete project deletion that cleans up ALL storage keys
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -161,6 +162,103 @@ function propagateTitleChange(projectId, newTitle) {
   }
 
   console.log(`[ProjectPage] Title propagated to all storage keys for project ${projectId}`);
+}
+
+// -------------------- COMPLETE Project Deletion Helper --------------------
+// This function removes ALL storage keys associated with a project
+function cleanupProjectStorage(projectId) {
+  if (!projectId) return;
+
+  console.log(`[ProjectPage] Cleaning up all storage for project: ${projectId}`);
+
+  // All known project-scoped key base names
+  const projectScopedKeyBases = [
+    // StoryLab modules
+    "dahtruth-story-lab-toc-v3",
+    "dahtruth-hfl-data-v2",
+    "dahtruth-priorities-v2",
+    "dahtruth-character-roadmap",
+    "dahtruth-clothesline-v2",
+    "dahtruth-dialogue-lab-v1",
+    "dahtruth-narrative-arc-v2",
+    "dahtruth-plot-builder-v2",
+    "dahtruth-project-genre",
+    "dt_arc_chars_v2",
+    
+    // Publishing / Cover
+    "dahtruth_cover_settings",
+    "dt_publishing_meta",
+    "publishingDraft",
+    "dahtruth_project_meta",
+    
+    // Workshop modules
+    "dahtruth-workshop-data",
+    "dahtruth-workshop-cohort",
+  ];
+
+  // Remove project-specific keys (try both - and _ separators)
+  projectScopedKeyBases.forEach((baseKey) => {
+    try {
+      storage.removeItem(`${baseKey}-${projectId}`);
+    } catch {}
+    try {
+      storage.removeItem(`${baseKey}_${projectId}`);
+    } catch {}
+  });
+
+  // Clean up selected project ID if it's the deleted one
+  try {
+    const selectedId = storage.getItem("dahtruth-selected-project-id");
+    if (selectedId === projectId) {
+      storage.removeItem("dahtruth-selected-project-id");
+      console.log(`[ProjectPage] Cleared selected project ID`);
+    }
+  } catch {}
+
+  // Clean up currentStory if it references deleted project
+  try {
+    const currentStoryRaw = storage.getItem("currentStory");
+    if (currentStoryRaw) {
+      const currentStory = JSON.parse(currentStoryRaw);
+      if (currentStory?.id === projectId) {
+        storage.removeItem("currentStory");
+        console.log(`[ProjectPage] Cleared currentStory`);
+      }
+    }
+  } catch {}
+
+  // Clean up dahtruth-project-store if it references deleted project
+  try {
+    const projectStoreRaw = storage.getItem("dahtruth-project-store");
+    if (projectStoreRaw) {
+      const projectStore = JSON.parse(projectStoreRaw);
+      let modified = false;
+
+      if (projectStore.selectedProjectId === projectId) {
+        projectStore.selectedProjectId = null;
+        modified = true;
+      }
+      if (projectStore.currentProjectId === projectId) {
+        projectStore.currentProjectId = null;
+        modified = true;
+      }
+      // Remove from projects array if present
+      if (Array.isArray(projectStore.projects)) {
+        const originalLength = projectStore.projects.length;
+        projectStore.projects = projectStore.projects.filter(p => p.id !== projectId);
+        if (projectStore.projects.length !== originalLength) {
+          modified = true;
+        }
+      }
+
+      if (modified) {
+        storage.setItem("dahtruth-project-store", JSON.stringify(projectStore));
+        console.log(`[ProjectPage] Cleaned dahtruth-project-store`);
+      }
+    }
+  } catch {}
+
+  console.log(`[ProjectPage] Cleanup complete for project: ${projectId}`);
 }
 
 // -------------------- Image helpers --------------------
@@ -752,6 +850,7 @@ export default function ProjectPage() {
       const legacy = loadLegacyProjects();
       const mergedProjects = [...entries];
       
+      // Only add legacy projects that don't already exist
       for (const lp of legacy) {
         if (!mergedProjects.find((p) => p.id === lp.id)) {
           mergedProjects.push({
@@ -926,17 +1025,30 @@ export default function ProjectPage() {
     updateProject(projectId, { title: newTitle });
   };
 
+  // ✅ FIXED: Complete project deletion with full cleanup
   const handleDeleteProject = async (id) => {
     if (!window.confirm("Delete this project? This cannot be undone.")) return;
 
+    console.log(`[ProjectPage] Deleting project: ${id}`);
+
+    // 1. Delete from cloud service
     try {
       await deleteProjectService(id);
     } catch (err) {
       console.error("[ProjectPage] Cloud delete failed:", err);
     }
 
+    // 2. Delete from legacy projects array
     const legacy = loadLegacyProjects();
     saveLegacyProjects(legacy.filter((p) => p.id !== id));
+
+    // 3. Clean up ALL project-scoped storage keys
+    cleanupProjectStorage(id);
+
+    // 4. Dispatch event to notify all modules
+    window.dispatchEvent(new Event("project:change"));
+
+    // 5. Reload projects list
     loadProjectsList();
   };
 
@@ -958,6 +1070,9 @@ export default function ProjectPage() {
         storage.setItem("currentStory", JSON.stringify(snapshot));
       }
       
+      // Set selected project ID for StoryLab modules
+      storage.setItem("dahtruth-selected-project-id", project.id);
+      
       window.dispatchEvent(new Event("project:change"));
     } catch (err) {
       console.error("[ProjectPage] Failed to load project:", err);
@@ -970,6 +1085,7 @@ export default function ProjectPage() {
         targetWords: project.targetWords || 50000,
       };
       storage.setItem("currentStory", JSON.stringify(snapshot));
+      storage.setItem("dahtruth-selected-project-id", project.id);
       window.dispatchEvent(new Event("project:change"));
     }
 
@@ -1474,7 +1590,7 @@ export default function ProjectPage() {
                       {/* Header */}
                       <div className="flex justify-between items-start mb-1">
                         <div className="flex-1 min-w-0">
-                          {/* ✅ UPDATED: Title with dedicated rename button */}
+                          {/* ✅ Title with dedicated rename button */}
                           <div className="flex items-center gap-2">
                             <h3
                               className="text-xl font-semibold truncate cursor-pointer hover:text-purple-700 transition-colors"
@@ -1818,7 +1934,7 @@ export default function ProjectPage() {
                   </div>
 
                   {/* Actions */}
-                  <div>
+                  <div className="flex gap-2">
                     <button
                       onClick={() => openInWriter(project)}
                       className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold text-white transition-all hover:scale-105"
@@ -1828,6 +1944,17 @@ export default function ProjectPage() {
                       }}
                     >
                       <Edit3 size={12} /> Write
+                    </button>
+                    <button
+                      onClick={() => handleDeleteProject(project.id)}
+                      className="p-2 rounded-lg transition-all hover:scale-105"
+                      style={{
+                        background: "rgba(239,68,68,0.06)",
+                        color: "#dc2626",
+                      }}
+                      title="Delete project"
+                    >
+                      <Trash2 size={12} />
                     </button>
                   </div>
                 </div>
