@@ -1,6 +1,6 @@
 // src/components/storylab/PlotBuilder.jsx
+// FIXED: Correct project-switching logic with project:change event
 // Plot Builder - Build story blocks organized by plot function
-// Groups: Raise the Heat, Obstacles, Turning Points, Transformation
 
 import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { Link } from "react-router-dom";
@@ -143,6 +143,7 @@ function savePlotData(data) {
     const key = getProjectKey(PLOT_KEY_BASE);
     localStorage.setItem(key, JSON.stringify(data));
     console.log(`[PlotBuilder] Saved to key: ${key}`);
+    window.dispatchEvent(new Event("project:change"));
     return true;
   } catch {
     return false;
@@ -180,6 +181,7 @@ function saveChapters(chapters) {
     const data = existing ? JSON.parse(existing) : {};
     data.chapters = chapters;
     localStorage.setItem(key, JSON.stringify(data));
+    window.dispatchEvent(new Event("project:change"));
     return true;
   } catch {
     return false;
@@ -201,6 +203,7 @@ function savePriorities(priorities) {
   try {
     const key = getProjectKey(PRIORITIES_KEY_BASE);
     localStorage.setItem(key, JSON.stringify(priorities));
+    window.dispatchEvent(new Event("project:change"));
     return true;
   } catch {
     return false;
@@ -810,6 +813,7 @@ JSON array only, no other text.`;
    MAIN COMPONENT
    ============================================ */
 export default function PlotBuilder() {
+  // ===== FIXED: Project ID tracking =====
   const [currentProjectId, setCurrentProjectId] = useState(getSelectedProjectId);
   const [plotData, setPlotData] = useState(() => loadPlotData());
   const [characters, setCharacters] = useState(() => loadCharactersFromNarrativeArc());
@@ -821,26 +825,43 @@ export default function PlotBuilder() {
 
   const blocks = plotData.blocks || [];
 
-  // Project switch listener
+  // ===== FIXED: Project switching with correct event names =====
   useEffect(() => {
-    const handleSwitch = () => {
-      const newId = getSelectedProjectId();
-      if (newId !== currentProjectId) {
-        setCurrentProjectId(newId);
-        setPlotData(loadPlotData());
-        setCharacters(loadCharactersFromNarrativeArc());
-        setChapters(loadChapters());
+    const reloadAllData = () => {
+      console.log(`[PlotBuilder] Reloading data for project: ${getSelectedProjectId()}`);
+      setPlotData(loadPlotData());
+      setCharacters(loadCharactersFromNarrativeArc());
+      setChapters(loadChapters());
+      setActiveExercise(null);
+      setDraggingId(null);
+    };
+
+    const handleProjectChange = () => {
+      const newProjectId = getSelectedProjectId();
+      if (newProjectId !== currentProjectId) {
+        console.log(`[PlotBuilder] Project switched: ${currentProjectId} → ${newProjectId}`);
+        setCurrentProjectId(newProjectId);
+        reloadAllData();
       }
     };
-    window.addEventListener("project:switch", handleSwitch);
-    window.addEventListener("storage", handleSwitch);
+
+    const handleDataChange = () => {
+      // Reload chapters and characters when other modules update
+      setChapters(loadChapters());
+      setCharacters(loadCharactersFromNarrativeArc());
+    };
+
+    // Listen for project changes and data updates
+    window.addEventListener("project:change", handleDataChange);
+    window.addEventListener("storage", handleProjectChange);
+    
     return () => {
-      window.removeEventListener("project:switch", handleSwitch);
-      window.removeEventListener("storage", handleSwitch);
+      window.removeEventListener("project:change", handleDataChange);
+      window.removeEventListener("storage", handleProjectChange);
     };
   }, [currentProjectId]);
 
-  // Auto-save
+  // Auto-save with debounce
   useEffect(() => {
     setSaving("saving");
     const id = setTimeout(() => {
@@ -931,7 +952,6 @@ export default function PlotBuilder() {
       source: "Plot Builder",
     });
     savePriorities(priorities);
-    window.dispatchEvent(new Event("project:change"));
     alert(`"${block.title}" sent to Priority Cards!`);
   }, []);
 
@@ -1255,3 +1275,4 @@ export default function PlotBuilder() {
     </div>
   );
 }
+
