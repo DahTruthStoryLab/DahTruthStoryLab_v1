@@ -1,7 +1,7 @@
 // src/components/storylab/HopesFearsLegacy.jsx
+// FIXED: Uses storage service (not localStorage directly)
 // Hopes • Fears • Legacy - Character/Subject motivation tracker
-// UPDATED: Supports Fiction, Non-Fiction, Poetry, and Memoir genres
-// Uses direct localStorage for project-aware data persistence
+// Supports Fiction, Non-Fiction, Poetry, and Memoir genres
 
 import React, { useEffect, useState, useMemo, useRef } from "react";
 import { Link } from "react-router-dom";
@@ -34,7 +34,9 @@ import {
   Compass,
   Clock,
   Layers,
+  ArrowLeft,
 } from "lucide-react";
+import { storage } from "../../lib/storage/storage";
 
 /* ============================================
    BRAND COLORS
@@ -139,7 +141,7 @@ const GENRE_CONFIG = {
 };
 
 /* ============================================
-   PROJECT-AWARE STORAGE UTILITIES
+   PROJECT-AWARE STORAGE UTILITIES (using storage service)
    ============================================ */
 
 const STORYLAB_KEY_BASE = "dahtruth-story-lab-toc-v3";
@@ -148,36 +150,32 @@ const GENRE_KEY_BASE = "dahtruth-project-genre";
 
 function getSelectedProjectId() {
   try {
-    const stored = localStorage.getItem('dahtruth-selected-project-id');
+    const stored = storage.getItem("dahtruth-selected-project-id");
     if (stored) return stored;
     
-    const projectData = localStorage.getItem('dahtruth-project-store');
+    const projectData = storage.getItem("dahtruth-project-store");
     if (projectData) {
       const parsed = JSON.parse(projectData);
-      return parsed.selectedProjectId || parsed.currentProjectId || 'default';
+      return parsed.selectedProjectId || parsed.currentProjectId || "default";
     }
     
-    return 'default';
+    return "default";
   } catch {
-    return 'default';
+    return "default";
   }
 }
 
 function getProjectKey(baseKey) {
   const projectId = getSelectedProjectId();
-  if (projectId === 'default') {
-    return baseKey;
-  }
-  return `${baseKey}-${projectId}`;
+  return projectId === "default" ? baseKey : `${baseKey}-${projectId}`;
 }
 
-// Load/save genre for project
 function loadProjectGenre() {
   try {
     const key = getProjectKey(GENRE_KEY_BASE);
-    const raw = localStorage.getItem(key);
+    const raw = storage.getItem(key);
     if (raw && GENRE_CONFIG[raw]) return raw;
-    return "fiction"; // Default
+    return "fiction";
   } catch {
     return "fiction";
   }
@@ -186,7 +184,7 @@ function loadProjectGenre() {
 function saveProjectGenre(genre) {
   try {
     const key = getProjectKey(GENRE_KEY_BASE);
-    localStorage.setItem(key, genre);
+    storage.setItem(key, genre);
     window.dispatchEvent(new Event("project:change"));
     return true;
   } catch {
@@ -194,11 +192,10 @@ function saveProjectGenre(genre) {
   }
 }
 
-// Load HFL data directly from localStorage
 function loadHflData() {
   try {
     const key = getProjectKey(HFL_KEY_BASE);
-    const raw = localStorage.getItem(key);
+    const raw = storage.getItem(key);
     console.log(`[HFL] Loading from key: ${key}`, raw);
     if (!raw) return null;
     return JSON.parse(raw);
@@ -208,12 +205,11 @@ function loadHflData() {
   }
 }
 
-// Save HFL data directly to localStorage
 function saveHflData(data) {
   try {
     const key = getProjectKey(HFL_KEY_BASE);
     const json = JSON.stringify(data);
-    localStorage.setItem(key, json);
+    storage.setItem(key, json);
     console.log(`[HFL] Saved to key: ${key}`, data);
     return true;
   } catch (e) {
@@ -225,7 +221,7 @@ function saveHflData(data) {
 function loadChapters() {
   try {
     const key = getProjectKey(STORYLAB_KEY_BASE);
-    const raw = localStorage.getItem(key);
+    const raw = storage.getItem(key);
     if (!raw) return [];
     const data = JSON.parse(raw);
     return Array.isArray(data.chapters) ? data.chapters : [];
@@ -240,7 +236,6 @@ function extractEntitiesFromChapters(chapters = [], pattern) {
   chapters.forEach((ch) => {
     const content = ch.content || ch.text || ch.textHTML || "";
     let match;
-    // Reset regex for each chapter
     const regex = new RegExp(pattern.source, pattern.flags);
     while ((match = regex.exec(content)) !== null) {
       const name = match[1].trim();
@@ -302,7 +297,7 @@ function GenreSelector({ value, onChange }) {
       >
         <Icon size={18} style={{ color: BRAND.gold }} />
         <span className="font-semibold" style={{ color: BRAND.navy }}>{current.label}</span>
-        <ChevronDown size={16} className={`transition-transform ${isOpen ? 'rotate-180' : ''}`} style={{ color: BRAND.navy }} />
+        <ChevronDown size={16} className={`transition-transform ${isOpen ? "rotate-180" : ""}`} style={{ color: BRAND.navy }} />
       </button>
 
       {isOpen && (
@@ -322,14 +317,14 @@ function GenreSelector({ value, onChange }) {
                   setIsOpen(false);
                 }}
                 className={`w-full flex items-start gap-3 px-4 py-3 text-left transition-colors ${
-                  isSelected ? 'bg-amber-50' : 'hover:bg-slate-50'
+                  isSelected ? "bg-amber-50" : "hover:bg-slate-50"
                 }`}
               >
                 <div 
                   className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
-                  style={{ background: isSelected ? `${BRAND.gold}25` : '#f1f5f9' }}
+                  style={{ background: isSelected ? `${BRAND.gold}25` : "#f1f5f9" }}
                 >
-                  <GenreIcon size={20} style={{ color: isSelected ? BRAND.gold : '#64748b' }} />
+                  <GenreIcon size={20} style={{ color: isSelected ? BRAND.gold : "#64748b" }} />
                 </div>
                 <div className="flex-1">
                   <div className="font-semibold text-sm" style={{ color: BRAND.navy }}>
@@ -387,8 +382,8 @@ function EntitySelector({ value, onChange, entities, placeholder, accentColor, g
         onClick={() => setIsOpen(!isOpen)}
         className="w-full flex items-center justify-between gap-2 px-4 py-3 rounded-xl border-2 text-left transition-all shadow-sm"
         style={{ 
-          borderColor: value ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.3)',
-          background: 'rgba(255,255,255,0.15)',
+          borderColor: value ? "rgba(255,255,255,0.5)" : "rgba(255,255,255,0.3)",
+          background: "rgba(255,255,255,0.15)",
         }}
       >
         <div className="flex items-center gap-2">
@@ -397,7 +392,7 @@ function EntitySelector({ value, onChange, entities, placeholder, accentColor, g
             {value || placeholder}
           </span>
         </div>
-        <ChevronDown size={18} className={`text-white/70 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        <ChevronDown size={18} className={`text-white/70 transition-transform ${isOpen ? "rotate-180" : ""}`} />
       </button>
 
       {isOpen && (
@@ -427,7 +422,7 @@ function EntitySelector({ value, onChange, entities, placeholder, accentColor, g
                   type="button"
                   onClick={() => handleSelect(name)}
                   className={`w-full px-4 py-3 text-left text-sm hover:bg-slate-50 flex items-center justify-between transition-colors ${
-                    name === value ? 'bg-amber-50' : ''
+                    name === value ? "bg-amber-50" : ""
                   }`}
                 >
                   <span className="font-medium text-slate-700">{name}</span>
@@ -557,12 +552,10 @@ function EntityCard({
 }) {
   const columns = genreConfig.columns;
   
-  // Get data for each column
   const col1Data = Array.isArray(entityData[columns[0].id]) ? entityData[columns[0].id] : [];
   const col2Data = Array.isArray(entityData[columns[1].id]) ? entityData[columns[1].id] : [];
   const col3Data = Array.isArray(entityData[columns[2].id]) ? entityData[columns[2].id] : [];
 
-  // Generate initials from name
   const getInitials = (name) => {
     if (!name) return "?";
     const parts = name.trim().split(/\s+/);
@@ -598,8 +591,8 @@ function EntityCard({
           <div 
             className="w-20 h-20 rounded-full flex items-center justify-center text-2xl font-bold shadow-lg"
             style={{ 
-              background: entityName ? 'white' : 'rgba(255,255,255,0.2)',
-              color: entityName ? BRAND.navy : 'rgba(255,255,255,0.5)'
+              background: entityName ? "white" : "rgba(255,255,255,0.2)",
+              color: entityName ? BRAND.navy : "rgba(255,255,255,0.5)"
             }}
           >
             {getInitials(entityName)}
@@ -674,7 +667,6 @@ export default function HopesFearsLegacy() {
 
   const genreConfig = GENRE_CONFIG[genre] || GENRE_CONFIG.fiction;
 
-  // Data structure (genre-agnostic)
   const DEFAULT_ROLES = {};
   genreConfig.roles.forEach(r => { DEFAULT_ROLES[r.id] = ""; });
 
@@ -692,7 +684,6 @@ export default function HopesFearsLegacy() {
       return { ...DEFAULT_DATA };
     }
     
-    // New format with 'roles' and 'entities'
     if (saved.roles && saved.entities) {
       return {
         roles: saved.roles,
@@ -701,7 +692,6 @@ export default function HopesFearsLegacy() {
       };
     }
     
-    // Old format (fiction-specific with 'characters')
     if (saved.roles && saved.characters) {
       return {
         roles: saved.roles,
@@ -710,13 +700,12 @@ export default function HopesFearsLegacy() {
       };
     }
     
-    // Legacy format migration
-    if (saved.protagonist && typeof saved.protagonist === 'object' && 'name' in saved.protagonist) {
+    if (saved.protagonist && typeof saved.protagonist === "object" && "name" in saved.protagonist) {
       console.log("[HFL] Migrating legacy format...");
       const migratedEntities = {};
       const migratedRoles = { protagonist: "", antagonist: "", secondary: "" };
       
-      ['protagonist', 'antagonist', 'secondary'].forEach(role => {
+      ["protagonist", "antagonist", "secondary"].forEach(role => {
         const oldData = saved[role];
         if (oldData && oldData.name) {
           migratedRoles[role] = oldData.name;
@@ -738,7 +727,6 @@ export default function HopesFearsLegacy() {
     return extractEntitiesFromChapters(chapters, genreConfig.tagPattern);
   }, [chapters, genreConfig.tagPattern]);
 
-  // Save data
   const commit = (next) => {
     saveHflData(next);
     try {
@@ -746,12 +734,10 @@ export default function HopesFearsLegacy() {
     } catch {}
   };
 
-  // Handle genre change
   const handleGenreChange = (newGenre) => {
     setGenre(newGenre);
     saveProjectGenre(newGenre);
     
-    // Reset roles for new genre
     const newConfig = GENRE_CONFIG[newGenre];
     const newRoles = {};
     newConfig.roles.forEach(r => { newRoles[r.id] = ""; });
@@ -763,38 +749,41 @@ export default function HopesFearsLegacy() {
     }));
   };
 
-  // Listen for project changes
   useEffect(() => {
+    const reloadAllData = () => {
+      const pid = getSelectedProjectId();
+      console.log(`[HFL] Reloading data for project: ${pid}`);
+      
+      const loadedGenre = loadProjectGenre();
+      setGenre(loadedGenre);
+      
+      const saved = loadHflData();
+      if (!saved) {
+        const cfg = GENRE_CONFIG[loadedGenre];
+        const roles = {};
+        cfg.roles.forEach(r => { roles[r.id] = ""; });
+        setData({ roles, entities: {}, genre: loadedGenre });
+      } else if (saved.roles && saved.entities) {
+        setData({ roles: saved.roles, entities: saved.entities, genre: saved.genre || loadedGenre });
+      } else if (saved.roles && saved.characters) {
+        setData({ roles: saved.roles, entities: saved.characters, genre: saved.genre || "fiction" });
+      } else {
+        const cfg = GENRE_CONFIG[loadedGenre];
+        const roles = {};
+        cfg.roles.forEach(r => { roles[r.id] = ""; });
+        setData({ roles, entities: {}, genre: loadedGenre });
+      }
+      
+      setChapters(loadChapters());
+    };
+
     const handleProjectSwitch = () => {
       const newProjectId = getSelectedProjectId();
       
       if (newProjectId !== currentProjectId) {
         console.log(`[HFL] Project switched: ${currentProjectId} → ${newProjectId}`);
         setCurrentProjectId(newProjectId);
-        
-        // Load genre
-        const loadedGenre = loadProjectGenre();
-        setGenre(loadedGenre);
-        
-        // Load data
-        const saved = loadHflData();
-        if (!saved) {
-          const cfg = GENRE_CONFIG[loadedGenre];
-          const roles = {};
-          cfg.roles.forEach(r => { roles[r.id] = ""; });
-          setData({ roles, entities: {}, genre: loadedGenre });
-        } else if (saved.roles && saved.entities) {
-          setData({ roles: saved.roles, entities: saved.entities, genre: saved.genre || loadedGenre });
-        } else if (saved.roles && saved.characters) {
-          setData({ roles: saved.roles, entities: saved.characters, genre: saved.genre || "fiction" });
-        } else {
-          const cfg = GENRE_CONFIG[loadedGenre];
-          const roles = {};
-          cfg.roles.forEach(r => { roles[r.id] = ""; });
-          setData({ roles, entities: {}, genre: loadedGenre });
-        }
-        
-        setChapters(loadChapters());
+        reloadAllData();
       }
     };
     
@@ -807,7 +796,6 @@ export default function HopesFearsLegacy() {
     };
   }, [currentProjectId]);
 
-  // Auto-save
   useEffect(() => {
     setSaving("saving");
     const id = setTimeout(() => {
@@ -817,7 +805,6 @@ export default function HopesFearsLegacy() {
     return () => clearTimeout(id);
   }, [data]);
 
-  // Assign entity to role
   const assignRole = (role, entityName) => {
     setData((prev) => {
       const newState = { ...prev, roles: { ...prev.roles } };
@@ -833,7 +820,6 @@ export default function HopesFearsLegacy() {
     });
   };
 
-  // Edit entity data
   const editEntity = (entityName, field, value) => {
     if (!entityName) return;
     
@@ -864,7 +850,6 @@ export default function HopesFearsLegacy() {
     setChapters(loadChapters());
   };
 
-  // All entities (from manuscript + from data)
   const allEntities = useMemo(() => {
     const fromData = Object.keys(data.entities || {});
     const combined = new Set([...manuscriptEntities, ...fromData]);
@@ -883,7 +868,7 @@ export default function HopesFearsLegacy() {
               to="/story-lab"
               className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-100 transition-colors"
             >
-              ← Landing
+              <ArrowLeft size={16} /> Landing
             </Link>
             <span className="text-slate-300">|</span>
             <span className="text-sm font-semibold" style={{ color: BRAND.navy }}>
@@ -911,8 +896,8 @@ export default function HopesFearsLegacy() {
             background: `linear-gradient(135deg, ${BRAND.navy} 0%, ${BRAND.navyLight} 30%, ${BRAND.mauve} 70%, ${BRAND.rose} 100%)`,
           }}
         >
-          <div className="absolute top-0 left-0 w-64 h-64 rounded-full opacity-10" style={{ background: BRAND.gold, filter: 'blur(80px)' }} />
-          <div className="absolute bottom-0 right-0 w-96 h-96 rounded-full opacity-10" style={{ background: BRAND.rose, filter: 'blur(100px)' }} />
+          <div className="absolute top-0 left-0 w-64 h-64 rounded-full opacity-10" style={{ background: BRAND.gold, filter: "blur(80px)" }} />
+          <div className="absolute bottom-0 right-0 w-96 h-96 rounded-full opacity-10" style={{ background: BRAND.rose, filter: "blur(100px)" }} />
           
           <div className="relative z-10">
             {/* Genre Selector */}
@@ -933,7 +918,7 @@ export default function HopesFearsLegacy() {
               </div>
             </div>
 
-            <h1 className="text-4xl font-bold mb-3">
+            <h1 className="text-4xl font-bold mb-3 text-white">
               <span style={{ color: BRAND.goldLight }}>{genreConfig.columns[0].label}</span>
               <span className="mx-3 opacity-50">•</span>
               <span style={{ color: BRAND.rose }}>{genreConfig.columns[1].label}</span>
@@ -957,7 +942,7 @@ export default function HopesFearsLegacy() {
               ))}
             </div>
 
-            <div className="mt-6 text-xs text-white/40">
+            <div className="mt-6 text-xs text-white/50">
               Project: {currentProjectId} · {genreConfig.label}
             </div>
           </div>
@@ -1071,3 +1056,4 @@ export default function HopesFearsLegacy() {
     </div>
   );
 }
+
