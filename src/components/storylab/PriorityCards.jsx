@@ -1,6 +1,6 @@
 // src/components/storylab/PriorityCards.jsx
-// Genre-aware Priority Cards with project-switching support
-// COMPLETE FILE - Replace your entire PriorityCards.jsx with this
+// Genre-aware Priority Cards with correct storage service
+// Uses storage from lib/storage/storage.ts (NOT localStorage directly)
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Link } from "react-router-dom";
@@ -29,6 +29,7 @@ import {
   RefreshCw,
   Loader2,
 } from "lucide-react";
+import { storage } from "../../lib/storage/storage";
 
 /* ============================================
    Brand Colors
@@ -112,7 +113,7 @@ const GENRE_CONFIG = {
 };
 
 /* ============================================
-   PROJECT-AWARE STORAGE
+   PROJECT-AWARE STORAGE (using storage service)
    ============================================ */
 const PRIORITIES_KEY_BASE = "dahtruth-priorities-v2";
 const STORYLAB_KEY_BASE = "dahtruth-story-lab-toc-v3";
@@ -120,9 +121,9 @@ const GENRE_KEY_BASE = "dahtruth-project-genre";
 
 function getSelectedProjectId() {
   try {
-    const stored = localStorage.getItem("dahtruth-selected-project-id");
+    const stored = storage.getItem("dahtruth-selected-project-id");
     if (stored) return stored;
-    const projectData = localStorage.getItem("dahtruth-project-store");
+    const projectData = storage.getItem("dahtruth-project-store");
     if (projectData) {
       const parsed = JSON.parse(projectData);
       return parsed.selectedProjectId || parsed.currentProjectId || "default";
@@ -141,7 +142,7 @@ function getProjectKey(baseKey) {
 function loadPriorities() {
   try {
     const key = getProjectKey(PRIORITIES_KEY_BASE);
-    const raw = localStorage.getItem(key);
+    const raw = storage.getItem(key);
     return raw ? JSON.parse(raw) : [];
   } catch {
     return [];
@@ -151,7 +152,7 @@ function loadPriorities() {
 function savePriorities(data) {
   try {
     const key = getProjectKey(PRIORITIES_KEY_BASE);
-    localStorage.setItem(key, JSON.stringify(data));
+    storage.setItem(key, JSON.stringify(data));
     window.dispatchEvent(new Event("project:change"));
   } catch (e) {
     console.error("[PriorityCards] Save failed:", e);
@@ -161,7 +162,7 @@ function savePriorities(data) {
 function loadGenre() {
   try {
     const key = getProjectKey(GENRE_KEY_BASE);
-    const raw = localStorage.getItem(key);
+    const raw = storage.getItem(key);
     return raw || "fiction";
   } catch {
     return "fiction";
@@ -171,7 +172,7 @@ function loadGenre() {
 function saveGenre(genre) {
   try {
     const key = getProjectKey(GENRE_KEY_BASE);
-    localStorage.setItem(key, genre);
+    storage.setItem(key, genre);
     window.dispatchEvent(new Event("project:change"));
   } catch (e) {
     console.error("[PriorityCards] Genre save failed:", e);
@@ -181,7 +182,7 @@ function saveGenre(genre) {
 function loadStoryLabData() {
   try {
     const key = getProjectKey(STORYLAB_KEY_BASE);
-    const raw = localStorage.getItem(key);
+    const raw = storage.getItem(key);
     return raw ? JSON.parse(raw) : null;
   } catch {
     return null;
@@ -316,7 +317,8 @@ export default function PriorityCards() {
   // Project switching
   useEffect(() => {
     const reloadAllData = () => {
-      console.log(`[PriorityCards] Reloading for project: ${getSelectedProjectId()}`);
+      const newProjectId = getSelectedProjectId();
+      console.log(`[PriorityCards] Reloading for project: ${newProjectId}`);
       setPriorities(loadPriorities());
       setGenre(loadGenre());
       setStoryLabData(loadStoryLabData());
@@ -338,11 +340,11 @@ export default function PriorityCards() {
       setStoryLabData(loadStoryLabData());
     };
 
-    window.addEventListener("project:change", handleDataChange);
+    window.addEventListener("project:change", handleProjectChange);
     window.addEventListener("storage", handleProjectChange);
 
     return () => {
-      window.removeEventListener("project:change", handleDataChange);
+      window.removeEventListener("project:change", handleProjectChange);
       window.removeEventListener("storage", handleProjectChange);
     };
   }, [currentProjectId]);
@@ -460,17 +462,17 @@ export default function PriorityCards() {
                 <BarChart3 size={32} className="text-white" />
               </div>
               <div>
-                <h1 className="text-3xl font-bold">Priority Cards</h1>
+                <h1 className="text-3xl font-bold text-white">Priority Cards</h1>
                 <p className="text-white/70">
                   {bookTitle} · {priorities.length} cards
                 </p>
-                <p className="text-white/40 text-xs mt-1">Project: {currentProjectId}</p>
+                <p className="text-white/50 text-xs mt-1">Project: {currentProjectId}</p>
               </div>
             </div>
 
             {/* Genre Selector */}
             <div className="flex items-center gap-3">
-              <label className="text-xs text-white/60 uppercase tracking-wide">Writing Type:</label>
+              <label className="text-xs text-white/70 uppercase tracking-wide">Writing Type:</label>
               <select
                 value={genre}
                 onChange={(e) => handleGenreChange(e.target.value)}
