@@ -387,6 +387,82 @@ function createDefaultProjectData(title = "Untitled Book") {
   };
 }
 
+// ============ Title Propagation ============
+// Updates title in ALL related storage keys for consistency
+
+function propagateTitleChange(projectId, newTitle) {
+  if (!projectId || !newTitle) return;
+
+  // Update project-scoped meta keys
+  [`dahtruth_project_meta_${projectId}`, `dt_publishing_meta_${projectId}`,
+   `dahtruth_cover_settings_${projectId}`, `publishingDraft_${projectId}`].forEach((key) => {
+    try {
+      const raw = localStorage.getItem(key);
+      if (raw) {
+        const data = JSON.parse(raw);
+        if (data && typeof data === "object") {
+          if ("title" in data) data.title = newTitle;
+          if (data.book?.title !== undefined) data.book.title = newTitle;
+          localStorage.setItem(key, JSON.stringify(data));
+        }
+      }
+    } catch {}
+  });
+
+  // Update currentStory
+  try {
+    const raw = localStorage.getItem("currentStory");
+    if (raw) {
+      const cs = JSON.parse(raw);
+      if (cs?.id === projectId) { 
+        cs.title = newTitle; 
+        localStorage.setItem("currentStory", JSON.stringify(cs)); 
+      }
+    }
+  } catch {}
+
+  // Update userProjects
+  try {
+    const raw = localStorage.getItem("userProjects");
+    if (raw) {
+      const up = JSON.parse(raw);
+      if (Array.isArray(up)) {
+        localStorage.setItem("userProjects", JSON.stringify(
+          up.map(p => p.id === projectId ? { ...p, title: newTitle } : p)
+        ));
+      }
+    }
+  } catch {}
+
+  // Update dahtruth_projects_index
+  try {
+    const raw = localStorage.getItem("dahtruth_projects_index");
+    if (raw) {
+      const idx = JSON.parse(raw);
+      if (Array.isArray(idx)) {
+        localStorage.setItem("dahtruth_projects_index", JSON.stringify(
+          idx.map(p => p.id === projectId ? { ...p, title: newTitle, updatedAt: new Date().toISOString() } : p)
+        ));
+      }
+    }
+  } catch {}
+
+  // Update dahtruth-projects-list
+  try {
+    const raw = localStorage.getItem(PROJECTS_LIST_KEY);
+    if (raw) {
+      const list = JSON.parse(raw);
+      if (Array.isArray(list)) {
+        localStorage.setItem(PROJECTS_LIST_KEY, JSON.stringify(
+          list.map(p => p.id === projectId ? { ...p, title: newTitle, updatedAt: new Date().toISOString() } : p)
+        ));
+      }
+    }
+  } catch {}
+
+  console.log(`[ProjectStore] Title propagated: "${newTitle}"`);
+}
+
 // ============ Main Hook ============
 
 export function useProjectStore() {
@@ -635,3 +711,6 @@ export function getProjectStorageKey() {
   if (!projectId) return LEGACY_STORAGE_KEY; // Fallback for compatibility
   return getProjectDataKey(projectId);
 }
+
+// Export for use in other components
+export { propagateTitleChange, deleteProjectData, cleanupAllProjectStorage };
