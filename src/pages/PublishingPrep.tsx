@@ -1,5 +1,8 @@
 // src/pages/PublishingPrep.tsx
-import React, { useEffect, useMemo, useState } from "react";
+// UPDATED: Uses storage wrapper and project-scoped keys
+// Properly tracks project switches via project:change events
+
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import PageShell from "../components/layout/PageShell.tsx";
 import {
@@ -13,6 +16,7 @@ import {
   Check,
   BookOpen,
   Sparkles,
+  RefreshCw,
 } from "lucide-react";
 
 import {
@@ -20,6 +24,9 @@ import {
   generateLogline,
   generateBackCoverBlurb,
 } from "../lib/api";
+
+// ✅ Import the storage wrapper
+import { storage } from "../lib/storage";
 
 /* ---------- Theme ---------- */
 const theme = {
@@ -60,7 +67,21 @@ const styles = {
 /* ---------- Storage Keys ---------- */
 const PROFILE_KEY = "profile";
 const PROJECTS_KEY = "userProjects";
+const CURRENT_PROJECT_ID_KEY = "dahtruth-current-project-id";
 const CURRENT_STORY_KEY = "currentStory";
+
+// Project-scoped keys
+const publishingPrepKeyForProject = (projectId: string) =>
+  `dt_publishing_prep_${projectId}`;
+
+const publishingDraftKeyForProject = (projectId: string) =>
+  `publishingDraft_${projectId}`;
+
+const publishingMetaKeyForProject = (projectId: string) =>
+  `dt_publishing_meta_${projectId}`;
+
+const projectDataKeyForProject = (projectId: string) =>
+  `dahtruth-project-${projectId}`;
 
 /* ---------- Types ---------- */
 interface PublishingChecklist {
@@ -82,12 +103,26 @@ interface Project {
   marketingNotes?: string;
   launchPlan?: string;
   lastModified?: string;
+  chapterCount?: number;
+}
+
+interface PublishingPrepData {
+  synopsis?: string;
+  queryLetter?: string;
+  backCover?: string;
+  logline?: string;
+  publishingChecklist?: PublishingChecklist;
+  marketingNotes?: string;
+  launchPlan?: string;
+  lastModified?: string;
 }
 
 /* ---------- Helpers ---------- */
+
+// ✅ Use storage wrapper instead of localStorage
 function loadProfile() {
   try {
-    const raw = localStorage.getItem(PROFILE_KEY);
+    const raw = storage.getItem(PROFILE_KEY);
     if (!raw) return null;
     return JSON.parse(raw);
   } catch {
@@ -97,7 +132,7 @@ function loadProfile() {
 
 function loadProjects(): Project[] {
   try {
-    const raw = localStorage.getItem(PROJECTS_KEY);
+    const raw = storage.getItem(PROJECTS_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed : [];
@@ -108,18 +143,120 @@ function loadProjects(): Project[] {
 
 function saveProjects(projects: Project[]) {
   try {
-    localStorage.setItem(PROJECTS_KEY, JSON.stringify(projects));
+    storage.setItem(PROJECTS_KEY, JSON.stringify(projects));
     window.dispatchEvent(new Event("project:change"));
   } catch (err) {
     console.error("Failed to save projects from PublishingPrep:", err);
   }
 }
 
+function getCurrentProjectId(): string | null {
+  try {
+    return storage.getItem(CURRENT_PROJECT_ID_KEY) || null;
+  } catch {
+    return null;
+  }
+}
+
 function loadCurrentStory() {
   try {
-    const raw = localStorage.getItem(CURRENT_STORY_KEY);
+    const raw = storage.getItem(CURRENT_STORY_KEY);
     if (!raw) return null;
     return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+// ✅ Load publishing prep data from project-scoped key
+function loadPublishingPrepData(projectId: string): PublishingPrepData | null {
+  if (!projectId) return null;
+  
+  try {
+    // First try the dedicated publishing prep key
+    const prepRaw = storage.getItem(publishingPrepKeyForProject(projectId));
+    if (prepRaw) {
+      return JSON.parse(prepRaw);
+    }
+    
+    // Fall back to publishing draft key (from Publishing.tsx)
+    const draftRaw = storage.getItem(publishingDraftKeyForProject(projectId));
+    if (draftRaw) {
+      const draft = JSON.parse(draftRaw);
+      // Extract relevant fields
+      return {
+        synopsis: draft.synopsis,
+        queryLetter: draft.queryLetter,
+        backCover: draft.backCover,
+        logline: draft.logline,
+        publishingChecklist: draft.publishingChecklist,
+        marketingNotes: draft.marketingNotes,
+        launchPlan: draft.launchPlan,
+      };
+    }
+    
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+// ✅ Save publishing prep data to project-scoped key
+function savePublishingPrepData(projectId: string, data: PublishingPrepData) {
+  if (!projectId) return;
+  
+  try {
+    const toSave = {
+      ...data,
+      lastModified: new Date().toISOString(),
+    };
+    storage.setItem(publishingPrepKeyForProject(projectId), JSON.stringify(toSave));
+    
+    // Also update the main project data if it exists
+    const projectsRaw = storage.getItem(PROJECTS_KEY);
+    if (projectsRaw) {
+      const projects = JSON.parse(projectsRaw);
+      const updated = projects.map((p: Project) =>
+        p.id === projectId
+          ? { ...p, ...data, lastModified: new Date().toISOString() }
+          : p
+      );
+      storage.setItem(PROJECTS_KEY, JSON.stringify(updated));
+    }
+    
+    window.dispatchEvent(new Event("project:change"));
+  } catch (err) {
+    console.error("Failed to save publishing prep data:", err);
+  }
+}
+
+// ✅ Load project metadata (title, author, word count) from project data
+function loadProjectMeta(projectId: string): Partial<Project> | null {
+  if (!projectId) return null;
+  
+  try {
+    // Try main project data key first
+    const dataRaw = storage.getItem(projectDataKeyForProject(projectId));
+    if (dataRaw) {
+      const data = JSON.parse(dataRaw);
+      const totalWords = (data.chapters || []).reduce(
+        (sum: number, ch: any) => sum + (ch.wordCount || 0),
+        0
+      );
+      return {
+        title: data.book?.title || "Untitled",
+        wordCount: totalWords,
+        chapterCount: (data.chapters || []).length,
+      };
+    }
+    
+    // Try publishing meta key
+    const metaRaw = storage.getItem(publishingMetaKeyForProject(projectId));
+    if (metaRaw) {
+      return JSON.parse(metaRaw);
+    }
+    
+    return null;
   } catch {
     return null;
   }
@@ -173,19 +310,23 @@ export default function PublishingPrep(): JSX.Element {
     !!initialMaterialType &&
     initialMaterialType.toString().startsWith("synopsis");
 
+  // ✅ NEW: Track current project ID
+  const [projectId, setProjectId] = useState<string>(() => {
+    return getCurrentProjectId() || "";
+  });
+
   // Core app state
   const [profile, setProfile] = useState<any | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [currentStory, setCurrentStory] = useState<any | null>(null);
+  const [projectMeta, setProjectMeta] = useState<Partial<Project> | null>(null);
 
   const [activeTab, setActiveTab] = useState<
     "synopsis" | "query" | "pitch" | "checklist" | "marketing"
   >("synopsis");
 
   // Main content states
-  const [synopsis, setSynopsis] = useState<string>(
-    isSynopsisMaterial && initialGenerated ? initialGenerated : ""
-  );
+  const [synopsis, setSynopsis] = useState<string>("");
   const [queryLetter, setQueryLetter] = useState<string>("");
   const [backCover, setBackCover] = useState<string>("");
   const [logline, setLogline] = useState<string>("");
@@ -205,87 +346,106 @@ export default function PublishingPrep(): JSX.Element {
   const [isSaving, setIsSaving] = useState(false);
   const [showSaved, setShowSaved] = useState(false);
 
-  // Load data on mount + keep in sync
-  useEffect(() => {
+  // ✅ Load all data for the current project
+  const loadAllData = useCallback(() => {
+    const currentProjId = getCurrentProjectId() || "";
+    setProjectId(currentProjId);
     setProfile(loadProfile());
     setProjects(loadProjects());
     setCurrentStory(loadCurrentStory());
+    
+    if (currentProjId) {
+      setProjectMeta(loadProjectMeta(currentProjId));
+      
+      // Load publishing prep data for this project
+      const prepData = loadPublishingPrepData(currentProjId);
+      if (prepData) {
+        // Only set if we didn't come from story materials with generated content
+        if (!(cameFromStoryMaterials && isSynopsisMaterial && initialGenerated)) {
+          setSynopsis(prepData.synopsis || "");
+        }
+        setQueryLetter(prepData.queryLetter || "");
+        setBackCover(prepData.backCover || "");
+        setLogline(prepData.logline || "");
+        
+        const storedChecklist = prepData.publishingChecklist || {};
+        const baseState: PublishingChecklist = {};
+        DEFAULT_CHECKLIST.forEach((item) => {
+          baseState[item.id] = !!storedChecklist[item.id];
+        });
+        setChecklistState(baseState);
+        
+        setMarketingNotes(prepData.marketingNotes || "");
+        setLaunchPlan(prepData.launchPlan || "");
+      } else {
+        // Reset fields if no data for this project
+        if (!(cameFromStoryMaterials && isSynopsisMaterial && initialGenerated)) {
+          setSynopsis("");
+        }
+        setQueryLetter("");
+        setBackCover("");
+        setLogline("");
+        setChecklistState({});
+        setMarketingNotes("");
+        setLaunchPlan("");
+      }
+    }
+  }, [cameFromStoryMaterials, isSynopsisMaterial, initialGenerated]);
 
-    const sync = () => {
-      setProfile(loadProfile());
-      setProjects(loadProjects());
-      setCurrentStory(loadCurrentStory());
+  // ✅ Initial load + listen for project changes
+  useEffect(() => {
+    loadAllData();
+    
+    // If we came from story materials with generated synopsis, set it
+    if (cameFromStoryMaterials && isSynopsisMaterial && initialGenerated) {
+      setSynopsis(initialGenerated);
+    }
+
+    const handleProjectChange = () => {
+      console.log("[PublishingPrep] Project changed, reloading data...");
+      loadAllData();
     };
 
-    window.addEventListener("storage", sync);
-    window.addEventListener("project:change", sync);
-    window.addEventListener("profile:updated", sync);
+    window.addEventListener("storage", handleProjectChange);
+    window.addEventListener("project:change", handleProjectChange);
+    window.addEventListener("profile:updated", () => setProfile(loadProfile()));
 
     return () => {
-      window.removeEventListener("storage", sync);
-      window.removeEventListener("project:change", sync);
-      window.removeEventListener("profile:updated", sync);
+      window.removeEventListener("storage", handleProjectChange);
+      window.removeEventListener("project:change", handleProjectChange);
+      window.removeEventListener("profile:updated", () => setProfile(loadProfile()));
     };
-  }, []);
+  }, [loadAllData, cameFromStoryMaterials, isSynopsisMaterial, initialGenerated]);
 
   // Resolve active project from currentStory or fall back to first
   const activeProject: Project | null = useMemo(() => {
     if (!projects || projects.length === 0) return null;
+    
+    // First try to find by projectId (most reliable)
+    if (projectId) {
+      const found = projects.find((p) => p.id === projectId);
+      if (found) {
+        // Merge with projectMeta for accurate word count
+        return {
+          ...found,
+          title: projectMeta?.title || found.title,
+          wordCount: projectMeta?.wordCount ?? found.wordCount,
+          chapterCount: projectMeta?.chapterCount ?? found.chapterCount,
+        };
+      }
+    }
+    
+    // Fall back to currentStory
     if (currentStory?.id) {
       const found = projects.find((p) => p.id === currentStory.id);
       if (found) return found;
     }
+    
     return projects[0];
-  }, [projects, currentStory]);
-
-  // Initialize fields when active project changes
-  useEffect(() => {
-    if (!activeProject) {
-      setSynopsis(
-        isSynopsisMaterial && initialGenerated ? initialGenerated : ""
-      );
-      setQueryLetter("");
-      setBackCover("");
-      setLogline("");
-      setChecklistState({});
-      setMarketingNotes("");
-      setLaunchPlan("");
-      return;
-    }
-
-    // If we arrived with a freshly generated synopsis, prefer that once
-    if (cameFromStoryMaterials && isSynopsisMaterial && initialGenerated) {
-      setSynopsis(initialGenerated);
-    } else {
-      setSynopsis(activeProject.synopsis || "");
-    }
-
-    setQueryLetter(activeProject.queryLetter || "");
-    setBackCover(activeProject.backCover || "");
-    setLogline(activeProject.logline || "");
-
-    const storedChecklist = activeProject.publishingChecklist || {};
-    const baseState: PublishingChecklist = {};
-    DEFAULT_CHECKLIST.forEach((item) => {
-      baseState[item.id] =
-        storedChecklist[item.id] === true ||
-        storedChecklist[item.id] === false
-          ? storedChecklist[item.id]
-          : false;
-    });
-    setChecklistState(baseState);
-
-    setMarketingNotes(activeProject.marketingNotes || "");
-    setLaunchPlan(activeProject.launchPlan || "");
-  }, [
-    activeProject,
-    cameFromStoryMaterials,
-    isSynopsisMaterial,
-    initialGenerated,
-  ]);
+  }, [projects, projectId, currentStory, projectMeta]);
 
   const authorName =
-    activeProject?.author || profile?.displayName || "New Author";
+    activeProject?.author || profile?.displayName || profile?.name || "Author";
 
   // Bundle author + project metadata into helpful strings for the AI
   const authorProfileText = useMemo(() => {
@@ -313,6 +473,11 @@ export default function PublishingPrep(): JSX.Element {
     navigate("/publishing");
   };
 
+  // ✅ Refresh data from storage
+  const handleRefreshData = () => {
+    loadAllData();
+  };
+
   const handleToggleChecklist = (id: string) => {
     setChecklistState((prev) => ({
       ...prev,
@@ -320,27 +485,40 @@ export default function PublishingPrep(): JSX.Element {
     }));
   };
 
+  // ✅ Updated save handler - saves to project-scoped key
   const handleSave = async () => {
-    if (!activeProject) return;
+    if (!projectId) {
+      alert("No project selected. Please go back and select a project first.");
+      return;
+    }
+    
     setIsSaving(true);
     try {
+      const prepData: PublishingPrepData = {
+        synopsis: synopsis || "",
+        queryLetter: queryLetter || "",
+        backCover: backCover || "",
+        logline: logline || "",
+        publishingChecklist: checklistState,
+        marketingNotes: marketingNotes || "",
+        launchPlan: launchPlan || "",
+      };
+      
+      savePublishingPrepData(projectId, prepData);
+      
+      // Also update the projects array
       const updatedProjects = projects.map((p) =>
-        p.id === activeProject.id
+        p.id === projectId
           ? {
               ...p,
-              synopsis: synopsis || "",
-              queryLetter: queryLetter || "",
-              backCover: backCover || "",
-              logline: logline || "",
-              publishingChecklist: checklistState,
-              marketingNotes: marketingNotes || "",
-              launchPlan: launchPlan || "",
+              ...prepData,
               lastModified: new Date().toISOString(),
             }
           : p
       );
       setProjects(updatedProjects);
       saveProjects(updatedProjects);
+      
       setShowSaved(true);
       setTimeout(() => setShowSaved(false), 2500);
     } catch (err) {
@@ -552,24 +730,54 @@ export default function PublishingPrep(): JSX.Element {
                 >
                   {activeProject ? (
                     <>
-                      <span style={{ fontWeight: 500 }}>
+                      <span style={{ fontWeight: 600, fontSize: 14 }}>
                         {activeProject.title || "Untitled Project"}
                       </span>{" "}
                       by {authorName}
                     </>
                   ) : (
-                    "No active project selected"
+                    <span style={{ color: "#fecaca" }}>
+                      ⚠️ No project selected — go back and select one
+                    </span>
                   )}
                 </div>
               </div>
             </div>
 
-            <div style={{ width: 150, textAlign: "right", fontSize: 12 }}>
-              {activeProject?.lastModified && (
-                <span>
-                  Last updated: {formatDate(activeProject.lastModified)}
-                </span>
-              )}
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              {/* ✅ Refresh button */}
+              <button
+                onClick={handleRefreshData}
+                title="Refresh data from storage"
+                style={{
+                  border: "none",
+                  background: "rgba(255,255,255,0.2)",
+                  color: theme.white,
+                  padding: "8px",
+                  borderRadius: 8,
+                  cursor: "pointer",
+                  display: "inline-flex",
+                  alignItems: "center",
+                }}
+              >
+                <RefreshCw size={16} />
+              </button>
+              
+              <div style={{ textAlign: "right", fontSize: 12 }}>
+                {activeProject?.wordCount && (
+                  <div>
+                    {activeProject.wordCount.toLocaleString()} words
+                    {activeProject.chapterCount && (
+                      <> • {activeProject.chapterCount} chapters</>
+                    )}
+                  </div>
+                )}
+                {activeProject?.lastModified && (
+                  <div style={{ opacity: 0.8 }}>
+                    Updated: {formatDate(activeProject.lastModified)}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -647,7 +855,7 @@ export default function PublishingPrep(): JSX.Element {
             <div style={{ marginLeft: "auto" }}>
               <button
                 onClick={handleSave}
-                disabled={isSaving || !activeProject}
+                disabled={isSaving || !projectId}
                 style={{
                   display: "inline-flex",
                   alignItems: "center",
@@ -660,8 +868,8 @@ export default function PublishingPrep(): JSX.Element {
                   color: "#1f2937",
                   fontSize: 13,
                   fontWeight: 600,
-                  cursor: isSaving ? "default" : "pointer",
-                  opacity: isSaving ? 0.8 : 1,
+                  cursor: isSaving || !projectId ? "default" : "pointer",
+                  opacity: isSaving || !projectId ? 0.6 : 1,
                   boxShadow:
                     "0 6px 18px rgba(180,142,38,0.35)",
                 }}
@@ -1207,6 +1415,11 @@ export default function PublishingPrep(): JSX.Element {
                         {activeProject.wordCount.toLocaleString()}
                       </div>
                     )}
+                    {activeProject.chapterCount && (
+                      <div>
+                        <strong>Chapters:</strong> {activeProject.chapterCount}
+                      </div>
+                    )}
                     {activeProject.targetWords && (
                       <div>
                         <strong>Target:</strong>{" "}
@@ -1221,15 +1434,21 @@ export default function PublishingPrep(): JSX.Element {
                     )}
                   </div>
                 ) : (
-                  <p
+                  <div
                     style={{
                       fontSize: 13,
-                      color: theme.subtext,
+                      color: "#ef4444",
+                      padding: "12px",
+                      background: "#fef2f2",
+                      borderRadius: 8,
                     }}
                   >
-                    No active project found. Go back to the Projects page and
-                    select a manuscript.
-                  </p>
+                    <strong>⚠️ No project selected</strong>
+                    <p style={{ margin: "8px 0 0" }}>
+                      Go back to the Dashboard or Projects page and select a
+                      manuscript to work on.
+                    </p>
+                  </div>
                 )}
               </div>
 
@@ -1283,8 +1502,10 @@ export default function PublishingPrep(): JSX.Element {
       {/* Save toast */}
       {showSaved && (
         <div
-          className="fixed bottom-8 right-8"
           style={{
+            position: "fixed",
+            bottom: 32,
+            right: 32,
             display: "flex",
             alignItems: "center",
             gap: 10,
@@ -1296,10 +1517,11 @@ export default function PublishingPrep(): JSX.Element {
             fontSize: 13,
             fontWeight: 600,
             boxShadow: "0 8px 24px rgba(22,163,74,0.4)",
+            zIndex: 1000,
           }}
         >
           <Check size={16} />
-          Publishing prep saved
+          Publishing prep saved for "{activeProject?.title || 'project'}"
         </div>
       )}
     </PageShell>
