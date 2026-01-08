@@ -1,6 +1,7 @@
 // src/components/storylab/CharacterRoadmap.jsx
-// UPDATED: Supports Fiction, Non-Fiction, Poetry, and Memoir with genre-specific terminology
-// Uses project-specific storage keys for multi-manuscript support
+// FIXED: Uses storage service (not localStorage directly)
+// FIXED: Removed problematic projectStore import
+// Supports Fiction, Non-Fiction, Poetry, and Memoir with genre-specific terminology
 
 import React, { useState, useRef, useMemo, useCallback, useEffect } from "react";
 import { Link } from "react-router-dom";
@@ -47,7 +48,7 @@ import {
 } from "lucide-react";
 import { useDrag, useDrop } from "react-dnd";
 import { runAssistant } from "../../lib/api";
-import { loadProject } from "../../lib/storylab/projectStore";
+import { storage } from "../../lib/storage/storage";
 
 /* ---------------------------
    Brand Colors
@@ -245,40 +246,38 @@ const GENRE_CONFIG = {
 const STORYLAB_KEY_BASE = "dahtruth-story-lab-toc-v3";
 const ROADMAP_KEY_BASE = "dahtruth-character-roadmap";
 const GENRE_KEY_BASE = "dahtruth-project-genre";
+const PRIORITIES_KEY_BASE = "dahtruth-priorities-v2";
 
 /* ============================================
-   PROJECT-AWARE STORAGE UTILITIES
+   PROJECT-AWARE STORAGE UTILITIES (using storage service)
    ============================================ */
 
 function getSelectedProjectId() {
   try {
-    const stored = localStorage.getItem('dahtruth-selected-project-id');
+    const stored = storage.getItem("dahtruth-selected-project-id");
     if (stored) return stored;
     
-    const projectData = localStorage.getItem('dahtruth-project-store');
+    const projectData = storage.getItem("dahtruth-project-store");
     if (projectData) {
       const parsed = JSON.parse(projectData);
-      return parsed.selectedProjectId || parsed.currentProjectId || 'default';
+      return parsed.selectedProjectId || parsed.currentProjectId || "default";
     }
     
-    return 'default';
+    return "default";
   } catch {
-    return 'default';
+    return "default";
   }
 }
 
 function getProjectKey(baseKey) {
   const projectId = getSelectedProjectId();
-  if (projectId === 'default') {
-    return baseKey;
-  }
-  return `${baseKey}-${projectId}`;
+  return projectId === "default" ? baseKey : `${baseKey}-${projectId}`;
 }
 
 function loadProjectGenre() {
   try {
     const key = getProjectKey(GENRE_KEY_BASE);
-    const raw = localStorage.getItem(key);
+    const raw = storage.getItem(key);
     if (raw && GENRE_CONFIG[raw]) return raw;
     return "fiction";
   } catch {
@@ -293,13 +292,6 @@ function uid() {
     }
   } catch {}
   return String(Date.now()) + "_" + Math.random().toString(36).slice(2);
-}
-
-function stripHtml(html = "") {
-  if (!html) return "";
-  const tmp = document.createElement("div");
-  tmp.innerHTML = html;
-  return tmp.textContent || tmp.innerText || "";
 }
 
 function extractEntitiesFromChapters(chapters = [], pattern) {
@@ -320,8 +312,10 @@ function extractEntitiesFromChapters(chapters = [], pattern) {
 
 function loadAllPriorities() {
   try {
-    const project = loadProject();
-    return project?.priorities || [];
+    const key = getProjectKey(PRIORITIES_KEY_BASE);
+    const raw = storage.getItem(key);
+    if (!raw) return [];
+    return JSON.parse(raw);
   } catch {
     return [];
   }
@@ -330,7 +324,7 @@ function loadAllPriorities() {
 function loadStoryLabData() {
   try {
     const key = getProjectKey(STORYLAB_KEY_BASE);
-    const raw = localStorage.getItem(key);
+    const raw = storage.getItem(key);
     if (raw) {
       return JSON.parse(raw);
     }
@@ -343,7 +337,7 @@ function loadStoryLabData() {
 function loadRoadmapData() {
   try {
     const key = getProjectKey(ROADMAP_KEY_BASE);
-    const raw = localStorage.getItem(key);
+    const raw = storage.getItem(key);
     if (raw) {
       return JSON.parse(raw);
     }
@@ -356,7 +350,7 @@ function loadRoadmapData() {
 function saveRoadmapData(data) {
   try {
     const key = getProjectKey(ROADMAP_KEY_BASE);
-    localStorage.setItem(key, JSON.stringify(data));
+    storage.setItem(key, JSON.stringify(data));
     window.dispatchEvent(new Event("project:change"));
   } catch (err) {
     console.error("[Roadmap] Failed to save roadmap data:", err);
@@ -473,7 +467,7 @@ const RoleSelector = ({ role, onChange, genreConfig }) => {
       >
         <Icon size={16} />
         {selectedRole.label}
-        <ChevronDown size={14} className={`transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        <ChevronDown size={14} className={`transition-transform ${isOpen ? "rotate-180" : ""}`} />
       </button>
 
       {isOpen && (
@@ -1091,7 +1085,6 @@ const GoalsView = ({ entity, onUpdate, allPriorities, genreConfig }) => {
     onUpdate(entity.id, { goals: { ...goals, [key]: value } });
   };
 
-  // Genre-specific fields
   const fieldsConfig = {
     fiction: [
       { key: "want", label: "External Want", placeholder: "What does this character consciously pursue?", icon: Target, color: BRAND.gold },
@@ -1200,21 +1193,26 @@ export default function CharacterRoadmap() {
     }
   }, [entities, selectedEntityId]);
 
-  // Listen for project changes
   useEffect(() => {
+    const reloadAllData = () => {
+      const pid = getSelectedProjectId();
+      console.log(`[Roadmap] Reloading data for project: ${pid}`);
+      setGenre(loadProjectGenre());
+      setStoryLabData(loadStoryLabData());
+      setRoadmapData(loadRoadmapData());
+      setAllPriorities(loadAllPriorities());
+      setSelectedEntityId(null);
+      setShowSuggestions(false);
+      setMilestoneSuggestions([]);
+    };
+
     const handleProjectSwitch = () => {
       const newProjectId = getSelectedProjectId();
       
       if (newProjectId !== currentProjectId) {
         console.log(`[Roadmap] Project switched: ${currentProjectId} → ${newProjectId}`);
         setCurrentProjectId(newProjectId);
-        setGenre(loadProjectGenre());
-        setStoryLabData(loadStoryLabData());
-        setRoadmapData(loadRoadmapData());
-        setAllPriorities(loadAllPriorities());
-        setSelectedEntityId(null);
-        setShowSuggestions(false);
-        setMilestoneSuggestions([]);
+        reloadAllData();
       }
     };
     
@@ -1225,11 +1223,11 @@ export default function CharacterRoadmap() {
       setGenre(loadProjectGenre());
     };
     
-    window.addEventListener("project:change", handleDataChange);
+    window.addEventListener("project:change", handleProjectSwitch);
     window.addEventListener("storage", handleProjectSwitch);
     
     return () => {
-      window.removeEventListener("project:change", handleDataChange);
+      window.removeEventListener("project:change", handleProjectSwitch);
       window.removeEventListener("storage", handleProjectSwitch);
     };
   }, [currentProjectId]);
@@ -1586,3 +1584,4 @@ Return ONLY the JSON array, no other text.`;
     </div>
   );
 }
+
