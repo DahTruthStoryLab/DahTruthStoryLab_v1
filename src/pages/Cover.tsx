@@ -1,5 +1,6 @@
 // src/pages/Cover.jsx
-import React, { useEffect, useRef, useState } from "react";
+// UPDATED: Listens for project:change events, shows current project name
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import PageShell from "../components/layout/PageShell.tsx";
 import { uploadImage } from "../lib/uploads";
 import { toPng } from "html-to-image";
@@ -148,6 +149,10 @@ const coverImageMetaKeyForProject = (projectId) =>
 const coverSettingsKeyForProject = (projectId) =>
   `dahtruth_cover_settings_${projectId}`;
 
+// Project data key (to get project title)
+const projectDataKeyForProject = (projectId) =>
+  `dahtruth-project-${projectId}`;
+
 // Legacy keys (for backwards compatibility)
 const COVER_DESIGNS_KEY = "dahtruth_cover_designs_v1";
 const COVER_IMAGE_URL_KEY = "dahtruth_cover_image_url";
@@ -158,6 +163,38 @@ function safeJsonParse(value, fallback) {
     return value ? JSON.parse(value) : fallback;
   } catch {
     return fallback;
+  }
+}
+
+// Get project title from storage
+function getProjectTitle(projectId) {
+  if (!projectId || projectId === "default") return null;
+  
+  try {
+    // Try main project data
+    const dataRaw = storage.getItem(projectDataKeyForProject(projectId));
+    if (dataRaw) {
+      const data = JSON.parse(dataRaw);
+      if (data.book?.title) return data.book.title;
+    }
+    
+    // Try cover settings
+    const settingsRaw = storage.getItem(coverSettingsKeyForProject(projectId));
+    if (settingsRaw) {
+      const settings = JSON.parse(settingsRaw);
+      if (settings.title) return settings.title;
+    }
+    
+    // Try currentStory
+    const storyRaw = storage.getItem("currentStory");
+    if (storyRaw) {
+      const story = JSON.parse(storyRaw);
+      if (story.id === projectId && story.title) return story.title;
+    }
+    
+    return null;
+  } catch {
+    return null;
   }
 }
 
@@ -316,8 +353,9 @@ function ColorPickerField({ label, value, onChange }) {
 export default function Cover() {
   const coverRef = useRef(null);
 
-  // Project ID
+  // Project ID and name
   const [projectId, setProjectId] = useState("");
+  const [projectName, setProjectName] = useState("");
 
   // Text content
   const [title, setTitle] = useState("Working Title");
@@ -388,29 +426,29 @@ export default function Cover() {
   if (layoutKey === "top") justifyContent = "flex-start";
   if (layoutKey === "bottom") justifyContent = "flex-end";
 
-  // Initialize project ID
-  useEffect(() => {
+  // ✅ Load cover data for a project
+  const loadCoverData = useCallback((pid) => {
+    if (!pid) return;
+    
+    console.log("[Cover] Loading data for project:", pid);
+    
     try {
-      const id = getSelectedProjectId() || "default";
-      setProjectId(id);
-    } catch (e) {
-      console.error("Failed to get project ID:", e);
-      setProjectId("default");
-    }
-  }, []);
+      // Get project name
+      const pName = getProjectTitle(pid);
+      setProjectName(pName || "");
 
-  // Load saved cover data when project changes
-  useEffect(() => {
-    if (!projectId) return;
-
-    try {
       // Load cover image URL (project-scoped first, then legacy)
-      let savedUrl = storage.getItem(coverImageUrlKeyForProject(projectId));
+      let savedUrl = storage.getItem(coverImageUrlKeyForProject(pid));
       if (!savedUrl) savedUrl = storage.getItem(COVER_IMAGE_URL_KEY);
-      if (savedUrl) setCoverImageUrl(savedUrl);
+      if (savedUrl) {
+        console.log("[Cover] Loaded image URL:", savedUrl.substring(0, 50) + "...");
+        setCoverImageUrl(savedUrl);
+      } else {
+        setCoverImageUrl("");
+      }
 
       // Load cover image meta
-      let savedMeta = storage.getItem(coverImageMetaKeyForProject(projectId));
+      let savedMeta = storage.getItem(coverImageMetaKeyForProject(pid));
       if (!savedMeta) savedMeta = storage.getItem(COVER_IMAGE_META_KEY);
       if (savedMeta) {
         const meta = safeJsonParse(savedMeta, {});
@@ -419,13 +457,13 @@ export default function Cover() {
       }
 
       // Load cover settings (colors, fonts, etc.)
-      const savedSettings = storage.getItem(coverSettingsKeyForProject(projectId));
+      const savedSettings = storage.getItem(coverSettingsKeyForProject(pid));
       if (savedSettings) {
         const settings = safeJsonParse(savedSettings, {});
         if (settings.title) setTitle(settings.title);
-        if (settings.subtitle) setSubtitle(settings.subtitle);
+        if (settings.subtitle !== undefined) setSubtitle(settings.subtitle);
         if (settings.author) setAuthor(settings.author);
-        if (settings.tagline) setTagline(settings.tagline);
+        if (settings.tagline !== undefined) setTagline(settings.tagline);
         if (settings.genrePresetKey) setGenrePresetKey(settings.genrePresetKey);
         if (settings.layoutKey) setLayoutKey(settings.layoutKey);
         if (settings.trimKey) setTrimKey(settings.trimKey);
@@ -438,26 +476,67 @@ export default function Cover() {
         if (settings.customTaglineColor) setCustomTaglineColor(settings.customTaglineColor);
 
         // Custom font
-        if (settings.customFontFamily) setCustomFontFamily(settings.customFontFamily);
+        if (settings.customFontFamily !== undefined) setCustomFontFamily(settings.customFontFamily);
 
         // Custom background
         if (typeof settings.useCustomBg === "boolean") setUseCustomBg(settings.useCustomBg);
         if (settings.customBgColor1) setCustomBgColor1(settings.customBgColor1);
         if (settings.customBgColor2) setCustomBgColor2(settings.customBgColor2);
+        
+        console.log("[Cover] Loaded settings for project");
+      } else {
+        // Reset to defaults if no settings for this project
+        console.log("[Cover] No saved settings, using defaults");
+        // Try to get title from project data
+        const pTitle = getProjectTitle(pid);
+        if (pTitle) setTitle(pTitle);
       }
 
       // Load saved designs
-      let savedDesigns = storage.getItem(coverDesignsKeyForProject(projectId));
+      let savedDesigns = storage.getItem(coverDesignsKeyForProject(pid));
       if (!savedDesigns) savedDesigns = storage.getItem(COVER_DESIGNS_KEY);
       const designsArray = safeJsonParse(savedDesigns, []);
       setDesigns(Array.isArray(designsArray) ? designsArray : []);
 
     } catch (e) {
-      console.error("Failed to load cover data:", e);
+      console.error("[Cover] Failed to load cover data:", e);
     } finally {
       setCoverLoaded(true);
     }
-  }, [projectId]);
+  }, []);
+
+  // ✅ Initialize project ID and listen for changes
+  useEffect(() => {
+    const initProject = () => {
+      try {
+        const id = getSelectedProjectId() || "default";
+        console.log("[Cover] Initializing with project:", id);
+        setProjectId(id);
+        setCoverLoaded(false);
+        loadCoverData(id);
+      } catch (e) {
+        console.error("[Cover] Failed to get project ID:", e);
+        setProjectId("default");
+        setCoverLoaded(true);
+      }
+    };
+
+    initProject();
+
+    // Listen for project switches
+    const handleProjectChange = () => {
+      console.log("[Cover] Project changed event received");
+      initProject();
+    };
+
+    window.addEventListener("project:change", handleProjectChange);
+    window.addEventListener("storage", handleProjectChange);
+
+    return () => {
+      window.removeEventListener("project:change", handleProjectChange);
+      window.removeEventListener("storage", handleProjectChange);
+    };
+  }, [loadCoverData]);
 
   // Auto-save cover settings when they change
   useEffect(() => {
@@ -488,6 +567,8 @@ export default function Cover() {
       // Save image URL
       if (coverImageUrl) {
         storage.setItem(coverImageUrlKeyForProject(projectId), coverImageUrl);
+        // Also save to legacy key for backwards compat
+        storage.setItem(COVER_IMAGE_URL_KEY, coverImageUrl);
       } else {
         storage.removeItem(coverImageUrlKeyForProject(projectId));
       }
@@ -498,8 +579,9 @@ export default function Cover() {
         JSON.stringify({ fit: coverImageFit, filter: coverImageFilter })
       );
 
+      console.log("[Cover] Auto-saved settings for project:", projectId);
     } catch (e) {
-      console.error("Failed to save cover settings:", e);
+      console.error("[Cover] Failed to save cover settings:", e);
     }
   }, [
     coverLoaded,
@@ -532,8 +614,23 @@ export default function Cover() {
 
     try {
       setCoverImageUploading(true);
+      console.log("[Cover] Uploading image:", file.name);
       const result = await uploadImage(file);
-      setCoverImageUrl(result.viewUrl);
+      console.log("[Cover] Upload result:", result);
+      
+      if (result.viewUrl) {
+        setCoverImageUrl(result.viewUrl);
+        
+        // Immediately save to storage
+        if (projectId) {
+          storage.setItem(coverImageUrlKeyForProject(projectId), result.viewUrl);
+          storage.setItem(COVER_IMAGE_URL_KEY, result.viewUrl);
+          console.log("[Cover] Saved image URL to storage");
+        }
+      } else {
+        throw new Error("No viewUrl in upload response");
+      }
+      
       input.value = "";
     } catch (err) {
       console.error("[Cover upload error]", err);
@@ -545,6 +642,9 @@ export default function Cover() {
 
   const handleClearCoverImage = () => {
     setCoverImageUrl("");
+    if (projectId) {
+      storage.removeItem(coverImageUrlKeyForProject(projectId));
+    }
   };
 
   // Apply preset colors to custom colors (for starting point)
@@ -823,16 +923,30 @@ Story description: ${aiPrompt}`,
               </div>
             </div>
 
-            <div style={{ textAlign: "right", fontSize: 11, opacity: 0.9 }}>
-              <div>
-                Currently editing: <strong>{title || "Untitled Project"}</strong>
+            {/* ✅ Show current project name prominently */}
+            <div style={{ textAlign: "right", fontSize: 11 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 2 }}>
+                {projectName || title || "Untitled Project"}
               </div>
-              <div>Changes auto-save to your project.</div>
+              <div style={{ opacity: 0.8 }}>
+                Changes auto-save to your project
+              </div>
+              {coverImageUrl && (
+                <div style={{ 
+                  marginTop: 4, 
+                  padding: "2px 8px", 
+                  background: "rgba(34, 197, 94, 0.3)", 
+                  borderRadius: 999,
+                  fontSize: 10 
+                }}>
+                  ✅ Cover image saved
+                </div>
+              )}
             </div>
           </div>
         </div>
 
-        {/* BODY GRID - FIXED: removed maxHeight constraint on sidebar */}
+        {/* BODY GRID */}
         <div
           style={{
             padding: "18px 24px 24px",
@@ -842,7 +956,7 @@ Story description: ${aiPrompt}`,
             alignItems: "start",
           }}
         >
-          {/* LEFT: CONTROLS - FIXED: no maxHeight, natural scroll */}
+          {/* LEFT: CONTROLS */}
           <aside style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             {/* Save / Load Designs */}
             <div style={styles.glassCard}>
@@ -1003,7 +1117,7 @@ Story description: ${aiPrompt}`,
               </div>
             </div>
 
-            {/* Colors & Fonts - Using new ColorPickerField */}
+            {/* Colors & Fonts */}
             <div style={styles.glassCard}>
               <h3 style={{ margin: "0 0 10px", fontSize: 15, fontWeight: 600, color: theme.text }}>
                 🎨 Colors & Fonts
@@ -1166,8 +1280,8 @@ Story description: ${aiPrompt}`,
 
                   {coverImageUrl && (
                     <>
-                      <p style={{ fontSize: 10, color: theme.subtext }}>
-                        ✅ Image set. It appears behind your text.
+                      <p style={{ fontSize: 10, color: "#16a34a", fontWeight: 500 }}>
+                        ✅ Image uploaded and saved to project.
                       </p>
 
                       <div>
@@ -1469,4 +1583,3 @@ Story description: ${aiPrompt}`,
     </PageShell>
   );
 }
-
