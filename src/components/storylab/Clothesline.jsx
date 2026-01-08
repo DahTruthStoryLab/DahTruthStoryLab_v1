@@ -1,6 +1,6 @@
 // src/components/storylab/Clothesline.jsx
-// UPDATED: Supports Fiction, Non-Fiction, Poetry, and Memoir with genre-specific terminology
-// Uses project-specific storage keys for multi-manuscript support
+// FIXED: Uses storage service (not localStorage directly)
+// Supports Fiction, Non-Fiction, Poetry, and Memoir with genre-specific terminology
 
 import React, { useCallback, useMemo, useState, useEffect } from "react";
 import { Link } from "react-router-dom";
@@ -17,6 +17,7 @@ import {
   Check,
   Search,
   ArrowRight,
+  ArrowLeft,
   FileText,
   Feather,
   BookMarked,
@@ -24,24 +25,23 @@ import {
   Image,
   Clock,
   MessageSquare,
+  GripVertical,
 } from "lucide-react";
-import { useDrag, useDrop } from "react-dnd";
-import {
-  loadProject,
-  saveProject,
-  ensureWorkshopFields,
-  uid,
-} from "../../lib/storylab/projectStore";
-import BackToLanding, { BackToLandingFab } from "./BackToLanding";
+import { storage } from "../../lib/storage/storage";
 
 /* ---------------------------
    Brand Colors
 ---------------------------- */
 const BRAND = {
   navy: "#1e3a5f",
-  gold: "#d4af37",
-  mauve: "#b8a9c9",
   navyLight: "#2d4a6f",
+  gold: "#d4af37",
+  goldLight: "#f5e6b3",
+  goldDark: "#b8960c",
+  mauve: "#b8a9c9",
+  rose: "#e8b4b8",
+  ink: "#0F172A",
+  cream: "#fefdfb",
 };
 
 /* ---------------------------
@@ -135,49 +135,42 @@ const GENRE_CONFIG = {
 };
 
 /* ---------------------------
-   DnD type
----------------------------- */
-const ITEM = "ENTITY_CARD";
-
-/* ---------------------------
    BASE Storage keys
 ---------------------------- */
 const STORYLAB_KEY_BASE = "dahtruth-story-lab-toc-v3";
 const GENRE_KEY_BASE = "dahtruth-project-genre";
+const CLOTHESLINE_KEY_BASE = "dahtruth-clothesline-v2";
 
 /* ============================================
-   PROJECT-AWARE STORAGE UTILITIES
+   PROJECT-AWARE STORAGE UTILITIES (using storage service)
    ============================================ */
 
 function getSelectedProjectId() {
   try {
-    const stored = localStorage.getItem('dahtruth-selected-project-id');
+    const stored = storage.getItem("dahtruth-selected-project-id");
     if (stored) return stored;
     
-    const projectData = localStorage.getItem('dahtruth-project-store');
+    const projectData = storage.getItem("dahtruth-project-store");
     if (projectData) {
       const parsed = JSON.parse(projectData);
-      return parsed.selectedProjectId || parsed.currentProjectId || 'default';
+      return parsed.selectedProjectId || parsed.currentProjectId || "default";
     }
     
-    return 'default';
+    return "default";
   } catch {
-    return 'default';
+    return "default";
   }
 }
 
 function getProjectKey(baseKey) {
   const projectId = getSelectedProjectId();
-  if (projectId === 'default') {
-    return baseKey;
-  }
-  return `${baseKey}-${projectId}`;
+  return projectId === "default" ? baseKey : `${baseKey}-${projectId}`;
 }
 
 function loadProjectGenre() {
   try {
     const key = getProjectKey(GENRE_KEY_BASE);
-    const raw = localStorage.getItem(key);
+    const raw = storage.getItem(key);
     if (raw && GENRE_CONFIG[raw]) return raw;
     return "fiction";
   } catch {
@@ -188,7 +181,7 @@ function loadProjectGenre() {
 function loadChapters() {
   try {
     const key = getProjectKey(STORYLAB_KEY_BASE);
-    const raw = localStorage.getItem(key);
+    const raw = storage.getItem(key);
     if (!raw) return [];
     const data = JSON.parse(raw);
     return Array.isArray(data.chapters) ? data.chapters : [];
@@ -197,11 +190,36 @@ function loadChapters() {
   }
 }
 
-function stripHtml(html = "") {
-  if (!html) return "";
-  const tmp = document.createElement("div");
-  tmp.innerHTML = html;
-  return tmp.textContent || tmp.innerText || "";
+function loadClotheslineData() {
+  try {
+    const key = getProjectKey(CLOTHESLINE_KEY_BASE);
+    const raw = storage.getItem(key);
+    if (!raw) return { characters: [] };
+    return JSON.parse(raw);
+  } catch {
+    return { characters: [] };
+  }
+}
+
+function saveClotheslineData(data) {
+  try {
+    const key = getProjectKey(CLOTHESLINE_KEY_BASE);
+    storage.setItem(key, JSON.stringify(data));
+    window.dispatchEvent(new Event("project:change"));
+    return true;
+  } catch (e) {
+    console.error("[Clothesline] Save failed:", e);
+    return false;
+  }
+}
+
+function uid() {
+  try {
+    if (typeof window !== "undefined" && window.crypto?.randomUUID) {
+      return window.crypto.randomUUID();
+    }
+  } catch {}
+  return String(Date.now()) + "_" + Math.random().toString(36).slice(2);
 }
 
 function extractEntitiesFromChapters(chapters = [], pattern) {
@@ -238,24 +256,40 @@ function extractEntitiesFromChapters(chapters = [], pattern) {
 /* ---------------------------
    Page banner
 ---------------------------- */
-const PageBanner = ({ genreConfig }) => {
+const PageBanner = ({ genreConfig, currentProjectId }) => {
   const Icon = genreConfig.icon;
   
   return (
-    <div className="mx-auto mb-8">
-      <div className="relative mx-auto max-w-3xl rounded-2xl border border-border bg-white/80 backdrop-blur-xl px-6 py-6 text-center shadow overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-gold/10 pointer-events-none" />
-        <div className="relative z-10">
-          <div className="mx-auto mb-3 inline-flex items-center justify-center rounded-xl border border-border bg-white/70 px-4 py-1.5 gap-2">
-            <Icon size={14} className="text-muted" />
-            <span className="text-xs font-semibold tracking-wide text-muted">
-              DahTruth · StoryLab · {genreConfig.label}
-            </span>
+    <div 
+      className="rounded-3xl p-8 mb-8 text-white relative overflow-hidden"
+      style={{
+        background: `linear-gradient(135deg, ${BRAND.navy} 0%, ${BRAND.navyLight} 40%, ${BRAND.mauve} 100%)`,
+      }}
+    >
+      <div className="absolute top-0 right-0 w-64 h-64 rounded-full opacity-10" style={{ background: BRAND.gold, filter: "blur(80px)" }} />
+      
+      <div className="relative z-10 flex items-center justify-between flex-wrap gap-4">
+        <div className="flex items-center gap-4">
+          <div 
+            className="w-16 h-16 rounded-2xl flex items-center justify-center shadow-lg"
+            style={{ background: `linear-gradient(135deg, ${BRAND.gold}, ${BRAND.goldDark})` }}
+          >
+            <Icon size={32} className="text-white" />
           </div>
-          <h1 className="text-3xl font-extrabold text-ink mb-2">{genreConfig.pageTitle}</h1>
-          <p className="mt-1 text-sm text-muted max-w-xl mx-auto">
-            {genreConfig.pageSubtitle}
-          </p>
+          <div>
+            <h1 className="text-3xl font-bold text-white">{genreConfig.pageTitle}</h1>
+            <p className="text-white/70">{genreConfig.pageSubtitle}</p>
+            <p className="text-white/50 text-xs mt-1">Project: {currentProjectId}</p>
+          </div>
+        </div>
+        
+        <div className="flex items-center gap-2">
+          <span 
+            className="text-xs px-3 py-1.5 rounded-full font-medium"
+            style={{ background: "rgba(255,255,255,0.2)", color: "#fff" }}
+          >
+            {genreConfig.label}
+          </span>
         </div>
       </div>
     </div>
@@ -265,20 +299,29 @@ const PageBanner = ({ genreConfig }) => {
 /* ---------------------------
    Entity Card (on the board)
 ---------------------------- */
-function EntityCard({ entity, onRemove, genreConfig }) {
+function EntityCard({ entity, onRemove, genreConfig, onDragStart, onDragOver, onDragEnd, isDragging }) {
   const roleOption = genreConfig.roleOptions.find(r => r.id === entity.role);
   
   return (
     <div 
-      className="rounded-xl border bg-white/90 p-4 shadow-sm transition-all hover:shadow-md"
+      draggable
+      onDragStart={onDragStart}
+      onDragOver={(e) => { e.preventDefault(); onDragOver(); }}
+      onDragEnd={onDragEnd}
+      className={`rounded-xl border-2 bg-white p-4 shadow-sm transition-all hover:shadow-md cursor-grab active:cursor-grabbing ${
+        isDragging ? "opacity-50 scale-95" : ""
+      }`}
       style={{ borderColor: `${BRAND.navy}20` }}
     >
       <div className="flex items-start gap-3">
-        <div 
-          className="rounded-lg p-2 flex-shrink-0"
-          style={{ background: `${BRAND.mauve}20` }}
-        >
-          <User className="h-5 w-5" style={{ color: BRAND.mauve }} />
+        <div className="flex items-center gap-2">
+          <GripVertical size={14} className="text-slate-300" />
+          <div 
+            className="rounded-lg p-2 flex-shrink-0"
+            style={{ background: `${BRAND.mauve}20` }}
+          >
+            <User className="h-5 w-5" style={{ color: BRAND.mauve }} />
+          </div>
         </div>
         <div className="flex-1 min-w-0">
           <div className="font-semibold truncate" style={{ color: BRAND.navy }}>
@@ -294,7 +337,7 @@ function EntityCard({ entity, onRemove, genreConfig }) {
           )}
           {entity.mentions && (
             <div className="text-xs text-slate-400 mt-1">
-              {entity.mentions} mention{entity.mentions !== 1 ? 's' : ''}
+              {entity.mentions} mention{entity.mentions !== 1 ? "s" : ""}
             </div>
           )}
         </div>
@@ -338,7 +381,7 @@ function EntityCard({ entity, onRemove, genreConfig }) {
                 key={idx}
                 className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600"
               >
-                {ch.length > 20 ? ch.slice(0, 20) + '...' : ch}
+                {ch.length > 20 ? ch.slice(0, 20) + "..." : ch}
               </span>
             ))}
             {entity.chapters.length > 3 && (
@@ -349,49 +392,6 @@ function EntityCard({ entity, onRemove, genreConfig }) {
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-/* ---------------------------
-   Draggable + Droppable Card
----------------------------- */
-function DraggableCard({ index, entity, move, onDropPersist, onRemove, genreConfig }) {
-  const ref = React.useRef(null);
-
-  const [, drop] = useDrop({
-    accept: ITEM,
-    hover(item) {
-      if (!ref.current) return;
-      const dragIndex = item.index;
-      const hoverIndex = index;
-      if (dragIndex === hoverIndex) return;
-      move(dragIndex, hoverIndex);
-      item.index = hoverIndex;
-    },
-    drop() {
-      onDropPersist();
-    },
-  });
-
-  const [{ isDragging }, drag] = useDrag({
-    type: ITEM,
-    item: { index },
-    collect: (monitor) => ({
-      isDragging: monitor.isDragging(),
-    }),
-  });
-
-  drag(drop(ref));
-
-  return (
-    <div
-      ref={ref}
-      className={`cursor-grab active:cursor-grabbing transition-all ${
-        isDragging ? "opacity-50 scale-95" : "opacity-100"
-      }`}
-    >
-      <EntityCard entity={entity} onRemove={onRemove} genreConfig={genreConfig} />
     </div>
   );
 }
@@ -532,7 +532,7 @@ function EntityDiscoveryPanel({
                           {entity.name}
                         </div>
                         <div className="text-xs text-slate-400">
-                          {entity.mentions} mention{entity.mentions !== 1 ? 's' : ''} in {entity.chapters.length} chapter{entity.chapters.length !== 1 ? 's' : ''}
+                          {entity.mentions} mention{entity.mentions !== 1 ? "s" : ""} in {entity.chapters.length} chapter{entity.chapters.length !== 1 ? "s" : ""}
                         </div>
                       </div>
                     </div>
@@ -582,37 +582,43 @@ function EntityDiscoveryPanel({
 export default function Clothesline() {
   const [currentProjectId, setCurrentProjectId] = useState(getSelectedProjectId);
   const [genre, setGenre] = useState(() => loadProjectGenre());
-  const [project, setProject] = useState(() => ensureWorkshopFields(loadProject()));
+  const [clotheslineData, setClotheslineData] = useState(() => loadClotheslineData());
   const [chapters, setChapters] = useState(() => loadChapters());
   const [isPanelExpanded, setIsPanelExpanded] = useState(true);
+  const [draggingIndex, setDraggingIndex] = useState(null);
 
   const genreConfig = GENRE_CONFIG[genre] || GENRE_CONFIG.fiction;
+  const boardEntities = clotheslineData.characters || [];
 
   // Listen for project changes
   useEffect(() => {
+    const reloadAllData = () => {
+      const pid = getSelectedProjectId();
+      console.log(`[Clothesline] Reloading data for project: ${pid}`);
+      setGenre(loadProjectGenre());
+      setChapters(loadChapters());
+      setClotheslineData(loadClotheslineData());
+    };
+
     const handleProjectChange = () => {
       const newProjectId = getSelectedProjectId();
-      
       if (newProjectId !== currentProjectId) {
         console.log(`[Clothesline] Project switched: ${currentProjectId} → ${newProjectId}`);
         setCurrentProjectId(newProjectId);
-        setGenre(loadProjectGenre());
-        setChapters(loadChapters());
-        setProject(ensureWorkshopFields(loadProject()));
+        reloadAllData();
       }
     };
     
     const handleDataChange = () => {
       setChapters(loadChapters());
-      setProject(ensureWorkshopFields(loadProject()));
       setGenre(loadProjectGenre());
     };
     
-    window.addEventListener("project:change", handleDataChange);
+    window.addEventListener("project:change", handleProjectChange);
     window.addEventListener("storage", handleProjectChange);
     
     return () => {
-      window.removeEventListener("project:change", handleDataChange);
+      window.removeEventListener("project:change", handleProjectChange);
       window.removeEventListener("storage", handleProjectChange);
     };
   }, [currentProjectId]);
@@ -622,51 +628,14 @@ export default function Clothesline() {
     return extractEntitiesFromChapters(chapters, genreConfig.tagPattern);
   }, [chapters, genreConfig.tagPattern]);
 
-  // Board entities (from project.characters - keeping same key for compatibility)
-  const boardEntities = useMemo(() => {
-    const arr = Array.isArray(project.characters) ? project.characters : [];
-    return arr.map((e) => (e.id ? e : { ...e, id: uid() }));
-  }, [project]);
-
-  // Local working order for DnD
-  const [order, setOrder] = useState(boardEntities);
-  
-  useEffect(() => {
-    setOrder(boardEntities);
-  }, [boardEntities]);
-
-  const move = useCallback((from, to) => {
-    setOrder((prev) => {
-      const next = prev.slice();
-      const [it] = next.splice(from, 1);
-      next.splice(to, 0, it);
-      return next;
-    });
-  }, []);
-
-  const persistOrder = useCallback(() => {
-    const copy = JSON.parse(JSON.stringify(project));
-    copy.characters = order;
-    ensureWorkshopFields(copy);
-    saveProject(copy);
-    setProject(copy);
-    try {
-      window.dispatchEvent(new Event("project:change"));
-    } catch {}
-  }, [order, project]);
-
+  // Add entity to board
   const addToBoard = useCallback((entity) => {
-    const copy = JSON.parse(JSON.stringify(project));
-    if (!Array.isArray(copy.characters)) {
-      copy.characters = [];
-    }
-    
-    const exists = copy.characters.some(
+    const exists = boardEntities.some(
       e => e.name?.toLowerCase() === entity.name?.toLowerCase()
     );
     if (exists) return;
     
-    copy.characters.push({
+    const newEntity = {
       id: uid(),
       name: entity.name,
       role: "",
@@ -674,55 +643,79 @@ export default function Clothesline() {
       traits: [],
       mentions: entity.mentions,
       chapters: entity.chapters,
-    });
+    };
     
-    ensureWorkshopFields(copy);
-    saveProject(copy);
-    setProject(copy);
-    setOrder(copy.characters);
+    const newData = {
+      ...clotheslineData,
+      characters: [...boardEntities, newEntity],
+    };
     
-    try {
-      window.dispatchEvent(new Event("project:change"));
-    } catch {}
-  }, [project]);
+    setClotheslineData(newData);
+    saveClotheslineData(newData);
+  }, [boardEntities, clotheslineData]);
 
+  // Remove entity from board
   const removeFromBoard = useCallback((id) => {
-    const copy = JSON.parse(JSON.stringify(project));
-    copy.characters = (copy.characters || []).filter(e => e.id !== id);
-    ensureWorkshopFields(copy);
-    saveProject(copy);
-    setProject(copy);
-    setOrder(copy.characters);
+    const newData = {
+      ...clotheslineData,
+      characters: boardEntities.filter(e => e.id !== id),
+    };
     
-    try {
-      window.dispatchEvent(new Event("project:change"));
-    } catch {}
-  }, [project]);
+    setClotheslineData(newData);
+    saveClotheslineData(newData);
+  }, [boardEntities, clotheslineData]);
 
-  const gridCls = "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-start";
+  // Drag and drop
+  const handleDragStart = useCallback((index) => {
+    setDraggingIndex(index);
+  }, []);
+
+  const handleDragOver = useCallback((overIndex) => {
+    if (draggingIndex === null || draggingIndex === overIndex) return;
+    
+    const newEntities = [...boardEntities];
+    const [moved] = newEntities.splice(draggingIndex, 1);
+    newEntities.splice(overIndex, 0, moved);
+    
+    const newData = { ...clotheslineData, characters: newEntities };
+    setClotheslineData(newData);
+    setDraggingIndex(overIndex);
+  }, [draggingIndex, boardEntities, clotheslineData]);
+
+  const handleDragEnd = useCallback(() => {
+    setDraggingIndex(null);
+    saveClotheslineData(clotheslineData);
+  }, [clotheslineData]);
 
   return (
-    <div className="min-h-screen bg-base text-ink">
-      <BackToLanding
-        title={genreConfig.pageTitle}
-        rightSlot={
-          <div className="flex items-center gap-2">
-            <span className="text-xs px-2 py-1 rounded-full bg-slate-100 text-slate-500">
-              {genreConfig.label}
-            </span>
+    <div className="min-h-screen" style={{ background: `linear-gradient(180deg, ${BRAND.cream} 0%, #f1f5f9 100%)` }}>
+      {/* Navigation */}
+      <div className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-slate-200 shadow-sm">
+        <div className="max-w-6xl mx-auto px-4 py-2 flex items-center justify-between">
+          <div className="flex items-center gap-3">
             <Link
-              to="/story-lab/workshop"
-              className="inline-flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-medium bg-white/70 border border-border hover:bg-white"
-              title="Open Workshop Hub"
+              to="/story-lab"
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-100"
             >
-              Workshop Hub
+              <ArrowLeft size={16} /> Landing
             </Link>
+            <span className="text-slate-300">|</span>
+            <span className="text-sm font-semibold" style={{ color: BRAND.navy }}>
+              {genreConfig.pageTitle}
+            </span>
           </div>
-        }
-      />
+          <Link
+            to="/story-lab/workshop"
+            className="rounded-xl px-3 py-2 text-sm font-medium text-white hover:scale-105 transition-all"
+            style={{ background: `linear-gradient(135deg, ${BRAND.gold}, ${BRAND.goldDark})` }}
+          >
+            Workshop Hub
+          </Link>
+        </div>
+      </div>
 
-      <div className="mx-auto max-w-6xl px-6 py-8">
-        <PageBanner genreConfig={genreConfig} />
+      <div className="max-w-6xl mx-auto px-6 py-8">
+        <PageBanner genreConfig={genreConfig} currentProjectId={currentProjectId} />
 
         <EntityDiscoveryPanel
           discoveredEntities={discoveredEntities}
@@ -735,11 +728,8 @@ export default function Clothesline() {
 
         {/* Board */}
         <div 
-          className="rounded-2xl border backdrop-blur-xl p-5"
-          style={{ 
-            background: "rgba(255, 255, 255, 0.8)",
-            borderColor: `${BRAND.navy}15`,
-          }}
+          className="rounded-2xl border bg-white/90 backdrop-blur p-6"
+          style={{ borderColor: `${BRAND.navy}15` }}
         >
           <div className="flex items-center justify-between mb-4">
             <div>
@@ -747,10 +737,10 @@ export default function Clothesline() {
                 {genreConfig.boardTitle}
               </h3>
               <p className="text-xs text-slate-500">
-                {order.length} {genreConfig.entityLabel.toLowerCase()}{order.length !== 1 ? 's' : ''} · Drag to reorder
+                {boardEntities.length} {genreConfig.entityLabel.toLowerCase()}{boardEntities.length !== 1 ? "s" : ""} · Drag to reorder
               </p>
             </div>
-            {discoveredEntities.length > 0 && order.length === 0 && (
+            {discoveredEntities.length > 0 && boardEntities.length === 0 && (
               <button
                 onClick={() => setIsPanelExpanded(true)}
                 className="text-xs font-medium px-3 py-1.5 rounded-lg"
@@ -761,21 +751,22 @@ export default function Clothesline() {
             )}
           </div>
 
-          <div className={gridCls}>
-            {order.map((entity, i) => (
-              <DraggableCard
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {boardEntities.map((entity, i) => (
+              <EntityCard
                 key={entity.id || `${entity.name}-${i}`}
-                index={i}
                 entity={entity}
-                move={move}
-                onDropPersist={persistOrder}
                 onRemove={removeFromBoard}
                 genreConfig={genreConfig}
+                onDragStart={() => handleDragStart(i)}
+                onDragOver={() => handleDragOver(i)}
+                onDragEnd={handleDragEnd}
+                isDragging={draggingIndex === i}
               />
             ))}
           </div>
           
-          {order.length === 0 && (
+          {boardEntities.length === 0 && (
             <div className="text-center py-12">
               <Users size={40} className="mx-auto text-slate-300 mb-3" />
               <p className="text-slate-500">
@@ -796,12 +787,12 @@ export default function Clothesline() {
             💡 How to tag {genreConfig.entityLabelPlural.toLowerCase()}
           </h4>
           <p className="text-sm text-slate-600">
-            In your manuscript, {genreConfig.tagInstruction.toLowerCase()}. For example: <code className="bg-white px-1.5 py-0.5 rounded border text-xs">{genreConfig.tagExample}</code>
+            In your manuscript, {genreConfig.tagInstruction.toLowerCase()}. For example:{" "}
+            <code className="bg-white px-1.5 py-0.5 rounded border text-xs">{genreConfig.tagExample}</code>
           </p>
         </div>
       </div>
-
-      <BackToLandingFab />
     </div>
   );
 }
+
