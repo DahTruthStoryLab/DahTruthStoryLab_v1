@@ -1,5 +1,5 @@
 // src/components/storylab/NarrativeArc.jsx
-// FIXED: Correct project-switching logic with project:change event
+// FIXED: Uses storage service (not localStorage directly)
 // Characters displayed as Trello-style cards at bottom (not sidebar)
 
 import React, { useMemo, useState, useEffect, useRef, useCallback } from "react";
@@ -11,6 +11,7 @@ import {
   RefreshCw, ChevronDown, ChevronUp, Check, X, GripVertical, Edit3,
   HelpCircle, Lightbulb
 } from "lucide-react";
+import { storage } from "../../lib/storage/storage";
 
 /* ============================================
    Brand Colors
@@ -95,7 +96,7 @@ const ROLE_OPTIONS = [
 ];
 
 /* ============================================
-   PROJECT-AWARE STORAGE
+   PROJECT-AWARE STORAGE (using storage service)
    ============================================ */
 const STORYLAB_KEY_BASE = "dahtruth-story-lab-toc-v3";
 const ARC_BEATS_KEY_BASE = "dt_arc_beats_v2";
@@ -103,27 +104,27 @@ const ARC_CHARS_KEY_BASE = "dt_arc_chars_v2";
 
 function getSelectedProjectId() {
   try {
-    const stored = localStorage.getItem('dahtruth-selected-project-id');
+    const stored = storage.getItem("dahtruth-selected-project-id");
     if (stored) return stored;
-    const projectData = localStorage.getItem('dahtruth-project-store');
+    const projectData = storage.getItem("dahtruth-project-store");
     if (projectData) {
       const parsed = JSON.parse(projectData);
-      return parsed.selectedProjectId || parsed.currentProjectId || 'default';
+      return parsed.selectedProjectId || parsed.currentProjectId || "default";
     }
-    return 'default';
+    return "default";
   } catch {
-    return 'default';
+    return "default";
   }
 }
 
 function getProjectKey(baseKey) {
   const projectId = getSelectedProjectId();
-  return projectId === 'default' ? baseKey : `${baseKey}-${projectId}`;
+  return projectId === "default" ? baseKey : `${baseKey}-${projectId}`;
 }
 
 const loadLocal = (key, fallback) => {
   try {
-    const raw = localStorage.getItem(key);
+    const raw = storage.getItem(key);
     return raw ? JSON.parse(raw) : fallback;
   } catch {
     return fallback;
@@ -132,7 +133,7 @@ const loadLocal = (key, fallback) => {
 
 const saveLocal = (key, value) => {
   try {
-    localStorage.setItem(key, JSON.stringify(value));
+    storage.setItem(key, JSON.stringify(value));
     window.dispatchEvent(new Event("project:change"));
   } catch {}
 };
@@ -140,7 +141,7 @@ const saveLocal = (key, value) => {
 function loadStoryLabData() {
   try {
     const key = getProjectKey(STORYLAB_KEY_BASE);
-    const raw = localStorage.getItem(key);
+    const raw = storage.getItem(key);
     return raw ? JSON.parse(raw) : null;
   } catch {
     return null;
@@ -703,7 +704,7 @@ function InstructionsPanel() {
    Main Component
    ============================================ */
 export default function NarrativeArc() {
-  // ===== FIXED: Project ID tracking =====
+  // ===== Project ID tracking =====
   const [currentProjectId, setCurrentProjectId] = useState(getSelectedProjectId);
   const [storyLabData, setStoryLabData] = useState(() => loadStoryLabData());
   const [activeNode, setActiveNode] = useState(null);
@@ -743,10 +744,11 @@ export default function NarrativeArc() {
     });
   }, [storyBeats]);
 
-  // ===== FIXED: Project switching with correct event names =====
+  // ===== Project switching with correct event names =====
   useEffect(() => {
     const reloadAllData = () => {
-      console.log(`[NarrativeArc] Reloading data for project: ${getSelectedProjectId()}`);
+      const pid = getSelectedProjectId();
+      console.log(`[NarrativeArc] Reloading data for project: ${pid}`);
       setStoryLabData(loadStoryLabData());
       setStoryBeats(loadBeats());
       setCharacters(loadCharacters());
@@ -769,11 +771,11 @@ export default function NarrativeArc() {
     };
     
     // Listen for project changes and data updates
-    window.addEventListener("project:change", handleDataChange);
+    window.addEventListener("project:change", handleProjectChange);
     window.addEventListener("storage", handleProjectChange);
     
     return () => {
-      window.removeEventListener("project:change", handleDataChange);
+      window.removeEventListener("project:change", handleProjectChange);
       window.removeEventListener("storage", handleProjectChange);
     };
   }, [currentProjectId]);
@@ -921,19 +923,19 @@ export default function NarrativeArc() {
                 <BookOpen size={32} className="text-white" />
               </div>
               <div>
-                <h1 className="text-3xl font-bold">{bookTitle}</h1>
+                <h1 className="text-3xl font-bold text-white">{bookTitle}</h1>
                 <p className="text-white/70">{storyBeats.length} beats · {characters.length} characters</p>
-                <p className="text-white/40 text-xs mt-1">Project: {currentProjectId}</p>
+                <p className="text-white/50 text-xs mt-1">Project: {currentProjectId}</p>
               </div>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
-              <button onClick={addBeat} className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium bg-white/20 hover:bg-white/30">
+              <button onClick={addBeat} className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-white bg-white/20 hover:bg-white/30">
                 <Plus size={16} /> Add Beat
               </button>
-              <button onClick={exportJSON} className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium bg-white/20 hover:bg-white/30">
+              <button onClick={exportJSON} className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-white bg-white/20 hover:bg-white/30">
                 <Download size={16} /> Export
               </button>
-              <button onClick={handleImportClick} className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium bg-white/20 hover:bg-white/30">
+              <button onClick={handleImportClick} className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium text-white bg-white/20 hover:bg-white/30">
                 <Upload size={16} /> Import
               </button>
               <input ref={fileInputRef} type="file" accept="application/json" className="hidden" onChange={handleImportChange} />
