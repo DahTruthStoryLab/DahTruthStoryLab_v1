@@ -1,5 +1,5 @@
 // src/components/storylab/DialogueLab.jsx
-// FIXED: Correct project-switching logic with project:change event
+// FIXED: Uses storage service (not localStorage directly)
 // Dialogue Lab - Write, Analyze, and Enhance Character Dialogue
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
@@ -32,6 +32,7 @@ import {
   X,
   FileText,
 } from "lucide-react";
+import { storage } from "../../lib/storage/storage";
 
 /* ============================================
    Brand Colors
@@ -71,27 +72,27 @@ const ARC_CHARS_KEY_BASE = "dt_arc_chars_v2";
 
 function getSelectedProjectId() {
   try {
-    const stored = localStorage.getItem('dahtruth-selected-project-id');
+    const stored = storage.getItem("dahtruth-selected-project-id");
     if (stored) return stored;
-    const projectData = localStorage.getItem('dahtruth-project-store');
+    const projectData = storage.getItem("dahtruth-project-store");
     if (projectData) {
       const parsed = JSON.parse(projectData);
-      return parsed.selectedProjectId || parsed.currentProjectId || 'default';
+      return parsed.selectedProjectId || parsed.currentProjectId || "default";
     }
-    return 'default';
+    return "default";
   } catch {
-    return 'default';
+    return "default";
   }
 }
 
 function getProjectKey(baseKey) {
   const projectId = getSelectedProjectId();
-  return projectId === 'default' ? baseKey : `${baseKey}-${projectId}`;
+  return projectId === "default" ? baseKey : `${baseKey}-${projectId}`;
 }
 
 const loadLocal = (key, fallback) => {
   try {
-    const raw = localStorage.getItem(key);
+    const raw = storage.getItem(key);
     return raw ? JSON.parse(raw) : fallback;
   } catch {
     return fallback;
@@ -100,7 +101,7 @@ const loadLocal = (key, fallback) => {
 
 const saveLocal = (key, value) => {
   try {
-    localStorage.setItem(key, JSON.stringify(value));
+    storage.setItem(key, JSON.stringify(value));
     window.dispatchEvent(new Event("project:change"));
   } catch {}
 };
@@ -129,7 +130,7 @@ function saveDialogueSessions(sessions) {
 const uid = () => crypto?.randomUUID?.() || `${Date.now()}_${Math.random().toString(36).slice(2)}`;
 
 function getInitials(name) {
-  return name.split(/\s+/).map(w => w[0]).join('').toUpperCase().slice(0, 2);
+  return name.split(/\s+/).map(w => w[0]).join("").toUpperCase().slice(0, 2);
 }
 
 /* ============================================
@@ -203,7 +204,6 @@ Respond ONLY with the JSON, no other text.`;
         instructions: "Analyze dialogue and return JSON analysis.",
       });
       
-      // Parse the response - Lambda returns improvedHtml
       const text = data.improvedHtml || "";
       const clean = text.replace(/```json|```/g, "").trim();
       const parsed = JSON.parse(clean);
@@ -514,13 +514,11 @@ function AnalysisResults({ analysis, onClose }) {
    Main Component
    ============================================ */
 export default function DialogueLab() {
-  // ===== FIXED: Project ID tracking =====
   const [currentProjectId, setCurrentProjectId] = useState(getSelectedProjectId);
   const [characters, setCharacters] = useState(() => loadCharacters());
   const [chapters, setChapters] = useState(() => loadChapters());
   const [sessions, setSessions] = useState(() => loadDialogueSessions());
   
-  // Current session state
   const [selectedChapterIdx, setSelectedChapterIdx] = useState(null);
   const [characterAId, setCharacterAId] = useState(null);
   const [characterBId, setCharacterBId] = useState(null);
@@ -537,19 +535,17 @@ export default function DialogueLab() {
   const characterB = characters.find(c => c.id === characterBId);
   const selectedChapter = selectedChapterIdx !== null ? chapters[selectedChapterIdx] : null;
 
-  // Save sessions when they change
   useEffect(() => {
     saveDialogueSessions(sessions);
   }, [sessions]);
 
-  // ===== FIXED: Project switching with correct event names =====
   useEffect(() => {
     const reloadAllData = () => {
-      console.log(`[DialogueLab] Reloading data for project: ${getSelectedProjectId()}`);
+      const pid = getSelectedProjectId();
+      console.log(`[DialogueLab] Reloading data for project: ${pid}`);
       setCharacters(loadCharacters());
       setChapters(loadChapters());
       setSessions(loadDialogueSessions());
-      // Reset session state
       setSelectedChapterIdx(null);
       setCharacterAId(null);
       setCharacterBId(null);
@@ -570,17 +566,15 @@ export default function DialogueLab() {
     };
 
     const handleDataChange = () => {
-      // Reload chapters and characters when other modules update
       setCharacters(loadCharacters());
       setChapters(loadChapters());
     };
 
-    // Listen for project changes and data updates
-    window.addEventListener("project:change", handleDataChange);
+    window.addEventListener("project:change", handleProjectChange);
     window.addEventListener("storage", handleProjectChange);
     
     return () => {
-      window.removeEventListener("project:change", handleDataChange);
+      window.removeEventListener("project:change", handleProjectChange);
       window.removeEventListener("storage", handleProjectChange);
     };
   }, [currentProjectId]);
@@ -671,7 +665,7 @@ export default function DialogueLab() {
           className="rounded-3xl p-8 mb-8 text-white relative overflow-hidden"
           style={{ background: `linear-gradient(135deg, ${BRAND.navy} 0%, ${BRAND.navyLight} 40%, ${BRAND.mauve} 100%)` }}
         >
-          <div className="absolute top-0 right-0 w-64 h-64 rounded-full opacity-10" style={{ background: BRAND.gold, filter: 'blur(80px)' }} />
+          <div className="absolute top-0 right-0 w-64 h-64 rounded-full opacity-10" style={{ background: BRAND.gold, filter: "blur(80px)" }} />
           
           <div className="relative z-10 flex items-center justify-between flex-wrap gap-4">
             <div className="flex items-center gap-4">
@@ -682,9 +676,9 @@ export default function DialogueLab() {
                 <MessageSquare size={32} className="text-white" />
               </div>
               <div>
-                <h1 className="text-3xl font-bold">Dialogue Lab</h1>
+                <h1 className="text-3xl font-bold text-white">Dialogue Lab</h1>
                 <p className="text-white/70">Write, analyze, and enhance character dialogue</p>
-                <p className="text-white/40 text-xs mt-1">Project: {currentProjectId}</p>
+                <p className="text-white/50 text-xs mt-1">Project: {currentProjectId}</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
