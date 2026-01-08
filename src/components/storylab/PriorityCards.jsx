@@ -1,44 +1,37 @@
 // src/components/storylab/PriorityCards.jsx
-// Priority Cards - Track character/subject priorities
-// UPDATED: Supports Fiction, Non-Fiction, Poetry, and Memoir genres
-// Uses direct localStorage with project-aware keys
+// Genre-aware Priority Cards with project-switching support
+// COMPLETE FILE - Replace your entire PriorityCards.jsx with this
 
-import React, { useState, useCallback, useEffect, useRef } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Link } from "react-router-dom";
-import { 
-  Plus, 
-  GripVertical, 
-  Trash2, 
-  Flag, 
-  Tag, 
-  CheckCircle, 
-  ListChecks,
+import {
+  ArrowLeft,
+  Plus,
+  Trash2,
+  GripVertical,
+  Target,
+  AlertTriangle,
+  Heart,
+  Lock,
+  Lightbulb,
+  FileText,
+  Quote,
+  Eye,
+  Music,
+  Palette,
+  Clock,
   Sparkles,
   BookOpen,
   ChevronDown,
-  Check,
-  X,
+  Search,
+  Filter,
+  BarChart3,
+  RefreshCw,
   Loader2,
-  User,
-  Target,
-  AlertCircle,
-  Save,
-  FileText,
-  Feather,
-  BookMarked,
-  Eye,
-  Heart,
-  MessageSquare,
-  Lightbulb,
-  Quote,
-  Layers,
-  Music,
-  Image,
 } from "lucide-react";
-import { runAssistant } from "../../lib/api";
 
 /* ============================================
-   BRAND COLORS
+   Brand Colors
    ============================================ */
 const BRAND = {
   navy: "#1e3a5f",
@@ -48,68 +41,73 @@ const BRAND = {
   goldDark: "#b8960c",
   mauve: "#b8a9c9",
   rose: "#e8b4b8",
+  ink: "#0F172A",
   cream: "#fefdfb",
 };
 
 /* ============================================
-   GENRE CONFIGURATIONS
+   GENRE CONFIGURATION
    ============================================ */
 const GENRE_CONFIG = {
   fiction: {
     id: "fiction",
     label: "Fiction",
     icon: BookOpen,
-    entityLabel: "Character",
-    priorityTypes: [
-      { id: "Want", label: "Want", icon: Target, color: BRAND.gold, description: "What they consciously pursue" },
-      { id: "Fear", label: "Fear", icon: AlertCircle, color: "#dc2626", description: "What they're afraid of" },
-      { id: "Need", label: "Need", icon: Heart, color: "#16a34a", description: "What they truly need for growth" },
-      { id: "Secret", label: "Secret", icon: Eye, color: BRAND.navy, description: "What they're hiding" },
-    ],
     tagPattern: /@char:\s*([A-Za-z][A-Za-z\s.'-]*)/gi,
-    aiPrompt: "character wants, fears, needs, and secrets",
+    entityLabel: "Character",
+    entityPlural: "Characters",
+    priorityTypes: [
+      { key: "want", label: "Want", icon: Target, color: "#059669", description: "What the character desires" },
+      { key: "fear", label: "Fear", icon: AlertTriangle, color: "#dc2626", description: "What the character dreads" },
+      { key: "need", label: "Need", icon: Heart, color: "#7c3aed", description: "What the character truly needs" },
+      { key: "secret", label: "Secret", icon: Lock, color: "#0284c7", description: "What the character hides" },
+    ],
+    aiPrompt: "Analyze this fiction manuscript for character wants, fears, needs, and secrets.",
   },
   nonfiction: {
     id: "nonfiction",
     label: "Non-Fiction",
     icon: FileText,
-    entityLabel: "Topic",
-    priorityTypes: [
-      { id: "Argument", label: "Argument", icon: Target, color: BRAND.gold, description: "Key claim or point" },
-      { id: "Evidence", label: "Evidence", icon: Layers, color: "#16a34a", description: "Supporting facts or data" },
-      { id: "Counter", label: "Counter-Point", icon: MessageSquare, color: "#dc2626", description: "Opposing view to address" },
-      { id: "Quote", label: "Key Quote", icon: Quote, color: BRAND.navy, description: "Important citation" },
-    ],
     tagPattern: /@topic:\s*([A-Za-z][A-Za-z\s.'-]*)/gi,
-    aiPrompt: "key arguments, evidence, counter-points, and quotable insights",
+    entityLabel: "Topic",
+    entityPlural: "Topics",
+    priorityTypes: [
+      { key: "argument", label: "Argument", icon: Target, color: "#059669", description: "Key arguments to make" },
+      { key: "evidence", label: "Evidence", icon: FileText, color: "#0284c7", description: "Supporting evidence needed" },
+      { key: "counterpoint", label: "Counter-Point", icon: AlertTriangle, color: "#dc2626", description: "Objections to address" },
+      { key: "keyquote", label: "Key Quote", icon: Quote, color: "#7c3aed", description: "Important quotations" },
+    ],
+    aiPrompt: "Analyze this non-fiction manuscript for key arguments, evidence needs, counter-points to address, and important quotes.",
   },
   poetry: {
     id: "poetry",
     label: "Poetry",
-    icon: Feather,
-    entityLabel: "Theme",
-    priorityTypes: [
-      { id: "Image", label: "Image", icon: Image, color: BRAND.gold, description: "Visual or sensory element" },
-      { id: "Sound", label: "Sound", icon: Music, color: "#8b5cf6", description: "Rhythm, rhyme, or sonic device" },
-      { id: "Emotion", label: "Emotion", icon: Heart, color: "#dc2626", description: "Feeling to evoke" },
-      { id: "Symbol", label: "Symbol", icon: Sparkles, color: BRAND.navy, description: "Deeper meaning or metaphor" },
-    ],
+    icon: Sparkles,
     tagPattern: /@theme:\s*([A-Za-z][A-Za-z\s.'-]*)/gi,
-    aiPrompt: "key images, sounds, emotions, and symbols",
+    entityLabel: "Theme",
+    entityPlural: "Themes",
+    priorityTypes: [
+      { key: "image", label: "Image", icon: Eye, color: "#059669", description: "Visual imagery to develop" },
+      { key: "sound", label: "Sound", icon: Music, color: "#7c3aed", description: "Sound patterns and rhythm" },
+      { key: "emotion", label: "Emotion", icon: Heart, color: "#dc2626", description: "Emotional resonance" },
+      { key: "symbol", label: "Symbol", icon: Palette, color: "#0284c7", description: "Symbolic elements" },
+    ],
+    aiPrompt: "Analyze this poetry for imagery, sound patterns, emotional resonance, and symbolic elements.",
   },
   memoir: {
     id: "memoir",
     label: "Memoir",
-    icon: BookMarked,
-    entityLabel: "Person/Event",
-    priorityTypes: [
-      { id: "Memory", label: "Memory", icon: Eye, color: BRAND.gold, description: "Specific recollection" },
-      { id: "Emotion", label: "Emotion", icon: Heart, color: "#dc2626", description: "Feeling tied to the moment" },
-      { id: "Meaning", label: "Meaning", icon: Lightbulb, color: "#16a34a", description: "What you learned or realized" },
-      { id: "Connection", label: "Connection", icon: Layers, color: BRAND.navy, description: "Link to broader theme" },
-    ],
+    icon: Clock,
     tagPattern: /@person:\s*([A-Za-z][A-Za-z\s.'-]*)/gi,
-    aiPrompt: "key memories, emotions, meanings, and thematic connections",
+    entityLabel: "Person/Event",
+    entityPlural: "People & Events",
+    priorityTypes: [
+      { key: "memory", label: "Memory", icon: Clock, color: "#059669", description: "Key memories to explore" },
+      { key: "emotion", label: "Emotion", icon: Heart, color: "#dc2626", description: "Emotional truth to capture" },
+      { key: "meaning", label: "Meaning", icon: Lightbulb, color: "#7c3aed", description: "Deeper significance" },
+      { key: "connection", label: "Connection", icon: Target, color: "#0284c7", description: "Links to universal themes" },
+    ],
+    aiPrompt: "Analyze this memoir for key memories, emotional truths, deeper meanings, and universal connections.",
   },
 };
 
@@ -117,557 +115,177 @@ const GENRE_CONFIG = {
    PROJECT-AWARE STORAGE
    ============================================ */
 const PRIORITIES_KEY_BASE = "dahtruth-priorities-v2";
-const CHAPTERS_KEY_BASE = "dahtruth-story-lab-toc-v3";
+const STORYLAB_KEY_BASE = "dahtruth-story-lab-toc-v3";
 const GENRE_KEY_BASE = "dahtruth-project-genre";
 
 function getSelectedProjectId() {
   try {
-    const stored = localStorage.getItem('dahtruth-selected-project-id');
+    const stored = localStorage.getItem("dahtruth-selected-project-id");
     if (stored) return stored;
-    const projectData = localStorage.getItem('dahtruth-project-store');
+    const projectData = localStorage.getItem("dahtruth-project-store");
     if (projectData) {
       const parsed = JSON.parse(projectData);
-      return parsed.selectedProjectId || parsed.currentProjectId || 'default';
+      return parsed.selectedProjectId || parsed.currentProjectId || "default";
     }
-    return 'default';
+    return "default";
   } catch {
-    return 'default';
+    return "default";
   }
 }
 
 function getProjectKey(baseKey) {
   const projectId = getSelectedProjectId();
-  return projectId === 'default' ? baseKey : `${baseKey}-${projectId}`;
-}
-
-function loadProjectGenre() {
-  try {
-    const key = getProjectKey(GENRE_KEY_BASE);
-    const raw = localStorage.getItem(key);
-    if (raw && GENRE_CONFIG[raw]) return raw;
-    return "fiction";
-  } catch {
-    return "fiction";
-  }
-}
-
-function saveProjectGenre(genre) {
-  try {
-    const key = getProjectKey(GENRE_KEY_BASE);
-    localStorage.setItem(key, genre);
-    window.dispatchEvent(new Event("project:change"));
-  } catch {}
+  return projectId === "default" ? baseKey : `${baseKey}-${projectId}`;
 }
 
 function loadPriorities() {
   try {
     const key = getProjectKey(PRIORITIES_KEY_BASE);
-    console.log(`[PriorityCards] Loading from key: ${key}`);
     const raw = localStorage.getItem(key);
-    if (!raw) return [];
-    return JSON.parse(raw);
+    return raw ? JSON.parse(raw) : [];
   } catch {
     return [];
   }
 }
 
-function savePriorities(priorities) {
+function savePriorities(data) {
   try {
     const key = getProjectKey(PRIORITIES_KEY_BASE);
-    localStorage.setItem(key, JSON.stringify(priorities));
-    console.log(`[PriorityCards] Saved to key: ${key}`);
-    return true;
-  } catch {
-    return false;
+    localStorage.setItem(key, JSON.stringify(data));
+    window.dispatchEvent(new Event("project:change"));
+  } catch (e) {
+    console.error("[PriorityCards] Save failed:", e);
   }
 }
 
-function loadChapters() {
+function loadGenre() {
   try {
-    const key = getProjectKey(CHAPTERS_KEY_BASE);
+    const key = getProjectKey(GENRE_KEY_BASE);
     const raw = localStorage.getItem(key);
-    if (!raw) return [];
-    const data = JSON.parse(raw);
-    return Array.isArray(data.chapters) ? data.chapters : [];
+    return raw || "fiction";
   } catch {
-    return [];
+    return "fiction";
   }
 }
 
-function uid() {
-  return Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
-}
-
-function stripHtml(html = "") {
-  const tmp = document.createElement("div");
-  tmp.innerHTML = html;
-  return tmp.textContent || tmp.innerText || "";
-}
-
-function extractEntities(text = "", pattern) {
-  const regex = new RegExp(pattern.source, pattern.flags);
-  const matches = [];
-  let match;
-  while ((match = regex.exec(text)) !== null) {
-    matches.push(match[1].trim());
+function saveGenre(genre) {
+  try {
+    const key = getProjectKey(GENRE_KEY_BASE);
+    localStorage.setItem(key, genre);
+    window.dispatchEvent(new Event("project:change"));
+  } catch (e) {
+    console.error("[PriorityCards] Genre save failed:", e);
   }
-  return [...new Set(matches)];
 }
 
-/* ============================================
-   SAVING BADGE
-   ============================================ */
-function SavingBadge({ state }) {
-  return (
-    <span className={`text-xs px-3 py-1.5 rounded-full font-medium ${
-      state === "saving" 
-        ? "bg-amber-100 text-amber-700 border border-amber-200" 
-        : "bg-emerald-100 text-emerald-700 border border-emerald-200"
-    }`}>
-      {state === "saving" ? "Saving…" : "✓ Saved"}
-    </span>
-  );
-}
-
-/* ============================================
-   GENRE SELECTOR
-   ============================================ */
-function GenreSelector({ value, onChange }) {
-  const [isOpen, setIsOpen] = useState(false);
-  const dropdownRef = useRef(null);
-
-  useEffect(() => {
-    const handleClick = (e) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
-        setIsOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, []);
-
-  const current = GENRE_CONFIG[value] || GENRE_CONFIG.fiction;
-  const Icon = current.icon;
-
-  return (
-    <div className="relative" ref={dropdownRef}>
-      <button
-        type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 transition-all hover:shadow-md"
-        style={{ borderColor: `${BRAND.gold}60`, background: `${BRAND.gold}15` }}
-      >
-        <Icon size={18} style={{ color: BRAND.gold }} />
-        <span className="font-semibold" style={{ color: BRAND.navy }}>{current.label}</span>
-        <ChevronDown size={16} className={`transition-transform ${isOpen ? 'rotate-180' : ''}`} style={{ color: BRAND.navy }} />
-      </button>
-
-      {isOpen && (
-        <div className="absolute top-full left-0 mt-2 z-50 bg-white rounded-xl shadow-2xl border border-slate-200 overflow-hidden min-w-[280px]">
-          <div className="p-2 bg-slate-50 border-b border-slate-100">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Writing Type</span>
-          </div>
-          {Object.values(GENRE_CONFIG).map((genre) => {
-            const GenreIcon = genre.icon;
-            const isSelected = value === genre.id;
-            return (
-              <button
-                key={genre.id}
-                type="button"
-                onClick={() => { onChange(genre.id); setIsOpen(false); }}
-                className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${isSelected ? 'bg-amber-50' : 'hover:bg-slate-50'}`}
-              >
-                <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: isSelected ? `${BRAND.gold}25` : '#f1f5f9' }}>
-                  <GenreIcon size={20} style={{ color: isSelected ? BRAND.gold : '#64748b' }} />
-                </div>
-                <div className="flex-1">
-                  <div className="font-semibold text-sm" style={{ color: BRAND.navy }}>{genre.label}</div>
-                  <div className="text-xs text-slate-500">{genre.priorityTypes.map(p => p.label).join(", ")}</div>
-                </div>
-                {isSelected && <Check size={18} style={{ color: BRAND.gold }} />}
-              </button>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* ============================================
-   PAGE BANNER
-   ============================================ */
-const PageBanner = ({ projectId, cardCount, genre, onGenreChange }) => {
-  const genreConfig = GENRE_CONFIG[genre] || GENRE_CONFIG.fiction;
-  
-  return (
-    <div 
-      className="rounded-3xl p-8 mb-8 text-white text-center relative overflow-hidden"
-      style={{
-        background: `linear-gradient(135deg, ${BRAND.navy} 0%, ${BRAND.navyLight} 30%, ${BRAND.mauve} 70%, ${BRAND.rose} 100%)`,
-      }}
-    >
-      <div className="absolute top-0 left-0 w-64 h-64 rounded-full opacity-10" style={{ background: BRAND.gold, filter: 'blur(80px)' }} />
-      <div className="absolute bottom-0 right-0 w-96 h-96 rounded-full opacity-10" style={{ background: BRAND.rose, filter: 'blur(100px)' }} />
-      
-      <div className="relative z-10">
-        {/* Genre Selector */}
-        <div className="flex justify-center mb-6">
-          <GenreSelector value={genre} onChange={onGenreChange} />
-        </div>
-
-        {/* Icons */}
-        <div className="flex items-center justify-center gap-3 mb-4">
-          {genreConfig.priorityTypes.slice(0, 2).map((pt, idx) => (
-            <div key={pt.id} className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: `${pt.color}30` }}>
-              {React.createElement(pt.icon, { size: 24, style: { color: pt.color } })}
-            </div>
-          ))}
-          <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg" style={{ background: `linear-gradient(135deg, ${BRAND.gold}, ${BRAND.goldDark})` }}>
-            <ListChecks size={28} className="text-white" />
-          </div>
-          {genreConfig.priorityTypes.slice(2).map((pt, idx) => (
-            <div key={pt.id} className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: `${pt.color}30` }}>
-              {React.createElement(pt.icon, { size: 24, style: { color: pt.color } })}
-            </div>
-          ))}
-        </div>
-
-        <h1 className="text-3xl font-bold mb-2">Priority Cards</h1>
-        <p className="text-white/70 max-w-xl mx-auto">
-          Track {genreConfig.entityLabel.toLowerCase()} {genreConfig.aiPrompt}. Use AI to analyze chapters or add cards manually.
-        </p>
-        
-        <div className="mt-4 flex flex-wrap justify-center gap-2">
-          {genreConfig.priorityTypes.map(pt => (
-            <span key={pt.id} className="text-xs px-3 py-1 rounded-full" style={{ background: `${pt.color}30`, color: "white" }}>
-              {pt.label}
-            </span>
-          ))}
-        </div>
-        
-        <div className="mt-4 text-xs text-white/40">
-          Project: {projectId} · {cardCount} cards · {genreConfig.label}
-        </div>
-      </div>
-    </div>
-  );
-};
-
-/* ============================================
-   AI SUGGESTIONS PANEL
-   ============================================ */
-const SuggestionsPanel = ({ suggestions, onAccept, onReject, onAcceptAll, onClose, isLoading, error, genreConfig }) => {
-  if (!isLoading && !error && suggestions.length === 0) return null;
-
-  return (
-    <div className="bg-gradient-to-br from-amber-50 to-white border-2 border-amber-200 rounded-2xl p-5 mb-6 shadow-lg">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: `${BRAND.gold}20` }}>
-            <Sparkles size={18} style={{ color: BRAND.gold }} />
-          </div>
-          <div>
-            <h3 className="font-bold text-slate-800">AI Suggestions</h3>
-            <p className="text-xs text-slate-500">Review and accept priorities</p>
-          </div>
-        </div>
-        <button onClick={onClose} className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600">
-          <X size={18} />
-        </button>
-      </div>
-
-      {isLoading && (
-        <div className="flex items-center justify-center py-8">
-          <Loader2 size={24} className="animate-spin text-amber-500 mr-3" />
-          <span className="text-slate-600">Analyzing for {genreConfig.aiPrompt}...</span>
-        </div>
-      )}
-
-      {error && (
-        <div className="flex items-center gap-3 p-4 bg-red-50 rounded-xl text-red-700">
-          <AlertCircle size={20} />
-          <span>{error}</span>
-        </div>
-      )}
-
-      {!isLoading && !error && suggestions.length > 0 && (
-        <>
-          <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
-            {suggestions.map((suggestion, idx) => {
-              const typeConfig = genreConfig.priorityTypes.find(pt => pt.id === suggestion.type) || genreConfig.priorityTypes[0];
-              return (
-                <div key={idx} className="bg-white rounded-xl border border-slate-200 p-4 hover:shadow-md transition-shadow">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-2">
-                        <User size={14} className="text-slate-400" />
-                        <span className="text-xs font-medium text-slate-500">{suggestion.entity || suggestion.character}</span>
-                        <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: `${typeConfig.color}20`, color: typeConfig.color }}>
-                          {suggestion.type}
-                        </span>
-                      </div>
-                      <p className="text-sm text-slate-700 font-medium">{suggestion.title}</p>
-                      {suggestion.reason && (
-                        <p className="text-xs text-slate-500 mt-1 italic">"{suggestion.reason}"</p>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <button onClick={() => onAccept(suggestion)} className="p-2 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100">
-                        <Check size={16} />
-                      </button>
-                      <button onClick={() => onReject(idx)} className="p-2 rounded-lg bg-slate-50 text-slate-400 hover:bg-slate-100">
-                        <X size={16} />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          <div className="flex items-center justify-between mt-4 pt-4 border-t border-amber-200">
-            <span className="text-sm text-slate-500">{suggestions.length} suggestion{suggestions.length !== 1 ? 's' : ''}</span>
-            <button
-              onClick={onAcceptAll}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all hover:scale-105"
-              style={{ background: `linear-gradient(135deg, ${BRAND.gold}, ${BRAND.goldDark})` }}
-            >
-              <Check size={16} />
-              Accept All
-            </button>
-          </div>
-        </>
-      )}
-    </div>
-  );
-};
-
-/* ============================================
-   CHAPTER ANALYZER
-   ============================================ */
-const AIAnalyzer = ({ onAnalyze, isAnalyzing, genreConfig }) => {
-  const [chapters, setChapters] = useState([]);
-  const [selectedChapterId, setSelectedChapterId] = useState("");
-  const [isOpen, setIsOpen] = useState(false);
-  const dropdownRef = useRef(null);
-
-  useEffect(() => {
-    const loaded = loadChapters();
-    setChapters(loaded);
-    if (loaded.length > 0) setSelectedChapterId(loaded[0].id);
-  }, []);
-
-  useEffect(() => {
-    const handleChange = () => {
-      const loaded = loadChapters();
-      setChapters(loaded);
-    };
-    window.addEventListener("project:change", handleChange);
-    window.addEventListener("storage", handleChange);
-    return () => {
-      window.removeEventListener("project:change", handleChange);
-      window.removeEventListener("storage", handleChange);
-    };
-  }, []);
-
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) setIsOpen(false);
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  const selectedChapter = chapters.find(c => c.id === selectedChapterId);
-
-  const handleAnalyze = () => {
-    if (!selectedChapter) return;
-    const plainText = stripHtml(selectedChapter.content || "");
-    const entities = extractEntities(selectedChapter.content || "", genreConfig.tagPattern);
-    onAnalyze(plainText, selectedChapter.title, entities);
-  };
-
-  if (chapters.length === 0) {
-    return (
-      <div className="bg-white rounded-2xl border border-slate-200 p-6 text-center mb-6">
-        <BookOpen size={32} className="mx-auto text-slate-300 mb-3" />
-        <p className="text-slate-500 mb-2">No chapters found</p>
-        <Link to="/compose" className="text-sm font-medium" style={{ color: BRAND.gold }}>Go to Writer →</Link>
-      </div>
-    );
+function loadStoryLabData() {
+  try {
+    const key = getProjectKey(STORYLAB_KEY_BASE);
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
   }
+}
 
-  return (
-    <div className="bg-white rounded-2xl border border-slate-200 p-5 mb-6">
-      <div className="flex items-center gap-3 mb-4">
-        <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: `${BRAND.navy}15` }}>
-          <Sparkles size={20} style={{ color: BRAND.navy }} />
-        </div>
-        <div>
-          <h3 className="font-bold text-slate-800">AI Chapter Analysis</h3>
-          <p className="text-sm text-slate-500">Extract {genreConfig.aiPrompt}</p>
-        </div>
-      </div>
+function extractEntitiesFromChapters(chapters = [], pattern) {
+  const entitySet = new Set();
+  chapters.forEach((ch) => {
+    const content = ch.content || ch.text || ch.textHTML || "";
+    let match;
+    const regex = new RegExp(pattern.source, pattern.flags);
+    while ((match = regex.exec(content)) !== null) {
+      const name = match[1].trim();
+      if (name) entitySet.add(name);
+    }
+  });
+  return Array.from(entitySet).sort();
+}
 
-      <div className="flex items-center gap-3 flex-wrap">
-        <div className="relative" ref={dropdownRef}>
-          <button
-            onClick={() => setIsOpen(!isOpen)}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 hover:border-slate-300 text-sm font-medium text-slate-700 min-w-[220px] justify-between"
-          >
-            <div className="flex items-center gap-2">
-              <BookOpen size={16} className="text-slate-400" />
-              <span className="truncate max-w-[150px]">{selectedChapter?.title || "Select chapter"}</span>
-            </div>
-            <ChevronDown size={16} className={`text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-          </button>
-
-          {isOpen && (
-            <div className="absolute top-full left-0 mt-2 z-50 bg-white rounded-xl shadow-xl border border-slate-200 min-w-[280px] max-h-[300px] overflow-y-auto">
-              {chapters.map((chapter, idx) => (
-                <button
-                  key={chapter.id}
-                  onClick={() => { setSelectedChapterId(chapter.id); setIsOpen(false); }}
-                  className={`w-full px-4 py-3 text-left text-sm hover:bg-slate-50 flex items-center gap-3 ${chapter.id === selectedChapterId ? 'bg-amber-50' : ''}`}
-                >
-                  <span className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-xs font-medium text-slate-500">{idx + 1}</span>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium text-slate-700 truncate">{chapter.title}</div>
-                  </div>
-                  {chapter.id === selectedChapterId && <Check size={16} style={{ color: BRAND.gold }} />}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <button
-          onClick={handleAnalyze}
-          disabled={!selectedChapter || isAnalyzing}
-          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-all hover:scale-105 disabled:opacity-50 disabled:hover:scale-100"
-          style={{ background: `linear-gradient(135deg, ${BRAND.navy}, ${BRAND.navyLight})` }}
-        >
-          {isAnalyzing ? (
-            <><Loader2 size={16} className="animate-spin" /> Analyzing...</>
-          ) : (
-            <><Sparkles size={16} /> Analyze Chapter</>
-          )}
-        </button>
-      </div>
-    </div>
-  );
-};
+const uid = () =>
+  crypto?.randomUUID?.() || `${Date.now()}_${Math.random().toString(36).slice(2)}`;
 
 /* ============================================
-   PRIORITY CARD
+   PRIORITY CARD COMPONENT
    ============================================ */
-function PriorityCard({ card, index, onEdit, onDelete, onDragStart, onDragOver, onDragEnd, isDragging, genreConfig }) {
-  const priorityColor = card.priority === "High" ? "text-red-500" : card.priority === "Medium" ? "text-amber-500" : "text-slate-400";
-  const typeConfig = genreConfig.priorityTypes.find(pt => pt.id === card.priorityType) || genreConfig.priorityTypes[0];
+function PriorityCard({ card, genreConfig, onEdit, onDelete, onDragStart, onDragOver, onDragEnd, isDragging }) {
+  const typeConfig = genreConfig.priorityTypes.find((t) => t.key === card.type) || genreConfig.priorityTypes[0];
+  const TypeIcon = typeConfig.icon;
 
   return (
     <div
       draggable
-      onDragStart={() => onDragStart(index)}
-      onDragOver={(e) => { e.preventDefault(); onDragOver(index); }}
+      onDragStart={() => onDragStart(card.id)}
+      onDragOver={(e) => {
+        e.preventDefault();
+        onDragOver(card.id);
+      }}
       onDragEnd={onDragEnd}
-      className={`bg-white rounded-2xl border border-slate-200 p-4 shadow-sm transition-all ${isDragging ? "opacity-50 scale-95" : "hover:shadow-md"}`}
+      className={`bg-white rounded-xl border-2 p-4 shadow-sm hover:shadow-md transition-all cursor-grab ${
+        isDragging ? "opacity-50 scale-95" : ""
+      }`}
+      style={{ borderColor: `${typeConfig.color}30` }}
     >
-      <div className="flex items-start gap-3">
-        <div className="cursor-grab active:cursor-grabbing pt-1 text-slate-300" title="Drag to reorder">
-          <GripVertical size={18} />
-        </div>
-
-        <div className="flex-1">
-          {/* Entity badge */}
-          {(card.character || card.entity) && (
-            <div className="flex items-center gap-1 mb-2">
-              <User size={12} className="text-slate-400" />
-              <span className="text-xs font-medium text-slate-500">{card.character || card.entity}</span>
-            </div>
-          )}
-          
-          <input
-            value={card.title}
-            onChange={(e) => onEdit(card.id, { title: e.target.value })}
-            className="w-full bg-transparent border-b border-slate-200 focus:border-amber-400 outline-none text-slate-800 font-medium"
-            placeholder="Priority title"
-          />
-
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-xs bg-slate-50">
-              <Tag size={12} className="text-slate-400" />
-              <select
-                value={card.scope}
-                onChange={(e) => onEdit(card.id, { scope: e.target.value })}
-                className="bg-transparent outline-none text-slate-600"
-              >
-                <option>{genreConfig.entityLabel}</option>
-                <option>Structure</option>
-                <option>Style</option>
-                <option>Research</option>
-              </select>
-            </span>
-
-            <span className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-xs bg-slate-50">
-              <Flag size={12} className={priorityColor} />
-              <select
-                value={card.priority}
-                onChange={(e) => onEdit(card.id, { priority: e.target.value })}
-                className="bg-transparent outline-none text-slate-600"
-              >
-                <option>High</option>
-                <option>Medium</option>
-                <option>Low</option>
-              </select>
-            </span>
-
-            <span className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-xs bg-slate-50">
-              <CheckCircle size={12} className="text-emerald-500" />
-              <select
-                value={card.status}
-                onChange={(e) => onEdit(card.id, { status: e.target.value })}
-                className="bg-transparent outline-none text-slate-600"
-              >
-                <option>Open</option>
-                <option>In Progress</option>
-                <option>Done</option>
-              </select>
-            </span>
-
-            {/* Priority type selector */}
-            <span 
-              className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium"
-              style={{ background: `${typeConfig.color}15`, color: typeConfig.color }}
-            >
-              {React.createElement(typeConfig.icon, { size: 12 })}
-              <select
-                value={card.priorityType || genreConfig.priorityTypes[0].id}
-                onChange={(e) => onEdit(card.id, { priorityType: e.target.value })}
-                className="bg-transparent outline-none"
-                style={{ color: typeConfig.color }}
-              >
-                {genreConfig.priorityTypes.map(pt => (
-                  <option key={pt.id} value={pt.id}>{pt.label}</option>
-                ))}
-              </select>
-            </span>
-
-            {card.source === "AI Suggestion" && (
-              <span className="inline-flex items-center gap-1 text-xs text-amber-600">
-                <Sparkles size={10} /> AI
-              </span>
-            )}
+      {/* Header */}
+      <div className="flex items-start justify-between gap-2 mb-3">
+        <div className="flex items-center gap-2">
+          <GripVertical size={14} className="text-slate-300" />
+          <div
+            className="flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-semibold"
+            style={{ background: `${typeConfig.color}15`, color: typeConfig.color }}
+          >
+            <TypeIcon size={12} />
+            {typeConfig.label}
           </div>
         </div>
-
         <button
           onClick={() => onDelete(card.id)}
-          className="p-2 rounded-lg hover:bg-red-50 text-slate-300 hover:text-red-500 transition-colors"
+          className="p-1.5 rounded-lg hover:bg-red-50 text-slate-300 hover:text-red-500 transition-colors"
         >
-          <Trash2 size={16} />
+          <Trash2 size={14} />
         </button>
+      </div>
+
+      {/* Entity */}
+      {card.entity && (
+        <div className="flex items-center gap-1.5 text-xs text-slate-500 mb-2">
+          <span
+            className="px-2 py-0.5 rounded-full"
+            style={{ background: `${BRAND.navy}10`, color: BRAND.navy }}
+          >
+            {card.entity}
+          </span>
+        </div>
+      )}
+
+      {/* Content */}
+      <textarea
+        value={card.content || ""}
+        onChange={(e) => onEdit(card.id, { content: e.target.value })}
+        placeholder={typeConfig.description}
+        className="w-full text-sm text-slate-700 bg-transparent border-none focus:outline-none resize-none min-h-[60px]"
+      />
+
+      {/* Priority */}
+      <div className="flex items-center justify-between mt-3 pt-3 border-t border-slate-100">
+        <select
+          value={card.priority || "Medium"}
+          onChange={(e) => onEdit(card.id, { priority: e.target.value })}
+          className="text-xs rounded-lg px-2 py-1 bg-slate-50 border border-slate-200 outline-none"
+        >
+          <option value="High">High Priority</option>
+          <option value="Medium">Medium Priority</option>
+          <option value="Low">Low Priority</option>
+        </select>
+        <label className="flex items-center gap-1.5 text-xs text-slate-500">
+          <input
+            type="checkbox"
+            checked={card.done || false}
+            onChange={(e) => onEdit(card.id, { done: e.target.checked })}
+            className="rounded"
+          />
+          Done
+        </label>
       </div>
     </div>
   );
@@ -677,1200 +295,319 @@ function PriorityCard({ card, index, onEdit, onDelete, onDragStart, onDragOver, 
    MAIN COMPONENT
    ============================================ */
 export default function PriorityCards() {
+  // Project tracking
   const [currentProjectId, setCurrentProjectId] = useState(getSelectedProjectId);
-  const [genre, setGenre] = useState(() => loadProjectGenre());
   const [priorities, setPriorities] = useState(() => loadPriorities());
-  const [saving, setSaving] = useState("idle");
-  const [draggingIndex, setDraggingIndex] = useState(null);
-  
+  const [genre, setGenre] = useState(() => loadGenre());
+  const [storyLabData, setStoryLabData] = useState(() => loadStoryLabData());
+
+  // UI state
+  const [filterType, setFilterType] = useState("all");
+  const [filterEntity, setFilterEntity] = useState("all");
+  const [showDone, setShowDone] = useState(true);
+  const [draggingId, setDraggingId] = useState(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [suggestions, setSuggestions] = useState([]);
-  const [analysisError, setAnalysisError] = useState(null);
-  const [showSuggestions, setShowSuggestions] = useState(false);
 
   const genreConfig = GENRE_CONFIG[genre] || GENRE_CONFIG.fiction;
+  const chapters = storyLabData?.chapters || [];
+  const entities = extractEntitiesFromChapters(chapters, genreConfig.tagPattern);
+  const bookTitle = storyLabData?.book?.title || "Untitled";
 
-  // Handle genre change
-  const handleGenreChange = (newGenre) => {
-    setGenre(newGenre);
-    saveProjectGenre(newGenre);
-  };
-
-  // Project switch listener
+  // Project switching
   useEffect(() => {
-    const handleSwitch = () => {
-      const newId = getSelectedProjectId();
-      if (newId !== currentProjectId) {
-        setCurrentProjectId(newId);
-        setGenre(loadProjectGenre());
-        setPriorities(loadPriorities());
+    const reloadAllData = () => {
+      console.log(`[PriorityCards] Reloading for project: ${getSelectedProjectId()}`);
+      setPriorities(loadPriorities());
+      setGenre(loadGenre());
+      setStoryLabData(loadStoryLabData());
+      setFilterType("all");
+      setFilterEntity("all");
+      setDraggingId(null);
+    };
+
+    const handleProjectChange = () => {
+      const newProjectId = getSelectedProjectId();
+      if (newProjectId !== currentProjectId) {
+        console.log(`[PriorityCards] Project switched: ${currentProjectId} → ${newProjectId}`);
+        setCurrentProjectId(newProjectId);
+        reloadAllData();
       }
     };
-    window.addEventListener("project:change", handleSwitch);
-    window.addEventListener("storage", handleSwitch);
+
+    const handleDataChange = () => {
+      setStoryLabData(loadStoryLabData());
+    };
+
+    window.addEventListener("project:change", handleDataChange);
+    window.addEventListener("storage", handleProjectChange);
+
     return () => {
-      window.removeEventListener("project:change", handleSwitch);
-      window.removeEventListener("storage", handleSwitch);
+      window.removeEventListener("project:change", handleDataChange);
+      window.removeEventListener("storage", handleProjectChange);
     };
   }, [currentProjectId]);
 
   // Auto-save
   useEffect(() => {
-    setSaving("saving");
-    const id = setTimeout(() => {
-      savePriorities(priorities);
-      setSaving("idle");
-    }, 500);
-    return () => clearTimeout(id);
+    savePriorities(priorities);
   }, [priorities]);
 
-  const addCard = useCallback(() => {
-    setPriorities(prev => [...prev, {
-      id: uid(),
-      title: "New priority",
-      scope: genreConfig.entityLabel,
-      priority: "Medium",
-      status: "Open",
-      priorityType: genreConfig.priorityTypes[0].id,
-      done: false,
-    }]);
-  }, [genreConfig]);
-
-  const deleteCard = useCallback((id) => {
-    setPriorities(prev => prev.filter(c => c.id !== id));
-  }, []);
-
-  const editCard = useCallback((id, patch) => {
-    setPriorities(prev => prev.map(c => c.id === id ? { ...c, ...patch } : c));
-  }, []);
-
-  const handleDragStart = useCallback((index) => setDraggingIndex(index), []);
-  const handleDragOver = useCallback((overIndex) => {
-    if (draggingIndex === null || draggingIndex === overIndex) return;
-    setPriorities(prev => {
-      const copy = [...prev];
-      const [moved] = copy.splice(draggingIndex, 1);
-      copy.splice(overIndex, 0, moved);
-      return copy;
-    });
-    setDraggingIndex(overIndex);
-  }, [draggingIndex]);
-  const handleDragEnd = useCallback(() => setDraggingIndex(null), []);
-
-  // AI Analysis
-  const analyzeChapter = useCallback(async (chapterText, chapterTitle, entities) => {
-    setIsAnalyzing(true);
-    setAnalysisError(null);
-    setSuggestions([]);
-    setShowSuggestions(true);
-
-    const truncatedText = chapterText.slice(0, 4000);
-    const entityList = entities.length > 0 ? entities.join(", ") : `any ${genreConfig.entityLabel.toLowerCase()}s you can identify`;
-    const typesList = genreConfig.priorityTypes.map(pt => `**${pt.id}** - ${pt.description}`).join("\n");
-
-    const prompt = `Analyze this ${genreConfig.label.toLowerCase()} chapter and suggest priorities. For each ${genreConfig.entityLabel.toLowerCase()}, identify:
-
-${typesList}
-
-${genreConfig.entityLabel}s to focus on: ${entityList}
-
-Chapter: "${chapterTitle}"
----
-${truncatedText}
----
-
-Respond ONLY with a JSON array. Each suggestion should have:
-- "entity": ${genreConfig.entityLabel.toLowerCase()} name
-- "type": one of [${genreConfig.priorityTypes.map(pt => `"${pt.id}"`).join(", ")}]
-- "title": brief description (under 15 words)
-- "reason": short quote or evidence (under 20 words)
-
-Return 4-8 suggestions. JSON array only.`;
-
-    try {
-      const result = await runAssistant(prompt, "clarify", "", "anthropic");
-      const responseText = result?.result || result?.text || result?.output || result || "";
-      
-      const jsonMatch = responseText.match(/\[[\s\S]*\]/);
-      if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0]);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          // Normalize entity field
-          const normalized = parsed.map(s => ({
-            ...s,
-            entity: s.entity || s.character || s.topic || s.theme || s.person,
-            character: s.entity || s.character, // backwards compat
-          }));
-          setSuggestions(normalized);
-        } else {
-          setAnalysisError("No priorities found in this chapter.");
-        }
-      } else {
-        setAnalysisError("Couldn't parse AI suggestions. Please try again.");
-      }
-    } catch (err) {
-      console.error("AI analysis error:", err);
-      setAnalysisError("Failed to analyze chapter. Please try again.");
-    } finally {
-      setIsAnalyzing(false);
-    }
-  }, [genreConfig]);
-
-  const acceptSuggestion = useCallback((suggestion) => {
-    setPriorities(prev => [...prev, {
-      id: uid(),
-      title: suggestion.title,
-      character: suggestion.entity || suggestion.character,
-      entity: suggestion.entity || suggestion.character,
-      priorityType: suggestion.type,
-      scope: genreConfig.entityLabel,
-      priority: suggestion.type === "Fear" || suggestion.type === "Counter" ? "High" : "Medium",
-      status: "Open",
-      done: false,
-      source: "AI Suggestion",
-    }]);
-    setSuggestions(prev => prev.filter(s => 
-      !(s.entity === suggestion.entity && s.type === suggestion.type && s.title === suggestion.title)
-    ));
-  }, [genreConfig]);
-
-  const rejectSuggestion = useCallback((index) => {
-    setSuggestions(prev => prev.filter((_, i) => i !== index));
-  }, []);
-
-  const acceptAllSuggestions = useCallback(() => {
-    const newCards = suggestions.map(suggestion => ({
-      id: uid(),
-      title: suggestion.title,
-      character: suggestion.entity || suggestion.character,
-      entity: suggestion.entity || suggestion.character,
-      priorityType: suggestion.type,
-      scope: genreConfig.entityLabel,
-      priority: suggestion.type === "Fear" || suggestion.type === "Counter" ? "High" : "Medium",
-      status: "Open",
-      done: false,
-      source: "AI Suggestion",
-    }));
-    setPriorities(prev => [...prev, ...newCards]);
-    setSuggestions([]);
-    setShowSuggestions(false);
-  }, [suggestions, genreConfig]);
-
-  const closeSuggestions = useCallback(() => {
-    setShowSuggestions(false);
-    setSuggestions([]);
-    setAnalysisError(null);
-  }, []);
-
-  const saveNow = () => {
-    setSaving("saving");
-    savePriorities(priorities);
-    setTimeout(() => setSaving("idle"), 300);
+  // Genre change handler
+  const handleGenreChange = (newGenre) => {
+    setGenre(newGenre);
+    saveGenre(newGenre);
   };
 
-  return (
-    <div className="min-h-screen" style={{ background: `linear-gradient(180deg, ${BRAND.cream} 0%, #f1f5f9 100%)` }}>
-      {/* Navigation */}
-      <div className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-slate-200 shadow-sm">
-        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Link to="/story-lab" className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-100">
-              ← Landing
-            </Link>
-            <span className="text-slate-300">|</span>
-            <span className="text-sm font-semibold" style={{ color: BRAND.navy }}>Priority Cards</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <SavingBadge state={saving} />
-            <Link
-              to="/story-lab/workshop"
-              className="flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium text-white transition-all hover:scale-105"
-              style={{ background: `linear-gradient(135deg, ${BRAND.gold}, ${BRAND.goldDark})` }}
-            >
-              Workshop Hub
-            </Link>
-          </div>
-        </div>
-      </div>
+  // Card operations
+  const addCard = (type, entity = "") => {
+    const newCard = {
+      id: uid(),
+      type,
+      entity,
+      content: "",
+      priority: "Medium",
+      done: false,
+      createdAt: Date.now(),
+    };
+    setPriorities((prev) => [newCard, ...prev]);
+  };
 
-      <div className="max-w-4xl mx-auto px-4 py-8">
-        <PageBanner 
-          projectId={currentProjectId} 
-          cardCount={priorities.length} 
-          genre={genre}
-          onGenreChange={handleGenreChange}
-        />
+  const editCard = (id, updates) => {
+    setPriorities((prev) => prev.map((c) => (c.id === id ? { ...c, ...updates } : c)));
+  };
 
-        <AIAnalyzer onAnalyze={analyzeChapter} isAnalyzing={isAnalyzing} genreConfig={genreConfig} />
+  const deleteCard = (id) => {
+    setPriorities((prev) => prev.filter((c) => c.id !== id));
+  };
 
-        {showSuggestions && (
-          <SuggestionsPanel
-            suggestions={suggestions}
-            onAccept={acceptSuggestion}
-            onReject={rejectSuggestion}
-            onAcceptAll={acceptAllSuggestions}
-            onClose={closeSuggestions}
-            isLoading={isAnalyzing}
-            error={analysisError}
-            genreConfig={genreConfig}
-          />
-        )}
+  // Drag and drop
+  const handleDragStart = (id) => setDraggingId(id);
+  const handleDragEnd = () => setDraggingId(null);
+  const handleDragOver = (overId) => {
+    if (!draggingId || draggingId === overId) return;
+    setPriorities((prev) => {
+      const cards = [...prev];
+      const fromIdx = cards.findIndex((c) => c.id === draggingId);
+      const toIdx = cards.findIndex((c) => c.id === overId);
+      if (fromIdx !== -1 && toIdx !== -1) {
+        const [moved] = cards.splice(fromIdx, 1);
+        cards.splice(toIdx, 0, moved);
+      }
+      return cards;
+    });
+  };
 
-        {/* Add Card Button */}
-        <div className="flex items-center justify-between mb-4">
-          <span className="text-sm text-slate-500">{priorities.length} priority cards</span>
-          <button
-            onClick={addCard}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border border-slate-200 bg-white hover:bg-slate-50"
-          >
-            <Plus size={16} /> Add Card
-          </button>
-        </div>
-
-        {/* Cards */}
-        <div className="space-y-3">
-          {priorities.map((card, index) => (
-            <PriorityCard
-              key={card.id}
-              card={card}
-              index={index}
-              onEdit={editCard}
-              onDelete={deleteCard}
-              onDragStart={handleDragStart}
-              onDragOver={handleDragOver}
-              onDragEnd={handleDragEnd}
-              isDragging={draggingIndex === index}
-              genreConfig={genreConfig}
-            />
-          ))}
-
-          {priorities.length === 0 && (
-            <div className="text-center py-16 bg-white rounded-2xl border border-dashed border-slate-300">
-              <ListChecks size={48} className="mx-auto text-slate-300 mb-4" />
-              <p className="text-slate-500 font-medium mb-2">No priority cards yet</p>
-              <p className="text-sm text-slate-400 mb-4">Use AI to analyze a chapter, or add cards manually</p>
-              <button
-                onClick={addCard}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border border-slate-200 bg-white hover:bg-slate-50"
-              >
-                <Plus size={16} /> Add Card Manually
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* Stats */}
-        {priorities.length > 0 && (
-          <div className="mt-6 bg-white rounded-2xl border border-slate-200 px-5 py-4">
-            <div className="flex items-center justify-between flex-wrap gap-3 text-sm">
-              <div className="flex items-center gap-4 text-slate-500">
-                <span>{priorities.filter(c => c.status === "Done").length} Done</span>
-                <span>{priorities.filter(c => c.status === "In Progress").length} In Progress</span>
-                <span>{priorities.filter(c => c.status === "Open").length} Open</span>
-              </div>
-              <div className="flex items-center gap-3">
-                {genreConfig.priorityTypes.map(pt => {
-                  const count = priorities.filter(c => c.priorityType === pt.id).length;
-                  if (count === 0) return null;
-                  return (
-                    <span key={pt.id} className="flex items-center gap-1 text-xs" style={{ color: pt.color }}>
-                      {React.createElement(pt.icon, { size: 12 })}
-                      {count} {pt.label}
-                    </span>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Save Button */}
-        <div className="mt-8 flex justify-end">
-          <button
-            onClick={saveNow}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white shadow-lg transition-all hover:scale-105"
-            style={{ background: `linear-gradient(135deg, ${BRAND.navy}, ${BRAND.navyLight})` }}
-          >
-            <Save size={16} /> Save Now
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-// src/components/storylab/PriorityCards.jsx
-// Priority Cards - Track character wants, fears, needs, and secrets
-// Uses direct localStorage with project-aware keys
-
-import React, { useState, useCallback, useEffect, useRef } from "react";
-import { Link } from "react-router-dom";
-import { 
-  Plus, 
-  GripVertical, 
-  Trash2, 
-  Flag, 
-  Tag, 
-  CheckCircle, 
-  ListChecks,
-  Sparkles,
-  BookOpen,
-  ChevronDown,
-  Check,
-  X,
-  Loader2,
-  User,
-  Target,
-  AlertCircle,
-  Save,
-} from "lucide-react";
-import { runAssistant } from "../../lib/api";
-
-/* ============================================
-   BRAND COLORS
-   ============================================ */
-const BRAND = {
-  navy: "#1e3a5f",
-  navyLight: "#2d4a6f",
-  gold: "#d4af37",
-  goldLight: "#f5e6b3",
-  goldDark: "#b8960c",
-  mauve: "#b8a9c9",
-  rose: "#e8b4b8",
-  cream: "#fefdfb",
-};
-
-/* ============================================
-   PROJECT-AWARE STORAGE
-   ============================================ */
-const PRIORITIES_KEY_BASE = "dahtruth-priorities-v2";
-const CHAPTERS_KEY_BASE = "dahtruth-story-lab-toc-v3";
-
-function getSelectedProjectId() {
-  try {
-    const stored = localStorage.getItem('dahtruth-selected-project-id');
-    if (stored) return stored;
-    const projectData = localStorage.getItem('dahtruth-project-store');
-    if (projectData) {
-      const parsed = JSON.parse(projectData);
-      return parsed.selectedProjectId || parsed.currentProjectId || 'default';
-    }
-    return 'default';
-  } catch {
-    return 'default';
-  }
-}
-
-function getProjectKey(baseKey) {
-  const projectId = getSelectedProjectId();
-  return projectId === 'default' ? baseKey : `${baseKey}-${projectId}`;
-}
-
-function loadPriorities() {
-  try {
-    const key = getProjectKey(PRIORITIES_KEY_BASE);
-    console.log(`[PriorityCards] Loading from key: ${key}`);
-    const raw = localStorage.getItem(key);
-    if (!raw) return [];
-    return JSON.parse(raw);
-  } catch {
-    return [];
-  }
-}
-
-function savePriorities(priorities) {
-  try {
-    const key = getProjectKey(PRIORITIES_KEY_BASE);
-    localStorage.setItem(key, JSON.stringify(priorities));
-    console.log(`[PriorityCards] Saved to key: ${key}`);
+  // Filter cards
+  const filteredCards = priorities.filter((card) => {
+    if (!showDone && card.done) return false;
+    if (filterType !== "all" && card.type !== filterType) return false;
+    if (filterEntity !== "all" && card.entity !== filterEntity) return false;
     return true;
-  } catch {
-    return false;
-  }
-}
+  });
 
-function loadChapters() {
-  try {
-    const key = getProjectKey(CHAPTERS_KEY_BASE);
-    const raw = localStorage.getItem(key);
-    if (!raw) return [];
-    const data = JSON.parse(raw);
-    return Array.isArray(data.chapters) ? data.chapters : [];
-  } catch {
-    return [];
-  }
-}
-
-function uid() {
-  return Date.now().toString(36) + Math.random().toString(36).substr(2, 9);
-}
-
-// Extract plain text from HTML
-function stripHtml(html = "") {
-  const tmp = document.createElement("div");
-  tmp.innerHTML = html;
-  return tmp.textContent || tmp.innerText || "";
-}
-
-// Extract character names from text (looks for @char: tags)
-function extractCharacters(text = "") {
-  const matches = text.match(/@char:\s*([A-Za-z0-9 .'-]+)/gi) || [];
-  const names = matches.map(m => m.replace(/@char:\s*/i, "").trim());
-  return [...new Set(names)];
-}
-
-/* ============================================
-   SAVING BADGE
-   ============================================ */
-function SavingBadge({ state }) {
-  return (
-    <span className={`text-xs px-3 py-1.5 rounded-full font-medium ${
-      state === "saving" 
-        ? "bg-amber-100 text-amber-700 border border-amber-200" 
-        : "bg-emerald-100 text-emerald-700 border border-emerald-200"
-    }`}>
-      {state === "saving" ? "Saving…" : "✓ Saved"}
-    </span>
-  );
-}
-
-/* ============================================
-   PAGE BANNER
-   ============================================ */
-const PageBanner = ({ projectId, cardCount }) => (
-  <div 
-    className="rounded-3xl p-8 mb-8 text-white text-center relative overflow-hidden"
-    style={{
-      background: `linear-gradient(135deg, ${BRAND.navy} 0%, ${BRAND.navyLight} 30%, ${BRAND.mauve} 70%, ${BRAND.rose} 100%)`,
-    }}
-  >
-    {/* Decorative elements */}
-    <div className="absolute top-0 left-0 w-64 h-64 rounded-full opacity-10" style={{ background: BRAND.gold, filter: 'blur(80px)' }} />
-    <div className="absolute bottom-0 right-0 w-96 h-96 rounded-full opacity-10" style={{ background: BRAND.rose, filter: 'blur(100px)' }} />
-    
-    <div className="relative z-10">
-      {/* Icon trio */}
-      <div className="flex items-center justify-center gap-3 mb-4">
-        <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: `${BRAND.gold}40` }}>
-          <Target size={24} style={{ color: BRAND.goldLight }} />
-        </div>
-        <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg" style={{ background: `linear-gradient(135deg, ${BRAND.gold}, ${BRAND.goldDark})` }}>
-          <ListChecks size={28} className="text-white" />
-        </div>
-        <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: `${BRAND.mauve}50` }}>
-          <Sparkles size={24} style={{ color: BRAND.cream }} />
-        </div>
-      </div>
-
-      <h1 className="text-3xl font-bold mb-2">Priority Cards</h1>
-      <p className="text-white/70 max-w-xl mx-auto">
-        Track character wants, fears, needs, and secrets. Use AI to analyze chapters or add cards manually.
-      </p>
-      
-      <div className="mt-4 text-xs text-white/40">
-        Project: {projectId} · {cardCount} cards
-      </div>
-    </div>
-  </div>
-);
-
-/* ============================================
-   AI SUGGESTIONS PANEL
-   ============================================ */
-const SuggestionsPanel = ({ suggestions, onAccept, onReject, onAcceptAll, onClose, isLoading, error }) => {
-  if (!isLoading && !error && suggestions.length === 0) return null;
-
-  return (
-    <div className="bg-gradient-to-br from-amber-50 to-white border-2 border-amber-200 rounded-2xl p-5 mb-6 shadow-lg">
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <div 
-            className="w-8 h-8 rounded-lg flex items-center justify-center"
-            style={{ background: `${BRAND.gold}20` }}
-          >
-            <Sparkles size={18} style={{ color: BRAND.gold }} />
-          </div>
-          <div>
-            <h3 className="font-bold text-slate-800">AI Suggestions</h3>
-            <p className="text-xs text-slate-500">Review and accept priorities for your characters</p>
-          </div>
-        </div>
-        <button
-          onClick={onClose}
-          className="p-2 rounded-lg hover:bg-slate-100 text-slate-400 hover:text-slate-600"
-        >
-          <X size={18} />
-        </button>
-      </div>
-
-      {isLoading && (
-        <div className="flex items-center justify-center py-8">
-          <Loader2 size={24} className="animate-spin text-amber-500 mr-3" />
-          <span className="text-slate-600">Analyzing chapter for character priorities...</span>
-        </div>
-      )}
-
-      {error && (
-        <div className="flex items-center gap-3 p-4 bg-red-50 rounded-xl text-red-700">
-          <AlertCircle size={20} />
-          <span>{error}</span>
-        </div>
-      )}
-
-      {!isLoading && !error && suggestions.length > 0 && (
-        <>
-          <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
-            {suggestions.map((suggestion, idx) => (
-              <div 
-                key={idx}
-                className="bg-white rounded-xl border border-slate-200 p-4 hover:shadow-md transition-shadow"
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-2">
-                      <User size={14} className="text-slate-400" />
-                      <span className="text-xs font-medium text-slate-500">{suggestion.character}</span>
-                      <span 
-                        className="text-xs px-2 py-0.5 rounded-full"
-                        style={{ 
-                          background: suggestion.type === "Want" ? `${BRAND.gold}20` :
-                                     suggestion.type === "Fear" ? "#fef2f2" :
-                                     suggestion.type === "Need" ? "#f0fdf4" :
-                                     `${BRAND.mauve}30`,
-                          color: suggestion.type === "Want" ? BRAND.gold :
-                                 suggestion.type === "Fear" ? "#dc2626" :
-                                 suggestion.type === "Need" ? "#16a34a" :
-                                 BRAND.navy
-                        }}
-                      >
-                        {suggestion.type}
-                      </span>
-                    </div>
-                    <p className="text-sm text-slate-700 font-medium">{suggestion.title}</p>
-                    {suggestion.reason && (
-                      <p className="text-xs text-slate-500 mt-1 italic">"{suggestion.reason}"</p>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => onAccept(suggestion)}
-                      className="p-2 rounded-lg bg-emerald-50 text-emerald-600 hover:bg-emerald-100 transition-colors"
-                      title="Accept this suggestion"
-                    >
-                      <Check size={16} />
-                    </button>
-                    <button
-                      onClick={() => onReject(idx)}
-                      className="p-2 rounded-lg bg-slate-50 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
-                      title="Dismiss"
-                    >
-                      <X size={16} />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="flex items-center justify-between mt-4 pt-4 border-t border-amber-200">
-            <span className="text-sm text-slate-500">{suggestions.length} suggestion{suggestions.length !== 1 ? 's' : ''}</span>
-            <button
-              onClick={onAcceptAll}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold text-white transition-all hover:scale-105"
-              style={{ background: `linear-gradient(135deg, ${BRAND.gold}, ${BRAND.goldDark})` }}
-            >
-              <Check size={16} />
-              Accept All
-            </button>
-          </div>
-        </>
-      )}
-    </div>
-  );
-};
-
-/* ============================================
-   CHAPTER ANALYZER
-   ============================================ */
-const AIAnalyzer = ({ onAnalyze, isAnalyzing }) => {
-  const [chapters, setChapters] = useState([]);
-  const [selectedChapterId, setSelectedChapterId] = useState("");
-  const [isOpen, setIsOpen] = useState(false);
-  const dropdownRef = useRef(null);
-
-  useEffect(() => {
-    const loaded = loadChapters();
-    setChapters(loaded);
-    if (loaded.length > 0) {
-      setSelectedChapterId(loaded[0].id);
-    }
-  }, []);
-
-  useEffect(() => {
-    const handleChange = () => {
-      const loaded = loadChapters();
-      setChapters(loaded);
-    };
-    window.addEventListener("project:change", handleChange);
-    window.addEventListener("storage", handleChange);
-    return () => {
-      window.removeEventListener("project:change", handleChange);
-      window.removeEventListener("storage", handleChange);
-    };
-  }, []);
-
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
-        setIsOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  const selectedChapter = chapters.find(c => c.id === selectedChapterId);
-
-  const handleAnalyze = () => {
-    if (!selectedChapter) return;
-    const plainText = stripHtml(selectedChapter.content || "");
-    const characters = extractCharacters(selectedChapter.content || "");
-    onAnalyze(plainText, selectedChapter.title, characters);
-  };
-
-  if (chapters.length === 0) {
-    return (
-      <div className="bg-white rounded-2xl border border-slate-200 p-6 text-center mb-6">
-        <BookOpen size={32} className="mx-auto text-slate-300 mb-3" />
-        <p className="text-slate-500 mb-2">No chapters found</p>
-        <Link 
-          to="/compose" 
-          className="text-sm font-medium"
-          style={{ color: BRAND.gold }}
-        >
-          Go to Writer →
-        </Link>
-      </div>
-    );
-  }
-
-  return (
-    <div className="bg-white rounded-2xl border border-slate-200 p-5 mb-6">
-      <div className="flex items-center gap-3 mb-4">
-        <div 
-          className="w-10 h-10 rounded-xl flex items-center justify-center"
-          style={{ background: `${BRAND.navy}15` }}
-        >
-          <Sparkles size={20} style={{ color: BRAND.navy }} />
-        </div>
-        <div>
-          <h3 className="font-bold text-slate-800">AI Chapter Analysis</h3>
-          <p className="text-sm text-slate-500">Select a chapter to extract character priorities</p>
-        </div>
-      </div>
-
-      <div className="flex items-center gap-3 flex-wrap">
-        {/* Chapter Selector */}
-        <div className="relative" ref={dropdownRef}>
-          <button
-            onClick={() => setIsOpen(!isOpen)}
-            className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 hover:border-slate-300 text-sm font-medium text-slate-700 min-w-[220px] justify-between"
-          >
-            <div className="flex items-center gap-2">
-              <BookOpen size={16} className="text-slate-400" />
-              <span className="truncate max-w-[150px]">
-                {selectedChapter?.title || "Select chapter"}
-              </span>
-            </div>
-            <ChevronDown size={16} className={`text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-          </button>
-
-          {isOpen && (
-            <div className="absolute top-full left-0 mt-2 z-50 bg-white rounded-xl shadow-xl border border-slate-200 min-w-[280px] max-h-[300px] overflow-y-auto">
-              {chapters.map((chapter, idx) => (
-                <button
-                  key={chapter.id}
-                  onClick={() => {
-                    setSelectedChapterId(chapter.id);
-                    setIsOpen(false);
-                  }}
-                  className={`w-full px-4 py-3 text-left text-sm hover:bg-slate-50 flex items-center gap-3 ${
-                    chapter.id === selectedChapterId ? 'bg-amber-50' : ''
-                  }`}
-                >
-                  <span className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-xs font-medium text-slate-500">
-                    {idx + 1}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <div className="font-medium text-slate-700 truncate">{chapter.title}</div>
-                  </div>
-                  {chapter.id === selectedChapterId && (
-                    <Check size={16} style={{ color: BRAND.gold }} />
-                  )}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Analyze Button */}
-        <button
-          onClick={handleAnalyze}
-          disabled={!selectedChapter || isAnalyzing}
-          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-all hover:scale-105 disabled:opacity-50 disabled:hover:scale-100"
-          style={{ background: `linear-gradient(135deg, ${BRAND.navy}, ${BRAND.navyLight})` }}
-        >
-          {isAnalyzing ? (
-            <>
-              <Loader2 size={16} className="animate-spin" />
-              Analyzing...
-            </>
-          ) : (
-            <>
-              <Sparkles size={16} />
-              Analyze Chapter
-            </>
-          )}
-        </button>
-      </div>
-    </div>
-  );
-};
-
-/* ============================================
-   PRIORITY CARD
-   ============================================ */
-function PriorityCard({ card, index, onEdit, onDelete, onDragStart, onDragOver, onDragEnd, isDragging }) {
-  const priorityColor = card.priority === "High" ? "text-red-500" :
-                        card.priority === "Medium" ? "text-amber-500" : "text-slate-400";
-
-  return (
-    <div
-      draggable
-      onDragStart={() => onDragStart(index)}
-      onDragOver={(e) => { e.preventDefault(); onDragOver(index); }}
-      onDragEnd={onDragEnd}
-      className={`bg-white rounded-2xl border border-slate-200 p-4 shadow-sm transition-all ${
-        isDragging ? "opacity-50 scale-95" : "hover:shadow-md"
-      }`}
-    >
-      <div className="flex items-start gap-3">
-        <div className="cursor-grab active:cursor-grabbing pt-1 text-slate-300" title="Drag to reorder">
-          <GripVertical size={18} />
-        </div>
-
-        <div className="flex-1">
-          {/* Character badge */}
-          {card.character && (
-            <div className="flex items-center gap-1 mb-2">
-              <User size={12} className="text-slate-400" />
-              <span className="text-xs font-medium text-slate-500">{card.character}</span>
-            </div>
-          )}
-          
-          <input
-            value={card.title}
-            onChange={(e) => onEdit(card.id, { title: e.target.value })}
-            className="w-full bg-transparent border-b border-slate-200 focus:border-amber-400 outline-none text-slate-800 font-medium"
-            placeholder="Priority title"
-          />
-
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-xs bg-slate-50">
-              <Tag size={12} className="text-slate-400" />
-              <select
-                value={card.scope}
-                onChange={(e) => onEdit(card.id, { scope: e.target.value })}
-                className="bg-transparent outline-none text-slate-600"
-              >
-                <option>Character</option>
-                <option>Plot</option>
-                <option>World</option>
-                <option>Craft</option>
-              </select>
-            </span>
-
-            <span className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-xs bg-slate-50">
-              <Flag size={12} className={priorityColor} />
-              <select
-                value={card.priority}
-                onChange={(e) => onEdit(card.id, { priority: e.target.value })}
-                className="bg-transparent outline-none text-slate-600"
-              >
-                <option>High</option>
-                <option>Medium</option>
-                <option>Low</option>
-              </select>
-            </span>
-
-            <span className="inline-flex items-center gap-1 rounded-lg border border-slate-200 px-2 py-1 text-xs bg-slate-50">
-              <CheckCircle size={12} className="text-emerald-500" />
-              <select
-                value={card.status}
-                onChange={(e) => onEdit(card.id, { status: e.target.value })}
-                className="bg-transparent outline-none text-slate-600"
-              >
-                <option>Open</option>
-                <option>In Session</option>
-                <option>Done</option>
-              </select>
-            </span>
-
-            {/* Priority type badge */}
-            {card.priorityType && (
-              <span 
-                className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium"
-                style={{ 
-                  background: card.priorityType === "Want" ? `${BRAND.gold}15` :
-                             card.priorityType === "Fear" ? "#fef2f2" :
-                             card.priorityType === "Need" ? "#f0fdf4" :
-                             `${BRAND.mauve}20`,
-                  color: card.priorityType === "Want" ? BRAND.gold :
-                         card.priorityType === "Fear" ? "#dc2626" :
-                         card.priorityType === "Need" ? "#16a34a" :
-                         BRAND.navy
-                }}
-              >
-                {card.priorityType}
-              </span>
-            )}
-
-            {/* AI source badge */}
-            {card.source === "AI Suggestion" && (
-              <span className="inline-flex items-center gap-1 text-xs text-amber-600">
-                <Sparkles size={10} />
-                AI
-              </span>
-            )}
-          </div>
-        </div>
-
-        <button
-          onClick={() => onDelete(card.id)}
-          className="p-2 rounded-lg hover:bg-red-50 text-slate-300 hover:text-red-500 transition-colors"
-          title="Delete"
-        >
-          <Trash2 size={16} />
-        </button>
-      </div>
-    </div>
-  );
-}
-
-/* ============================================
-   MAIN COMPONENT
-   ============================================ */
-export default function PriorityCards() {
-  const [currentProjectId, setCurrentProjectId] = useState(getSelectedProjectId);
-  const [priorities, setPriorities] = useState(() => loadPriorities());
-  const [saving, setSaving] = useState("idle");
-  const [draggingIndex, setDraggingIndex] = useState(null);
-  
-  // AI Analysis state
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [suggestions, setSuggestions] = useState([]);
-  const [analysisError, setAnalysisError] = useState(null);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-
-  // Project switch listener
-  useEffect(() => {
-    const handleSwitch = () => {
-      const newId = getSelectedProjectId();
-      if (newId !== currentProjectId) {
-        setCurrentProjectId(newId);
-        setPriorities(loadPriorities());
-      }
-    };
-    window.addEventListener("project:switch", handleSwitch);
-    window.addEventListener("storage", handleSwitch);
-    return () => {
-      window.removeEventListener("project:switch", handleSwitch);
-      window.removeEventListener("storage", handleSwitch);
-    };
-  }, [currentProjectId]);
-
-  // Auto-save with debounce
-  useEffect(() => {
-    setSaving("saving");
-    const id = setTimeout(() => {
-      savePriorities(priorities);
-      setSaving("idle");
-    }, 500);
-    return () => clearTimeout(id);
-  }, [priorities]);
-
-  // Add new card
-  const addCard = useCallback(() => {
-    setPriorities(prev => [...prev, {
-      id: uid(),
-      title: "New priority",
-      scope: "Character",
-      priority: "Medium",
-      status: "Open",
-      done: false,
-    }]);
-  }, []);
-
-  // Delete card
-  const deleteCard = useCallback((id) => {
-    setPriorities(prev => prev.filter(c => c.id !== id));
-  }, []);
-
-  // Edit card
-  const editCard = useCallback((id, patch) => {
-    setPriorities(prev => prev.map(c => c.id === id ? { ...c, ...patch } : c));
-  }, []);
-
-  // Drag handlers
-  const handleDragStart = useCallback((index) => {
-    setDraggingIndex(index);
-  }, []);
-
-  const handleDragOver = useCallback((overIndex) => {
-    if (draggingIndex === null || draggingIndex === overIndex) return;
-    setPriorities(prev => {
-      const copy = [...prev];
-      const [moved] = copy.splice(draggingIndex, 1);
-      copy.splice(overIndex, 0, moved);
-      return copy;
-    });
-    setDraggingIndex(overIndex);
-  }, [draggingIndex]);
-
-  const handleDragEnd = useCallback(() => {
-    setDraggingIndex(null);
-  }, []);
-
-  // AI Analysis
-  const analyzeChapter = useCallback(async (chapterText, chapterTitle, characters) => {
-    setIsAnalyzing(true);
-    setAnalysisError(null);
-    setSuggestions([]);
-    setShowSuggestions(true);
-
-    const truncatedText = chapterText.slice(0, 4000);
-    const charList = characters.length > 0 ? characters.join(", ") : "any characters you can identify";
-
-    const prompt = `Analyze this chapter excerpt and suggest character priorities. For each main character, identify:
-
-1. **WANT** - What they consciously desire or are pursuing
-2. **FEAR** - What they're afraid of or trying to avoid  
-3. **NEED** - What they truly need for growth (may differ from want)
-4. **SECRET** - What they're hiding or not revealing
-
-Characters to focus on: ${charList}
-
-Chapter: "${chapterTitle}"
----
-${truncatedText}
----
-
-Respond ONLY with a JSON array. Each suggestion should have:
-- "character": character name
-- "type": "Want", "Fear", "Need", or "Secret"
-- "title": brief description (under 15 words)
-- "reason": short quote or evidence (under 20 words)
-
-Return 4-8 suggestions. JSON array only.`;
-
-    try {
-      const result = await runAssistant(prompt, "clarify", "", "anthropic");
-      const responseText = result?.result || result?.text || result?.output || result || "";
-      
-      const jsonMatch = responseText.match(/\[[\s\S]*\]/);
-      if (jsonMatch) {
-        const parsed = JSON.parse(jsonMatch[0]);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setSuggestions(parsed);
-        } else {
-          setAnalysisError("No character priorities found in this chapter.");
-        }
-      } else {
-        setAnalysisError("Couldn't parse AI suggestions. Please try again.");
-      }
-    } catch (err) {
-      console.error("AI analysis error:", err);
-      setAnalysisError("Failed to analyze chapter. Please try again.");
-    } finally {
-      setIsAnalyzing(false);
-    }
-  }, []);
-
-  const acceptSuggestion = useCallback((suggestion) => {
-    setPriorities(prev => [...prev, {
-      id: uid(),
-      title: suggestion.title,
-      character: suggestion.character,
-      priorityType: suggestion.type,
-      scope: "Character",
-      priority: suggestion.type === "Fear" ? "High" : "Medium",
-      status: "Open",
-      done: false,
-      source: "AI Suggestion",
-    }]);
-    setSuggestions(prev => prev.filter(s => 
-      !(s.character === suggestion.character && s.type === suggestion.type && s.title === suggestion.title)
-    ));
-  }, []);
-
-  const rejectSuggestion = useCallback((index) => {
-    setSuggestions(prev => prev.filter((_, i) => i !== index));
-  }, []);
-
-  const acceptAllSuggestions = useCallback(() => {
-    const newCards = suggestions.map(suggestion => ({
-      id: uid(),
-      title: suggestion.title,
-      character: suggestion.character,
-      priorityType: suggestion.type,
-      scope: "Character",
-      priority: suggestion.type === "Fear" ? "High" : "Medium",
-      status: "Open",
-      done: false,
-      source: "AI Suggestion",
-    }));
-    setPriorities(prev => [...prev, ...newCards]);
-    setSuggestions([]);
-    setShowSuggestions(false);
-  }, [suggestions]);
-
-  const closeSuggestions = useCallback(() => {
-    setShowSuggestions(false);
-    setSuggestions([]);
-    setAnalysisError(null);
-  }, []);
-
-  const saveNow = () => {
-    setSaving("saving");
-    savePriorities(priorities);
-    setTimeout(() => setSaving("idle"), 300);
-  };
+  // Stats
+  const stats = genreConfig.priorityTypes.map((type) => ({
+    ...type,
+    count: priorities.filter((c) => c.type === type.key && !c.done).length,
+  }));
 
   return (
     <div className="min-h-screen" style={{ background: `linear-gradient(180deg, ${BRAND.cream} 0%, #f1f5f9 100%)` }}>
       {/* Navigation */}
       <div className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-slate-200 shadow-sm">
-        <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
+        <div className="max-w-6xl mx-auto px-4 py-2 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Link
               to="/story-lab"
-              className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-100 transition-colors"
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-100"
             >
-              ← Landing
+              <ArrowLeft size={16} /> Landing
             </Link>
             <span className="text-slate-300">|</span>
             <span className="text-sm font-semibold" style={{ color: BRAND.navy }}>
               Priority Cards
             </span>
           </div>
-          <div className="flex items-center gap-3">
-            <SavingBadge state={saving} />
-            <Link
-              to="/story-lab/workshop"
-              className="flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium text-white transition-all hover:scale-105"
-              style={{ background: `linear-gradient(135deg, ${BRAND.gold}, ${BRAND.goldDark})` }}
-            >
-              Workshop Hub
-            </Link>
-          </div>
+          <Link
+            to="/story-lab/workshop"
+            className="rounded-xl px-3 py-2 text-sm font-medium text-white hover:scale-105 transition-all"
+            style={{ background: `linear-gradient(135deg, ${BRAND.gold}, ${BRAND.goldDark})` }}
+          >
+            Workshop Hub
+          </Link>
         </div>
       </div>
 
-      <div className="max-w-4xl mx-auto px-4 py-8">
-        <PageBanner projectId={currentProjectId} cardCount={priorities.length} />
-
-        {/* AI Analyzer */}
-        <AIAnalyzer onAnalyze={analyzeChapter} isAnalyzing={isAnalyzing} />
-
-        {/* AI Suggestions */}
-        {showSuggestions && (
-          <SuggestionsPanel
-            suggestions={suggestions}
-            onAccept={acceptSuggestion}
-            onReject={rejectSuggestion}
-            onAcceptAll={acceptAllSuggestions}
-            onClose={closeSuggestions}
-            isLoading={isAnalyzing}
-            error={analysisError}
+      <div className="max-w-6xl mx-auto p-6">
+        {/* Header */}
+        <div
+          className="rounded-3xl p-8 mb-8 text-white relative overflow-hidden"
+          style={{
+            background: `linear-gradient(135deg, ${BRAND.navy} 0%, ${BRAND.navyLight} 40%, ${BRAND.mauve} 100%)`,
+          }}
+        >
+          <div
+            className="absolute top-0 right-0 w-64 h-64 rounded-full opacity-10"
+            style={{ background: BRAND.gold, filter: "blur(80px)" }}
           />
-        )}
 
-        {/* Add Card Button */}
-        <div className="flex items-center justify-between mb-4">
-          <span className="text-sm text-slate-500">{priorities.length} priority cards</span>
-          <button
-            onClick={addCard}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border border-slate-200 bg-white hover:bg-slate-50 transition-colors"
-          >
-            <Plus size={16} />
-            Add Card
-          </button>
+          <div className="relative z-10 flex items-center justify-between flex-wrap gap-4">
+            <div className="flex items-center gap-4">
+              <div
+                className="w-16 h-16 rounded-2xl flex items-center justify-center shadow-lg"
+                style={{ background: `linear-gradient(135deg, ${BRAND.gold}, ${BRAND.goldDark})` }}
+              >
+                <BarChart3 size={32} className="text-white" />
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold">Priority Cards</h1>
+                <p className="text-white/70">
+                  {bookTitle} · {priorities.length} cards
+                </p>
+                <p className="text-white/40 text-xs mt-1">Project: {currentProjectId}</p>
+              </div>
+            </div>
+
+            {/* Genre Selector */}
+            <div className="flex items-center gap-3">
+              <label className="text-xs text-white/60 uppercase tracking-wide">Writing Type:</label>
+              <select
+                value={genre}
+                onChange={(e) => handleGenreChange(e.target.value)}
+                className="rounded-xl px-4 py-2 text-sm font-medium bg-white/20 text-white border border-white/30 outline-none cursor-pointer"
+              >
+                {Object.values(GENRE_CONFIG).map((g) => (
+                  <option key={g.id} value={g.id} className="text-slate-800">
+                    {g.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* Stats Row */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          {stats.map((stat) => (
+            <button
+              key={stat.key}
+              onClick={() => setFilterType(filterType === stat.key ? "all" : stat.key)}
+              className={`rounded-xl p-4 border-2 transition-all hover:shadow-md ${
+                filterType === stat.key ? "scale-105 shadow-lg" : ""
+              }`}
+              style={{
+                borderColor: filterType === stat.key ? stat.color : `${stat.color}30`,
+                background: filterType === stat.key ? `${stat.color}10` : "white",
+              }}
+            >
+              <div className="flex items-center gap-3">
+                <div
+                  className="w-10 h-10 rounded-xl flex items-center justify-center"
+                  style={{ background: `${stat.color}15` }}
+                >
+                  <stat.icon size={20} style={{ color: stat.color }} />
+                </div>
+                <div className="text-left">
+                  <p className="text-2xl font-bold" style={{ color: stat.color }}>
+                    {stat.count}
+                  </p>
+                  <p className="text-xs text-slate-500">{stat.label}</p>
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+
+        {/* Filters & Add */}
+        <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
+          <div className="flex items-center gap-3">
+            {/* Entity Filter */}
+            <div className="flex items-center gap-2">
+              <Filter size={16} className="text-slate-400" />
+              <select
+                value={filterEntity}
+                onChange={(e) => setFilterEntity(e.target.value)}
+                className="text-sm rounded-lg px-3 py-2 border border-slate-200 bg-white outline-none"
+              >
+                <option value="all">All {genreConfig.entityPlural}</option>
+                {entities.map((e) => (
+                  <option key={e} value={e}>
+                    {e}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Show Done Toggle */}
+            <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={showDone}
+                onChange={(e) => setShowDone(e.target.checked)}
+                className="rounded"
+              />
+              Show completed
+            </label>
+          </div>
+
+          {/* Add Buttons */}
+          <div className="flex items-center gap-2">
+            {genreConfig.priorityTypes.map((type) => (
+              <button
+                key={type.key}
+                onClick={() => addCard(type.key, filterEntity !== "all" ? filterEntity : "")}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-medium transition-all hover:scale-105"
+                style={{ background: `${type.color}15`, color: type.color }}
+              >
+                <Plus size={14} />
+                {type.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Cards Grid */}
-        <div className="space-y-3">
-          {priorities.map((card, index) => (
-            <PriorityCard
-              key={card.id}
-              card={card}
-              index={index}
-              onEdit={editCard}
-              onDelete={deleteCard}
-              onDragStart={handleDragStart}
-              onDragOver={handleDragOver}
-              onDragEnd={handleDragEnd}
-              isDragging={draggingIndex === index}
-            />
-          ))}
-
-          {priorities.length === 0 && (
-            <div className="text-center py-16 bg-white rounded-2xl border border-dashed border-slate-300">
-              <ListChecks size={48} className="mx-auto text-slate-300 mb-4" />
-              <p className="text-slate-500 font-medium mb-2">No priority cards yet</p>
-              <p className="text-sm text-slate-400 mb-4">
-                Use AI to analyze a chapter, or add cards manually
-              </p>
-              <button
-                onClick={addCard}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium border border-slate-200 bg-white hover:bg-slate-50"
-              >
-                <Plus size={16} />
-                Add Card Manually
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* Stats Footer */}
-        {priorities.length > 0 && (
-          <div className="mt-6 bg-white rounded-2xl border border-slate-200 px-5 py-4">
-            <div className="flex items-center justify-between flex-wrap gap-3 text-sm">
-              <div className="flex items-center gap-4 text-slate-500">
-                <span>{priorities.filter(c => c.status === "Done").length} Done</span>
-                <span>{priorities.filter(c => c.status === "In Session").length} In Session</span>
-                <span>{priorities.filter(c => c.status === "Open").length} Open</span>
-              </div>
-              {priorities.some(c => c.source === "AI Suggestion") && (
-                <span className="flex items-center gap-1 text-amber-600">
-                  <Sparkles size={14} />
-                  {priorities.filter(c => c.source === "AI Suggestion").length} from AI
-                </span>
-              )}
-            </div>
+        {filteredCards.length === 0 ? (
+          <div className="text-center py-16 bg-white rounded-2xl border border-slate-200">
+            <BarChart3 size={48} className="mx-auto mb-4" style={{ color: BRAND.mauve }} />
+            <p className="text-slate-500 font-medium mb-2">No priority cards yet</p>
+            <p className="text-sm text-slate-400">
+              Add cards to track {genreConfig.entityLabel.toLowerCase()} priorities
+            </p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filteredCards.map((card) => (
+              <PriorityCard
+                key={card.id}
+                card={card}
+                genreConfig={genreConfig}
+                onEdit={editCard}
+                onDelete={deleteCard}
+                onDragStart={handleDragStart}
+                onDragOver={handleDragOver}
+                onDragEnd={handleDragEnd}
+                isDragging={draggingId === card.id}
+              />
+            ))}
           </div>
         )}
 
-        {/* Save Button */}
-        <div className="mt-8 flex justify-end">
-          <button
-            onClick={saveNow}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white shadow-lg transition-all hover:scale-105"
-            style={{ background: `linear-gradient(135deg, ${BRAND.navy}, ${BRAND.navyLight})` }}
-          >
-            <Save size={16} />
-            Save Now
-          </button>
+        {/* Footer Stats */}
+        <div className="mt-8 pt-6 border-t border-slate-200 flex items-center justify-between text-sm text-slate-500">
+          <div>
+            {priorities.filter((c) => c.done).length} of {priorities.length} completed
+          </div>
+          <div className="flex items-center gap-4">
+            {entities.length > 0 && (
+              <span>
+                {entities.length} {genreConfig.entityPlural.toLowerCase()} found via tags
+              </span>
+            )}
+          </div>
         </div>
       </div>
     </div>
   );
 }
+
