@@ -1,5 +1,4 @@
 // src/components/ProjectPage.jsx
-// FIXED: Complete project deletion that cleans up ALL storage keys
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -46,14 +45,13 @@ import {
   setCurrentProject,
 } from "../lib/projectsService";
 import { migrateLegacyData, needsMigration } from "../lib/projectSystem";
-import { storage } from "../lib/storage";
 
-// -------------------- Storage helpers --------------------
+// -------------------- Storage helpers (legacy, for backward compat) --------------------
 const PROJECTS_KEY = "userProjects";
 
 function loadLegacyProjects() {
   try {
-    const raw = storage.getItem(PROJECTS_KEY);
+    const raw = localStorage.getItem(PROJECTS_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed : [];
@@ -64,7 +62,7 @@ function loadLegacyProjects() {
 
 function saveLegacyProjects(projects) {
   try {
-    storage.setItem(PROJECTS_KEY, JSON.stringify(projects));
+    localStorage.setItem(PROJECTS_KEY, JSON.stringify(projects));
     window.dispatchEvent(new Event("project:change"));
   } catch (err) {
     console.error("Failed to save projects:", err);
@@ -76,7 +74,7 @@ const API_KEYS_KEY = "dahtruth_api_keys";
 
 function loadApiKeys() {
   try {
-    const raw = storage.getItem(API_KEYS_KEY);
+    const raw = localStorage.getItem(API_KEYS_KEY);
     if (!raw) return { openai: "", anthropic: "" };
     return JSON.parse(raw);
   } catch {
@@ -86,93 +84,26 @@ function loadApiKeys() {
 
 function saveApiKeys(keys) {
   try {
-    storage.setItem(API_KEYS_KEY, JSON.stringify(keys));
+    localStorage.setItem(API_KEYS_KEY, JSON.stringify(keys));
     window.dispatchEvent(new Event("apikeys:updated"));
   } catch (err) {
     console.error("Failed to save API keys:", err);
   }
 }
 
-// -------------------- Title Sync Helper --------------------
-// This function propagates a title change to ALL related storage keys
-function propagateTitleChange(projectId, newTitle) {
-  if (!projectId || !newTitle) return;
-
-  const keysToUpdate = [
-    // Project meta keys
-    `dahtruth_project_meta_${projectId}`,
-    `dt_publishing_meta_${projectId}`,
-    
-    // Cover settings
-    `dahtruth_cover_settings_${projectId}`,
-    
-    // Publishing draft
-    `publishingDraft_${projectId}`,
-  ];
-
-  keysToUpdate.forEach((key) => {
-    try {
-      const raw = storage.getItem(key);
-      if (raw) {
-        const data = JSON.parse(raw);
-        if (data && typeof data === "object") {
-          // Update title in the object
-          if ("title" in data) {
-            data.title = newTitle;
-          }
-          // For publishingDraft, also update book.title
-          if (data.book && typeof data.book === "object") {
-            data.book.title = newTitle;
-          }
-          storage.setItem(key, JSON.stringify(data));
-        }
-      }
-    } catch (err) {
-      console.error(`Failed to update title in ${key}:`, err);
-    }
-  });
-
-  // Also update currentStory if it matches this project
-  try {
-    const currentStoryRaw = storage.getItem("currentStory");
-    if (currentStoryRaw) {
-      const currentStory = JSON.parse(currentStoryRaw);
-      if (currentStory && currentStory.id === projectId) {
-        currentStory.title = newTitle;
-        storage.setItem("currentStory", JSON.stringify(currentStory));
-      }
-    }
-  } catch (err) {
-    console.error("Failed to update currentStory:", err);
-  }
-
-  // Update legacy dahtruth_project_meta if it exists
-  try {
-    const legacyMeta = storage.getItem("dahtruth_project_meta");
-    if (legacyMeta) {
-      const meta = JSON.parse(legacyMeta);
-      // Only update if this appears to be for the same project
-      if (meta && typeof meta === "object") {
-        meta.title = newTitle;
-        storage.setItem("dahtruth_project_meta", JSON.stringify(meta));
-      }
-    }
-  } catch (err) {
-    // Ignore
-  }
-
-  console.log(`[ProjectPage] Title propagated to all storage keys for project ${projectId}`);
-}
-
 // -------------------- COMPLETE Project Deletion Helper --------------------
-// This function removes ALL storage keys associated with a project
+// This function removes ALL storage keys associated with a project from ALL systems
 function cleanupProjectStorage(projectId) {
   if (!projectId) return;
 
-  console.log(`[ProjectPage] Cleaning up all storage for project: ${projectId}`);
+  console.log(`[ProjectPage] ========== COMPLETE CLEANUP for project: ${projectId} ==========`);
 
-  // All known project-scoped key base names
+  // All known project-scoped key base names (comprehensive list from ALL systems)
   const projectScopedKeyBases = [
+    // projectsService.ts keys
+    "dahtruth_projects_cache",
+    // useProjectStore.js keys
+    "dahtruth-project",
     // StoryLab modules
     "dahtruth-story-lab-toc-v3",
     "dahtruth-hfl-data-v2",
@@ -184,52 +115,73 @@ function cleanupProjectStorage(projectId) {
     "dahtruth-plot-builder-v2",
     "dahtruth-project-genre",
     "dt_arc_chars_v2",
-    
     // Publishing / Cover
     "dahtruth_cover_settings",
+    "dahtruth_cover_designs",
+    "dahtruth_cover_image_url",
+    "dahtruth_cover_image_meta",
     "dt_publishing_meta",
     "publishingDraft",
     "dahtruth_project_meta",
-    
+    // Chapters / Characters
+    "dahtruth_chapters",
+    "chapters",
+    "dahtruth_characters",
     // Workshop modules
     "dahtruth-workshop-data",
     "dahtruth-workshop-cohort",
   ];
 
+  let removedCount = 0;
+
   // Remove project-specific keys (try both - and _ separators)
   projectScopedKeyBases.forEach((baseKey) => {
-    try {
-      storage.removeItem(`${baseKey}-${projectId}`);
-    } catch {}
-    try {
-      storage.removeItem(`${baseKey}_${projectId}`);
-    } catch {}
+    [`${baseKey}-${projectId}`, `${baseKey}_${projectId}`].forEach((key) => {
+      try {
+        if (localStorage.getItem(key) !== null) {
+          localStorage.removeItem(key);
+          console.log(`  ✓ Removed: ${key}`);
+          removedCount++;
+        }
+      } catch {}
+    });
   });
 
-  // Clean up selected project ID if it's the deleted one
+  // Clean up dahtruth_projects_index (projectsService)
   try {
-    const selectedId = storage.getItem("dahtruth-selected-project-id");
-    if (selectedId === projectId) {
-      storage.removeItem("dahtruth-selected-project-id");
-      console.log(`[ProjectPage] Cleared selected project ID`);
-    }
-  } catch {}
-
-  // Clean up currentStory if it references deleted project
-  try {
-    const currentStoryRaw = storage.getItem("currentStory");
-    if (currentStoryRaw) {
-      const currentStory = JSON.parse(currentStoryRaw);
-      if (currentStory?.id === projectId) {
-        storage.removeItem("currentStory");
-        console.log(`[ProjectPage] Cleared currentStory`);
+    const indexRaw = localStorage.getItem("dahtruth_projects_index");
+    if (indexRaw) {
+      const index = JSON.parse(indexRaw);
+      if (Array.isArray(index)) {
+        const filtered = index.filter((p) => p.id !== projectId);
+        if (filtered.length !== index.length) {
+          localStorage.setItem("dahtruth_projects_index", JSON.stringify(filtered));
+          console.log(`  ✓ Removed from dahtruth_projects_index`);
+          removedCount++;
+        }
       }
     }
   } catch {}
 
-  // Clean up dahtruth-project-store if it references deleted project
+  // Clean up dahtruth-projects-list (useProjectStore)
   try {
-    const projectStoreRaw = storage.getItem("dahtruth-project-store");
+    const listRaw = localStorage.getItem("dahtruth-projects-list");
+    if (listRaw) {
+      const list = JSON.parse(listRaw);
+      if (Array.isArray(list)) {
+        const filtered = list.filter((p) => p.id !== projectId);
+        if (filtered.length !== list.length) {
+          localStorage.setItem("dahtruth-projects-list", JSON.stringify(filtered));
+          console.log(`  ✓ Removed from dahtruth-projects-list`);
+          removedCount++;
+        }
+      }
+    }
+  } catch {}
+
+  // Clean up dahtruth-project-store
+  try {
+    const projectStoreRaw = localStorage.getItem("dahtruth-project-store");
     if (projectStoreRaw) {
       const projectStore = JSON.parse(projectStoreRaw);
       let modified = false;
@@ -242,23 +194,58 @@ function cleanupProjectStorage(projectId) {
         projectStore.currentProjectId = null;
         modified = true;
       }
-      // Remove from projects array if present
       if (Array.isArray(projectStore.projects)) {
         const originalLength = projectStore.projects.length;
         projectStore.projects = projectStore.projects.filter(p => p.id !== projectId);
-        if (projectStore.projects.length !== originalLength) {
-          modified = true;
-        }
+        if (projectStore.projects.length !== originalLength) modified = true;
       }
 
       if (modified) {
-        storage.setItem("dahtruth-project-store", JSON.stringify(projectStore));
-        console.log(`[ProjectPage] Cleaned dahtruth-project-store`);
+        localStorage.setItem("dahtruth-project-store", JSON.stringify(projectStore));
+        console.log(`  ✓ Cleaned dahtruth-project-store`);
+        removedCount++;
       }
     }
   } catch {}
 
-  console.log(`[ProjectPage] Cleanup complete for project: ${projectId}`);
+  // Clean up selected/current project IDs
+  ["dahtruth-selected-project-id", "dahtruth-current-project-id", "dahtruth_current_project_id"].forEach((key) => {
+    try {
+      if (localStorage.getItem(key) === projectId) {
+        localStorage.removeItem(key);
+        console.log(`  ✓ Cleared ${key}`);
+        removedCount++;
+      }
+    } catch {}
+  });
+
+  // Clean up currentStory
+  try {
+    const currentStoryRaw = localStorage.getItem("currentStory");
+    if (currentStoryRaw) {
+      const currentStory = JSON.parse(currentStoryRaw);
+      if (currentStory?.id === projectId) {
+        localStorage.removeItem("currentStory");
+        console.log(`  ✓ Cleared currentStory`);
+        removedCount++;
+      }
+    }
+  } catch {}
+
+  // Clean up dahtruth_current_project
+  try {
+    const currentProjectRaw = localStorage.getItem("dahtruth_current_project");
+    if (currentProjectRaw) {
+      const currentProject = JSON.parse(currentProjectRaw);
+      if (currentProject?.id === projectId) {
+        localStorage.removeItem("dahtruth_current_project");
+        console.log(`  ✓ Cleared dahtruth_current_project`);
+        removedCount++;
+      }
+    }
+  } catch {}
+
+  console.log(`[ProjectPage] ========== CLEANUP COMPLETE: Removed ${removedCount} items ==========`);
 }
 
 // -------------------- Image helpers --------------------
@@ -349,7 +336,7 @@ function ApiSettingsPanel({ isOpen, onClose }) {
   const [saved, setSaved] = useState(false);
   const [testingOpenAI, setTestingOpenAI] = useState(false);
   const [testingAnthropic, setTestingAnthropic] = useState(false);
-  const [openAIStatus, setOpenAIStatus] = useState(null);
+  const [openAIStatus, setOpenAIStatus] = useState(null); // null, 'valid', 'invalid'
   const [anthropicStatus, setAnthropicStatus] = useState(null);
 
   useEffect(() => {
@@ -368,6 +355,7 @@ function ApiSettingsPanel({ isOpen, onClose }) {
     setOpenAIStatus(null);
     
     try {
+      // Simple test: list models endpoint
       const res = await fetch("https://api.openai.com/v1/models", {
         headers: { Authorization: `Bearer ${keys.openai}` },
       });
@@ -385,6 +373,8 @@ function ApiSettingsPanel({ isOpen, onClose }) {
     setAnthropicStatus(null);
     
     try {
+      // Anthropic doesn't have a simple test endpoint, so we'll just validate format
+      // Keys should start with "sk-ant-"
       const isValidFormat = keys.anthropic.startsWith("sk-ant-");
       setAnthropicStatus(isValidFormat ? "valid" : "invalid");
     } catch {
@@ -392,6 +382,11 @@ function ApiSettingsPanel({ isOpen, onClose }) {
     } finally {
       setTestingAnthropic(false);
     }
+  };
+
+  const maskKey = (key) => {
+    if (!key || key.length < 12) return key;
+    return key.slice(0, 7) + "•".repeat(Math.min(key.length - 11, 20)) + key.slice(-4);
   };
 
   if (!isOpen) return null;
@@ -721,95 +716,6 @@ function AuthorSetupModal({ isOpen, onComplete }) {
   );
 }
 
-// -------------------- Rename Project Modal --------------------
-function RenameProjectModal({ isOpen, onClose, project, onSave }) {
-  const [title, setTitle] = useState(project?.title || "");
-
-  useEffect(() => {
-    if (project) setTitle(project.title || "");
-  }, [project]);
-
-  if (!isOpen || !project) return null;
-
-  const handleSave = () => {
-    const trimmed = title.trim();
-    if (!trimmed) return;
-    onSave(project.id, trimmed);
-    onClose();
-  };
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: "rgba(15, 23, 42, 0.6)", backdropFilter: "blur(4px)" }}
-      onClick={onClose}
-    >
-      <div
-        className="w-full max-w-md rounded-2xl overflow-hidden"
-        style={{
-          background: "#fff",
-          boxShadow: "0 25px 80px rgba(15, 23, 42, 0.25)",
-        }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div
-          className="px-6 py-4"
-          style={{
-            background: "linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%)",
-          }}
-        >
-          <h2 className="text-lg font-semibold text-white">Rename Project</h2>
-          <p className="text-xs text-white/70 mt-1">
-            This will update the title everywhere in the app
-          </p>
-        </div>
-
-        <div className="p-6">
-          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-            Project Title
-          </label>
-          <input
-            type="text"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            placeholder="Enter project title..."
-            className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition-all text-lg"
-            style={{ fontFamily: "'EB Garamond', Georgia, serif" }}
-            autoFocus
-            onKeyDown={(e) => {
-              if (e.key === "Enter") handleSave();
-              if (e.key === "Escape") onClose();
-            }}
-          />
-        </div>
-
-        <div
-          className="px-6 py-4 flex justify-end gap-3"
-          style={{ background: "rgba(248, 250, 252, 0.9)", borderTop: "1px solid rgba(148, 163, 184, 0.2)" }}
-        >
-          <button
-            onClick={onClose}
-            className="px-5 py-2.5 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-100 transition-all"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={!title.trim()}
-            className="px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-all hover:scale-105 disabled:opacity-50"
-            style={{
-              background: "linear-gradient(135deg, #9b7bc9, #b897d6)",
-              boxShadow: "0 4px 14px rgba(155, 123, 201, 0.4)",
-            }}
-          >
-            Save Title
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 // -------------------- Main Component --------------------
 export default function ProjectPage() {
   const navigate = useNavigate();
@@ -820,14 +726,11 @@ export default function ProjectPage() {
   const [authorAvatar, setAuthorAvatar] = useState("");
   const [showApiSettings, setShowApiSettings] = useState(false);
   const [showAuthorSetup, setShowAuthorSetup] = useState(false);
-  const [syncStatus, setSyncStatus] = useState("idle");
-
-  // Rename modal state
-  const [renameModalOpen, setRenameModalOpen] = useState(false);
-  const [projectToRename, setProjectToRename] = useState(null);
+  const [syncStatus, setSyncStatus] = useState("idle"); // idle, syncing, synced, error
 
   // Initialize
   useEffect(() => {
+    // Check if author setup is needed
     const profile = getLocalAuthorProfile();
     if (!profile) {
       setShowAuthorSetup(true);
@@ -835,22 +738,29 @@ export default function ProjectPage() {
       setAuthorName(profile.name);
     }
 
+    // Check for legacy migration
     if (needsMigration()) {
       console.log("[ProjectPage] Migrating legacy data...");
       migrateLegacyData();
     }
 
+    // Load projects
     loadProjectsList();
   }, []);
 
   const loadProjectsList = async () => {
     setSyncStatus("syncing");
     try {
+      // Load from new system
       const entries = await listProjects({ refreshFromCloud: true });
+      
+      // Also load legacy projects for backward compat
       const legacy = loadLegacyProjects();
+      
+      // Merge: convert legacy to new format if needed
       const mergedProjects = [...entries];
       
-      // Only add legacy projects that don't already exist
+      // Add legacy projects not in new system
       for (const lp of legacy) {
         if (!mergedProjects.find((p) => p.id === lp.id)) {
           mergedProjects.push({
@@ -862,6 +772,7 @@ export default function ProjectPage() {
             chapterCount: lp.chapterCount || 0,
             updatedAt: lp.lastModified || new Date().toISOString(),
             createdAt: lp.createdAt || new Date().toISOString(),
+            // Keep legacy fields
             _legacy: lp,
           });
         }
@@ -871,6 +782,7 @@ export default function ProjectPage() {
       setSyncStatus("synced");
     } catch (err) {
       console.error("[ProjectPage] Failed to load projects:", err);
+      // Fall back to legacy
       const legacy = loadLegacyProjects();
       setProjects(legacy.map((lp) => ({
         id: lp.id,
@@ -887,6 +799,7 @@ export default function ProjectPage() {
     }
   };
 
+  // Sync listener
   useEffect(() => {
     const sync = () => loadProjectsList();
     window.addEventListener("storage", sync);
@@ -917,6 +830,7 @@ export default function ProjectPage() {
     const trimmed = (newName || "").trim() || "New Author";
     setAuthorName(trimmed);
 
+    // Update author profile
     const profile = getLocalAuthorProfile();
     if (profile) {
       profile.name = trimmed;
@@ -924,11 +838,13 @@ export default function ProjectPage() {
       setLocalAuthorProfile(profile);
     }
 
+    // Update all projects' author field
     setProjects((prev) => {
       const updated = prev.map((p) => ({
         ...p,
         author: trimmed,
       }));
+      // Save legacy format too
       saveLegacyProjects(updated.map((p) => p._legacy || p));
       return updated;
     });
@@ -941,11 +857,13 @@ export default function ProjectPage() {
     const profile = getLocalAuthorProfile();
     
     try {
+      // Create in new system
       const project = await createProject("Untitled Project", {
         authorName: profile?.name || authorName,
         saveToCloud: true,
       });
 
+      // Also add to legacy for backward compat
       const legacyProject = {
         id: project.id,
         title: project.title,
@@ -965,9 +883,12 @@ export default function ProjectPage() {
 
       const legacy = loadLegacyProjects();
       saveLegacyProjects([legacyProject, ...legacy]);
+
+      // Refresh list
       loadProjectsList();
     } catch (err) {
       console.error("[ProjectPage] Failed to create project:", err);
+      // Fall back to legacy-only creation
       const legacyProject = {
         id: Date.now().toString(),
         title: "Untitled Project",
@@ -990,19 +911,12 @@ export default function ProjectPage() {
     }
   };
 
-  // ✅ UPDATED: Now propagates title changes to all storage keys
   const updateProject = (id, patch) => {
     setProjects((prev) => {
       const now = new Date().toISOString();
       const updated = prev.map((p) =>
         p.id === id ? { ...p, ...patch, updatedAt: now } : p
       );
-
-      // If title was updated, propagate to all storage keys
-      if (patch.title) {
-        propagateTitleChange(id, patch.title);
-      }
-
       // Save to legacy
       const legacyUpdated = updated.map((p) => ({
         ...(p._legacy || {}),
@@ -1014,51 +928,47 @@ export default function ProjectPage() {
     });
   };
 
-  // Open rename modal
-  const openRenameModal = (project) => {
-    setProjectToRename(project);
-    setRenameModalOpen(true);
-  };
-
-  // Handle rename from modal
-  const handleRenameProject = (projectId, newTitle) => {
-    updateProject(projectId, { title: newTitle });
-  };
-
-  // ✅ FIXED: Complete project deletion with full cleanup
   const handleDeleteProject = async (id) => {
     if (!window.confirm("Delete this project? This cannot be undone.")) return;
 
-    console.log(`[ProjectPage] Deleting project: ${id}`);
+    console.log(`[ProjectPage] ========== DELETING PROJECT: ${id} ==========`);
 
-    // 1. Delete from cloud service
+    // 1. Delete from cloud service (projectsService)
     try {
       await deleteProjectService(id);
+      console.log(`[ProjectPage] ✓ Deleted from cloud service`);
     } catch (err) {
       console.error("[ProjectPage] Cloud delete failed:", err);
     }
 
-    // 2. Delete from legacy projects array
+    // 2. Delete from legacy projects array (userProjects)
     const legacy = loadLegacyProjects();
     saveLegacyProjects(legacy.filter((p) => p.id !== id));
+    console.log(`[ProjectPage] ✓ Removed from userProjects`);
 
-    // 3. Clean up ALL project-scoped storage keys
+    // 3. COMPLETE CLEANUP: Remove ALL project-scoped storage keys from ALL systems
     cleanupProjectStorage(id);
 
-    // 4. Dispatch event to notify all modules
+    // 4. Dispatch events to notify all modules/hooks
     window.dispatchEvent(new Event("project:change"));
+    window.dispatchEvent(new Event("projects:change"));
+    window.dispatchEvent(new Event("storage"));
 
-    // 5. Reload projects list
-    loadProjectsList();
+    // 5. Refresh list
+    await loadProjectsList();
+
+    console.log(`[ProjectPage] ========== PROJECT DELETION COMPLETE ==========`);
   };
 
   const openInWriter = async (project) => {
     try {
+      // Try to load from new system first
       const loaded = await loadProject(project.id);
       
       if (loaded) {
         setCurrentProject(loaded);
       } else {
+        // Fall back to legacy snapshot
         const snapshot = {
           id: project.id,
           title: project.title || project._legacy?.title || "Untitled",
@@ -1067,15 +977,13 @@ export default function ProjectPage() {
           status: project.status || "Draft",
           targetWords: project.targetWords || project._legacy?.targetWords || 50000,
         };
-        storage.setItem("currentStory", JSON.stringify(snapshot));
+        localStorage.setItem("currentStory", JSON.stringify(snapshot));
       }
-      
-      // Set selected project ID for StoryLab modules
-      storage.setItem("dahtruth-selected-project-id", project.id);
       
       window.dispatchEvent(new Event("project:change"));
     } catch (err) {
       console.error("[ProjectPage] Failed to load project:", err);
+      // Use legacy snapshot
       const snapshot = {
         id: project.id,
         title: project.title,
@@ -1084,14 +992,14 @@ export default function ProjectPage() {
         status: project.status || "Draft",
         targetWords: project.targetWords || 50000,
       };
-      storage.setItem("currentStory", JSON.stringify(snapshot));
-      storage.setItem("dahtruth-selected-project-id", project.id);
+      localStorage.setItem("currentStory", JSON.stringify(snapshot));
       window.dispatchEvent(new Event("project:change"));
     }
 
     navigate("/compose");
   };
 
+  // Handle cover upload
   const handleCoverChange = async (projectId, fileInputEvent) => {
     const file = fileInputEvent.target.files?.[0];
     if (!file) return;
@@ -1134,6 +1042,7 @@ export default function ProjectPage() {
     }
   };
 
+  // Calculate totals
   const totalWords = projects.reduce((sum, p) => sum + (p.wordCount || 0), 0);
   const inProgress = projects.filter(
     (p) => !["Published", "Idea", "published", "completed", "archived"].includes(p.status)
@@ -1158,6 +1067,7 @@ export default function ProjectPage() {
     });
   };
 
+  // Check if API keys are configured
   const apiKeys = loadApiKeys();
   const hasApiKeys = !!(apiKeys.openai || apiKeys.anthropic);
 
@@ -1179,17 +1089,6 @@ export default function ProjectPage() {
       <ApiSettingsPanel
         isOpen={showApiSettings}
         onClose={() => setShowApiSettings(false)}
-      />
-
-      {/* Rename Project Modal */}
-      <RenameProjectModal
-        isOpen={renameModalOpen}
-        onClose={() => {
-          setRenameModalOpen(false);
-          setProjectToRename(null);
-        }}
-        project={projectToRename}
-        onSave={handleRenameProject}
       />
 
       <div className="mx-auto max-w-7xl px-6 py-8">
@@ -1261,6 +1160,7 @@ export default function ProjectPage() {
 
                 <p className="text-xs text-gray-500 mt-1 flex items-center gap-2">
                   {projects.length} projects • {totalWords.toLocaleString()} total words
+                  {/* Sync status indicator */}
                   <span
                     className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium"
                     style={{
@@ -1590,28 +1490,20 @@ export default function ProjectPage() {
                       {/* Header */}
                       <div className="flex justify-between items-start mb-1">
                         <div className="flex-1 min-w-0">
-                          {/* ✅ Title with dedicated rename button */}
-                          <div className="flex items-center gap-2">
-                            <h3
-                              className="text-xl font-semibold truncate cursor-pointer hover:text-purple-700 transition-colors"
-                              style={{
-                                fontFamily: "'EB Garamond', Georgia, serif",
-                                color: "#111827",
-                              }}
-                              onClick={() => openRenameModal(project)}
-                              title="Click to rename"
-                            >
-                              {project.title || "Untitled"}
-                            </h3>
-                            <button
-                              type="button"
-                              onClick={() => openRenameModal(project)}
-                              className="text-gray-400 hover:text-purple-600 transition-colors p-1"
-                              title="Rename project"
-                            >
-                              <PencilLine size={14} />
-                            </button>
-                          </div>
+                          <input
+                            value={project.title || ""}
+                            onChange={(e) =>
+                              updateProject(project.id, {
+                                title: e.target.value,
+                              })
+                            }
+                            placeholder="Project title..."
+                            className="w-full bg-transparent text-xl font-semibold outline-none border-b-2 border-transparent hover:border-purple-200 focus:border-purple-400 transition-colors pb-1"
+                            style={{
+                              fontFamily: "'EB Garamond', Georgia, serif",
+                              color: "#111827",
+                            }}
+                          />
                           <div className="flex items-center gap-2 mt-2 text-sm text-gray-500">
                             <div
                               className="w-5 h-5 rounded-full flex items-center justify-center text-xs text-white font-semibold"
@@ -1876,15 +1768,13 @@ export default function ProjectPage() {
                   {/* Title / Author */}
                   <div>
                     <div
-                      className="font-semibold flex items-center gap-2 cursor-pointer hover:text-purple-700"
+                      className="font-semibold"
                       style={{
                         fontFamily: "'EB Garamond', Georgia, serif",
                         color: "#111827",
                       }}
-                      onClick={() => openRenameModal(project)}
                     >
                       {project.title || "Untitled"}
-                      <PencilLine size={12} className="text-gray-400" />
                     </div>
                     <div className="text-xs text-gray-500 mt-0.5">
                       by {project.author || authorName}
@@ -1934,7 +1824,7 @@ export default function ProjectPage() {
                   </div>
 
                   {/* Actions */}
-                  <div className="flex gap-2">
+                  <div>
                     <button
                       onClick={() => openInWriter(project)}
                       className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold text-white transition-all hover:scale-105"
@@ -1944,17 +1834,6 @@ export default function ProjectPage() {
                       }}
                     >
                       <Edit3 size={12} /> Write
-                    </button>
-                    <button
-                      onClick={() => handleDeleteProject(project.id)}
-                      className="p-2 rounded-lg transition-all hover:scale-105"
-                      style={{
-                        background: "rgba(239,68,68,0.06)",
-                        color: "#dc2626",
-                      }}
-                      title="Delete project"
-                    >
-                      <Trash2 size={12} />
                     </button>
                   </div>
                 </div>
@@ -1966,4 +1845,5 @@ export default function ProjectPage() {
     </div>
   );
 }
+
 
