@@ -1375,4 +1375,3 @@ export default function NarrativeArc() {
     </div>
   );
 }
-
