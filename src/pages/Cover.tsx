@@ -7,7 +7,7 @@ import PageShell from "../components/layout/PageShell.tsx";
 import { uploadImage } from "../lib/uploads";
 import { toPng } from "html-to-image";
 import { storage } from "../lib/storage";
-import { getSelectedProjectId } from "../lib/projectsSync";
+import { getCurrentProjectId, loadProject, saveProject } from "../lib/projectsService";
 
 const theme = {
   bg: "var(--brand-bg, #0f172a)",
@@ -361,66 +361,56 @@ function ColorPickerField({ label, value, onChange }) {
 /**
  * Persist cover fields into the *actual* Project record (IndexedDB).
  * This is what makes Publishing/Writing reliably see the cover.
- *
- * This uses a dynamic import to avoid hard-crashing if your projectsService file path differs.
- * Once you confirm your exact load/save function names, we can simplify this.
  */
 async function persistCoverToProjectRecord(projectId, payload) {
   if (!projectId || projectId === "default") return;
 
   try {
-    const mod = await import("../lib/projectsService");
-
-    const load =
-      mod.getProject ||
-      mod.loadProject ||
-      mod.readProject ||
-      mod.getProjectById ||
-      mod.loadProjectById;
-
-    const save =
-      mod.saveProject ||
-      mod.putProject ||
-      mod.updateProject ||
-      mod.saveProjectById;
-
-    if (typeof load !== "function" || typeof save !== "function") {
-      console.warn(
-        "[Cover] projectsService found but missing expected load/save functions.",
-        { available: Object.keys(mod) }
-      );
-      return;
-    }
-
-    const project = await load(projectId);
+    const project = await loadProject(projectId, { preferCloud: false });
     if (!project) {
       console.warn("[Cover] No project found for id:", projectId);
       return;
     }
 
-    project.publishing = project.publishing || {};
+    // Ensure objects exist
     project.book = project.book || {};
+    project.cover = project.cover || {};
+    project.publishing = project.publishing || {};
+    project.publishing.meta = project.publishing.meta || {};
 
+    // Keep titles in sync (project.title, publishing.meta.title, cover.title)
     if (payload.title !== undefined) {
-      // Keep book title in sync (optional but helps everywhere)
-      project.book.title = payload.title || project.book.title || "";
+      const nextTitle = payload.title || "";
+      project.title = nextTitle;
+      project.book.title = nextTitle;
+      project.publishing.meta.title = nextTitle;
+      project.cover.title = nextTitle;
     }
 
+    // Cover text fields
+    if (payload.subtitle !== undefined) project.cover.subtitle = payload.subtitle || "";
+    if (payload.author !== undefined) {
+      project.cover.author = payload.author || "";
+      project.publishing.meta.author = payload.author || project.publishing.meta.author || "";
+    }
+    if (payload.tagline !== undefined) project.cover.tagline = payload.tagline || "";
+
+    // Cover image fields
     if (payload.coverImageUrl !== undefined) {
-      project.publishing.coverImageUrl = payload.coverImageUrl || "";
-    }
-    if (payload.coverImageFit !== undefined) {
-      project.publishing.coverImageFit = payload.coverImageFit;
-    }
-    if (payload.coverImageFilter !== undefined) {
-      project.publishing.coverImageFilter = payload.coverImageFilter;
+      const url = payload.coverImageUrl || "";
+      project.cover.imageUrl = url;
+      project.publishing.coverImageUrl = url; // in case other pages read from publishing
     }
 
-    project.publishing.coverUpdatedAt = Date.now();
+    if (payload.coverImageFit !== undefined) project.cover.imageFit = payload.coverImageFit;
+    if (payload.coverImageFilter !== undefined) project.cover.imageFilter = payload.coverImageFilter;
 
-    await save(project);
+    // Timestamp
+    project.cover.updatedAt = new Date().toISOString();
 
-    // Notify other pages that might listen
+    // ✅ IMPORTANT: Don't cloud-sync on every keystroke.
+    await saveProject(project, { updateIndex: true, cloudSync: false });
+
     window.dispatchEvent(
       new CustomEvent("project:cover-updated", { detail: { projectId } })
     );
@@ -440,8 +430,7 @@ export default function Cover() {
 
   // Project ID and name
   const [projectId, setProjectId] = useState("");
-  const [projectName, setProjectName]_toggle = useState(""); // internal setter name fixed below
-  const setProjectName = setProjectName_toggle;
+  const [projectName, setProjectName] = useState("");
 
   // Text content
   const [title, setTitle] = useState("Working Title");
@@ -513,17 +502,14 @@ export default function Cover() {
   if (layoutKey === "bottom") justifyContent = "flex-end";
 
   // Debounced persist into Project record (IndexedDB)
-  const schedulePersistToProjectRecord = useCallback(
-    (pid, payload) => {
-      if (!pid || pid === "default") return;
+  const schedulePersistToProjectRecord = useCallback((pid, payload) => {
+    if (!pid || pid === "default") return;
 
-      if (persistTimerRef.current) clearTimeout(persistTimerRef.current);
-      persistTimerRef.current = setTimeout(() => {
-        void persistCoverToProjectRecord(pid, payload);
-      }, 250);
-    },
-    []
-  );
+    if (persistTimerRef.current) clearTimeout(persistTimerRef.current);
+    persistTimerRef.current = setTimeout(() => {
+      void persistCoverToProjectRecord(pid, payload);
+    }, 250);
+  }, []);
 
   // keep a ref so effects can call without extra deps churn
   useEffect(() => {
@@ -542,11 +528,8 @@ export default function Cover() {
 
       // Load cover image URL (project-scoped only — NO legacy fallback to avoid cross-project bleed)
       const savedUrl = storage.getItem(coverImageUrlKeyForProject(pid));
-      if (savedUrl) {
-        setCoverImageUrl(savedUrl);
-      } else {
-        setCoverImageUrl("");
-      }
+      if (savedUrl) setCoverImageUrl(savedUrl);
+      else setCoverImageUrl("");
 
       // Load cover image meta (project-scoped; legacy read intentionally avoided)
       const savedMeta = storage.getItem(coverImageMetaKeyForProject(pid));
@@ -594,13 +577,13 @@ export default function Cover() {
     } finally {
       setCoverLoaded(true);
     }
-  }, [setProjectName]);
+  }, []);
 
   // ✅ Initialize project ID and listen for changes
   useEffect(() => {
     const initProject = () => {
       try {
-        const id = getSelectedProjectId() || "default";
+        const id = getCurrentProjectId() || "default";
         setProjectId(id);
         setCoverLoaded(false);
         loadCoverData(id);
@@ -654,7 +637,6 @@ export default function Cover() {
       // Save image URL (project-scoped only)
       if (coverImageUrl) {
         storage.setItem(coverImageUrlKeyForProject(projectId), coverImageUrl);
-
         // Legacy write kept ONLY for backward compatibility with older builds (optional)
         storage.setItem(COVER_IMAGE_URL_KEY, coverImageUrl);
       } else {
@@ -682,6 +664,9 @@ export default function Cover() {
       if (schedulePersistRef.current) {
         schedulePersistRef.current(projectId, {
           title,
+          subtitle,
+          author,
+          tagline,
           coverImageUrl,
           coverImageFit,
           coverImageFilter,
@@ -720,7 +705,7 @@ export default function Cover() {
     if (!file) return;
 
     // Snapshot projectId so we don't save to the wrong project if it changes mid-upload
-    const pid = projectId || getSelectedProjectId() || "default";
+    const pid = projectId || getCurrentProjectId() || "default";
 
     try {
       setCoverImageUploading(true);
@@ -749,6 +734,9 @@ export default function Cover() {
       // ✅ Persist to Project record (IndexedDB) so Publishing sees it
       await persistCoverToProjectRecord(pid, {
         title,
+        subtitle,
+        author,
+        tagline,
         coverImageUrl: result.viewUrl,
         coverImageFit,
         coverImageFilter,
@@ -764,7 +752,7 @@ export default function Cover() {
   };
 
   const handleClearCoverImage = async () => {
-    const pid = projectId || getSelectedProjectId() || "default";
+    const pid = projectId || getCurrentProjectId() || "default";
 
     setCoverImageUrl("");
 
@@ -779,6 +767,9 @@ export default function Cover() {
 
     await persistCoverToProjectRecord(pid, {
       title,
+      subtitle,
+      author,
+      tagline,
       coverImageUrl: "",
       coverImageFit,
       coverImageFilter,
@@ -998,7 +989,9 @@ Story description: ${aiPrompt}`,
 
   // Preview size
   const COVER_PREVIEW_WIDTH = 420;
-  const coverPreviewHeight = Math.round(COVER_PREVIEW_WIDTH * (selectedTrim.hIn / selectedTrim.wIn));
+  const coverPreviewHeight = Math.round(
+    COVER_PREVIEW_WIDTH * (selectedTrim.hIn / selectedTrim.wIn)
+  );
 
   return (
     <PageShell
