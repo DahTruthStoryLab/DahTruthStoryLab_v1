@@ -1,16 +1,21 @@
 // src/components/UI/UIComponents.jsx
 // Reusable UI components with brand styling + AIInstructionsCard
+// UPDATED: better disabled handling, SSR-safe helpers, ProjectBadge component
 
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 
 /* ===================== Buttons & Crumbs ===================== */
 
-export function GoldButton({ children, className = "", ...props }) {
+export function GoldButton({ children, className = "", disabled, ...props }) {
+  const isDisabled = !!disabled || !!props?.["aria-disabled"];
+
   return (
     <button
       {...props}
+      disabled={disabled}
       className={[
-        "inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium text-white shadow-sm hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-offset-1",
+        "inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium text-white shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-1",
+        isDisabled ? "opacity-60 cursor-not-allowed" : "hover:opacity-90",
         className,
       ].join(" ")}
       style={{ backgroundColor: "#D4AF37" }}
@@ -30,12 +35,32 @@ export function WritingCrumb({ view }) {
   );
 }
 
+/* ===================== Project Badge (optional) ===================== */
+/**
+ * Use anywhere you want to show the current project title:
+ * <ProjectBadge title={currentProject?.title} />
+ */
+export function ProjectBadge({ title, subtitle }) {
+  if (!title && !subtitle) return null;
+
+  return (
+    <div className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-[12px] text-slate-700 shadow-sm">
+      <span className="font-semibold">Project:</span>
+      <span className="truncate max-w-[260px]">{title || "Untitled"}</span>
+      {subtitle ? <span className="opacity-60">• {subtitle}</span> : null}
+    </div>
+  );
+}
+
 /* ===================== Editor Badges ===================== */
 
 export function PageNumberBadge({ pageIndex, pageCount }) {
+  const safeCount = Math.max(1, Number(pageCount || 1));
+  const safeIndex = Math.min(Math.max(0, Number(pageIndex || 0)), safeCount - 1);
+
   return (
     <div
-      aria-label={`Page ${Math.min(pageIndex + 1, pageCount)} of ${pageCount}`}
+      aria-label={`Page ${safeIndex + 1} of ${safeCount}`}
       className="pointer-events-none select-none text-[12px] text-slate-600"
       style={{
         position: "absolute",
@@ -49,7 +74,7 @@ export function PageNumberBadge({ pageIndex, pageCount }) {
         backdropFilter: "blur(2px)",
       }}
     >
-      Page {Math.min(pageIndex + 1, pageCount)} / {pageCount}
+      Page {safeIndex + 1} / {safeCount}
     </div>
   );
 }
@@ -117,35 +142,49 @@ export function AIInstructionsCard({
 
   /* ---------- helpers ---------- */
   const stripHtml = (html = "") => {
+    // SSR-safe
+    if (typeof document === "undefined") {
+      return String(html || "")
+        .replace(/<[^>]+>/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+    }
     const div = document.createElement("div");
     div.innerHTML = html;
     return (div.textContent || div.innerText || "").trim();
   };
 
   const summarize = (text = "", max = 800) => {
-    if (text.length <= max) return text;
-    const cut = text.slice(0, max);
+    const s = String(text || "");
+    if (s.length <= max) return s;
+    const cut = s.slice(0, max);
     const lastDot = cut.lastIndexOf(".");
     return cut.slice(0, lastDot > 400 ? lastDot + 1 : max) + "…";
   };
 
+  const resolvedIndex = useMemo(() => {
+    if (typeof chapter?.index === "number") return chapter.index;
+    const idx = chapters.findIndex((c) => String(c?.id) === String(chapter?.id));
+    return idx >= 0 ? idx : 0;
+  }, [chapter?.id, chapter?.index, chapters]);
+
   const buildPayload = () => {
-    const idx =
-      typeof chapter?.index === "number"
-        ? chapter.index
-        : chapters.findIndex((c) => String(c.id) === String(chapter?.id));
+    const idx = resolvedIndex;
 
     const prev = idx > 0 ? chapters[idx - 1] : null;
     const next = idx < chapters.length - 1 ? chapters[idx + 1] : null;
+
+    const chapterTitle = chapter?.title?.trim() || `Chapter ${idx + 1}`;
+    const chapterContent = stripHtml(chapter?.html || "");
 
     return {
       styleInstructions,
       chapter: {
         id: chapter?.id,
         index: idx,
-        title: chapter?.title?.trim() || `Chapter ${idx + 1}`,
-        content: stripHtml(chapter?.html || ""),
-        summary: summarize(stripHtml(chapter?.html || ""), 1200),
+        title: chapterTitle,
+        content: chapterContent,
+        summary: summarize(chapterContent, 1200),
       },
       neighbors: {
         previous: prev
@@ -170,11 +209,24 @@ export function AIInstructionsCard({
     };
   };
 
+  const normalizeErrorMessage = (e) => {
+    const msg = e?.message || String(e || "");
+    if (!msg) return "Couldn’t generate a prompt. Please try again.";
+    // If backend sends JSON error, show a short version
+    if (msg.includes("{") && msg.includes("}")) return "Couldn’t generate a prompt. Please try again.";
+    return msg;
+  };
+
   /* ---------- action ---------- */
   const handleGenerate = async () => {
     try {
       setLoading(true);
       setError("");
+
+      if (!chapter?.id && !chapter?.title) {
+        throw new Error("No chapter selected.");
+      }
+
       const payload = buildPayload();
 
       const res = await fetch(apiUrl, {
@@ -192,11 +244,12 @@ export function AIInstructionsCard({
       }
 
       const data = await res.json();
-      setPromptText(data?.prompt || "");
+      const prompt = data?.prompt || data?.result || "";
+      setPromptText(prompt);
       onGenerated?.(data);
     } catch (e) {
       console.error(e);
-      setError("Couldn’t generate a prompt. Please try again.");
+      setError(normalizeErrorMessage(e));
     } finally {
       setLoading(false);
     }
@@ -220,25 +273,23 @@ export function AIInstructionsCard({
       ) : null}
 
       <div className="px-4 py-3">
-        {error && <div className="text-xs text-red-600 mb-2">{error}</div>}
+        {error ? <div className="text-xs text-red-600 mb-2">{error}</div> : null}
+
         {promptText ? (
-          <div className="text-sm whitespace-pre-wrap leading-relaxed">
-            {promptText}
-          </div>
+          <div className="text-sm whitespace-pre-wrap leading-relaxed">{promptText}</div>
         ) : (
           <div className="text-sm text-slate-500">
-            Click <span className="font-medium">Generate Prompt</span> to get a
-            focused suggestion that moves this chapter forward.
+            Click <span className="font-medium">Generate Prompt</span> to get a focused suggestion that moves this
+            chapter forward.
           </div>
         )}
       </div>
 
-      {/* Optional footer (e.g., show what chapter this relates to) */}
-      {chapter?.title || typeof chapter?.index === "number" ? (
+      {(chapter?.title || typeof chapter?.index === "number") && (
         <div className="px-4 pb-3 text-[12px] text-slate-500">
-          For: {chapter?.title?.trim() || `Chapter ${(chapter.index ?? 0) + 1}`}
+          For: {chapter?.title?.trim() || `Chapter ${resolvedIndex + 1}`}
         </div>
-      ) : null}
+      )}
     </div>
   );
 }
