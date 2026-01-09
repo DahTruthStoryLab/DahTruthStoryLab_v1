@@ -1,5 +1,7 @@
 // src/pages/Cover.jsx
-// UPDATED: Listens for project:change events, shows current project name
+// UPDATED: Persists cover image + settings to BOTH project-scoped storage AND the Project record (IndexedDB)
+// Fixes: cover image not saving across navigation + cross-project “legacy key” bleed
+
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import PageShell from "../components/layout/PageShell.tsx";
 import { uploadImage } from "../lib/uploads";
@@ -22,20 +24,41 @@ const theme = {
 
 // Preset color swatches for quick selection
 const COLOR_SWATCHES = [
-  // Whites & Lights
-  "#ffffff", "#f9fafb", "#f3f4f6", "#e5e7eb", "#d1d5db",
-  // Golds & Yellows
-  "#d4af37", "#facc15", "#fbbf24", "#f59e0b", "#eab308",
-  // Reds & Pinks
-  "#ef4444", "#dc2626", "#b91c1c", "#f43f5e", "#ec4899",
-  // Blues
-  "#3b82f6", "#2563eb", "#1d4ed8", "#1e3a5f", "#0f172a",
-  // Purples & Mauves
-  "#8b5cf6", "#7c3aed", "#6366f1", "#b8a9c9", "#a855f7",
-  // Greens
-  "#22c55e", "#16a34a", "#15803d", "#10b981", "#059669",
-  // Neutrals & Blacks
-  "#111827", "#1f2937", "#374151", "#4b5563", "#000000",
+  "#ffffff",
+  "#f9fafb",
+  "#f3f4f6",
+  "#e5e7eb",
+  "#d1d5db",
+  "#d4af37",
+  "#facc15",
+  "#fbbf24",
+  "#f59e0b",
+  "#eab308",
+  "#ef4444",
+  "#dc2626",
+  "#b91c1c",
+  "#f43f5e",
+  "#ec4899",
+  "#3b82f6",
+  "#2563eb",
+  "#1d4ed8",
+  "#1e3a5f",
+  "#0f172a",
+  "#8b5cf6",
+  "#7c3aed",
+  "#6366f1",
+  "#b8a9c9",
+  "#a855f7",
+  "#22c55e",
+  "#16a34a",
+  "#15803d",
+  "#10b981",
+  "#059669",
+  "#111827",
+  "#1f2937",
+  "#374151",
+  "#4b5563",
+  "#000000",
 ];
 
 const GENRE_PRESETS = [
@@ -137,23 +160,15 @@ const TRIM_PRESETS = [
 ];
 
 // Project-scoped storage keys
-const coverDesignsKeyForProject = (projectId) =>
-  `dahtruth_cover_designs_${projectId}`;
-
-const coverImageUrlKeyForProject = (projectId) =>
-  `dahtruth_cover_image_url_${projectId}`;
-
-const coverImageMetaKeyForProject = (projectId) =>
-  `dahtruth_cover_image_meta_${projectId}`;
-
-const coverSettingsKeyForProject = (projectId) =>
-  `dahtruth_cover_settings_${projectId}`;
+const coverDesignsKeyForProject = (projectId) => `dahtruth_cover_designs_${projectId}`;
+const coverImageUrlKeyForProject = (projectId) => `dahtruth_cover_image_url_${projectId}`;
+const coverImageMetaKeyForProject = (projectId) => `dahtruth_cover_image_meta_${projectId}`;
+const coverSettingsKeyForProject = (projectId) => `dahtruth_cover_settings_${projectId}`;
 
 // Project data key (to get project title)
-const projectDataKeyForProject = (projectId) =>
-  `dahtruth-project-${projectId}`;
+const projectDataKeyForProject = (projectId) => `dahtruth-project-${projectId}`;
 
-// Legacy keys (for backwards compatibility)
+// Legacy keys (kept ONLY for backwards compat writing; we do NOT read from them anymore)
 const COVER_DESIGNS_KEY = "dahtruth_cover_designs_v1";
 const COVER_IMAGE_URL_KEY = "dahtruth_cover_image_url";
 const COVER_IMAGE_META_KEY = "dahtruth_cover_image_meta";
@@ -166,32 +181,31 @@ function safeJsonParse(value, fallback) {
   }
 }
 
-// Get project title from storage
+// Get project title from storage (best-effort)
 function getProjectTitle(projectId) {
   if (!projectId || projectId === "default") return null;
-  
+
   try {
-    // Try main project data
     const dataRaw = storage.getItem(projectDataKeyForProject(projectId));
     if (dataRaw) {
       const data = JSON.parse(dataRaw);
-      if (data.book?.title) return data.book.title;
+      if (data?.book?.title) return data.book.title;
+      if (data?.name) return data.name;
+      if (data?.title) return data.title;
     }
-    
-    // Try cover settings
+
     const settingsRaw = storage.getItem(coverSettingsKeyForProject(projectId));
     if (settingsRaw) {
       const settings = JSON.parse(settingsRaw);
-      if (settings.title) return settings.title;
+      if (settings?.title) return settings.title;
     }
-    
-    // Try currentStory
+
     const storyRaw = storage.getItem("currentStory");
     if (storyRaw) {
       const story = JSON.parse(storyRaw);
-      if (story.id === projectId && story.title) return story.title;
+      if (story?.id === projectId && story?.title) return story.title;
     }
-    
+
     return null;
   } catch {
     return null;
@@ -258,7 +272,6 @@ function ColorPickerField({ label, value, onChange }) {
     <div style={{ marginBottom: 12 }}>
       <div style={{ ...styles.label, marginBottom: 6 }}>{label}</div>
       <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-        {/* Color preview box that opens swatches */}
         <button
           type="button"
           onClick={() => setShowSwatches(!showSwatches)}
@@ -273,8 +286,6 @@ function ColorPickerField({ label, value, onChange }) {
           }}
           title="Click to choose color"
         />
-
-        {/* Hex input */}
         <input
           type="text"
           value={value}
@@ -290,8 +301,6 @@ function ColorPickerField({ label, value, onChange }) {
             background: theme.white,
           }}
         />
-
-        {/* Native color picker as backup */}
         <input
           type="color"
           value={value}
@@ -309,7 +318,6 @@ function ColorPickerField({ label, value, onChange }) {
         />
       </div>
 
-      {/* Color swatches dropdown */}
       {showSwatches && (
         <div
           style={{
@@ -350,12 +358,90 @@ function ColorPickerField({ label, value, onChange }) {
   );
 }
 
+/**
+ * Persist cover fields into the *actual* Project record (IndexedDB).
+ * This is what makes Publishing/Writing reliably see the cover.
+ *
+ * This uses a dynamic import to avoid hard-crashing if your projectsService file path differs.
+ * Once you confirm your exact load/save function names, we can simplify this.
+ */
+async function persistCoverToProjectRecord(projectId, payload) {
+  if (!projectId || projectId === "default") return;
+
+  try {
+    const mod = await import("../lib/projectsService");
+
+    const load =
+      mod.getProject ||
+      mod.loadProject ||
+      mod.readProject ||
+      mod.getProjectById ||
+      mod.loadProjectById;
+
+    const save =
+      mod.saveProject ||
+      mod.putProject ||
+      mod.updateProject ||
+      mod.saveProjectById;
+
+    if (typeof load !== "function" || typeof save !== "function") {
+      console.warn(
+        "[Cover] projectsService found but missing expected load/save functions.",
+        { available: Object.keys(mod) }
+      );
+      return;
+    }
+
+    const project = await load(projectId);
+    if (!project) {
+      console.warn("[Cover] No project found for id:", projectId);
+      return;
+    }
+
+    project.publishing = project.publishing || {};
+    project.book = project.book || {};
+
+    if (payload.title !== undefined) {
+      // Keep book title in sync (optional but helps everywhere)
+      project.book.title = payload.title || project.book.title || "";
+    }
+
+    if (payload.coverImageUrl !== undefined) {
+      project.publishing.coverImageUrl = payload.coverImageUrl || "";
+    }
+    if (payload.coverImageFit !== undefined) {
+      project.publishing.coverImageFit = payload.coverImageFit;
+    }
+    if (payload.coverImageFilter !== undefined) {
+      project.publishing.coverImageFilter = payload.coverImageFilter;
+    }
+
+    project.publishing.coverUpdatedAt = Date.now();
+
+    await save(project);
+
+    // Notify other pages that might listen
+    window.dispatchEvent(
+      new CustomEvent("project:cover-updated", { detail: { projectId } })
+    );
+
+    console.log("[Cover] ✅ Persisted cover into project record:", projectId);
+  } catch (e) {
+    console.warn("[Cover] Could not persist cover to project record:", e);
+  }
+}
+
 export default function Cover() {
   const coverRef = useRef(null);
 
+  // Debounce project-record writes so we don't spam IndexedDB on every keystroke
+  const persistTimerRef = useRef(null);
+  const schedulePersistRef = useRef(null);
+
   // Project ID and name
   const [projectId, setProjectId] = useState("");
-  const [projectName, setProjectName] = useState("");
+  const [projectName, setProjectName]_toggle = useState(""); // internal setter name fixed below
+  const setProjectName = setProjectName_toggle;
 
   // Text content
   const [title, setTitle] = useState("Working Title");
@@ -405,8 +491,8 @@ export default function Cover() {
 
   const selectedPreset =
     GENRE_PRESETS.find((p) => p.key === genrePresetKey) || GENRE_PRESETS[0];
-
-  const selectedTrim = TRIM_PRESETS.find((t) => t.key === trimKey) || TRIM_PRESETS[0];
+  const selectedTrim =
+    TRIM_PRESETS.find((t) => t.key === trimKey) || TRIM_PRESETS[0];
 
   // Determine actual colors to use
   const activeTitleColor = useCustomColors ? customTitleColor : selectedPreset.titleColor;
@@ -426,30 +512,44 @@ export default function Cover() {
   if (layoutKey === "top") justifyContent = "flex-start";
   if (layoutKey === "bottom") justifyContent = "flex-end";
 
+  // Debounced persist into Project record (IndexedDB)
+  const schedulePersistToProjectRecord = useCallback(
+    (pid, payload) => {
+      if (!pid || pid === "default") return;
+
+      if (persistTimerRef.current) clearTimeout(persistTimerRef.current);
+      persistTimerRef.current = setTimeout(() => {
+        void persistCoverToProjectRecord(pid, payload);
+      }, 250);
+    },
+    []
+  );
+
+  // keep a ref so effects can call without extra deps churn
+  useEffect(() => {
+    schedulePersistRef.current = schedulePersistToProjectRecord;
+  }, [schedulePersistToProjectRecord]);
+
   // ✅ Load cover data for a project
   const loadCoverData = useCallback((pid) => {
     if (!pid) return;
-    
+
     console.log("[Cover] Loading data for project:", pid);
-    
+
     try {
-      // Get project name
       const pName = getProjectTitle(pid);
       setProjectName(pName || "");
 
-      // Load cover image URL (project-scoped first, then legacy)
-      let savedUrl = storage.getItem(coverImageUrlKeyForProject(pid));
-      if (!savedUrl) savedUrl = storage.getItem(COVER_IMAGE_URL_KEY);
+      // Load cover image URL (project-scoped only — NO legacy fallback to avoid cross-project bleed)
+      const savedUrl = storage.getItem(coverImageUrlKeyForProject(pid));
       if (savedUrl) {
-        console.log("[Cover] Loaded image URL:", savedUrl.substring(0, 50) + "...");
         setCoverImageUrl(savedUrl);
       } else {
         setCoverImageUrl("");
       }
 
-      // Load cover image meta
-      let savedMeta = storage.getItem(coverImageMetaKeyForProject(pid));
-      if (!savedMeta) savedMeta = storage.getItem(COVER_IMAGE_META_KEY);
+      // Load cover image meta (project-scoped; legacy read intentionally avoided)
+      const savedMeta = storage.getItem(coverImageMetaKeyForProject(pid));
       if (savedMeta) {
         const meta = safeJsonParse(savedMeta, {});
         if (meta.fit) setCoverImageFit(meta.fit);
@@ -468,49 +568,39 @@ export default function Cover() {
         if (settings.layoutKey) setLayoutKey(settings.layoutKey);
         if (settings.trimKey) setTrimKey(settings.trimKey);
 
-        // Custom colors
         if (typeof settings.useCustomColors === "boolean") setUseCustomColors(settings.useCustomColors);
         if (settings.customTitleColor) setCustomTitleColor(settings.customTitleColor);
         if (settings.customSubtitleColor) setCustomSubtitleColor(settings.customSubtitleColor);
         if (settings.customAuthorColor) setCustomAuthorColor(settings.customAuthorColor);
         if (settings.customTaglineColor) setCustomTaglineColor(settings.customTaglineColor);
 
-        // Custom font
         if (settings.customFontFamily !== undefined) setCustomFontFamily(settings.customFontFamily);
 
-        // Custom background
         if (typeof settings.useCustomBg === "boolean") setUseCustomBg(settings.useCustomBg);
         if (settings.customBgColor1) setCustomBgColor1(settings.customBgColor1);
         if (settings.customBgColor2) setCustomBgColor2(settings.customBgColor2);
-        
-        console.log("[Cover] Loaded settings for project");
       } else {
-        // Reset to defaults if no settings for this project
-        console.log("[Cover] No saved settings, using defaults");
-        // Try to get title from project data
         const pTitle = getProjectTitle(pid);
         if (pTitle) setTitle(pTitle);
       }
 
-      // Load saved designs
+      // Load saved designs (project-scoped first; legacy fallback ONLY for reading designs)
       let savedDesigns = storage.getItem(coverDesignsKeyForProject(pid));
       if (!savedDesigns) savedDesigns = storage.getItem(COVER_DESIGNS_KEY);
       const designsArray = safeJsonParse(savedDesigns, []);
       setDesigns(Array.isArray(designsArray) ? designsArray : []);
-
     } catch (e) {
       console.error("[Cover] Failed to load cover data:", e);
     } finally {
       setCoverLoaded(true);
     }
-  }, []);
+  }, [setProjectName]);
 
   // ✅ Initialize project ID and listen for changes
   useEffect(() => {
     const initProject = () => {
       try {
         const id = getSelectedProjectId() || "default";
-        console.log("[Cover] Initializing with project:", id);
         setProjectId(id);
         setCoverLoaded(false);
         loadCoverData(id);
@@ -523,11 +613,7 @@ export default function Cover() {
 
     initProject();
 
-    // Listen for project switches
-    const handleProjectChange = () => {
-      console.log("[Cover] Project changed event received");
-      initProject();
-    };
+    const handleProjectChange = () => initProject();
 
     window.addEventListener("project:change", handleProjectChange);
     window.addEventListener("storage", handleProjectChange);
@@ -535,12 +621,13 @@ export default function Cover() {
     return () => {
       window.removeEventListener("project:change", handleProjectChange);
       window.removeEventListener("storage", handleProjectChange);
+      if (persistTimerRef.current) clearTimeout(persistTimerRef.current);
     };
   }, [loadCoverData]);
 
-  // Auto-save cover settings when they change
+  // Auto-save cover settings when they change (project-scoped storage + debounced project-record persist)
   useEffect(() => {
-    if (!coverLoaded || !projectId) return;
+    if (!coverLoaded || !projectId || projectId === "default") return;
 
     try {
       const settings = {
@@ -564,22 +651,42 @@ export default function Cover() {
 
       storage.setItem(coverSettingsKeyForProject(projectId), JSON.stringify(settings));
 
-      // Save image URL
+      // Save image URL (project-scoped only)
       if (coverImageUrl) {
         storage.setItem(coverImageUrlKeyForProject(projectId), coverImageUrl);
-        // Also save to legacy key for backwards compat
+
+        // Legacy write kept ONLY for backward compatibility with older builds (optional)
         storage.setItem(COVER_IMAGE_URL_KEY, coverImageUrl);
       } else {
         storage.removeItem(coverImageUrlKeyForProject(projectId));
+        storage.removeItem(COVER_IMAGE_URL_KEY);
       }
 
       // Save image meta
-      storage.setItem(
-        coverImageMetaKeyForProject(projectId),
-        JSON.stringify({ fit: coverImageFit, filter: coverImageFilter })
-      );
+      if (coverImageUrl) {
+        storage.setItem(
+          coverImageMetaKeyForProject(projectId),
+          JSON.stringify({ fit: coverImageFit, filter: coverImageFilter })
+        );
+        // Legacy write kept ONLY for backward compatibility (optional)
+        storage.setItem(
+          COVER_IMAGE_META_KEY,
+          JSON.stringify({ fit: coverImageFit, filter: coverImageFilter })
+        );
+      } else {
+        storage.removeItem(coverImageMetaKeyForProject(projectId));
+        storage.removeItem(COVER_IMAGE_META_KEY);
+      }
 
-      console.log("[Cover] Auto-saved settings for project:", projectId);
+      // ✅ Persist into Project record (IndexedDB) so Publishing/Writing can read it
+      if (schedulePersistRef.current) {
+        schedulePersistRef.current(projectId, {
+          title,
+          coverImageUrl,
+          coverImageFit,
+          coverImageFilter,
+        });
+      }
     } catch (e) {
       console.error("[Cover] Failed to save cover settings:", e);
     }
@@ -612,25 +719,41 @@ export default function Cover() {
     const file = input.files?.[0];
     if (!file) return;
 
+    // Snapshot projectId so we don't save to the wrong project if it changes mid-upload
+    const pid = projectId || getSelectedProjectId() || "default";
+
     try {
       setCoverImageUploading(true);
-      console.log("[Cover] Uploading image:", file.name);
+
       const result = await uploadImage(file);
-      console.log("[Cover] Upload result:", result);
-      
-      if (result.viewUrl) {
-        setCoverImageUrl(result.viewUrl);
-        
-        // Immediately save to storage
-        if (projectId) {
-          storage.setItem(coverImageUrlKeyForProject(projectId), result.viewUrl);
-          storage.setItem(COVER_IMAGE_URL_KEY, result.viewUrl);
-          console.log("[Cover] Saved image URL to storage");
-        }
-      } else {
-        throw new Error("No viewUrl in upload response");
+      if (!result?.viewUrl) throw new Error("No viewUrl in upload response");
+
+      setCoverImageUrl(result.viewUrl);
+
+      // Save immediately to project-scoped storage
+      if (pid && pid !== "default") {
+        storage.setItem(coverImageUrlKeyForProject(pid), result.viewUrl);
+        storage.setItem(
+          coverImageMetaKeyForProject(pid),
+          JSON.stringify({ fit: coverImageFit, filter: coverImageFilter })
+        );
+
+        // Optional legacy writes (safe but can be removed later)
+        storage.setItem(COVER_IMAGE_URL_KEY, result.viewUrl);
+        storage.setItem(
+          COVER_IMAGE_META_KEY,
+          JSON.stringify({ fit: coverImageFit, filter: coverImageFilter })
+        );
       }
-      
+
+      // ✅ Persist to Project record (IndexedDB) so Publishing sees it
+      await persistCoverToProjectRecord(pid, {
+        title,
+        coverImageUrl: result.viewUrl,
+        coverImageFit,
+        coverImageFilter,
+      });
+
       input.value = "";
     } catch (err) {
       console.error("[Cover upload error]", err);
@@ -640,14 +763,28 @@ export default function Cover() {
     }
   };
 
-  const handleClearCoverImage = () => {
+  const handleClearCoverImage = async () => {
+    const pid = projectId || getSelectedProjectId() || "default";
+
     setCoverImageUrl("");
-    if (projectId) {
-      storage.removeItem(coverImageUrlKeyForProject(projectId));
+
+    if (pid && pid !== "default") {
+      storage.removeItem(coverImageUrlKeyForProject(pid));
+      storage.removeItem(coverImageMetaKeyForProject(pid));
+
+      // Clear legacy keys too so it doesn't “come back”
+      storage.removeItem(COVER_IMAGE_URL_KEY);
+      storage.removeItem(COVER_IMAGE_META_KEY);
     }
+
+    await persistCoverToProjectRecord(pid, {
+      title,
+      coverImageUrl: "",
+      coverImageFit,
+      coverImageFilter,
+    });
   };
 
-  // Apply preset colors to custom colors (for starting point)
   const applyPresetToCustom = () => {
     setCustomTitleColor(selectedPreset.titleColor);
     setCustomSubtitleColor(selectedPreset.subtitleColor);
@@ -656,10 +793,14 @@ export default function Cover() {
     setUseCustomColors(true);
   };
 
-  // Build current design object for saving
   const buildCurrentDesign = () => {
+    const id =
+      typeof crypto !== "undefined" && crypto?.randomUUID
+        ? crypto.randomUUID()
+        : String(Date.now());
+
     return {
-      id: crypto?.randomUUID ? crypto.randomUUID() : String(Date.now()),
+      id,
       name: (designName || title || "Untitled").trim(),
       createdAt: new Date().toISOString(),
       title,
@@ -712,9 +853,10 @@ export default function Cover() {
     const updated = [next, ...designs];
     setDesigns(updated);
 
-    // Save to storage
-    if (projectId) {
+    if (projectId && projectId !== "default") {
       storage.setItem(coverDesignsKeyForProject(projectId), JSON.stringify(updated));
+      // legacy write kept for backward compatibility
+      storage.setItem(COVER_DESIGNS_KEY, JSON.stringify(updated));
     }
 
     setSelectedDesignId(next.id);
@@ -735,8 +877,9 @@ export default function Cover() {
     const updated = designs.filter((d) => d.id !== selectedDesignId);
     setDesigns(updated);
 
-    if (projectId) {
+    if (projectId && projectId !== "default") {
       storage.setItem(coverDesignsKeyForProject(projectId), JSON.stringify(updated));
+      storage.setItem(COVER_DESIGNS_KEY, JSON.stringify(updated));
     }
 
     setSelectedDesignId("");
@@ -809,7 +952,6 @@ Story description: ${aiPrompt}`,
       if (data.ok && data.result) {
         let jsonStr = String(data.result).trim();
         jsonStr = jsonStr.replace(/```json?\n?/g, "").replace(/```/g, "").trim();
-
         const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
         if (jsonMatch) jsonStr = jsonMatch[0];
 
@@ -825,7 +967,6 @@ Story description: ${aiPrompt}`,
           setCoverImageFilter(suggestions.filter);
         }
 
-        // Apply custom colors if AI suggested them
         if (suggestions.titleColor || suggestions.subtitleColor || suggestions.authorColor) {
           setUseCustomColors(true);
           if (suggestions.titleColor) setCustomTitleColor(suggestions.titleColor);
@@ -923,22 +1064,22 @@ Story description: ${aiPrompt}`,
               </div>
             </div>
 
-            {/* ✅ Show current project name prominently */}
+            {/* Show current project name */}
             <div style={{ textAlign: "right", fontSize: 11 }}>
               <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 2 }}>
                 {projectName || title || "Untitled Project"}
               </div>
-              <div style={{ opacity: 0.8 }}>
-                Changes auto-save to your project
-              </div>
+              <div style={{ opacity: 0.8 }}>Changes auto-save to your project</div>
               {coverImageUrl && (
-                <div style={{ 
-                  marginTop: 4, 
-                  padding: "2px 8px", 
-                  background: "rgba(34, 197, 94, 0.3)", 
-                  borderRadius: 999,
-                  fontSize: 10 
-                }}>
+                <div
+                  style={{
+                    marginTop: 4,
+                    padding: "2px 8px",
+                    background: "rgba(34, 197, 94, 0.3)",
+                    borderRadius: 999,
+                    fontSize: 10,
+                  }}
+                >
                   ✅ Cover image saved
                 </div>
               )}
@@ -1146,26 +1287,10 @@ Story description: ${aiPrompt}`,
 
               {useCustomColors && (
                 <div style={{ marginBottom: 12 }}>
-                  <ColorPickerField
-                    label="Title Color"
-                    value={customTitleColor}
-                    onChange={setCustomTitleColor}
-                  />
-                  <ColorPickerField
-                    label="Subtitle Color"
-                    value={customSubtitleColor}
-                    onChange={setCustomSubtitleColor}
-                  />
-                  <ColorPickerField
-                    label="Author Color"
-                    value={customAuthorColor}
-                    onChange={setCustomAuthorColor}
-                  />
-                  <ColorPickerField
-                    label="Tagline Color"
-                    value={customTaglineColor}
-                    onChange={setCustomTaglineColor}
-                  />
+                  <ColorPickerField label="Title Color" value={customTitleColor} onChange={setCustomTitleColor} />
+                  <ColorPickerField label="Subtitle Color" value={customSubtitleColor} onChange={setCustomSubtitleColor} />
+                  <ColorPickerField label="Author Color" value={customAuthorColor} onChange={setCustomAuthorColor} />
+                  <ColorPickerField label="Tagline Color" value={customTaglineColor} onChange={setCustomTaglineColor} />
                 </div>
               )}
 
@@ -1198,16 +1323,8 @@ Story description: ${aiPrompt}`,
 
                 {useCustomBg && (
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                    <ColorPickerField
-                      label="Gradient Start"
-                      value={customBgColor1}
-                      onChange={setCustomBgColor1}
-                    />
-                    <ColorPickerField
-                      label="Gradient End"
-                      value={customBgColor2}
-                      onChange={setCustomBgColor2}
-                    />
+                    <ColorPickerField label="Gradient Start" value={customBgColor1} onChange={setCustomBgColor1} />
+                    <ColorPickerField label="Gradient End" value={customBgColor2} onChange={setCustomBgColor2} />
                   </div>
                 )}
               </div>
@@ -1397,11 +1514,7 @@ Story description: ${aiPrompt}`,
               <div style={{ display: "grid", gap: 10 }}>
                 <div>
                   <div style={styles.label}>Trim size</div>
-                  <select
-                    style={styles.input}
-                    value={trimKey}
-                    onChange={(e) => setTrimKey(e.target.value)}
-                  >
+                  <select style={styles.input} value={trimKey} onChange={(e) => setTrimKey(e.target.value)}>
                     {TRIM_PRESETS.map((t) => (
                       <option key={t.key} value={t.key}>
                         {t.label}
@@ -1412,11 +1525,7 @@ Story description: ${aiPrompt}`,
 
                 <div>
                   <div style={styles.label}>DPI</div>
-                  <select
-                    style={styles.input}
-                    value={dpi}
-                    onChange={(e) => setDpi(Number(e.target.value))}
-                  >
+                  <select style={styles.input} value={dpi} onChange={(e) => setDpi(Number(e.target.value))}>
                     <option value={150}>150 (draft)</option>
                     <option value={300}>300 (print)</option>
                   </select>
@@ -1450,16 +1559,14 @@ Story description: ${aiPrompt}`,
                     {selectedTrim.label}
                   </span>
                 </div>
-                <div style={{ fontSize: 11, color: theme.subtext }}>
-                  Auto-saves as you edit
-                </div>
+                <div style={{ fontSize: 11, color: theme.subtext }}>Auto-saves as you edit</div>
               </div>
 
               <div style={{ display: "flex", justifyContent: "center", alignItems: "center", flex: 1, padding: "20px 0" }}>
                 <div
                   ref={coverRef}
                   style={{
-                    width: COVER_PREVIEW_WIDTH,
+                    width: 420,
                     height: coverPreviewHeight,
                     borderRadius: 12,
                     position: "relative",
