@@ -307,5 +307,5 @@ export function useChapterManager() {
 
     // Import
     loadFromParsedDocument,
-  };
+  }; 
 }
