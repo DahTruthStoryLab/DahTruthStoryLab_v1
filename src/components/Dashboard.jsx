@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useUser } from "../lib/userStore";
+import { storage } from "../lib/storage";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import {
   Plus,
@@ -78,7 +79,7 @@ function readAuthorProfile() {
   try {
     const keys = ["dahtruth_project_meta", "dt_profile", "userProfile", "profile", "currentUser"];
     for (const key of keys) {
-      const raw = localStorage.getItem(key);
+      const raw = storage.getItem(key);
       if (!raw) continue;
       const obj = JSON.parse(raw);
 
@@ -283,7 +284,7 @@ const Sidebar = ({ isOpen, onClose, authorName, authorAvatar, navigate, userNove
                       wordCount: words,
                       lastModified: lastModified || new Date().toISOString(),
                     };
-                    localStorage.setItem("currentStory", JSON.stringify(snapshot));
+                    storage.setItem("currentStory", JSON.stringify(snapshot));
                     window.dispatchEvent(new Event("project:change"));
                   } catch (err) {
                     console.error("Failed to set currentStory from sidebar:", err);
@@ -444,20 +445,23 @@ export default function Dashboard() {
     const loadProjects = () => {
       try {
         // Try to get user-specific projects first
-        const userId = localStorage.getItem("dt_user_id") || "default";
+        const userId = storage.getItem("dt_user_id") || "default";
         const userProjectsKey = `userProjects_${userId}`;
         const userNovelsKey = `userNovels_${userId}`;
         
         // Check user-specific keys first, then fall back to generic keys
-        const projectData = localStorage.getItem(userProjectsKey) || localStorage.getItem("userProjects");
-        const novelsData = localStorage.getItem(userNovelsKey) || localStorage.getItem("userNovels");
+        // Also check dahtruth-projects-list which is the main project store
+        const projectData = storage.getItem(userProjectsKey) || storage.getItem("userProjects") || storage.getItem("dahtruth-projects-list");
+        const novelsData = storage.getItem(userNovelsKey) || storage.getItem("userNovels");
 
         if (projectData) {
-          setUserNovels(JSON.parse(projectData));
+          const projects = JSON.parse(projectData);
+          console.log(`[Dashboard] Loaded ${projects.length} projects`);
+          setUserNovels(projects);
         } else if (novelsData) {
           setUserNovels(JSON.parse(novelsData));
         } else {
-          const storyData = localStorage.getItem("currentStory");
+          const storyData = storage.getItem("currentStory");
           if (storyData) {
             const s = JSON.parse(storyData);
             setUserNovels([
@@ -484,12 +488,14 @@ export default function Dashboard() {
     window.addEventListener("profile:updated", loadProjects);
     window.addEventListener("project:change", loadProjects);
     window.addEventListener("auth:change", loadProjects);
+    window.addEventListener("storage:ready", loadProjects); // Listen for IndexedDB hydration complete
 
     return () => {
       window.removeEventListener("storage", loadProjects);
       window.removeEventListener("profile:updated", loadProjects);
       window.removeEventListener("project:change", loadProjects);
       window.removeEventListener("auth:change", loadProjects);
+      window.removeEventListener("storage:ready", loadProjects);
     };
   }, [user]);
 
