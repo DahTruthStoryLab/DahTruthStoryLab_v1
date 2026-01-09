@@ -1,6 +1,5 @@
 // src/hooks/useProjectStore.js
 // Central project management - create, switch, delete projects with isolated storage
-// UPDATED: Uses IndexedDB-backed storage wrapper for persistence
 
 import { useState, useEffect, useCallback } from "react";
 import { storage } from "../lib/storage";
@@ -168,50 +167,153 @@ function syncToUserProjects(projects) {
   }
 }
 
-// Delete ALL data associated with a project
-function deleteAllProjectData(projectId) {
-  try {
-    // Main project data key
-    const key = getProjectDataKey(projectId);
-    storage.removeItem(key);
-    
-    // All possible project-related keys to clean up
-    const keysToDelete = [
-      // Project data
-      `dahtruth-project-${projectId}`,
-      `dahtruth_project_${projectId}`,
-      `dahtruth_project_meta_${projectId}`,
-      
-      // Cover data
-      `dahtruth_cover_designs_${projectId}`,
-      `dahtruth_cover_settings_${projectId}`,
-      `dahtruth_cover_image_url_${projectId}`,
-      `dahtruth_cover_image_meta_${projectId}`,
-      
-      // Publishing data
-      `publishingDraft_${projectId}`,
-      `dt_publishing_meta_${projectId}`,
-      
-      // Chapters data (various formats)
-      `dahtruth_chapters_${projectId}`,
-      `chapters_${projectId}`,
-      
-      // Character data
-      `dahtruth_characters_${projectId}`,
-    ];
-    
-    keysToDelete.forEach(k => {
+// Delete project data
+// ============================================================================
+// COMPREHENSIVE PROJECT CLEANUP - Cleans ALL storage systems
+// ============================================================================
+
+function cleanupAllProjectStorage(projectId) {
+  if (!projectId) return;
+
+  console.log(`[ProjectStore] ========== COMPLETE CLEANUP for: ${projectId} ==========`);
+  let removedCount = 0;
+
+  // All project-scoped key patterns from ALL systems
+  const projectScopedKeyBases = [
+    "dahtruth_projects_cache", "dahtruth-project",
+    "dahtruth-story-lab-toc-v3", "dahtruth-hfl-data-v2", "dahtruth-priorities-v2",
+    "dahtruth-character-roadmap", "dahtruth-clothesline-v2", "dahtruth-dialogue-lab-v1",
+    "dahtruth-narrative-arc-v2", "dahtruth-plot-builder-v2", "dahtruth-project-genre",
+    "dt_arc_chars_v2", "dahtruth_cover_settings", "dahtruth_cover_designs",
+    "dahtruth_cover_image_url", "dahtruth_cover_image_meta", "dt_publishing_meta",
+    "publishingDraft", "dahtruth_project_meta", "dahtruth_chapters", "chapters",
+    "dahtruth_characters", "dahtruth-workshop-data", "dahtruth-workshop-cohort",
+  ];
+
+  projectScopedKeyBases.forEach((baseKey) => {
+    [`${baseKey}-${projectId}`, `${baseKey}_${projectId}`].forEach((key) => {
       try {
-        storage.removeItem(k);
-      } catch (e) {
-        // Ignore errors for non-existent keys
-      }
+        if (storage.getItem(key) !== null) {
+          storage.removeItem(key);
+          console.log(`  ✓ Removed: ${key}`);
+          removedCount++;
+        }
+      } catch {}
     });
-    
-    console.log(`[ProjectStore] Deleted all data for project: ${projectId}`);
-  } catch (err) {
-    console.error("Failed to delete project data:", err);
-  }
+  });
+
+  // Clean dahtruth_projects_index
+  try {
+    const indexRaw = storage.getItem("dahtruth_projects_index");
+    if (indexRaw) {
+      const index = JSON.parse(indexRaw);
+      if (Array.isArray(index)) {
+        const filtered = index.filter((p) => p.id !== projectId);
+        if (filtered.length !== index.length) {
+          storage.setItem("dahtruth_projects_index", JSON.stringify(filtered));
+          console.log(`  ✓ Removed from dahtruth_projects_index`);
+          removedCount++;
+        }
+      }
+    }
+  } catch {}
+
+  // Clean dahtruth-projects-list
+  try {
+    const listRaw = storage.getItem(PROJECTS_LIST_KEY);
+    if (listRaw) {
+      const list = JSON.parse(listRaw);
+      if (Array.isArray(list)) {
+        const filtered = list.filter((p) => p.id !== projectId);
+        if (filtered.length !== list.length) {
+          storage.setItem(PROJECTS_LIST_KEY, JSON.stringify(filtered));
+          console.log(`  ✓ Removed from ${PROJECTS_LIST_KEY}`);
+          removedCount++;
+        }
+      }
+    }
+  } catch {}
+
+  // Clean userProjects
+  try {
+    const userProjectsRaw = storage.getItem("userProjects");
+    if (userProjectsRaw) {
+      const userProjects = JSON.parse(userProjectsRaw);
+      if (Array.isArray(userProjects)) {
+        const filtered = userProjects.filter((p) => p.id !== projectId);
+        if (filtered.length !== userProjects.length) {
+          storage.setItem("userProjects", JSON.stringify(filtered));
+          console.log(`  ✓ Removed from userProjects`);
+          removedCount++;
+        }
+      }
+    }
+  } catch {}
+
+  // Clean dahtruth-project-store
+  try {
+    const storeRaw = storage.getItem("dahtruth-project-store");
+    if (storeRaw) {
+      const store = JSON.parse(storeRaw);
+      let modified = false;
+      if (store.selectedProjectId === projectId) { store.selectedProjectId = null; modified = true; }
+      if (store.currentProjectId === projectId) { store.currentProjectId = null; modified = true; }
+      if (Array.isArray(store.projects)) {
+        const len = store.projects.length;
+        store.projects = store.projects.filter(p => p.id !== projectId);
+        if (store.projects.length !== len) modified = true;
+      }
+      if (modified) {
+        storage.setItem("dahtruth-project-store", JSON.stringify(store));
+        console.log(`  ✓ Cleaned dahtruth-project-store`);
+        removedCount++;
+      }
+    }
+  } catch {}
+
+  // Clean ID keys
+  ["dahtruth-selected-project-id", "dahtruth-current-project-id", "dahtruth_current_project_id", CURRENT_PROJECT_KEY].forEach((key) => {
+    try {
+      if (storage.getItem(key) === projectId) {
+        storage.removeItem(key);
+        console.log(`  ✓ Cleared ${key}`);
+        removedCount++;
+      }
+    } catch {}
+  });
+
+  // Clean currentStory
+  try {
+    const raw = storage.getItem("currentStory");
+    if (raw) {
+      const cs = JSON.parse(raw);
+      if (cs?.id === projectId) {
+        storage.removeItem("currentStory");
+        console.log(`  ✓ Cleared currentStory`);
+        removedCount++;
+      }
+    }
+  } catch {}
+
+  // Clean dahtruth_current_project
+  try {
+    const raw = storage.getItem("dahtruth_current_project");
+    if (raw) {
+      const cp = JSON.parse(raw);
+      if (cp?.id === projectId) {
+        storage.removeItem("dahtruth_current_project");
+        console.log(`  ✓ Cleared dahtruth_current_project`);
+        removedCount++;
+      }
+    }
+  } catch {}
+
+  console.log(`[ProjectStore] ========== CLEANUP COMPLETE: ${removedCount} items ==========`);
+}
+
+// Legacy function name for backwards compatibility
+function deleteProjectData(projectId) {
+  cleanupAllProjectStorage(projectId);
 }
 
 // Migrate legacy data to new format (run once)
@@ -286,68 +388,80 @@ function createDefaultProjectData(title = "Untitled Book") {
   };
 }
 
-// Title Propagation - Updates title in ALL related storage keys
+// ============ Title Propagation ============
+// Updates title in ALL related storage keys for consistency
+
 function propagateTitleChange(projectId, newTitle) {
   if (!projectId || !newTitle) return;
 
-  const keysToUpdate = [
-    `dahtruth_project_meta_${projectId}`,
-    `dt_publishing_meta_${projectId}`,
-    `dahtruth_cover_settings_${projectId}`,
-    `publishingDraft_${projectId}`,
-  ];
-
-  keysToUpdate.forEach((key) => {
+  // Update project-scoped meta keys
+  [`dahtruth_project_meta_${projectId}`, `dt_publishing_meta_${projectId}`,
+   `dahtruth_cover_settings_${projectId}`, `publishingDraft_${projectId}`].forEach((key) => {
     try {
       const raw = storage.getItem(key);
       if (raw) {
         const data = JSON.parse(raw);
         if (data && typeof data === "object") {
-          if ("title" in data) {
-            data.title = newTitle;
-          }
-          if (data.book && typeof data.book === "object") {
-            data.book.title = newTitle;
-          }
+          if ("title" in data) data.title = newTitle;
+          if (data.book?.title !== undefined) data.book.title = newTitle;
           storage.setItem(key, JSON.stringify(data));
         }
       }
-    } catch (err) {
-      console.error(`Failed to update title in ${key}:`, err);
-    }
+    } catch {}
   });
 
-  // Also update currentStory if it matches this project
+  // Update currentStory
   try {
-    const currentStoryRaw = storage.getItem("currentStory");
-    if (currentStoryRaw) {
-      const currentStory = JSON.parse(currentStoryRaw);
-      if (currentStory && currentStory.id === projectId) {
-        currentStory.title = newTitle;
-        storage.setItem("currentStory", JSON.stringify(currentStory));
+    const raw = storage.getItem("currentStory");
+    if (raw) {
+      const cs = JSON.parse(raw);
+      if (cs?.id === projectId) { 
+        cs.title = newTitle; 
+        storage.setItem("currentStory", JSON.stringify(cs)); 
       }
     }
-  } catch (err) {
-    console.error("Failed to update currentStory:", err);
-  }
+  } catch {}
 
   // Update userProjects
   try {
-    const userProjectsRaw = storage.getItem("userProjects");
-    if (userProjectsRaw) {
-      const userProjects = JSON.parse(userProjectsRaw);
-      if (Array.isArray(userProjects)) {
-        const updated = userProjects.map(p => 
-          p.id === projectId ? { ...p, title: newTitle } : p
-        );
-        storage.setItem("userProjects", JSON.stringify(updated));
+    const raw = storage.getItem("userProjects");
+    if (raw) {
+      const up = JSON.parse(raw);
+      if (Array.isArray(up)) {
+        storage.setItem("userProjects", JSON.stringify(
+          up.map(p => p.id === projectId ? { ...p, title: newTitle } : p)
+        ));
       }
     }
-  } catch (err) {
-    console.error("Failed to update userProjects:", err);
-  }
+  } catch {}
 
-  console.log(`[ProjectStore] Title propagated for project ${projectId}: "${newTitle}"`);
+  // Update dahtruth_projects_index
+  try {
+    const raw = storage.getItem("dahtruth_projects_index");
+    if (raw) {
+      const idx = JSON.parse(raw);
+      if (Array.isArray(idx)) {
+        storage.setItem("dahtruth_projects_index", JSON.stringify(
+          idx.map(p => p.id === projectId ? { ...p, title: newTitle, updatedAt: new Date().toISOString() } : p)
+        ));
+      }
+    }
+  } catch {}
+
+  // Update dahtruth-projects-list
+  try {
+    const raw = storage.getItem(PROJECTS_LIST_KEY);
+    if (raw) {
+      const list = JSON.parse(raw);
+      if (Array.isArray(list)) {
+        storage.setItem(PROJECTS_LIST_KEY, JSON.stringify(
+          list.map(p => p.id === projectId ? { ...p, title: newTitle, updatedAt: new Date().toISOString() } : p)
+        ));
+      }
+    }
+  } catch {}
+
+  console.log(`[ProjectStore] Title propagated: "${newTitle}"`);
 }
 
 // ============ Main Hook ============
@@ -361,7 +475,7 @@ export function useProjectStore() {
   const [projects, setProjects] = useState(() => loadProjectsList());
   const [currentProjectId, setCurrentProjectId] = useState(() => loadCurrentProjectId());
 
-  // Sync with storage changes
+  // Sync with localStorage changes
   useEffect(() => {
     const sync = () => {
       setProjects(loadProjectsList());
@@ -494,18 +608,21 @@ export function useProjectStore() {
     return true;
   }, [projects]);
 
-  // Delete a project and ALL related data
+  // Delete a project and ALL related data from ALL storage systems
   const deleteProject = useCallback((projectId) => {
-    // Remove from list
+    console.log(`[ProjectStore] ========== DELETING PROJECT: ${projectId} ==========`);
+
+    // COMPLETE CLEANUP: Remove ALL project-related data from ALL storage systems
+    cleanupAllProjectStorage(projectId);
+
+    // Update local state
     const updated = projects.filter((p) => p.id !== projectId);
-    saveProjectsList(updated);
     setProjects(updated);
 
-    // Delete ALL project-related data
-    deleteAllProjectData(projectId);
-
-    // Update userProjects to remove this project
-    syncToUserProjects(updated);
+    // Dispatch events to notify all modules
+    window.dispatchEvent(new Event("project:change"));
+    window.dispatchEvent(new Event("projects:change"));
+    window.dispatchEvent(new Event("storage"));
 
     // If we deleted the current project, switch to another or create new
     if (currentProjectId === projectId) {
@@ -516,13 +633,12 @@ export function useProjectStore() {
       }
     }
 
-    console.log(`[ProjectStore] Deleted project: ${projectId}`);
+    console.log(`[ProjectStore] ========== PROJECT DELETION COMPLETE ==========`);
     return true;
   }, [projects, currentProjectId, switchProject, createProject]);
 
-  // Rename a project with full propagation
+  // Rename a project
   const renameProject = useCallback((projectId, newTitle) => {
-    // Update projects list
     const updated = projects.map((p) =>
       p.id === projectId
         ? { ...p, title: newTitle, updatedAt: new Date().toISOString() }
@@ -537,12 +653,6 @@ export function useProjectStore() {
       data.book = { ...data.book, title: newTitle };
       saveProjectData(projectId, data);
     }
-
-    // Propagate title to all related storage keys
-    propagateTitleChange(projectId, newTitle);
-
-    // Sync to userProjects
-    syncToUserProjects(updated);
 
     return true;
   }, [projects]);
@@ -578,6 +688,8 @@ export function useProjectStore() {
 
 // ============ Standalone Functions for Direct Use ============
 
+// These can be imported directly without the hook
+
 export function getCurrentProjectId() {
   return loadCurrentProjectId();
 }
@@ -597,9 +709,9 @@ export function saveCurrentProjectData(data) {
 
 export function getProjectStorageKey() {
   const projectId = loadCurrentProjectId();
-  if (!projectId) return LEGACY_STORAGE_KEY;
+  if (!projectId) return LEGACY_STORAGE_KEY; // Fallback for compatibility
   return getProjectDataKey(projectId);
 }
 
 // Export for use in other components
-export { propagateTitleChange, deleteAllProjectData };
+export { propagateTitleChange, deleteProjectData, cleanupAllProjectStorage };
