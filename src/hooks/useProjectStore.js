@@ -1,21 +1,18 @@
 // src/hooks/useProjectStore.js
 // Central project management - create, switch, delete projects with isolated storage
-// UPDATED: consistent project title propagation + emits "project:title-change" event
-// NOTE: keeps legacy syncing (currentStory, userProjects, LEGACY_STORAGE_KEY) for compatibility
 
 import { useState, useEffect, useCallback } from "react";
 import { storage } from "../lib/storage";
 
-/* ===================== Storage keys ===================== */
-
+// Storage keys
 const PROJECTS_LIST_KEY = "dahtruth-projects-list";
 const CURRENT_PROJECT_KEY = "dahtruth-current-project-id";
 const PROJECT_DATA_PREFIX = "dahtruth-project-";
 
-// Legacy key (for migration / compatibility)
+// Legacy key (for migration)
 const LEGACY_STORAGE_KEY = "dahtruth-story-lab-toc-v3";
 
-/* ===================== Helper Functions ===================== */
+// ============ Helper Functions ============
 
 function generateId() {
   return `project-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -25,21 +22,19 @@ function getProjectDataKey(projectId) {
   return `${PROJECT_DATA_PREFIX}${projectId}`;
 }
 
-function safeJsonParse(raw, fallback) {
+// Load projects list
+function loadProjectsList() {
   try {
-    return raw ? JSON.parse(raw) : fallback;
+    const raw = storage.getItem(PROJECTS_LIST_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
   } catch {
-    return fallback;
+    return [];
   }
 }
 
-/* ===================== Projects List ===================== */
-
-function loadProjectsList() {
-  const raw = storage.getItem(PROJECTS_LIST_KEY);
-  return safeJsonParse(raw, []);
-}
-
+// Save projects list
 function saveProjectsList(projects) {
   try {
     storage.setItem(PROJECTS_LIST_KEY, JSON.stringify(projects));
@@ -49,8 +44,7 @@ function saveProjectsList(projects) {
   }
 }
 
-/* ===================== Current Project ===================== */
-
+// Load current project ID
 function loadCurrentProjectId() {
   try {
     return storage.getItem(CURRENT_PROJECT_KEY) || null;
@@ -59,22 +53,13 @@ function loadCurrentProjectId() {
   }
 }
 
-function emitProjectTitleChange(projectId, title) {
-  try {
-    window.dispatchEvent(
-      new CustomEvent("project:title-change", { detail: { projectId, title } })
-    );
-  } catch {
-    // ignore
-  }
-}
-
 // Load project data
 function loadProjectData(projectId) {
   try {
     const key = getProjectDataKey(projectId);
     const raw = storage.getItem(key);
-    return safeJsonParse(raw, null);
+    if (!raw) return null;
+    return JSON.parse(raw);
   } catch {
     return null;
   }
@@ -83,7 +68,7 @@ function loadProjectData(projectId) {
 // Sync projects list to legacy userProjects key
 function syncToUserProjects(projects) {
   try {
-    const userProjects = projects.map((p) => ({
+    const userProjects = (projects || []).map((p) => ({
       id: p.id,
       title: p.title,
       status: p.status || "Draft",
@@ -98,11 +83,12 @@ function syncToUserProjects(projects) {
   }
 }
 
-// When switching project: keep legacy keys updated (currentStory, legacy TOC key)
+// Save current project ID
 function saveCurrentProjectId(projectId) {
   try {
     storage.setItem(CURRENT_PROJECT_KEY, projectId);
 
+    // Load project data and sync to legacy keys
     const data = loadProjectData(projectId);
     if (data) {
       const title = data.book?.title || "Untitled";
@@ -115,7 +101,7 @@ function saveCurrentProjectId(projectId) {
       // Update legacy storage key
       storage.setItem(LEGACY_STORAGE_KEY, JSON.stringify(data));
 
-      // Update currentStory for StoryLab sidebar
+      // Update currentStory for StoryLab sidebar (legacy consumers)
       storage.setItem(
         "currentStory",
         JSON.stringify({
@@ -127,147 +113,23 @@ function saveCurrentProjectId(projectId) {
           chapterCount,
         })
       );
-
-      // Emit title-change (helps headers across the app update instantly)
-      emitProjectTitleChange(projectId, title);
     }
 
-    // Existing events (keep for compatibility)
     window.dispatchEvent(new Event("project:change"));
-
-    // Important: native "storage" event doesn't fire in same tab.
-    // Your app already listens for "storage", so we intentionally keep this manual dispatch.
-    window.dispatchEvent(new Event("storage"));
+    window.dispatchEvent(new Event("storage")); // custom notify for same-tab listeners
   } catch (err) {
     console.error("Failed to save current project ID:", err);
   }
 }
 
-/* ===================== Default Project Data ===================== */
-
-function createDefaultProjectData(title = "Untitled Book") {
-  return {
-    book: { title },
-    chapters: [
-      {
-        id: `chapter-${Date.now()}`,
-        title: "Chapter 1: Untitled",
-        content: "",
-        wordCount: 0,
-        lastEdited: new Date().toLocaleString(),
-        status: "draft",
-        order: 0,
-      },
-    ],
-    daily: { goal: 500, counts: {} },
-    settings: { theme: "light", focusMode: false },
-    tocOutline: [],
-  };
-}
-
-/* ===================== Title Propagation ===================== */
-// Updates title in ALL related storage keys for consistency
-function propagateTitleChange(projectId, newTitle) {
-  if (!projectId || typeof newTitle !== "string") return;
-
-  // Update project-scoped meta keys (best effort)
-  [
-    `dahtruth_project_meta_${projectId}`,
-    `dt_publishing_meta_${projectId}`,
-    `dahtruth_cover_settings_${projectId}`,
-    `publishingDraft_${projectId}`,
-  ].forEach((key) => {
-    try {
-      const raw = storage.getItem(key);
-      if (!raw) return;
-      const data = safeJsonParse(raw, null);
-      if (!data || typeof data !== "object") return;
-
-      if ("title" in data) data.title = newTitle;
-      if (data.book?.title !== undefined) data.book.title = newTitle;
-
-      storage.setItem(key, JSON.stringify(data));
-    } catch {
-      // ignore
-    }
-  });
-
-  // Update currentStory
-  try {
-    const raw = storage.getItem("currentStory");
-    const cs = safeJsonParse(raw, null);
-    if (cs?.id === projectId) {
-      cs.title = newTitle;
-      cs.updatedAt = new Date().toISOString();
-      storage.setItem("currentStory", JSON.stringify(cs));
-    }
-  } catch {
-    // ignore
-  }
-
-  // Update userProjects
-  try {
-    const raw = storage.getItem("userProjects");
-    const up = safeJsonParse(raw, null);
-    if (Array.isArray(up)) {
-      storage.setItem(
-        "userProjects",
-        JSON.stringify(up.map((p) => (p.id === projectId ? { ...p, title: newTitle } : p)))
-      );
-    }
-  } catch {
-    // ignore
-  }
-
-  // Update dahtruth_projects_index if present
-  try {
-    const raw = storage.getItem("dahtruth_projects_index");
-    const idx = safeJsonParse(raw, null);
-    if (Array.isArray(idx)) {
-      storage.setItem(
-        "dahtruth_projects_index",
-        JSON.stringify(
-          idx.map((p) =>
-            p.id === projectId ? { ...p, title: newTitle, updatedAt: new Date().toISOString() } : p
-          )
-        )
-      );
-    }
-  } catch {
-    // ignore
-  }
-
-  // Update dahtruth-projects-list
-  try {
-    const raw = storage.getItem(PROJECTS_LIST_KEY);
-    const list = safeJsonParse(raw, null);
-    if (Array.isArray(list)) {
-      storage.setItem(
-        PROJECTS_LIST_KEY,
-        JSON.stringify(
-          list.map((p) =>
-            p.id === projectId ? { ...p, title: newTitle, updatedAt: new Date().toISOString() } : p
-          )
-        )
-      );
-    }
-  } catch {
-    // ignore
-  }
-
-  emitProjectTitleChange(projectId, newTitle);
-  console.log(`[ProjectStore] Title propagated: "${newTitle}"`);
-}
-
-/* ===================== Save Project Data ===================== */
-
+// Save project data
 function saveProjectData(projectId, data) {
   try {
     const key = getProjectDataKey(projectId);
     storage.setItem(key, JSON.stringify(data));
 
+    // Update project metadata (updatedAt, wordCount)
     const projects = loadProjectsList();
-
     const totalWords = (data.chapters || []).reduce(
       (sum, ch) => sum + (ch.wordCount || 0),
       0
@@ -289,7 +151,7 @@ function saveProjectData(projectId, data) {
 
     saveProjectsList(updated);
 
-    // ===== SYNC WITH LEGACY KEYS (only for current project) =====
+    // ===== SYNC WITH LEGACY KEYS (only if saving current project) =====
     const currentId = loadCurrentProjectId();
     if (projectId === currentId) {
       storage.setItem(LEGACY_STORAGE_KEY, JSON.stringify(data));
@@ -306,28 +168,30 @@ function saveProjectData(projectId, data) {
         })
       );
 
+      // Keep Project Page list in sync
       syncToUserProjects(updated);
-
-      // 🔥 Emit title-change (if title changed, app headers update immediately)
-      emitProjectTitleChange(projectId, title);
     }
 
     window.dispatchEvent(new Event("project:change"));
-    window.dispatchEvent(new Event("storage"));
+    window.dispatchEvent(new Event("storage")); // custom notify for same-tab listeners
   } catch (err) {
     console.error("Failed to save project data:", err);
   }
 }
 
-/* ===================== Comprehensive Cleanup ===================== */
+// ============================================================================
+// COMPREHENSIVE PROJECT CLEANUP - Cleans ALL storage systems
+// ============================================================================
 
 function cleanupAllProjectStorage(projectId) {
   if (!projectId) return;
 
-  console.log(`[ProjectStore] ========== COMPLETE CLEANUP for: ${projectId} ==========`);
-
+  console.log(
+    `[ProjectStore] ========== COMPLETE CLEANUP for: ${projectId} ==========`
+  );
   let removedCount = 0;
 
+  // All project-scoped key patterns from ALL systems
   const projectScopedKeyBases = [
     "dahtruth_projects_cache",
     "dahtruth-project",
@@ -363,45 +227,88 @@ function cleanupAllProjectStorage(projectId) {
           console.log(`  ✓ Removed: ${key}`);
           removedCount++;
         }
-      } catch {
-        // ignore
-      }
+      } catch {}
     });
   });
 
-  // Remove from projects list
+  // Clean dahtruth_projects_index (if present)
+  try {
+    const indexRaw = storage.getItem("dahtruth_projects_index");
+    if (indexRaw) {
+      const index = JSON.parse(indexRaw);
+      if (Array.isArray(index)) {
+        const filtered = index.filter((p) => p.id !== projectId);
+        if (filtered.length !== index.length) {
+          storage.setItem("dahtruth_projects_index", JSON.stringify(filtered));
+          console.log(`  ✓ Removed from dahtruth_projects_index`);
+          removedCount++;
+        }
+      }
+    }
+  } catch {}
+
+  // Clean dahtruth-projects-list
   try {
     const listRaw = storage.getItem(PROJECTS_LIST_KEY);
-    const list = safeJsonParse(listRaw, null);
-    if (Array.isArray(list)) {
-      const filtered = list.filter((p) => p.id !== projectId);
-      if (filtered.length !== list.length) {
-        storage.setItem(PROJECTS_LIST_KEY, JSON.stringify(filtered));
-        console.log(`  ✓ Removed from ${PROJECTS_LIST_KEY}`);
-        removedCount++;
+    if (listRaw) {
+      const list = JSON.parse(listRaw);
+      if (Array.isArray(list)) {
+        const filtered = list.filter((p) => p.id !== projectId);
+        if (filtered.length !== list.length) {
+          storage.setItem(PROJECTS_LIST_KEY, JSON.stringify(filtered));
+          console.log(`  ✓ Removed from ${PROJECTS_LIST_KEY}`);
+          removedCount++;
+        }
       }
     }
-  } catch {
-    // ignore
-  }
+  } catch {}
 
-  // Remove from userProjects
+  // Clean userProjects
   try {
-    const raw = storage.getItem("userProjects");
-    const up = safeJsonParse(raw, null);
-    if (Array.isArray(up)) {
-      const filtered = up.filter((p) => p.id !== projectId);
-      if (filtered.length !== up.length) {
-        storage.setItem("userProjects", JSON.stringify(filtered));
-        console.log(`  ✓ Removed from userProjects`);
+    const userProjectsRaw = storage.getItem("userProjects");
+    if (userProjectsRaw) {
+      const userProjects = JSON.parse(userProjectsRaw);
+      if (Array.isArray(userProjects)) {
+        const filtered = userProjects.filter((p) => p.id !== projectId);
+        if (filtered.length !== userProjects.length) {
+          storage.setItem("userProjects", JSON.stringify(filtered));
+          console.log(`  ✓ Removed from userProjects`);
+          removedCount++;
+        }
+      }
+    }
+  } catch {}
+
+  // Clean dahtruth-project-store (if present)
+  try {
+    const storeRaw = storage.getItem("dahtruth-project-store");
+    if (storeRaw) {
+      const store = JSON.parse(storeRaw);
+      let modified = false;
+
+      if (store.selectedProjectId === projectId) {
+        store.selectedProjectId = null;
+        modified = true;
+      }
+      if (store.currentProjectId === projectId) {
+        store.currentProjectId = null;
+        modified = true;
+      }
+      if (Array.isArray(store.projects)) {
+        const len = store.projects.length;
+        store.projects = store.projects.filter((p) => p.id !== projectId);
+        if (store.projects.length !== len) modified = true;
+      }
+
+      if (modified) {
+        storage.setItem("dahtruth-project-store", JSON.stringify(store));
+        console.log(`  ✓ Cleaned dahtruth-project-store`);
         removedCount++;
       }
     }
-  } catch {
-    // ignore
-  }
+  } catch {}
 
-  // Clear current IDs if they match
+  // Clean ID keys that may point to this project
   [
     "dahtruth-selected-project-id",
     "dahtruth-current-project-id",
@@ -414,30 +321,38 @@ function cleanupAllProjectStorage(projectId) {
         console.log(`  ✓ Cleared ${key}`);
         removedCount++;
       }
-    } catch {
-      // ignore
-    }
+    } catch {}
   });
 
-  // Clear currentStory if it points to this project
+  // Clean currentStory if it references this project
   try {
     const raw = storage.getItem("currentStory");
-    const cs = safeJsonParse(raw, null);
-    if (cs?.id === projectId) {
-      storage.removeItem("currentStory");
-      console.log(`  ✓ Cleared currentStory`);
-      removedCount++;
+    if (raw) {
+      const cs = JSON.parse(raw);
+      if (cs?.id === projectId) {
+        storage.removeItem("currentStory");
+        console.log(`  ✓ Cleared currentStory`);
+        removedCount++;
+      }
     }
-  } catch {
-    // ignore
-  }
+  } catch {}
 
-  console.log(`[ProjectStore] ========== CLEANUP COMPLETE: ${removedCount} items ==========`);
+  // Clean dahtruth_current_project object if it references this project
+  try {
+    const raw = storage.getItem("dahtruth_current_project");
+    if (raw) {
+      const cp = JSON.parse(raw);
+      if (cp?.id === projectId) {
+        storage.removeItem("dahtruth_current_project");
+        console.log(`  ✓ Cleared dahtruth_current_project`);
+        removedCount++;
+      }
+    }
+  } catch {}
 
-  // Notify app
-  window.dispatchEvent(new Event("project:change"));
-  window.dispatchEvent(new Event("projects:change"));
-  window.dispatchEvent(new Event("storage"));
+  console.log(
+    `[ProjectStore] ========== CLEANUP COMPLETE: ${removedCount} items ==========`
+  );
 }
 
 // Legacy function name for backwards compatibility
@@ -445,7 +360,126 @@ function deleteProjectData(projectId) {
   cleanupAllProjectStorage(projectId);
 }
 
-/* ===================== Migration ===================== */
+// ============ Default Project Data ============
+
+function createDefaultProjectData(title = "Untitled Book") {
+  return {
+    book: { title },
+    chapters: [
+      {
+        id: `chapter-${Date.now()}`,
+        title: "Chapter 1: Untitled",
+        content: "",
+        wordCount: 0,
+        lastEdited: new Date().toLocaleString(),
+        status: "draft",
+        order: 0,
+      },
+    ],
+    daily: { goal: 500, counts: {} },
+    settings: { theme: "light", focusMode: false },
+    tocOutline: [],
+  };
+}
+
+// ============ Title Propagation ============
+// Updates title in ALL related storage keys for consistency
+
+function propagateTitleChange(projectId, newTitle) {
+  if (!projectId || !newTitle) return;
+
+  // Update project-scoped meta keys
+  [
+    `dahtruth_project_meta_${projectId}`,
+    `dt_publishing_meta_${projectId}`,
+    `dahtruth_cover_settings_${projectId}`,
+    `publishingDraft_${projectId}`,
+  ].forEach((key) => {
+    try {
+      const raw = storage.getItem(key);
+      if (raw) {
+        const data = JSON.parse(raw);
+        if (data && typeof data === "object") {
+          if ("title" in data) data.title = newTitle;
+          if (data.book?.title !== undefined) data.book.title = newTitle;
+          storage.setItem(key, JSON.stringify(data));
+        }
+      }
+    } catch {}
+  });
+
+  // Update currentStory
+  try {
+    const raw = storage.getItem("currentStory");
+    if (raw) {
+      const cs = JSON.parse(raw);
+      if (cs?.id === projectId) {
+        cs.title = newTitle;
+        storage.setItem("currentStory", JSON.stringify(cs));
+      }
+    }
+  } catch {}
+
+  // Update userProjects
+  try {
+    const raw = storage.getItem("userProjects");
+    if (raw) {
+      const up = JSON.parse(raw);
+      if (Array.isArray(up)) {
+        storage.setItem(
+          "userProjects",
+          JSON.stringify(
+            up.map((p) => (p.id === projectId ? { ...p, title: newTitle } : p))
+          )
+        );
+      }
+    }
+  } catch {}
+
+  // Update dahtruth_projects_index
+  try {
+    const raw = storage.getItem("dahtruth_projects_index");
+    if (raw) {
+      const idx = JSON.parse(raw);
+      if (Array.isArray(idx)) {
+        storage.setItem(
+          "dahtruth_projects_index",
+          JSON.stringify(
+            idx.map((p) =>
+              p.id === projectId
+                ? { ...p, title: newTitle, updatedAt: new Date().toISOString() }
+                : p
+            )
+          )
+        );
+      }
+    }
+  } catch {}
+
+  // Update dahtruth-projects-list
+  try {
+    const raw = storage.getItem(PROJECTS_LIST_KEY);
+    if (raw) {
+      const list = JSON.parse(raw);
+      if (Array.isArray(list)) {
+        storage.setItem(
+          PROJECTS_LIST_KEY,
+          JSON.stringify(
+            list.map((p) =>
+              p.id === projectId
+                ? { ...p, title: newTitle, updatedAt: new Date().toISOString() }
+                : p
+            )
+          )
+        );
+      }
+    }
+  } catch {}
+
+  console.log(`[ProjectStore] Title propagated: "${newTitle}"`);
+}
+
+// ============ Migration ============
 
 function migrateLegacyData() {
   const migrated = storage.getItem("dahtruth-migration-complete");
@@ -458,18 +492,24 @@ function migrateLegacyData() {
       return null;
     }
 
-    const legacyData = safeJsonParse(legacyRaw, null);
-    if (!legacyData || !legacyData.chapters || legacyData.chapters.length === 0) {
+    const legacyData = JSON.parse(legacyRaw);
+    if (
+      !legacyData ||
+      !legacyData.chapters ||
+      legacyData.chapters.length === 0
+    ) {
       storage.setItem("dahtruth-migration-complete", "true");
       return null;
     }
 
     const projectId = generateId();
     const title = legacyData.book?.title || "Migrated Project";
-    const totalWords = legacyData.chapters.reduce((sum, ch) => sum + (ch.wordCount || 0), 0);
+    const totalWords = legacyData.chapters.reduce(
+      (sum, ch) => sum + (ch.wordCount || 0),
+      0
+    );
 
     const now = new Date().toISOString();
-
     const project = {
       id: projectId,
       title,
@@ -481,12 +521,23 @@ function migrateLegacyData() {
       chapterCount: legacyData.chapters.length,
     };
 
+    // Save data into the new project key
     saveProjectData(projectId, legacyData);
-    saveProjectsList([project]);
+
+    // ✅ IMPORTANT: Append to existing projects list (DO NOT overwrite)
+    const existing = loadProjectsList();
+    const next = [...existing, project];
+    saveProjectsList(next);
+    syncToUserProjects(next);
+
+    // Set as current project
     saveCurrentProjectId(projectId);
 
     storage.setItem("dahtruth-migration-complete", "true");
-    console.log(`[Migration] Migrated legacy project: "${title}" (${legacyData.chapters.length} chapters)`);
+    console.log(
+      `[Migration] Migrated legacy project: "${title}" (${legacyData.chapters.length} chapters)`
+    );
+
     return projectId;
   } catch (err) {
     console.error("Migration failed:", err);
@@ -495,7 +546,7 @@ function migrateLegacyData() {
   }
 }
 
-/* ===================== Main Hook ===================== */
+// ============ Main Hook ============
 
 export function useProjectStore() {
   // Run migration on first load
@@ -504,12 +555,18 @@ export function useProjectStore() {
   }, []);
 
   const [projects, setProjects] = useState(() => loadProjectsList());
-  const [currentProjectId, setCurrentProjectId] = useState(() => loadCurrentProjectId());
+  const [currentProjectId, setCurrentProjectId] = useState(() =>
+    loadCurrentProjectId()
+  );
 
+  // Sync with localStorage changes AND storage hydration
   useEffect(() => {
     const sync = () => {
       const loadedProjects = loadProjectsList();
       const loadedProjectId = loadCurrentProjectId();
+      console.log(
+        `[ProjectStore] Syncing - found ${loadedProjects.length} projects, current: ${loadedProjectId}`
+      );
       setProjects(loadedProjects);
       setCurrentProjectId(loadedProjectId);
     };
@@ -527,9 +584,10 @@ export function useProjectStore() {
     };
   }, []);
 
-  const currentProject = projects.find((p) => p.id === currentProjectId) || null;
+  const currentProject =
+    projects.find((p) => p.id === currentProjectId) || null;
 
-  /* ===================== Actions ===================== */
+  // ============ Actions ============
 
   const createProject = useCallback(
     (title = "Untitled Book") => {
@@ -548,20 +606,24 @@ export function useProjectStore() {
       };
 
       const data = createDefaultProjectData(title);
+
+      // Save project data
       storage.setItem(getProjectDataKey(projectId), JSON.stringify(data));
 
+      // Add to projects list
       const updated = [...projects, project];
       saveProjectsList(updated);
+      syncToUserProjects(updated);
+
       setProjects(updated);
 
+      // Switch to new project
       saveCurrentProjectId(projectId);
       setCurrentProjectId(projectId);
 
-      syncToUserProjects(updated);
-
-      emitProjectTitleChange(projectId, title);
-
-      console.log(`[ProjectStore] Created new project: "${title}" (${projectId})`);
+      console.log(
+        `[ProjectStore] Created new project: "${title}" (${projectId})`
+      );
       return projectId;
     },
     [projects]
@@ -577,11 +639,9 @@ export function useProjectStore() {
         0
       );
 
-      const projectTitle = parsedDocument.title || "Imported Project";
-
       const project = {
         id: projectId,
-        title: projectTitle,
+        title: parsedDocument.title,
         status: "Draft",
         source: "Imported",
         createdAt: now,
@@ -602,7 +662,7 @@ export function useProjectStore() {
       }));
 
       const data = {
-        book: { title: projectTitle },
+        book: { title: parsedDocument.title },
         chapters,
         daily: { goal: 500, counts: {} },
         settings: { theme: "light", focusMode: false },
@@ -613,17 +673,15 @@ export function useProjectStore() {
 
       const updated = [...projects, project];
       saveProjectsList(updated);
+      syncToUserProjects(updated);
+
       setProjects(updated);
 
       saveCurrentProjectId(projectId);
       setCurrentProjectId(projectId);
 
-      syncToUserProjects(updated);
-
-      emitProjectTitleChange(projectId, projectTitle);
-
       console.log(
-        `[ProjectStore] Imported project: "${projectTitle}" (${chapters.length} chapters, ${totalWords} words)`
+        `[ProjectStore] Imported project: "${parsedDocument.title}" (${chapters.length} chapters, ${totalWords} words)`
       );
       return projectId;
     },
@@ -649,17 +707,34 @@ export function useProjectStore() {
 
   const deleteProject = useCallback(
     (projectId) => {
+      console.log(
+        `[ProjectStore] ========== DELETING PROJECT: ${projectId} ==========`
+      );
+
+      // Remove ALL project-related data
       cleanupAllProjectStorage(projectId);
 
+      // Update + persist lists
       const updated = projects.filter((p) => p.id !== projectId);
+      saveProjectsList(updated);
+      syncToUserProjects(updated);
+
       setProjects(updated);
 
-      // If current project deleted, switch
+      window.dispatchEvent(new Event("project:change"));
+      window.dispatchEvent(new Event("projects:change"));
+      window.dispatchEvent(new Event("storage"));
+
+      // If deleted current, switch/create
       if (currentProjectId === projectId) {
-        if (updated.length > 0) switchProject(updated[0].id);
-        else createProject("Untitled Book");
+        if (updated.length > 0) {
+          switchProject(updated[0].id);
+        } else {
+          createProject("Untitled Book");
+        }
       }
 
+      console.log(`[ProjectStore] ========== PROJECT DELETION COMPLETE ==========`);
       return true;
     },
     [projects, currentProjectId, switchProject, createProject]
@@ -667,45 +742,25 @@ export function useProjectStore() {
 
   const renameProject = useCallback(
     (projectId, newTitle) => {
-      const trimmed = String(newTitle || "").trim();
-      if (!trimmed) return false;
-
-      // Update project metadata list
       const updated = projects.map((p) =>
-        p.id === projectId ? { ...p, title: trimmed, updatedAt: new Date().toISOString() } : p
+        p.id === projectId
+          ? { ...p, title: newTitle, updatedAt: new Date().toISOString() }
+          : p
       );
+
       saveProjectsList(updated);
+      syncToUserProjects(updated);
       setProjects(updated);
 
-      // Update project data book title
+      // Update book title in project data
       const data = loadProjectData(projectId);
       if (data) {
-        data.book = { ...(data.book || {}), title: trimmed };
+        data.book = { ...(data.book || {}), title: newTitle };
         saveProjectData(projectId, data);
-      } else {
-        // Even if data missing, still propagate to other keys
-        propagateTitleChange(projectId, trimmed);
       }
 
-      // If this is the current project, make sure currentStory + legacy keys update too
-      const currentId = loadCurrentProjectId();
-      if (currentId === projectId) {
-        // Keep currentStory aligned even if saveProjectData didn't run
-        try {
-          const raw = storage.getItem("currentStory");
-          const cs = safeJsonParse(raw, null);
-          if (cs?.id === projectId) {
-            cs.title = trimmed;
-            cs.updatedAt = new Date().toISOString();
-            storage.setItem("currentStory", JSON.stringify(cs));
-          }
-        } catch {
-          // ignore
-        }
-      }
-
-      // Final emit so headers update instantly
-      propagateTitleChange(projectId, trimmed);
+      // ✅ Also propagate to related keys (cover/publishing/currentStory)
+      propagateTitleChange(projectId, newTitle);
 
       return true;
     },
@@ -726,41 +781,25 @@ export function useProjectStore() {
     projects,
     currentProjectId,
     currentProject,
-
     createProject,
     createProjectFromImport,
     switchProject,
     deleteProject,
     renameProject,
-
     getProjectData,
     saveProject,
   };
 }
 
-/* ===================== Standalone Functions ===================== */
+// ============ Standalone Functions for Direct Use ============
 
 export function getCurrentProjectId() {
   return loadCurrentProjectId();
 }
 
-// Helpful for pages that need the title without loading full data everywhere
-export function getCurrentProjectTitle() {
-  const id = loadCurrentProjectId();
-  if (!id) return null;
-
-  // Prefer projects list (fast)
-  try {
-    const projects = loadProjectsList();
-    const found = projects.find((p) => p.id === id);
-    if (found?.title) return found.title;
-  } catch {
-    // ignore
-  }
-
-  // Fallback to project data
-  const data = loadProjectData(id);
-  return data?.book?.title || null;
+// ✅ Alias used by other pages (like Cover.jsx)
+export function getSelectedProjectId() {
+  return loadCurrentProjectId();
 }
 
 export function getCurrentProjectData() {
