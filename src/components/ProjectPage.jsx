@@ -45,13 +45,14 @@ import {
   setCurrentProject,
 } from "../lib/projectsService";
 import { migrateLegacyData, needsMigration } from "../lib/projectSystem";
+import { storage } from "../lib/storage";
 
 // -------------------- Storage helpers (legacy, for backward compat) --------------------
 const PROJECTS_KEY = "userProjects";
 
 function loadLegacyProjects() {
   try {
-    const raw = localStorage.getItem(PROJECTS_KEY);
+    const raw = storage.getItem(PROJECTS_KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed : [];
@@ -62,7 +63,7 @@ function loadLegacyProjects() {
 
 function saveLegacyProjects(projects) {
   try {
-    localStorage.setItem(PROJECTS_KEY, JSON.stringify(projects));
+    storage.setItem(PROJECTS_KEY, JSON.stringify(projects));
     window.dispatchEvent(new Event("project:change"));
   } catch (err) {
     console.error("Failed to save projects:", err);
@@ -74,7 +75,7 @@ const API_KEYS_KEY = "dahtruth_api_keys";
 
 function loadApiKeys() {
   try {
-    const raw = localStorage.getItem(API_KEYS_KEY);
+    const raw = storage.getItem(API_KEYS_KEY);
     if (!raw) return { openai: "", anthropic: "" };
     return JSON.parse(raw);
   } catch {
@@ -84,7 +85,7 @@ function loadApiKeys() {
 
 function saveApiKeys(keys) {
   try {
-    localStorage.setItem(API_KEYS_KEY, JSON.stringify(keys));
+    storage.setItem(API_KEYS_KEY, JSON.stringify(keys));
     window.dispatchEvent(new Event("apikeys:updated"));
   } catch (err) {
     console.error("Failed to save API keys:", err);
@@ -138,8 +139,8 @@ function cleanupProjectStorage(projectId) {
   projectScopedKeyBases.forEach((baseKey) => {
     [`${baseKey}-${projectId}`, `${baseKey}_${projectId}`].forEach((key) => {
       try {
-        if (localStorage.getItem(key) !== null) {
-          localStorage.removeItem(key);
+        if (storage.getItem(key) !== null) {
+          storage.removeItem(key);
           console.log(`  ✓ Removed: ${key}`);
           removedCount++;
         }
@@ -149,13 +150,13 @@ function cleanupProjectStorage(projectId) {
 
   // Clean up dahtruth_projects_index (projectsService)
   try {
-    const indexRaw = localStorage.getItem("dahtruth_projects_index");
+    const indexRaw = storage.getItem("dahtruth_projects_index");
     if (indexRaw) {
       const index = JSON.parse(indexRaw);
       if (Array.isArray(index)) {
         const filtered = index.filter((p) => p.id !== projectId);
         if (filtered.length !== index.length) {
-          localStorage.setItem("dahtruth_projects_index", JSON.stringify(filtered));
+          storage.setItem("dahtruth_projects_index", JSON.stringify(filtered));
           console.log(`  ✓ Removed from dahtruth_projects_index`);
           removedCount++;
         }
@@ -165,13 +166,13 @@ function cleanupProjectStorage(projectId) {
 
   // Clean up dahtruth-projects-list (useProjectStore)
   try {
-    const listRaw = localStorage.getItem("dahtruth-projects-list");
+    const listRaw = storage.getItem("dahtruth-projects-list");
     if (listRaw) {
       const list = JSON.parse(listRaw);
       if (Array.isArray(list)) {
         const filtered = list.filter((p) => p.id !== projectId);
         if (filtered.length !== list.length) {
-          localStorage.setItem("dahtruth-projects-list", JSON.stringify(filtered));
+          storage.setItem("dahtruth-projects-list", JSON.stringify(filtered));
           console.log(`  ✓ Removed from dahtruth-projects-list`);
           removedCount++;
         }
@@ -181,7 +182,7 @@ function cleanupProjectStorage(projectId) {
 
   // Clean up dahtruth-project-store
   try {
-    const projectStoreRaw = localStorage.getItem("dahtruth-project-store");
+    const projectStoreRaw = storage.getItem("dahtruth-project-store");
     if (projectStoreRaw) {
       const projectStore = JSON.parse(projectStoreRaw);
       let modified = false;
@@ -201,7 +202,7 @@ function cleanupProjectStorage(projectId) {
       }
 
       if (modified) {
-        localStorage.setItem("dahtruth-project-store", JSON.stringify(projectStore));
+        storage.setItem("dahtruth-project-store", JSON.stringify(projectStore));
         console.log(`  ✓ Cleaned dahtruth-project-store`);
         removedCount++;
       }
@@ -211,8 +212,8 @@ function cleanupProjectStorage(projectId) {
   // Clean up selected/current project IDs
   ["dahtruth-selected-project-id", "dahtruth-current-project-id", "dahtruth_current_project_id"].forEach((key) => {
     try {
-      if (localStorage.getItem(key) === projectId) {
-        localStorage.removeItem(key);
+      if (storage.getItem(key) === projectId) {
+        storage.removeItem(key);
         console.log(`  ✓ Cleared ${key}`);
         removedCount++;
       }
@@ -221,11 +222,11 @@ function cleanupProjectStorage(projectId) {
 
   // Clean up currentStory
   try {
-    const currentStoryRaw = localStorage.getItem("currentStory");
+    const currentStoryRaw = storage.getItem("currentStory");
     if (currentStoryRaw) {
       const currentStory = JSON.parse(currentStoryRaw);
       if (currentStory?.id === projectId) {
-        localStorage.removeItem("currentStory");
+        storage.removeItem("currentStory");
         console.log(`  ✓ Cleared currentStory`);
         removedCount++;
       }
@@ -234,11 +235,11 @@ function cleanupProjectStorage(projectId) {
 
   // Clean up dahtruth_current_project
   try {
-    const currentProjectRaw = localStorage.getItem("dahtruth_current_project");
+    const currentProjectRaw = storage.getItem("dahtruth_current_project");
     if (currentProjectRaw) {
       const currentProject = JSON.parse(currentProjectRaw);
       if (currentProject?.id === projectId) {
-        localStorage.removeItem("dahtruth_current_project");
+        storage.removeItem("dahtruth_current_project");
         console.log(`  ✓ Cleared dahtruth_current_project`);
         removedCount++;
       }
@@ -977,7 +978,7 @@ export default function ProjectPage() {
           status: project.status || "Draft",
           targetWords: project.targetWords || project._legacy?.targetWords || 50000,
         };
-        localStorage.setItem("currentStory", JSON.stringify(snapshot));
+        storage.setItem("currentStory", JSON.stringify(snapshot));
       }
       
       window.dispatchEvent(new Event("project:change"));
@@ -992,7 +993,7 @@ export default function ProjectPage() {
         status: project.status || "Draft",
         targetWords: project.targetWords || 50000,
       };
-      localStorage.setItem("currentStory", JSON.stringify(snapshot));
+      storage.setItem("currentStory", JSON.stringify(snapshot));
       window.dispatchEvent(new Event("project:change"));
     }
 
