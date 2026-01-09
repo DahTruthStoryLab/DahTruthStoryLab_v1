@@ -475,19 +475,29 @@ export function useProjectStore() {
   const [projects, setProjects] = useState(() => loadProjectsList());
   const [currentProjectId, setCurrentProjectId] = useState(() => loadCurrentProjectId());
 
-  // Sync with localStorage changes
+  // Sync with localStorage changes AND storage hydration
   useEffect(() => {
     const sync = () => {
-      setProjects(loadProjectsList());
-      setCurrentProjectId(loadCurrentProjectId());
+      const loadedProjects = loadProjectsList();
+      const loadedProjectId = loadCurrentProjectId();
+      console.log(`[ProjectStore] Syncing - found ${loadedProjects.length} projects, current: ${loadedProjectId}`);
+      setProjects(loadedProjects);
+      setCurrentProjectId(loadedProjectId);
     };
+    
+    // Listen for storage events
     window.addEventListener("storage", sync);
     window.addEventListener("projects:change", sync);
     window.addEventListener("project:change", sync);
+    
+    // IMPORTANT: Listen for storage:ready event (fired after IndexedDB hydration)
+    window.addEventListener("storage:ready", sync);
+    
     return () => {
       window.removeEventListener("storage", sync);
       window.removeEventListener("projects:change", sync);
       window.removeEventListener("project:change", sync);
+      window.removeEventListener("storage:ready", sync);
     };
   }, []);
 
