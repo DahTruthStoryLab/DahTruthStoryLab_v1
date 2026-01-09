@@ -14,6 +14,8 @@ import { storage, runMigrationIfNeeded } from "./storage";
 
 const PROJECTS_CACHE_KEY = "dahtruth_projects_cache";
 const PROJECTS_INDEX_KEY = "dahtruth_projects_index";
+
+// New/current keys (used by this service)
 const CURRENT_PROJECT_KEY = "dahtruth_current_project";
 const CURRENT_PROJECT_ID_KEY = "dahtruth_current_project_id";
 
@@ -31,13 +33,23 @@ runMigrationIfNeeded().catch((err) => {
 });
 
 /* ============================================================================
-   LOCAL STORAGE OPERATIONS (Now uses IndexedDB via storage wrapper)
+   SMALL HELPERS
    ============================================================================ */
 
+function isPlainObject(v: unknown): v is Record<string, any> {
+  return !!v && typeof v === "object" && !Array.isArray(v);
+}
+
+/**
+ * Some storage backends (or wrappers) may return already-parsed objects.
+ * Normalize to object when possible.
+ */
 function safeParseJson<T>(raw: any): T | null {
-  if (!raw) return null;
+  if (raw == null) return null;
   try {
-    return JSON.parse(raw) as T;
+    if (typeof raw === "string") return JSON.parse(raw) as T;
+    // If it's already an object/array, assume it is the value
+    return raw as T;
   } catch {
     return null;
   }
@@ -47,6 +59,69 @@ function safeParseIndex(raw: any): ProjectIndexEntry[] | null {
   const parsed = safeParseJson<unknown>(raw);
   return Array.isArray(parsed) ? (parsed as ProjectIndexEntry[]) : null;
 }
+
+function nowIso(): string {
+  return new Date().toISOString();
+}
+
+/**
+ * Emit events so hooks/pages listening to "storage"/"project:change"/"projects:change"
+ * stay in sync across the app.
+ */
+function emitProjectChangeEvents(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.dispatchEvent(new Event("project:change"));
+    window.dispatchEvent(new Event("projects:change"));
+    window.dispatchEvent(new Event("storage"));
+  } catch {
+    // ignore
+  }
+}
+
+/**
+ * Old UI expects `currentStory` to be *metadata*, not the full Project object.
+ * Keep this synced for backward compatibility.
+ */
+function computeLegacyStoryMeta(project: Project) {
+  const anyProj = project as any;
+
+  const title =
+    (typeof anyProj?.title === "string" && anyProj.title) ||
+    (typeof anyProj?.book?.title === "string" && anyProj.book.title) ||
+    (typeof anyProj?.publishing?.meta?.title === "string" && anyProj.publishing.meta.title) ||
+    "Untitled";
+
+  // Try to find chapters in a few common shapes (defensive)
+  const chapters: any[] =
+    (Array.isArray(anyProj?.chapters) && anyProj.chapters) ||
+    (Array.isArray(anyProj?.manuscript?.chapters) && anyProj.manuscript.chapters) ||
+    (Array.isArray(anyProj?.writing?.chapters) && anyProj.writing.chapters) ||
+    [];
+
+  const chapterCount = chapters.length;
+
+  const wordCount = chapters.reduce((sum, ch) => {
+    const wc = Number(ch?.wordCount ?? ch?.words ?? 0);
+    return sum + (Number.isFinite(wc) ? wc : 0);
+  }, 0);
+
+  const updatedAt = typeof anyProj?.updatedAt === "string" ? anyProj.updatedAt : nowIso();
+  const status = typeof anyProj?.status === "string" ? anyProj.status : "Draft";
+
+  return {
+    id: project.id,
+    title,
+    status,
+    updatedAt,
+    wordCount,
+    chapterCount,
+  };
+}
+
+/* ============================================================================
+   LOCAL STORAGE OPERATIONS (IndexedDB via storage wrapper)
+   ============================================================================ */
 
 /**
  * Get project index from storage (new key first, then legacy key)
@@ -65,8 +140,7 @@ export function getLocalProjectIndex(): ProjectIndexEntry[] {
     const parsedLegacy = safeParseIndex(rawLegacy);
     if (parsedLegacy) {
       // Heal forward
-      const healed = JSON.stringify(parsedLegacy);
-      storage.setItem(PROJECTS_INDEX_KEY, healed);
+      storage.setItem(PROJECTS_INDEX_KEY, JSON.stringify(parsedLegacy));
       return parsedLegacy;
     }
 
@@ -87,6 +161,7 @@ export function setLocalProjectIndex(entries: ProjectIndexEntry[]): void {
     const raw = JSON.stringify(entries);
     storage.setItem(PROJECTS_INDEX_KEY, raw);
     storage.setItem(LEGACY_PROJECTS_LIST_KEY, raw); // keep legacy UI in sync
+    emitProjectChangeEvents();
   } catch (err) {
     console.error("[projectsService] Failed to save project index:", err);
   }
@@ -102,7 +177,9 @@ export function getLocalProject(projectId: string): Project | null {
     const key = `${PROJECTS_CACHE_KEY}_${projectId}`;
     const raw = storage.getItem(key);
     if (!raw) return null;
-    return JSON.parse(raw) as Project;
+
+    const parsed = safeParseJson<Project>(raw);
+    return parsed ?? null;
   } catch (err) {
     console.error("[projectsService] Failed to load project from cache:", err);
     return null;
@@ -121,12 +198,18 @@ export function setLocalProject(project: Project): void {
 
     // Also update the current project if it matches (supports legacy current id key too)
     const currentId =
-      storage.getItem(CURRENT_PROJECT_ID_KEY) || storage.getItem(LEGACY_CURRENT_PROJECT_ID_KEY);
+      storage.getItem(CURRENT_PROJECT_ID_KEY) ||
+      storage.getItem(LEGACY_CURRENT_PROJECT_ID_KEY) ||
+      null;
 
     if (currentId === project.id) {
       storage.setItem(CURRENT_PROJECT_KEY, JSON.stringify(project));
-      storage.setItem(LEGACY_CURRENT_STORY_KEY, JSON.stringify(project));
+
+      // Legacy: `currentStory` should be metadata
+      storage.setItem(LEGACY_CURRENT_STORY_KEY, JSON.stringify(computeLegacyStoryMeta(project)));
     }
+
+    emitProjectChangeEvents();
   } catch (err) {
     console.error("[projectsService] Failed to save project to cache:", err);
   }
@@ -141,13 +224,18 @@ export function removeLocalProject(projectId: string): void {
   try {
     const key = `${PROJECTS_CACHE_KEY}_${projectId}`;
     storage.removeItem(key);
+
+    // Some older builds used "-" instead of "_" between base and id
+    storage.removeItem(`${PROJECTS_CACHE_KEY}-${projectId}`);
+
+    emitProjectChangeEvents();
   } catch (err) {
     console.error("[projectsService] Failed to remove project from cache:", err);
   }
 }
 
 /**
- * Get the currently active project from storage (new key first; legacy story is only a fallback)
+ * Get the currently active project from storage (new key first; legacy story meta is only a fallback)
  */
 export function getCurrentProject(): Project | null {
   if (typeof window === "undefined") return null;
@@ -157,15 +245,21 @@ export function getCurrentProject(): Project | null {
     const parsedNew = safeParseJson<Project>(rawNew);
     if (parsedNew) return parsedNew;
 
+    // If only legacy currentStory exists, it may be *metadata only*.
+    // In that case we can only recover the ID and try loading the cached project.
     const rawLegacy = storage.getItem(LEGACY_CURRENT_STORY_KEY);
-    const parsedLegacy = safeParseJson<Project>(rawLegacy);
-    if (parsedLegacy) {
-      // Heal forward
-      storage.setItem(CURRENT_PROJECT_KEY, JSON.stringify(parsedLegacy));
-      if (parsedLegacy?.id) {
-        storage.setItem(CURRENT_PROJECT_ID_KEY, parsedLegacy.id);
+    const legacy = safeParseJson<any>(rawLegacy);
+
+    if (legacy && isPlainObject(legacy) && typeof legacy.id === "string") {
+      const maybeProject = getLocalProject(legacy.id);
+      if (maybeProject) {
+        storage.setItem(CURRENT_PROJECT_KEY, JSON.stringify(maybeProject));
+        storage.setItem(CURRENT_PROJECT_ID_KEY, maybeProject.id);
+        return maybeProject;
       }
-      return parsedLegacy;
+
+      // Heal forward the ID even if the full project isn't cached
+      storage.setItem(CURRENT_PROJECT_ID_KEY, legacy.id);
     }
 
     return null;
@@ -188,9 +282,10 @@ export function setCurrentProject(project: Project | null): void {
 
       // Keep legacy keys in sync
       storage.setItem(LEGACY_CURRENT_PROJECT_ID_KEY, project.id);
-      storage.setItem(LEGACY_CURRENT_STORY_KEY, JSON.stringify(project));
+      storage.setItem(LEGACY_CURRENT_STORY_KEY, JSON.stringify(computeLegacyStoryMeta(project)));
 
-      setLocalProject(project); // Also cache it
+      // Cache it too
+      storage.setItem(`${PROJECTS_CACHE_KEY}_${project.id}`, JSON.stringify(project));
     } else {
       storage.removeItem(CURRENT_PROJECT_KEY);
       storage.removeItem(CURRENT_PROJECT_ID_KEY);
@@ -199,6 +294,8 @@ export function setCurrentProject(project: Project | null): void {
       storage.removeItem(LEGACY_CURRENT_PROJECT_ID_KEY);
       storage.removeItem(LEGACY_CURRENT_STORY_KEY);
     }
+
+    emitProjectChangeEvents();
   } catch (err) {
     console.error("[projectsService] Failed to set current project:", err);
   }
@@ -211,7 +308,11 @@ export function getCurrentProjectId(): string | null {
   if (typeof window === "undefined") return null;
 
   try {
-    return storage.getItem(CURRENT_PROJECT_ID_KEY) || storage.getItem(LEGACY_CURRENT_PROJECT_ID_KEY);
+    return (
+      storage.getItem(CURRENT_PROJECT_ID_KEY) ||
+      storage.getItem(LEGACY_CURRENT_PROJECT_ID_KEY) ||
+      null
+    );
   } catch {
     return null;
   }
@@ -230,7 +331,7 @@ function indexKey(authorId: string): string {
 }
 
 export async function saveProjectToCloud(project: Project): Promise<void> {
-  const authorId = project.authorId || getLocalAuthorId();
+  const authorId = (project as any).authorId || getLocalAuthorId();
   if (!authorId) throw new Error("No author ID available for cloud save");
 
   const key = projectKey(authorId, project.id);
@@ -282,8 +383,8 @@ export async function loadProjectFromCloud(authorId: string, projectId: string):
 
     const data = await response.json();
 
-    if (data.body) return typeof data.body === "string" ? JSON.parse(data.body) : data.body;
-    if (data.data) return data.data as Project;
+    if (data?.body) return typeof data.body === "string" ? JSON.parse(data.body) : (data.body as Project);
+    if (data?.data) return data.data as Project;
 
     return data as Project;
   } catch (err) {
@@ -317,7 +418,7 @@ export async function saveIndexToCloud(authorId: string, entries: ProjectIndexEn
   const index: ProjectIndex = {
     authorId,
     projects: entries,
-    updatedAt: new Date().toISOString(),
+    updatedAt: nowIso(),
   };
 
   const response = await fetch(`${API_BASE}/files`, {
@@ -365,11 +466,11 @@ export async function loadIndexFromCloud(authorId: string): Promise<ProjectIndex
     const data = await response.json();
 
     let index: ProjectIndex;
-    if (data.body) index = typeof data.body === "string" ? JSON.parse(data.body) : data.body;
-    else if (data.data) index = data.data;
+    if (data?.body) index = typeof data.body === "string" ? JSON.parse(data.body) : data.body;
+    else if (data?.data) index = data.data;
     else index = data;
 
-    return index.projects || [];
+    return Array.isArray(index?.projects) ? index.projects : [];
   } catch (err) {
     console.error("[projectsService] Failed to load index from cloud:", err);
     return [];
@@ -390,9 +491,15 @@ export async function createProject(
   const project = createEmptyProject(authorId, title);
 
   if (options.authorName) {
-    project.author = options.authorName;
-    project.publishing.meta.author = options.authorName;
-    project.cover.author = options.authorName;
+    // Be defensive: these fields may or may not exist depending on your Project type shape
+    (project as any).author = options.authorName;
+
+    if ((project as any).publishing?.meta) {
+      (project as any).publishing.meta.author = options.authorName;
+    }
+    if ((project as any).cover) {
+      (project as any).cover.author = options.authorName;
+    }
   }
 
   // Save locally
@@ -404,7 +511,7 @@ export async function createProject(
   const entry = createProjectIndexEntry(project);
   setLocalProjectIndex([entry, ...index]);
 
-  // Save to cloud if requested
+  // Save to cloud if requested (default true)
   if (options.saveToCloud !== false) {
     try {
       await saveProjectToCloud(project);
@@ -422,7 +529,7 @@ export async function saveProject(
   project: Project,
   options: { updateIndex?: boolean; cloudSync?: boolean } = {}
 ): Promise<void> {
-  project.updatedAt = new Date().toISOString();
+  (project as any).updatedAt = nowIso();
 
   // Save locally
   setLocalProject(project);
@@ -436,7 +543,7 @@ export async function saveProject(
 
     // Save index to cloud
     if (options.cloudSync !== false) {
-      const authorId = project.authorId || getLocalAuthorId();
+      const authorId = (project as any).authorId || getLocalAuthorId();
       if (authorId) {
         saveIndexToCloud(authorId, newIndex).catch((err) => {
           console.error("[projectsService] Index cloud save failed:", err);
@@ -463,17 +570,24 @@ export async function loadProject(
     if (local) {
       setCurrentProject(local);
 
-      // Sync from cloud in background
+      // If authorId exists, check cloud and refresh if newer (non-blocking)
       if (authorId) {
         loadProjectFromCloud(authorId, projectId)
           .then((cloud) => {
-            if (cloud && cloud.updatedAt > local.updatedAt) {
+            if (!cloud) return;
+
+            const localUpdated = String((local as any).updatedAt || "");
+            const cloudUpdated = String((cloud as any).updatedAt || "");
+
+            if (cloudUpdated && localUpdated && cloudUpdated > localUpdated) {
               console.log("[projectsService] Cloud version is newer, updating local");
               setLocalProject(cloud);
               setCurrentProject(cloud);
             }
           })
-          .catch(() => {});
+          .catch(() => {
+            // ignore background errors
+          });
       }
 
       return local;
@@ -510,11 +624,20 @@ export async function deleteProject(projectId: string, options: { authorId?: str
     setCurrentProject(null);
   }
 
-  // Extra legacy cleanup (older pages sometimes store per-project extras)
+  // Extra cleanup for older modules that stored project-scoped cover keys
+  // Try both "_" and "-" separators, and both raw id & "project-{id}" styles.
+  const idVariants = [projectId, `project-${projectId}`];
+  const keyBases = ["dahtruth_cover_image_url", "dahtruth_cover_image_meta", "dahtruth_cover_settings", "dahtruth_cover_designs"];
+
   try {
-    storage.removeItem(`dahtruth-project-project-${projectId}`);
-    storage.removeItem(`dahtruth_cover_image_url_project-${projectId}`);
-    storage.removeItem(`dahtruth_cover_image_meta_project-${projectId}`);
+    for (const id of idVariants) {
+      for (const base of keyBases) {
+        storage.removeItem(`${base}_${id}`);
+        storage.removeItem(`${base}-${id}`);
+      }
+      storage.removeItem(`dahtruth-project-${id}`);
+      storage.removeItem(`dahtruth_project_${id}`);
+    }
   } catch {
     // ignore
   }
@@ -529,6 +652,7 @@ export async function deleteProject(projectId: string, options: { authorId?: str
     }
   }
 
+  emitProjectChangeEvents();
   console.log("[projectsService] Project deleted:", projectId);
 }
 
@@ -568,19 +692,24 @@ export async function duplicateProject(projectId: string, newTitle?: string): Pr
   const original = await loadProject(projectId);
   if (!original) return null;
 
-  const authorId = original.authorId || getLocalAuthorId();
+  const authorId = (original as any).authorId || getLocalAuthorId();
   if (!authorId) return null;
 
-  const newProject: Project = {
-    ...JSON.parse(JSON.stringify(original)),
-    id: crypto?.randomUUID?.() || `proj_${Date.now()}`,
-    title: newTitle || `${original.title} (Copy)`,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
+  const newId =
+    (globalThis as any).crypto?.randomUUID?.() || `proj_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
-  newProject.publishing.meta.title = newProject.title;
-  newProject.cover.title = newProject.title;
+  const newProject: Project = {
+    ...(JSON.parse(JSON.stringify(original)) as Project),
+    id: newId,
+    title: newTitle || `${(original as any).title || "Untitled"} (Copy)`,
+    createdAt: nowIso(),
+    updatedAt: nowIso(),
+  } as any;
+
+  // Keep common nested title fields in sync (defensive)
+  const anyProj = newProject as any;
+  if (anyProj?.publishing?.meta) anyProj.publishing.meta.title = anyProj.title;
+  if (anyProj?.cover) anyProj.cover.title = anyProj.title;
 
   setLocalProject(newProject);
 
@@ -663,7 +792,7 @@ export async function flushAutoSave(): Promise<void> {
    ============================================================================ */
 
 let syncStatus: SyncStatus = "idle";
-let syncListeners: Set<(status: SyncStatus) => void> = new Set();
+const syncListeners: Set<(status: SyncStatus) => void> = new Set();
 
 export function getSyncStatus(): SyncStatus {
   return syncStatus;
