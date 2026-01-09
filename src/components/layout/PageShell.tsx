@@ -12,8 +12,12 @@ export type PageShellProps = {
   /** Optional header/footer (could be a nav, etc.) */
   header?: React.ReactNode;
   footer?: React.ReactNode;
-  /** Additional style overrides */
+  /** Additional style overrides for outer shell */
   style?: React.CSSProperties;
+  /** Optional class for outer shell */
+  className?: string;
+  /** Optional class for main container */
+  mainClassName?: string;
   children: React.ReactNode;
 };
 
@@ -27,20 +31,32 @@ export default function PageShell({
   header,
   footer,
   style,
+  className = "",
+  mainClassName = "",
   children,
 }: PageShellProps) {
   return (
-    <div style={{ minHeight: "100vh", background, ...style }}>
+    <div
+      className={className}
+      style={{
+        minHeight: "100vh",
+        background,
+        ...style,
+      }}
+    >
       {header}
+
       <main
+        className={mainClassName}
         style={{
           margin: "0 auto",
-          ...(contained ? { maxWidth } : { maxWidth: "none" }),
+          maxWidth: contained ? maxWidth : "none",
           padding,
         }}
       >
         {children}
       </main>
+
       {footer}
     </div>
   );
