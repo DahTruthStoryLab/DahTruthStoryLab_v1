@@ -1,54 +1,86 @@
 // src/lib/storage/storage.ts
-// Storage service - uses memory cache + localStorage + IndexedDB overflow
-// Memory cache ensures synchronous reads always work
+// Storage service that provides localStorage-like API but uses IndexedDB
+// This solves the quota exceeded error for large manuscripts
 
-import { db, initDB, isIndexedDBAvailable, StorageEntry } from './db';
-
-/* ============================================================================
-   MEMORY CACHE - Source of truth for synchronous reads
-   ============================================================================ */
-
-const memoryCache = new Map<string, string>();
-let isHydrated = false;
-let hydrationPromise: Promise<void> | null = null;
+import { db, initDB, isIndexedDBAvailable, StorageEntry, ProjectEntry } from './db';
 
 /* ============================================================================
-   INDEXEDDB HELPERS
+   INITIALIZATION STATE
    ============================================================================ */
 
-let dbReady = false;
-let dbInitPromise: Promise<void> | null = null;
+let initialized = false;
+let initPromise: Promise<void> | null = null;
+let fallbackToLocalStorage = false;
 
-async function ensureDB(): Promise<boolean> {
-  if (dbReady) return true;
-  if (!isIndexedDBAvailable()) return false;
+/**
+ * Ensure storage is ready before operations
+ */
+async function ensureReady(): Promise<void> {
+  if (initialized) return;
   
-  if (!dbInitPromise) {
-    dbInitPromise = initDB().then(() => {
-      dbReady = true;
-    }).catch((err) => {
-      console.error('[Storage] IndexedDB init failed:', err);
-      dbReady = false;
-    });
+  if (!initPromise) {
+    initPromise = (async () => {
+      if (!isIndexedDBAvailable()) {
+        console.warn('[Storage] IndexedDB not available, falling back to localStorage');
+        fallbackToLocalStorage = true;
+        initialized = true;
+        return;
+      }
+      
+      try {
+        await initDB();
+        initialized = true;
+      } catch (error) {
+        console.error('[Storage] Failed to init IndexedDB, falling back to localStorage:', error);
+        fallbackToLocalStorage = true;
+        initialized = true;
+      }
+    })();
   }
   
-  await dbInitPromise;
-  return dbReady;
+  return initPromise;
 }
 
-async function getFromIndexedDB(key: string): Promise<string | null> {
-  if (!await ensureDB()) return null;
+/* ============================================================================
+   CORE STORAGE OPERATIONS (Async - for direct use)
+   ============================================================================ */
+
+/**
+ * Get an item from storage
+ */
+export async function getItem(key: string): Promise<string | null> {
+  await ensureReady();
+  
+  if (fallbackToLocalStorage) {
+    return localStorage.getItem(key);
+  }
+  
   try {
     const entry = await db.storage.get(key);
     return entry?.value ?? null;
-  } catch (err) {
-    console.error(`[Storage] IndexedDB get failed for "${key}":`, err);
-    return null;
+  } catch (error) {
+    console.error(`[Storage] Failed to get "${key}":`, error);
+    // Try localStorage as fallback
+    return localStorage.getItem(key);
   }
 }
 
-async function setToIndexedDB(key: string, value: string): Promise<boolean> {
-  if (!await ensureDB()) return false;
+/**
+ * Set an item in storage
+ */
+export async function setItem(key: string, value: string): Promise<void> {
+  await ensureReady();
+  
+  if (fallbackToLocalStorage) {
+    try {
+      localStorage.setItem(key, value);
+    } catch (e) {
+      console.error(`[Storage] localStorage quota exceeded for "${key}"`);
+      throw e;
+    }
+    return;
+  }
+  
   try {
     const entry: StorageEntry = {
       key,
@@ -56,194 +88,480 @@ async function setToIndexedDB(key: string, value: string): Promise<boolean> {
       updatedAt: new Date().toISOString(),
     };
     await db.storage.put(entry);
-    return true;
-  } catch (err) {
-    console.error(`[Storage] IndexedDB set failed for "${key}":`, err);
-    return false;
+  } catch (error) {
+    console.error(`[Storage] Failed to set "${key}":`, error);
+    throw error;
   }
 }
 
-async function removeFromIndexedDB(key: string): Promise<void> {
-  if (!await ensureDB()) return;
-  try {
-    await db.storage.delete(key);
-  } catch (err) {
-    console.error(`[Storage] IndexedDB delete failed for "${key}":`, err);
-  }
-}
-
-/* ============================================================================
-   HYDRATION - Load IndexedDB data into memory cache on startup
-   ============================================================================ */
-
-async function hydrateFromIndexedDB(): Promise<void> {
-  if (isHydrated) return;
+/**
+ * Remove an item from storage
+ */
+export async function removeItem(key: string): Promise<void> {
+  await ensureReady();
   
-  if (!await ensureDB()) {
-    isHydrated = true;
+  if (fallbackToLocalStorage) {
+    localStorage.removeItem(key);
     return;
   }
   
   try {
-    console.log('[Storage] Hydrating from IndexedDB...');
-    const allEntries = await db.storage.toArray();
-    
-    for (const entry of allEntries) {
-      // Only add to cache if not already there (localStorage takes precedence)
-      if (!memoryCache.has(entry.key)) {
-        memoryCache.set(entry.key, entry.value);
-      }
-    }
-    
-    console.log(`[Storage] Hydrated ${allEntries.length} items from IndexedDB`);
-  } catch (err) {
-    console.error('[Storage] Hydration failed:', err);
+    await db.storage.delete(key);
+  } catch (error) {
+    console.error(`[Storage] Failed to remove "${key}":`, error);
   }
-  
-  isHydrated = true;
 }
 
 /**
- * Initialize storage - call this before app renders
- * Loads all localStorage into memory cache, then hydrates from IndexedDB
+ * Get all keys matching a prefix
  */
-export async function initStorage(): Promise<void> {
-  if (hydrationPromise) return hydrationPromise;
+export async function getKeys(prefix?: string): Promise<string[]> {
+  await ensureReady();
   
-  hydrationPromise = (async () => {
-    // First, load all localStorage into memory cache (instant)
+  if (fallbackToLocalStorage) {
+    const keys: string[] = [];
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
-      if (key) {
-        const value = localStorage.getItem(key);
-        if (value !== null) {
-          memoryCache.set(key, value);
-        }
+      if (key && (!prefix || key.startsWith(prefix))) {
+        keys.push(key);
       }
     }
-    console.log(`[Storage] Loaded ${memoryCache.size} items from localStorage`);
+    return keys;
+  }
+  
+  try {
+    const allEntries = await db.storage.toArray();
+    return allEntries
+      .map(e => e.key)
+      .filter(key => !prefix || key.startsWith(prefix));
+  } catch (error) {
+    console.error('[Storage] Failed to get keys:', error);
+    return [];
+  }
+}
+
+/**
+ * Clear all items (optionally matching a prefix)
+ */
+export async function clear(prefix?: string): Promise<void> {
+  await ensureReady();
+  
+  if (fallbackToLocalStorage) {
+    if (prefix) {
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith(prefix)) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach(key => localStorage.removeItem(key));
+    } else {
+      localStorage.clear();
+    }
+    return;
+  }
+  
+  try {
+    if (prefix) {
+      const keys = await getKeys(prefix);
+      await db.storage.bulkDelete(keys);
+    } else {
+      await db.storage.clear();
+    }
+  } catch (error) {
+    console.error('[Storage] Failed to clear:', error);
+  }
+}
+
+/* ============================================================================
+   PROJECT-SPECIFIC STORAGE (for large project data)
+   ============================================================================ */
+
+/**
+ * Save a project (optimized for large data)
+ */
+export async function saveProject(id: string, data: unknown): Promise<void> {
+  await ensureReady();
+  
+  const jsonString = JSON.stringify(data);
+  
+  if (fallbackToLocalStorage) {
+    try {
+      localStorage.setItem(`dahtruth_project_${id}`, jsonString);
+    } catch (e) {
+      console.error(`[Storage] localStorage quota exceeded for project "${id}"`);
+      throw new Error(`Storage quota exceeded. Your manuscript is too large for this browser's storage. Try clearing old projects or using a different browser.`);
+    }
+    return;
+  }
+  
+  try {
+    const entry: ProjectEntry = {
+      id,
+      data: jsonString,
+      updatedAt: new Date().toISOString(),
+    };
+    await db.projects.put(entry);
+  } catch (error) {
+    console.error(`[Storage] Failed to save project "${id}":`, error);
+    throw error;
+  }
+}
+
+/**
+ * Load a project
+ */
+export async function loadProject(id: string): Promise<unknown | null> {
+  await ensureReady();
+  
+  if (fallbackToLocalStorage) {
+    const raw = localStorage.getItem(`dahtruth_project_${id}`);
+    return raw ? JSON.parse(raw) : null;
+  }
+  
+  try {
+    const entry = await db.projects.get(id);
+    return entry ? JSON.parse(entry.data) : null;
+  } catch (error) {
+    console.error(`[Storage] Failed to load project "${id}":`, error);
+    return null;
+  }
+}
+
+/**
+ * Delete a project
+ */
+export async function deleteProject(id: string): Promise<void> {
+  await ensureReady();
+  
+  if (fallbackToLocalStorage) {
+    localStorage.removeItem(`dahtruth_project_${id}`);
+    return;
+  }
+  
+  try {
+    await db.projects.delete(id);
+  } catch (error) {
+    console.error(`[Storage] Failed to delete project "${id}":`, error);
+  }
+}
+
+/**
+ * List all project IDs
+ */
+export async function listProjectIds(): Promise<string[]> {
+  await ensureReady();
+  
+  if (fallbackToLocalStorage) {
+    const ids: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith('dahtruth_project_')) {
+        ids.push(key.replace('dahtruth_project_', ''));
+      }
+    }
+    return ids;
+  }
+  
+  try {
+    const entries = await db.projects.toArray();
+    return entries.map(e => e.id);
+  } catch (error) {
+    console.error('[Storage] Failed to list projects:', error);
+    return [];
+  }
+}
+
+/* ============================================================================
+   SYNCHRONOUS WRAPPER (for backwards compatibility)
+   
+   These functions provide a synchronous-looking API that matches localStorage.
+   They queue operations and return immediately, with actual storage happening async.
+   
+   NOTE: Use the async versions above when possible for better error handling.
+   ============================================================================ */
+
+// Operation queue for sync wrapper
+const operationQueue: Array<() => Promise<void>> = [];
+let isProcessingQueue = false;
+
+async function processQueue() {
+  if (isProcessingQueue) return;
+  isProcessingQueue = true;
+  
+  while (operationQueue.length > 0) {
+    const operation = operationQueue.shift();
+    if (operation) {
+      try {
+        await operation();
+      } catch (error) {
+        console.error('[Storage] Queue operation failed:', error);
+      }
+    }
+  }
+  
+  isProcessingQueue = false;
+}
+
+// Cache for sync reads (populated by writes and async reads)
+const readCache = new Map<string, string | null>();
+
+// Hydration state
+let isHydrated = false;
+let hydrationPromise: Promise<void> | null = null;
+
+/**
+ * Hydrate the cache from IndexedDB on startup
+ * This ensures data persists across page reloads
+ */
+export async function hydrateFromIndexedDB(): Promise<void> {
+  if (isHydrated) return;
+  
+  if (hydrationPromise) {
+    return hydrationPromise;
+  }
+  
+  hydrationPromise = (async () => {
+    await ensureReady();
     
-    // Then hydrate from IndexedDB (may have overflow items)
-    await hydrateFromIndexedDB();
+    if (fallbackToLocalStorage) {
+      console.log('[Storage] Using localStorage fallback, no hydration needed');
+      isHydrated = true;
+      return;
+    }
     
-    console.log('[Storage] Storage ready');
+    try {
+      console.log('[Storage] Hydrating from IndexedDB...');
+      const allEntries = await db.storage.toArray();
+      
+      let loadedCount = 0;
+      for (const entry of allEntries) {
+        readCache.set(entry.key, entry.value);
+        // Also populate localStorage as backup (ignore errors for large items)
+        try {
+          localStorage.setItem(entry.key, entry.value);
+        } catch (e) {
+          // Ignore - item too large for localStorage
+        }
+        loadedCount++;
+      }
+      
+      isHydrated = true;
+      console.log(`[Storage] Hydrated ${loadedCount} items from IndexedDB`);
+      
+      // Dispatch event so components know storage is ready
+      window.dispatchEvent(new Event('storage:ready'));
+    } catch (error) {
+      console.error('[Storage] Hydration failed:', error);
+      isHydrated = true; // Mark as hydrated anyway to prevent infinite retries
+    }
   })();
   
   return hydrationPromise;
 }
 
-// Start hydration immediately on module load
-initStorage();
+/**
+ * Check if storage has been hydrated
+ */
+export function isStorageHydrated(): boolean {
+  return isHydrated;
+}
 
-/* ============================================================================
-   MAIN STORAGE API (Synchronous - drop-in localStorage replacement)
-   ============================================================================ */
+/**
+ * Wait for storage to be ready (hydrated)
+ */
+export async function waitForStorage(): Promise<void> {
+  if (isHydrated) return;
+  return hydrateFromIndexedDB();
+}
 
+// Auto-hydrate on module load
+hydrateFromIndexedDB().catch(err => {
+  console.error('[Storage] Auto-hydration failed:', err);
+});
+
+/**
+ * Synchronous-style storage wrapper
+ * Provides localStorage-compatible API but uses IndexedDB under the hood
+ */
 export const storage = {
   /**
-   * Get item - checks memory cache first, then localStorage
+   * Get item (uses cache for sync access, async fetch for fresh data)
    */
   getItem(key: string): string | null {
-    // 1. Check memory cache (has both localStorage + IndexedDB data after hydration)
-    if (memoryCache.has(key)) {
-      return memoryCache.get(key)!;
+    // Return from cache if available
+    if (readCache.has(key)) {
+      return readCache.get(key) ?? null;
     }
     
-    // 2. Check localStorage directly (in case hydration hasn't run yet)
+    // Try localStorage as immediate fallback
     const localValue = localStorage.getItem(key);
     if (localValue !== null) {
-      memoryCache.set(key, localValue);
-      return localValue;
+      readCache.set(key, localValue);
     }
     
-    // 3. Not found
-    return null;
+    // Queue async fetch to update cache (in case localStorage was stale)
+    operationQueue.push(async () => {
+      const value = await getItem(key);
+      if (value !== null) {
+        readCache.set(key, value);
+      }
+    });
+    processQueue();
+    
+    return localValue;
   },
-
+  
   /**
-   * Set item - writes to memory cache + tries localStorage, overflows to IndexedDB
+   * Set item (queues async write, updates cache immediately)
    */
   setItem(key: string, value: string): void {
-    // Always update memory cache first (ensures sync reads work)
-    memoryCache.set(key, value);
+    // Update cache immediately for sync reads
+    readCache.set(key, value);
     
-    // Try to save to localStorage
+    // Also write to localStorage as backup (may fail for large items)
     try {
       localStorage.setItem(key, value);
     } catch (e) {
-      // localStorage quota exceeded - save to IndexedDB instead
-      console.log(`[Storage] localStorage quota exceeded for "${key}", saving to IndexedDB`);
-      
-      // Remove from localStorage if it was partially there
-      try {
-        localStorage.removeItem(key);
-      } catch {}
-      
-      // Save to IndexedDB (async, but memory cache already has it)
-      setToIndexedDB(key, value).then((success) => {
-        if (!success) {
-          console.error(`[Storage] Failed to save "${key}" to IndexedDB`);
-        }
-      });
+      // Ignore localStorage errors - IndexedDB will handle it
+      console.debug(`[Storage] localStorage failed for "${key}", using IndexedDB`);
     }
+    
+    // Queue async write to IndexedDB
+    operationQueue.push(async () => {
+      try {
+        await setItem(key, value);
+      } catch (error) {
+        // If IndexedDB also fails, we have a real problem
+        console.error(`[Storage] Failed to save "${key}":`, error);
+        
+        // Show user-friendly error for quota issues
+        if (error instanceof Error && error.message.includes('quota')) {
+          alert('Storage full! Please delete some old projects to free up space.');
+        }
+      }
+    });
+    processQueue();
   },
-
+  
   /**
-   * Remove item from all stores
+   * Remove item
    */
   removeItem(key: string): void {
-    memoryCache.delete(key);
+    readCache.delete(key);
     localStorage.removeItem(key);
-    removeFromIndexedDB(key);
+    
+    operationQueue.push(async () => {
+      await removeItem(key);
+    });
+    processQueue();
   },
-
+  
   /**
-   * Clear all storage
+   * Clear storage
    */
   clear(): void {
-    memoryCache.clear();
+    readCache.clear();
     localStorage.clear();
-    ensureDB().then(() => {
-      db.storage.clear().catch(() => {});
+    
+    operationQueue.push(async () => {
+      await clear();
     });
-  },
-
-  /**
-   * Get number of items (for debugging)
-   */
-  get length(): number {
-    return memoryCache.size;
-  },
-
-  /**
-   * Get key at index (for debugging)
-   */
-  key(index: number): string | null {
-    const keys = Array.from(memoryCache.keys());
-    return keys[index] ?? null;
+    processQueue();
   },
 };
 
 /* ============================================================================
-   ASYNC API (for explicit async usage)
+   MIGRATION UTILITIES
    ============================================================================ */
 
-export async function getItemAsync(key: string): Promise<string | null> {
-  await initStorage(); // Ensure hydrated
-  return storage.getItem(key);
+const MIGRATION_KEY = 'dahtruth_indexeddb_migration_v1';
+
+/**
+ * Check if migration from localStorage to IndexedDB is needed
+ */
+export async function needsMigration(): Promise<boolean> {
+  await ensureReady();
+  
+  if (fallbackToLocalStorage) {
+    return false; // Can't migrate if IndexedDB isn't available
+  }
+  
+  // Check if we've already migrated
+  const migrated = await getItem(MIGRATION_KEY);
+  if (migrated === 'complete') {
+    return false;
+  }
+  
+  // Check if there's localStorage data to migrate
+  return localStorage.length > 0;
 }
 
-export async function setItemAsync(key: string, value: string): Promise<void> {
-  await initStorage();
-  storage.setItem(key, value);
+/**
+ * Migrate all localStorage data to IndexedDB
+ */
+export async function migrateFromLocalStorage(): Promise<{
+  migrated: number;
+  failed: number;
+  errors: string[];
+}> {
+  await ensureReady();
+  
+  const result = {
+    migrated: 0,
+    failed: 0,
+    errors: [] as string[],
+  };
+  
+  if (fallbackToLocalStorage) {
+    return result;
+  }
+  
+  console.log('[Storage] Starting migration from localStorage to IndexedDB...');
+  
+  const keys: string[] = [];
+  for (let i = 0; i < localStorage.length; i++) {
+    const key = localStorage.key(i);
+    if (key) keys.push(key);
+  }
+  
+  for (const key of keys) {
+    try {
+      const value = localStorage.getItem(key);
+      if (value !== null) {
+        await setItem(key, value);
+        result.migrated++;
+      }
+    } catch (error) {
+      result.failed++;
+      result.errors.push(`Failed to migrate "${key}": ${error}`);
+      console.error(`[Storage] Migration failed for "${key}":`, error);
+    }
+  }
+  
+  // Mark migration as complete
+  await setItem(MIGRATION_KEY, 'complete');
+  
+  console.log(`[Storage] Migration complete: ${result.migrated} items migrated, ${result.failed} failed`);
+  
+  return result;
 }
 
-/* ============================================================================
-   MIGRATION HELPER
-   ============================================================================ */
-
+/**
+ * Run migration if needed (call this on app startup)
+ */
 export async function runMigrationIfNeeded(): Promise<void> {
-  await initStorage();
+  try {
+    if (await needsMigration()) {
+      const result = await migrateFromLocalStorage();
+      if (result.failed > 0) {
+        console.warn(`[Storage] Migration had ${result.failed} failures:`, result.errors);
+      }
+    }
+  } catch (error) {
+    console.error('[Storage] Migration check failed:', error);
+  }
 }
 
 /* ============================================================================
