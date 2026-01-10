@@ -43,6 +43,49 @@ function saveProjectsList(projects) {
   }
 }
 
+// AUTO-REPAIR: Ensure current project exists in projects list
+// If we have project DATA but no LIST entry, create one
+function repairProjectsList() {
+  const currentId = loadCurrentProjectId();
+  if (!currentId) return;
+
+  let projects = loadProjectsList();
+  const existsInList = projects.some(p => p.id === currentId);
+
+  if (!existsInList) {
+    // Project ID exists but not in list - try to repair from project data
+    const projectData = loadProjectData(currentId);
+    if (projectData) {
+      console.log(`[ProjectStore] Auto-repairing: Adding missing project ${currentId} to list`);
+      
+      const title = projectData.book?.title || "Untitled Book";
+      const totalWords = (projectData.chapters || []).reduce((sum, ch) => sum + (ch.wordCount || 0), 0);
+      const chapterCount = (projectData.chapters || []).length;
+
+      const newEntry = {
+        id: currentId,
+        title: title,
+        status: "Draft",
+        source: "Repaired",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        wordCount: totalWords,
+        chapterCount: chapterCount,
+      };
+
+      projects = [...projects, newEntry];
+      saveProjectsList(projects);
+      
+      // Also sync to userProjects for backward compatibility
+      syncToUserProjects(projects);
+      
+      console.log(`[ProjectStore] Repaired project list with: "${title}"`);
+    }
+  }
+
+  return projects;
+}
+
 // Load current project ID
 function loadCurrentProjectId() {
   try {
@@ -472,15 +515,25 @@ export function useProjectStore() {
     migrateLegacyData();
   }, []);
 
-  const [projects, setProjects] = useState(() => loadProjectsList());
+  const [projects, setProjects] = useState(() => {
+    repairProjectsList(); // Auto-repair on initial load
+    return loadProjectsList();
+  });
   const [currentProjectId, setCurrentProjectId] = useState(() => loadCurrentProjectId());
 
   // Sync with localStorage changes AND storage hydration
   useEffect(() => {
     const sync = () => {
+      repairProjectsList(); // Auto-repair on every sync
       const loadedProjects = loadProjectsList();
       const loadedProjectId = loadCurrentProjectId();
       console.log(`[ProjectStore] Syncing - found ${loadedProjects.length} projects, current: ${loadedProjectId}`);
+      
+      // Log project titles for debugging
+      if (loadedProjects.length > 0) {
+        console.log(`[ProjectStore] Projects:`, loadedProjects.map(p => ({ id: p.id?.slice(-8), title: p.title })));
+      }
+      
       setProjects(loadedProjects);
       setCurrentProjectId(loadedProjectId);
     };
@@ -492,6 +545,9 @@ export function useProjectStore() {
     
     // IMPORTANT: Listen for storage:ready event (fired after IndexedDB hydration)
     window.addEventListener("storage:ready", sync);
+    
+    // Run sync immediately in case storage is already ready
+    sync();
     
     return () => {
       window.removeEventListener("storage", sync);
@@ -649,6 +705,8 @@ export function useProjectStore() {
 
   // Rename a project
   const renameProject = useCallback((projectId, newTitle) => {
+    console.log(`[ProjectStore] Renaming project ${projectId} to "${newTitle}"`);
+    
     const updated = projects.map((p) =>
       p.id === projectId
         ? { ...p, title: newTitle, updatedAt: new Date().toISOString() }
@@ -664,8 +722,28 @@ export function useProjectStore() {
       saveProjectData(projectId, data);
     }
 
+    // Sync to userProjects for backward compatibility
+    syncToUserProjects(updated);
+
+    // Update currentStory if this is the current project
+    if (projectId === currentProjectId) {
+      const totalWords = (data?.chapters || []).reduce((sum, ch) => sum + (ch.wordCount || 0), 0);
+      storage.setItem("currentStory", JSON.stringify({
+        id: projectId,
+        title: newTitle,
+        status: "Draft",
+        updatedAt: new Date().toISOString(),
+        wordCount: totalWords,
+        chapterCount: (data?.chapters || []).length,
+      }));
+    }
+
+    // Dispatch event so other components update
+    window.dispatchEvent(new Event("project:change"));
+    window.dispatchEvent(new Event("projects:change"));
+
     return true;
-  }, [projects]);
+  }, [projects, currentProjectId]);
 
   // Get project data (for useChapterManager to use)
   const getProjectData = useCallback((projectId) => {
