@@ -1001,7 +1001,7 @@ Return ONLY the JSON array, no other text.`;
 /* =============================================================================
    PROJECT DROPDOWN COMPONENT
 ============================================================================= */
-function ProjectDropdown({ currentProject, projects, onSwitch, onCreate, onImportNew }) {
+function ProjectDropdown({ currentProject, projects, onSwitch, onCreate, onImportNew, onRename }) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
 
@@ -1014,6 +1014,15 @@ function ProjectDropdown({ currentProject, projects, onSwitch, onCreate, onImpor
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  const handleEditTitle = () => {
+    if (!currentProject) return;
+    const newTitle = window.prompt("Enter new title for your manuscript:", currentProject.title || "Untitled");
+    if (newTitle && newTitle.trim() && newTitle !== currentProject.title) {
+      onRename(currentProject.id, newTitle.trim());
+    }
+    setIsOpen(false);
+  };
 
   return (
     <div ref={dropdownRef} className="relative">
@@ -1028,6 +1037,27 @@ function ProjectDropdown({ currentProject, projects, onSwitch, onCreate, onImpor
 
       {isOpen && (
         <div className="absolute top-full left-0 mt-2 z-50 bg-white rounded-xl shadow-xl border min-w-[280px] py-2">
+          {/* Current Project Actions */}
+          {currentProject && (
+            <>
+              <div className="px-3 py-1.5 text-xs font-semibold text-slate-400 uppercase tracking-wide">
+                Current Project
+              </div>
+              <div className="px-3 py-2 mb-2 border-b border-slate-100">
+                <div className="font-medium text-sm truncate" style={{ color: BRAND.navy }}>
+                  {currentProject.title || "Untitled"}
+                </div>
+                <button
+                  onClick={handleEditTitle}
+                  className="mt-1 text-xs text-amber-600 hover:text-amber-700 flex items-center gap-1"
+                >
+                  <Edit3 size={12} />
+                  Edit Title
+                </button>
+              </div>
+            </>
+          )}
+
           <div className="px-3 py-1.5 text-xs font-semibold text-slate-400 uppercase tracking-wide">
             My Manuscripts
           </div>
@@ -1330,7 +1360,7 @@ export default function ComposePage() {
   const navigate = useNavigate();
 
   // Project management
-  const { projects, currentProjectId, currentProject, createProject, createProjectFromImport, switchProject } =
+  const { projects, currentProjectId, currentProject, createProject, createProjectFromImport, switchProject, renameProject } =
     useProjectStore();
 
   const {
@@ -1578,6 +1608,11 @@ export default function ComposePage() {
 
       const safeTitle = bookTitle?.trim() || book?.title?.trim() || "Untitled Book";
       const projectId = currentProjectId || getSelectedProjectId() || "unknown";
+
+      // Update project title in projects list
+      if (currentProjectId && safeTitle) {
+        renameProject(currentProjectId, safeTitle);
+      }
 
       saveCurrentStorySnapshot({ id: projectId, title: safeTitle });
 
@@ -2211,6 +2246,10 @@ export default function ComposePage() {
                 onSwitch={handleSwitchProject}
                 onCreate={handleCreateNewProject}
                 onImportNew={triggerNewProjectImport}
+                onRename={(id, newTitle) => {
+                  renameProject(id, newTitle);
+                  setBookTitle(newTitle);
+                }}
               />
             </div>
 
