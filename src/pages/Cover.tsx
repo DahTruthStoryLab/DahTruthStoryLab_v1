@@ -1169,6 +1169,13 @@ Story description: ${aiPrompt}`,
     COVER_PREVIEW_WIDTH * (selectedTrim.hIn / selectedTrim.wIn)
   );
 
+
+  // Preview dimensions
+  const COVER_PREVIEW_WIDTH = 360;
+  const coverPreviewHeight = Math.round(
+    COVER_PREVIEW_WIDTH * (selectedTrim.hIn / selectedTrim.wIn)
+  );
+
   return (
     <PageShell
       style={{
@@ -1198,13 +1205,12 @@ Story description: ${aiPrompt}`,
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
-              maxWidth: 1400,
+              maxWidth: 1600,
               margin: "0 auto",
               flexWrap: "wrap",
               gap: 12,
             }}
           >
-            {/* Left: Breadcrumb + Project Name */}
             <div>
               <div
                 style={{
@@ -1216,15 +1222,11 @@ Story description: ${aiPrompt}`,
               >
                 <a
                   href="/publishing"
-                  style={{
-                    color: "rgba(255,255,255,0.8)",
-                    textDecoration: "none",
-                  }}
+                  style={{ color: "rgba(255,255,255,0.8)", textDecoration: "none" }}
                 >
                   PUBLISHING SUITE
                 </a>
-                {" ▸ "}
-                <span>Cover Designer</span>
+                {" ▸ "}Cover Designer
               </div>
               <div
                 style={{
@@ -1233,20 +1235,11 @@ Story description: ${aiPrompt}`,
                   fontFamily: "system-ui, -apple-system, sans-serif",
                 }}
               >
-                Project: {projectName || title || "Untitled"}
+                {projectName || title || "Untitled Project"}
               </div>
             </div>
 
-            {/* Right: Action Buttons */}
-            <div
-              style={{
-                display: "flex",
-                gap: 10,
-                alignItems: "center",
-                flexWrap: "wrap",
-              }}
-            >
-              {/* Save Button */}
+            <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
               <button
                 onClick={handleSaveDesign}
                 style={{
@@ -1258,13 +1251,10 @@ Story description: ${aiPrompt}`,
                   cursor: "pointer",
                   fontSize: 12,
                   fontWeight: 500,
-                  fontFamily: "system-ui, -apple-system, sans-serif",
                 }}
               >
-                💾 Save
+                💾 Save Design
               </button>
-
-              {/* Export Button */}
               <button
                 onClick={handleExportPNG}
                 style={{
@@ -1276,93 +1266,10 @@ Story description: ${aiPrompt}`,
                   cursor: "pointer",
                   fontSize: 12,
                   fontWeight: 600,
-                  fontFamily: "system-ui, -apple-system, sans-serif",
                 }}
               >
-                📦 Export
+                📦 Export PNG
               </button>
-
-              {/* Trim Size Dropdown */}
-              <select
-                value={trimKey}
-                onChange={(e) => setTrimKey(e.target.value)}
-                style={{
-                  padding: "8px 12px",
-                  borderRadius: 6,
-                  border: "1px solid rgba(255,255,255,0.3)",
-                  background: "rgba(255,255,255,0.15)",
-                  color: "#fff",
-                  cursor: "pointer",
-                  fontSize: 12,
-                  fontFamily: "system-ui, -apple-system, sans-serif",
-                }}
-              >
-                {TRIM_PRESETS.map((t) => (
-                  <option
-                    key={t.key}
-                    value={t.key}
-                    style={{ color: "#111", background: "#fff" }}
-                  >
-                    {t.label}
-                  </option>
-                ))}
-              </select>
-
-              {/* DPI Dropdown */}
-              <select
-                value={dpi}
-                onChange={(e) => setDpi(Number(e.target.value))}
-                style={{
-                  padding: "8px 12px",
-                  borderRadius: 6,
-                  border: "1px solid rgba(255,255,255,0.3)",
-                  background: "rgba(255,255,255,0.15)",
-                  color: "#fff",
-                  cursor: "pointer",
-                  fontSize: 12,
-                  fontFamily: "system-ui, -apple-system, sans-serif",
-                }}
-              >
-                <option value={300} style={{ color: "#111", background: "#fff" }}>
-                  300 DPI
-                </option>
-                <option value={150} style={{ color: "#111", background: "#fff" }}>
-                  150 DPI
-                </option>
-              </select>
-
-              {/* Load Design Dropdown */}
-              {designs.length > 0 && (
-                <select
-                  value={selectedDesignId}
-                  onChange={(e) => handleLoadDesign(e.target.value)}
-                  style={{
-                    padding: "8px 12px",
-                    borderRadius: 6,
-                    border: "1px solid rgba(255,255,255,0.3)",
-                    background: "rgba(255,255,255,0.15)",
-                    color: "#fff",
-                    cursor: "pointer",
-                    fontSize: 12,
-                    fontFamily: "system-ui, -apple-system, sans-serif",
-                  }}
-                >
-                  <option value="" style={{ color: "#111", background: "#fff" }}>
-                    Load Design...
-                  </option>
-                  {designs.map((d) => (
-                    <option
-                      key={d.id}
-                      value={d.id}
-                      style={{ color: "#111", background: "#fff" }}
-                    >
-                      {d.name}
-                    </option>
-                  ))}
-                </select>
-              )}
-
-              {/* Image Saved Indicator */}
               {coverImageKey && (
                 <span
                   style={{
@@ -1379,507 +1286,161 @@ Story description: ${aiPrompt}`,
           </div>
         </header>
 
-        {/* ========== CENTER CANVAS: STACKED COVERS ========== */}
+        {/* ========== MAIN BODY: LEFT | CENTER | RIGHT ========== */}
         <div
           style={{
             flex: 1,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: "30px 24px",
-            gap: 24,
-            overflow: "auto",
-            background: theme.bg,
+            display: "grid",
+            gridTemplateColumns: "320px 1fr 320px",
+            gap: 20,
+            padding: "20px 24px",
+            maxWidth: 1600,
+            margin: "0 auto",
+            width: "100%",
+            boxSizing: "border-box",
+            alignItems: "start",
           }}
         >
-          <div
-            ref={coverRef}
+
+          {/* ========== LEFT SIDEBAR ========== */}
+          <aside
             style={{
               display: "flex",
               flexDirection: "column",
-              gap: 20,
-              alignItems: "center",
+              gap: 16,
+              overflowY: "auto",
+              maxHeight: "calc(100vh - 140px)",
             }}
           >
-            {/* ========== FRONT COVER ========== */}
-            <div
-              style={{
-                width: COVER_PREVIEW_WIDTH,
-                height: coverPreviewHeight,
-                position: "relative",
-                overflow: "hidden",
-                borderRadius: 8,
-                boxShadow: "0 20px 60px rgba(0,0,0,0.4)",
-                backgroundImage: effectiveCoverUrl
-                  ? `url(${effectiveCoverUrl})`
-                  : undefined,
-                background: effectiveCoverUrl
-                  ? undefined
-                  : useCustomBg
-                  ? `linear-gradient(145deg, ${customBgColor1}, ${customBgColor2})`
-                  : selectedPreset.bg,
-                backgroundSize: coverImageFit,
-                backgroundPosition: "center",
-                backgroundRepeat: "no-repeat",
-                display: "flex",
-                flexDirection: "column",
-                justifyContent,
-                padding: "32px 24px",
-              }}
-            >
-              {/* Overlay */}
-              <div
-                style={{
-                  position: "absolute",
-                  inset: 0,
-                  background: overlayBackground,
-                  pointerEvents: "none",
-                }}
-              />
-
-              {/* Front Cover Content */}
-              <div
-                style={{
-                  position: "relative",
-                  zIndex: 1,
-                  textAlign: "center",
-                  fontFamily: activeFontFamily,
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 6,
-                }}
-              >
-                {/* Tagline */}
-                {tagline && (
-                  <div
-                    style={{
-                      fontSize: 12,
-                      letterSpacing: 3,
-                      textTransform: "uppercase",
-                      color: activeTaglineColor,
-                      fontWeight: 500,
-                    }}
-                  >
-                    {tagline}
-                  </div>
-                )}
-
-                {/* Title */}
-                <div
-                  style={{
-                    fontSize: 26,
-                    lineHeight: 1.15,
-                    fontWeight: 700,
-                    textTransform: "uppercase",
-                    color: activeTitleColor,
-                    textShadow: effectiveCoverUrl
-                      ? "0 2px 8px rgba(0,0,0,0.3)"
-                      : "none",
-                  }}
-                >
-                  {title || "YOUR TITLE"}
+            {/* Save & Load Designs */}
+            <div style={styles.glassCard}>
+              <h3 style={{ margin: "0 0 12px", fontSize: 14, fontWeight: 600, color: theme.text }}>
+                💾 Save & Load
+              </h3>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                <div>
+                  <div style={styles.label}>Design name</div>
+                  <input
+                    style={styles.input}
+                    value={designName}
+                    onChange={(e) => setDesignName(e.target.value)}
+                    placeholder="e.g., Thriller v2"
+                  />
                 </div>
-
-                {/* Subtitle */}
-                {subtitle && (
-                  <div
-                    style={{
-                      fontSize: 12,
-                      marginTop: 6,
-                      color: activeSubtitleColor,
-                      maxWidth: 260,
-                      marginInline: "auto",
-                      lineHeight: 1.4,
-                    }}
+                <button type="button" onClick={handleSaveDesign} style={styles.btnPrimary}>
+                  Save Current Design
+                </button>
+                <div>
+                  <div style={styles.label}>Load saved design</div>
+                  <select
+                    style={styles.input}
+                    value={selectedDesignId}
+                    onChange={(e) => handleLoadDesign(e.target.value)}
                   >
-                    {subtitle}
-                  </div>
-                )}
-
-                {/* Author */}
-                <div
-                  style={{
-                    fontSize: 12,
-                    marginTop: 24,
-                    letterSpacing: 3,
-                    textTransform: "uppercase",
-                    color: activeAuthorColor,
-                    fontWeight: 500,
-                  }}
-                >
-                  {author || "AUTHOR"}
+                    <option value="">— Select —</option>
+                    {designs.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.name} ({new Date(d.createdAt).toLocaleDateString()})
+                      </option>
+                    ))}
+                  </select>
                 </div>
-              </div>
-
-              {/* StoryLab Badge */}
-              <div
-                style={{
-                  position: "absolute",
-                  bottom: 10,
-                  right: 12,
-                  zIndex: 1,
-                  fontSize: 7,
-                  letterSpacing: 1,
-                  textTransform: "uppercase",
-                  color: "rgba(255,255,255,0.4)",
-                  background: "rgba(15,23,42,0.5)",
-                  padding: "3px 6px",
-                  borderRadius: 999,
-                }}
-              >
-                DahTruth StoryLab
-              </div>
-
-              {/* Front Cover Label */}
-              <div
-                style={{
-                  position: "absolute",
-                  top: 10,
-                  left: 12,
-                  fontSize: 9,
-                  letterSpacing: 1.5,
-                  textTransform: "uppercase",
-                  color: "rgba(255,255,255,0.5)",
-                  fontFamily: "system-ui, -apple-system, sans-serif",
-                }}
-              >
-                Front Cover
+                {selectedDesignId && (
+                  <button
+                    type="button"
+                    onClick={handleDeleteDesign}
+                    style={{ ...styles.btn, border: "1px solid #ef4444", color: "#b91c1c", background: "#fef2f2" }}
+                  >
+                    Delete Selected
+                  </button>
+                )}
               </div>
             </div>
 
-            {/* ========== BACK COVER ========== */}
-            <div
-              style={{
-                width: COVER_PREVIEW_WIDTH,
-                height: coverPreviewHeight,
-                position: "relative",
-                overflow: "hidden",
-                borderRadius: 8,
-                boxShadow: "0 20px 60px rgba(0,0,0,0.4)",
-                backgroundImage: effectiveCoverUrl
-                  ? `url(${effectiveCoverUrl})`
-                  : undefined,
-                background: effectiveCoverUrl
-                  ? undefined
-                  : useCustomBg
-                  ? `linear-gradient(145deg, ${customBgColor1}, ${customBgColor2})`
-                  : selectedPreset.bg,
-                backgroundSize: coverImageFit,
-                backgroundPosition: "center",
-                backgroundRepeat: "no-repeat",
-                padding: "24px 20px",
-                display: "flex",
-                flexDirection: "column",
-                justifyContent: "space-between",
-              }}
-            >
-              {/* Overlay */}
-              <div
-                style={{
-                  position: "absolute",
-                  inset: 0,
-                  background: overlayBackground,
-                  pointerEvents: "none",
-                }}
-              />
-
-              {/* Back Cover Content */}
-              <div style={{ position: "relative", zIndex: 1 }}>
-                {/* Back Cover Label */}
-                <div
-                  style={{
-                    fontSize: 9,
-                    letterSpacing: 1.5,
-                    textTransform: "uppercase",
-                    color: "rgba(255,255,255,0.5)",
-                    marginBottom: 12,
-                    fontFamily: "system-ui, -apple-system, sans-serif",
-                  }}
-                >
-                  Back Cover
-                </div>
-
-                {/* Blurb */}
-                {backBlurb ? (
-                  <div
-                    style={{
-                      fontSize: 12,
-                      lineHeight: 1.6,
-                      color: activeSubtitleColor,
-                      fontFamily: activeFontFamily,
-                      whiteSpace: "pre-wrap",
-                    }}
-                  >
-                    {backBlurb}
-                  </div>
-                ) : (
-                  <div
-                    style={{
-                      fontSize: 11,
-                      opacity: 0.5,
-                      fontStyle: "italic",
-                      color: "#fff",
-                    }}
-                  >
-                    Blurb / Endorsements / Bio...
-                  </div>
-                )}
-
-                {/* Author Bio */}
-                {aboutAuthor && (
-                  <div style={{ marginTop: 16 }}>
-                    <div
-                      style={{
-                        fontSize: 9,
-                        fontWeight: 700,
-                        letterSpacing: 1.5,
-                        textTransform: "uppercase",
-                        color: activeTitleColor,
-                        marginBottom: 4,
-                      }}
-                    >
-                      About the Author
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 10,
-                        lineHeight: 1.5,
-                        color: activeSubtitleColor,
-                        fontFamily: activeFontFamily,
-                        whiteSpace: "pre-wrap",
-                      }}
-                    >
-                      {aboutAuthor}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* ISBN Barcode Placeholder */}
-              <div
-                style={{
-                  position: "relative",
-                  zIndex: 1,
-                  alignSelf: "flex-end",
-                  width: 100,
-                  height: 50,
-                  background: "rgba(255,255,255,0.9)",
-                  borderRadius: 4,
-                  display: "grid",
-                  placeItems: "center",
-                  fontSize: 8,
-                  color: "#374151",
-                  fontWeight: 500,
-                  fontFamily: "system-ui, -apple-system, sans-serif",
-                }}
-              >
-                ISBN BARCODE
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* ========== FOOTER: ALL CONTROLS ========== */}
-        <footer
-          style={{
-            background: "#ffffff",
-            borderTop: "1px solid #e2e8f0",
-            padding: "16px 24px 20px",
-          }}
-        >
-          <div
-            style={{
-              maxWidth: 1400,
-              margin: "0 auto",
-              display: "grid",
-              gridTemplateColumns: "repeat(4, 1fr)",
-              gap: 24,
-            }}
-          >
-            {/* ========== SECTION 1: Text & Layout ========== */}
-            <div>
-              <div
-                style={{
-                  fontSize: 11,
-                  fontWeight: 700,
-                  textTransform: "uppercase",
-                  letterSpacing: 1,
-                  color: theme.subtext,
-                  marginBottom: 10,
-                  borderBottom: `1px solid ${theme.border}`,
-                  paddingBottom: 6,
-                }}
-              >
-                Text & Layout
-              </div>
-
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 8,
-                }}
-              >
-                {/* Title Input */}
+            {/* Text & Metadata */}
+            <div style={styles.glassCard}>
+              <h3 style={{ margin: "0 0 12px", fontSize: 14, fontWeight: 600, color: theme.text }}>
+                📝 Text & Metadata
+              </h3>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 <div>
-                  <label
-                    style={{
-                      fontSize: 10,
-                      textTransform: "uppercase",
-                      letterSpacing: 0.5,
-                      color: theme.subtext,
-                      marginBottom: 4,
-                      display: "block",
-                    }}
-                  >
-                    Title
-                  </label>
+                  <div style={styles.label}>Tagline (above title)</div>
                   <input
-                    type="text"
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    placeholder="Book title"
-                    style={{
-                      borderRadius: 6,
-                      border: `1px solid ${theme.border}`,
-                      padding: "8px 10px",
-                      fontSize: 13,
-                      width: "100%",
-                      background: "#fff",
-                      color: theme.text,
-                      boxSizing: "border-box",
-                    }}
-                  />
-                </div>
-
-                {/* Subtitle Input */}
-                <div>
-                  <label
-                    style={{
-                      fontSize: 10,
-                      textTransform: "uppercase",
-                      letterSpacing: 0.5,
-                      color: theme.subtext,
-                      marginBottom: 4,
-                      display: "block",
-                    }}
-                  >
-                    Subtitle
-                  </label>
-                  <input
-                    type="text"
-                    value={subtitle}
-                    onChange={(e) => setSubtitle(e.target.value)}
-                    placeholder="Optional subtitle"
-                    style={{
-                      borderRadius: 6,
-                      border: `1px solid ${theme.border}`,
-                      padding: "8px 10px",
-                      fontSize: 13,
-                      width: "100%",
-                      background: "#fff",
-                      color: theme.text,
-                      boxSizing: "border-box",
-                    }}
-                  />
-                </div>
-
-                {/* Author Input */}
-                <div>
-                  <label
-                    style={{
-                      fontSize: 10,
-                      textTransform: "uppercase",
-                      letterSpacing: 0.5,
-                      color: theme.subtext,
-                      marginBottom: 4,
-                      display: "block",
-                    }}
-                  >
-                    Author
-                  </label>
-                  <input
-                    type="text"
-                    value={author}
-                    onChange={(e) => setAuthor(e.target.value)}
-                    placeholder="Author name"
-                    style={{
-                      borderRadius: 6,
-                      border: `1px solid ${theme.border}`,
-                      padding: "8px 10px",
-                      fontSize: 13,
-                      width: "100%",
-                      background: "#fff",
-                      color: theme.text,
-                      boxSizing: "border-box",
-                    }}
-                  />
-                </div>
-
-                {/* Tagline Input */}
-                <div>
-                  <label
-                    style={{
-                      fontSize: 10,
-                      textTransform: "uppercase",
-                      letterSpacing: 0.5,
-                      color: theme.subtext,
-                      marginBottom: 4,
-                      display: "block",
-                    }}
-                  >
-                    Tagline
-                  </label>
-                  <input
-                    type="text"
+                    style={styles.input}
                     value={tagline}
                     onChange={(e) => setTagline(e.target.value)}
                     placeholder="A NOVEL"
-                    style={{
-                      borderRadius: 6,
-                      border: `1px solid ${theme.border}`,
-                      padding: "8px 10px",
-                      fontSize: 13,
-                      width: "100%",
-                      background: "#fff",
-                      color: theme.text,
-                      boxSizing: "border-box",
-                    }}
                   />
                 </div>
-
-                {/* Layout Buttons */}
                 <div>
-                  <label
-                    style={{
-                      fontSize: 10,
-                      textTransform: "uppercase",
-                      letterSpacing: 0.5,
-                      color: theme.subtext,
-                      marginBottom: 4,
-                      display: "block",
-                    }}
-                  >
-                    Layout
-                  </label>
-                  <div style={{ display: "flex", gap: 4 }}>
+                  <div style={styles.label}>Title</div>
+                  <input
+                    style={styles.input}
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder="Book title"
+                  />
+                </div>
+                <div>
+                  <div style={styles.label}>Subtitle</div>
+                  <input
+                    style={styles.input}
+                    value={subtitle}
+                    onChange={(e) => setSubtitle(e.target.value)}
+                    placeholder="Optional subtitle"
+                  />
+                </div>
+                <div>
+                  <div style={styles.label}>Author</div>
+                  <input
+                    style={styles.input}
+                    value={author}
+                    onChange={(e) => setAuthor(e.target.value)}
+                    placeholder="Author name"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Genre Preset */}
+            <div style={styles.glassCard}>
+              <h3 style={{ margin: "0 0 12px", fontSize: 14, fontWeight: 600, color: theme.text }}>
+                🎨 Genre & Layout
+              </h3>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                <div>
+                  <div style={styles.label}>Genre Preset</div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {GENRE_PRESETS.map((p) => (
+                      <button
+                        key={p.key}
+                        type="button"
+                        onClick={() => setGenrePresetKey(p.key)}
+                        style={{
+                          ...styles.btn,
+                          fontSize: 10,
+                          padding: "5px 8px",
+                          border: genrePresetKey === p.key ? `2px solid ${theme.accent}` : `1px solid ${theme.border}`,
+                          background: genrePresetKey === p.key ? "#eef2ff" : theme.white,
+                        }}
+                      >
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <div style={styles.label}>Layout</div>
+                  <div style={{ display: "flex", gap: 6 }}>
                     {LAYOUTS.map((l) => (
                       <button
                         key={l.key}
+                        type="button"
                         onClick={() => setLayoutKey(l.key)}
                         style={{
-                          padding: "6px 12px",
-                          fontSize: 11,
-                          borderRadius: 6,
-                          border:
-                            layoutKey === l.key
-                              ? `2px solid ${theme.accent}`
-                              : `1px solid ${theme.border}`,
-                          background:
-                            layoutKey === l.key ? "#eef2ff" : "#fff",
-                          cursor: "pointer",
-                          color: theme.text,
+                          ...styles.btn,
+                          border: layoutKey === l.key ? `2px solid ${theme.accent}` : `1px solid ${theme.border}`,
+                          background: layoutKey === l.key ? "#eef2ff" : theme.white,
                         }}
                       >
                         {l.label}
@@ -1890,230 +1451,387 @@ Story description: ${aiPrompt}`,
               </div>
             </div>
 
-            {/* ========== SECTION 2: Visual Style ========== */}
-            <div>
-              <div
-                style={{
-                  fontSize: 11,
-                  fontWeight: 700,
-                  textTransform: "uppercase",
-                  letterSpacing: 1,
-                  color: theme.subtext,
-                  marginBottom: 10,
-                  borderBottom: `1px solid ${theme.border}`,
-                  paddingBottom: 6,
-                }}
-              >
-                Visual Style
-              </div>
-
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 8,
-                }}
-              >
-                {/* Genre Preset */}
+            {/* Colors & Fonts */}
+            <div style={styles.glassCard}>
+              <h3 style={{ margin: "0 0 12px", fontSize: 14, fontWeight: 600, color: theme.text }}>
+                🎨 Colors & Fonts
+              </h3>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 <div>
-                  <label
-                    style={{
-                      fontSize: 10,
-                      textTransform: "uppercase",
-                      letterSpacing: 0.5,
-                      color: theme.subtext,
-                      marginBottom: 4,
-                      display: "block",
-                    }}
-                  >
-                    Genre Preset
-                  </label>
+                  <div style={styles.label}>Font Family</div>
                   <select
-                    value={genrePresetKey}
-                    onChange={(e) => setGenrePresetKey(e.target.value)}
-                    style={{
-                      padding: "8px 10px",
-                      borderRadius: 6,
-                      border: `1px solid ${theme.border}`,
-                      fontSize: 12,
-                      background: "#fff",
-                      width: "100%",
-                      color: theme.text,
-                    }}
-                  >
-                    {GENRE_PRESETS.map((p) => (
-                      <option key={p.key} value={p.key}>
-                        {p.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Font Family */}
-                <div>
-                  <label
-                    style={{
-                      fontSize: 10,
-                      textTransform: "uppercase",
-                      letterSpacing: 0.5,
-                      color: theme.subtext,
-                      marginBottom: 4,
-                      display: "block",
-                    }}
-                  >
-                    Font
-                  </label>
-                  <select
+                    style={styles.input}
                     value={customFontFamily}
                     onChange={(e) => setCustomFontFamily(e.target.value)}
-                    style={{
-                      padding: "8px 10px",
-                      borderRadius: 6,
-                      border: `1px solid ${theme.border}`,
-                      fontSize: 12,
-                      background: "#fff",
-                      width: "100%",
-                      color: theme.text,
-                    }}
                   >
                     <option value="">Preset Default</option>
                     {FONT_FAMILIES.map((f) => (
-                      <option key={f.key} value={f.value}>
-                        {f.label}
-                      </option>
+                      <option key={f.key} value={f.value}>{f.label}</option>
                     ))}
                   </select>
                 </div>
 
-                {/* Custom Colors Toggle */}
-                <label
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                    cursor: "pointer",
-                    fontSize: 12,
-                    color: theme.text,
-                  }}
-                >
+                <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
                   <input
                     type="checkbox"
                     checked={useCustomColors}
                     onChange={(e) => setUseCustomColors(e.target.checked)}
                   />
-                  Custom Colors
+                  <span style={{ fontSize: 12 }}>Custom Text Colors</span>
                 </label>
 
-                {/* Custom Color Pickers */}
                 {useCustomColors && (
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "1fr 1fr",
-                      gap: 6,
-                    }}
-                  >
-                    <ColorPickerField
-                      label="Title"
-                      value={customTitleColor}
-                      onChange={setCustomTitleColor}
-                    />
-                    <ColorPickerField
-                      label="Subtitle"
-                      value={customSubtitleColor}
-                      onChange={setCustomSubtitleColor}
-                    />
-                    <ColorPickerField
-                      label="Author"
-                      value={customAuthorColor}
-                      onChange={setCustomAuthorColor}
-                    />
-                    <ColorPickerField
-                      label="Tagline"
-                      value={customTaglineColor}
-                      onChange={setCustomTaglineColor}
-                    />
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                    <ColorPickerField label="Title" value={customTitleColor} onChange={setCustomTitleColor} />
+                    <ColorPickerField label="Subtitle" value={customSubtitleColor} onChange={setCustomSubtitleColor} />
+                    <ColorPickerField label="Author" value={customAuthorColor} onChange={setCustomAuthorColor} />
+                    <ColorPickerField label="Tagline" value={customTaglineColor} onChange={setCustomTaglineColor} />
                   </div>
                 )}
 
-                {/* Custom Gradient Toggle */}
-                <label
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 6,
-                    cursor: "pointer",
-                    fontSize: 12,
-                    color: theme.text,
-                  }}
-                >
+                <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
                   <input
                     type="checkbox"
                     checked={useCustomBg}
                     onChange={(e) => setUseCustomBg(e.target.checked)}
                   />
-                  Custom Gradient
+                  <span style={{ fontSize: 12 }}>Custom Background Gradient</span>
                 </label>
 
-                {/* Custom Gradient Pickers */}
                 {useCustomBg && (
-                  <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "1fr 1fr",
-                      gap: 6,
-                    }}
-                  >
-                    <ColorPickerField
-                      label="Start"
-                      value={customBgColor1}
-                      onChange={setCustomBgColor1}
-                    />
-                    <ColorPickerField
-                      label="End"
-                      value={customBgColor2}
-                      onChange={setCustomBgColor2}
-                    />
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                    <ColorPickerField label="Gradient Start" value={customBgColor1} onChange={setCustomBgColor1} />
+                    <ColorPickerField label="Gradient End" value={customBgColor2} onChange={setCustomBgColor2} />
                   </div>
                 )}
               </div>
             </div>
+          </aside>
 
-            {/* ========== SECTION 3: Imagery ========== */}
-            <div>
-              <div
-                style={{
-                  fontSize: 11,
-                  fontWeight: 700,
-                  textTransform: "uppercase",
-                  letterSpacing: 1,
-                  color: theme.subtext,
-                  marginBottom: 10,
-                  borderBottom: `1px solid ${theme.border}`,
-                  paddingBottom: 6,
-                }}
-              >
-                Imagery
-              </div>
-
+          {/* ========== CENTER: PREVIEW ========== */}
+          <section
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 16,
+              position: "sticky",
+              top: 20,
+            }}
+          >
+            <div style={{ ...styles.glassCard, width: "100%", padding: "16px 20px" }}>
               <div
                 style={{
                   display: "flex",
-                  flexDirection: "column",
-                  gap: 8,
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  marginBottom: 12,
                 }}
               >
-                {/* Upload Image Button */}
+                <div style={{ fontSize: 13, fontWeight: 600, color: theme.text }}>
+                  Live Preview
+                  <span style={{ marginLeft: 8, fontSize: 11, fontWeight: 400, color: theme.subtext }}>
+                    {selectedTrim.label}
+                  </span>
+                </div>
+                <div style={{ fontSize: 10, color: theme.subtext }}>Auto-saves</div>
+              </div>
+
+              <div
+                ref={coverRef}
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 16,
+                  alignItems: "center",
+                }}
+              >
+                {/* FRONT COVER */}
+                <div
+                  style={{
+                    width: COVER_PREVIEW_WIDTH,
+                    height: coverPreviewHeight,
+                    position: "relative",
+                    overflow: "hidden",
+                    borderRadius: 10,
+                    boxShadow: "0 20px 50px rgba(0,0,0,0.4)",
+                    backgroundImage: effectiveCoverUrl ? `url(${effectiveCoverUrl})` : undefined,
+                    background: effectiveCoverUrl
+                      ? undefined
+                      : useCustomBg
+                      ? `linear-gradient(145deg, ${customBgColor1}, ${customBgColor2})`
+                      : selectedPreset.bg,
+                    backgroundSize: coverImageFit,
+                    backgroundPosition: "center",
+                    backgroundRepeat: "no-repeat",
+                    display: "flex",
+                    flexDirection: "column",
+                    justifyContent,
+                    alignItems: "center",
+                    padding: "28px 22px",
+                  }}
+                >
+                  {/* Overlay */}
+                  <div
+                    style={{
+                      position: "absolute",
+                      inset: 0,
+                      background: overlayBackground,
+                      pointerEvents: "none",
+                    }}
+                  />
+
+                  {/* Front Cover Content */}
+                  <div
+                    style={{
+                      position: "relative",
+                      zIndex: 1,
+                      textAlign: "center",
+                      fontFamily: activeFontFamily,
+                      display: "flex",
+                      flexDirection: "column",
+                      gap: 6,
+                    }}
+                  >
+                    {tagline && (
+                      <div
+                        style={{
+                          fontSize: 11,
+                          letterSpacing: 3,
+                          textTransform: "uppercase",
+                          color: activeTaglineColor,
+                        }}
+                      >
+                        {tagline}
+                      </div>
+                    )}
+                    <div
+                      style={{
+                        fontSize: 24,
+                        lineHeight: 1.15,
+                        fontWeight: 700,
+                        textTransform: "uppercase",
+                        color: activeTitleColor,
+                        textShadow: effectiveCoverUrl ? "0 2px 8px rgba(0,0,0,0.3)" : "none",
+                      }}
+                    >
+                      {title || "YOUR TITLE"}
+                    </div>
+                    {subtitle && (
+                      <div
+                        style={{
+                          fontSize: 11,
+                          marginTop: 6,
+                          color: activeSubtitleColor,
+                          maxWidth: 240,
+                          lineHeight: 1.4,
+                        }}
+                      >
+                        {subtitle}
+                      </div>
+                    )}
+                    <div
+                      style={{
+                        fontSize: 11,
+                        marginTop: 22,
+                        letterSpacing: 3,
+                        textTransform: "uppercase",
+                        color: activeAuthorColor,
+                      }}
+                    >
+                      {author || "AUTHOR"}
+                    </div>
+                  </div>
+
+                  {/* StoryLab Badge */}
+                  <div
+                    style={{
+                      position: "absolute",
+                      bottom: 10,
+                      right: 12,
+                      fontSize: 7,
+                      letterSpacing: 1,
+                      textTransform: "uppercase",
+                      color: "rgba(255,255,255,0.4)",
+                      background: "rgba(15,23,42,0.5)",
+                      padding: "3px 6px",
+                      borderRadius: 999,
+                    }}
+                  >
+                    DahTruth StoryLab
+                  </div>
+
+                  {/* Label */}
+                  <div
+                    style={{
+                      position: "absolute",
+                      top: 10,
+                      left: 12,
+                      fontSize: 8,
+                      letterSpacing: 1.5,
+                      textTransform: "uppercase",
+                      color: "rgba(255,255,255,0.4)",
+                    }}
+                  >
+                    Front Cover
+                  </div>
+                </div>
+
+                {/* BACK COVER */}
+                {showBackCover && (
+                  <div
+                    style={{
+                      width: COVER_PREVIEW_WIDTH,
+                      height: coverPreviewHeight,
+                      position: "relative",
+                      overflow: "hidden",
+                      borderRadius: 10,
+                      boxShadow: "0 20px 50px rgba(0,0,0,0.4)",
+                      backgroundImage: effectiveCoverUrl ? `url(${effectiveCoverUrl})` : undefined,
+                      background: effectiveCoverUrl
+                        ? undefined
+                        : useCustomBg
+                        ? `linear-gradient(145deg, ${customBgColor1}, ${customBgColor2})`
+                        : selectedPreset.bg,
+                      backgroundSize: coverImageFit,
+                      backgroundPosition: "center",
+                      backgroundRepeat: "no-repeat",
+                      padding: "22px 18px",
+                      display: "flex",
+                      flexDirection: "column",
+                      justifyContent: "space-between",
+                    }}
+                  >
+                    {/* Overlay */}
+                    <div
+                      style={{
+                        position: "absolute",
+                        inset: 0,
+                        background: overlayBackground,
+                        pointerEvents: "none",
+                      }}
+                    />
+
+                    <div style={{ position: "relative", zIndex: 1 }}>
+                      {/* Label */}
+                      <div
+                        style={{
+                          fontSize: 8,
+                          letterSpacing: 1.5,
+                          textTransform: "uppercase",
+                          color: "rgba(255,255,255,0.4)",
+                          marginBottom: 10,
+                        }}
+                      >
+                        Back Cover
+                      </div>
+
+                      {/* Blurb */}
+                      {backBlurb ? (
+                        <div
+                          style={{
+                            fontSize: 11,
+                            lineHeight: 1.55,
+                            color: activeSubtitleColor,
+                            fontFamily: activeFontFamily,
+                            whiteSpace: "pre-wrap",
+                          }}
+                        >
+                          {backBlurb}
+                        </div>
+                      ) : (
+                        <div
+                          style={{
+                            fontSize: 10,
+                            opacity: 0.5,
+                            fontStyle: "italic",
+                            color: "#fff",
+                          }}
+                        >
+                          Add blurb in Back Cover section →
+                        </div>
+                      )}
+
+                      {/* Author Bio */}
+                      {aboutAuthor && (
+                        <div style={{ marginTop: 14 }}>
+                          <div
+                            style={{
+                              fontSize: 9,
+                              fontWeight: 700,
+                              letterSpacing: 1.5,
+                              textTransform: "uppercase",
+                              color: activeTitleColor,
+                              marginBottom: 4,
+                            }}
+                          >
+                            About the Author
+                          </div>
+                          <div
+                            style={{
+                              fontSize: 9,
+                              lineHeight: 1.45,
+                              color: activeSubtitleColor,
+                              fontFamily: activeFontFamily,
+                              whiteSpace: "pre-wrap",
+                            }}
+                          >
+                            {aboutAuthor}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* ISBN Placeholder */}
+                    <div
+                      style={{
+                        position: "relative",
+                        zIndex: 1,
+                        alignSelf: "flex-end",
+                        width: 90,
+                        height: 45,
+                        background: "rgba(255,255,255,0.9)",
+                        borderRadius: 4,
+                        display: "grid",
+                        placeItems: "center",
+                        fontSize: 8,
+                        color: "#374151",
+                        fontWeight: 500,
+                      }}
+                    >
+                      ISBN BARCODE
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </section>
+
+          {/* ========== RIGHT SIDEBAR ========== */}
+          <aside
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: 16,
+              overflowY: "auto",
+              maxHeight: "calc(100vh - 140px)",
+            }}
+          >
+            {/* Background Image */}
+            <div style={styles.glassCard}>
+              <h3 style={{ margin: "0 0 12px", fontSize: 14, fontWeight: 600, color: theme.text }}>
+                🖼️ Background Image
+              </h3>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 <label
                   style={{
-                    padding: "10px 14px",
-                    borderRadius: 6,
+                    padding: "12px 16px",
+                    borderRadius: 8,
                     border: "2px dashed #cbd5e1",
                     background: "#f8fafc",
                     cursor: "pointer",
                     fontSize: 12,
                     textAlign: "center",
-                    color: theme.text,
                     display: "block",
                   }}
                 >
@@ -2127,40 +1845,20 @@ Story description: ${aiPrompt}`,
                   />
                 </label>
 
-                {/* Image Options - only show if image is loaded */}
                 {effectiveCoverUrl && (
                   <>
-                    {/* Fit Options */}
                     <div>
-                      <label
-                        style={{
-                          fontSize: 10,
-                          textTransform: "uppercase",
-                          letterSpacing: 0.5,
-                          color: theme.subtext,
-                          marginBottom: 4,
-                          display: "block",
-                        }}
-                      >
-                        Fit
-                      </label>
-                      <div style={{ display: "flex", gap: 4 }}>
+                      <div style={styles.label}>Image Fit</div>
+                      <div style={{ display: "flex", gap: 6 }}>
                         {["cover", "contain"].map((f) => (
                           <button
                             key={f}
+                            type="button"
                             onClick={() => setCoverImageFit(f)}
                             style={{
-                              padding: "6px 12px",
-                              fontSize: 11,
-                              borderRadius: 6,
-                              border:
-                                coverImageFit === f
-                                  ? `2px solid ${theme.accent}`
-                                  : `1px solid ${theme.border}`,
-                              background:
-                                coverImageFit === f ? "#eef2ff" : "#fff",
-                              cursor: "pointer",
-                              color: theme.text,
+                              ...styles.btn,
+                              border: coverImageFit === f ? `2px solid ${theme.accent}` : `1px solid ${theme.border}`,
+                              background: coverImageFit === f ? "#eef2ff" : theme.white,
                             }}
                           >
                             {f === "cover" ? "Fill" : "Fit"}
@@ -2169,21 +1867,9 @@ Story description: ${aiPrompt}`,
                       </div>
                     </div>
 
-                    {/* Overlay Options */}
                     <div>
-                      <label
-                        style={{
-                          fontSize: 10,
-                          textTransform: "uppercase",
-                          letterSpacing: 0.5,
-                          color: theme.subtext,
-                          marginBottom: 4,
-                          display: "block",
-                        }}
-                      >
-                        Overlay
-                      </label>
-                      <div style={{ display: "flex", gap: 4 }}>
+                      <div style={styles.label}>Overlay</div>
+                      <div style={{ display: "flex", gap: 6 }}>
                         {[
                           { k: "soft-dark", l: "Dark" },
                           { k: "soft-blur", l: "Light" },
@@ -2191,19 +1877,12 @@ Story description: ${aiPrompt}`,
                         ].map((o) => (
                           <button
                             key={o.k}
+                            type="button"
                             onClick={() => setCoverImageFilter(o.k)}
                             style={{
-                              padding: "6px 12px",
-                              fontSize: 11,
-                              borderRadius: 6,
-                              border:
-                                coverImageFilter === o.k
-                                  ? `2px solid ${theme.accent}`
-                                  : `1px solid ${theme.border}`,
-                              background:
-                                coverImageFilter === o.k ? "#eef2ff" : "#fff",
-                              cursor: "pointer",
-                              color: theme.text,
+                              ...styles.btn,
+                              border: coverImageFilter === o.k ? `2px solid ${theme.accent}` : `1px solid ${theme.border}`,
+                              background: coverImageFilter === o.k ? "#eef2ff" : theme.white,
                             }}
                           >
                             {o.l}
@@ -2212,17 +1891,14 @@ Story description: ${aiPrompt}`,
                       </div>
                     </div>
 
-                    {/* Remove Image Button */}
                     <button
+                      type="button"
                       onClick={handleClearCoverImage}
                       style={{
-                        padding: "6px 12px",
-                        fontSize: 11,
-                        borderRadius: 6,
+                        ...styles.btn,
                         border: "1px solid #ef4444",
                         color: "#b91c1c",
                         background: "#fef2f2",
-                        cursor: "pointer",
                       }}
                     >
                       Remove Image
@@ -2232,143 +1908,133 @@ Story description: ${aiPrompt}`,
               </div>
             </div>
 
-            {/* ========== SECTION 4: Back Cover Content ========== */}
-            <div>
-              <div
-                style={{
-                  fontSize: 11,
-                  fontWeight: 700,
-                  textTransform: "uppercase",
-                  letterSpacing: 1,
-                  color: theme.subtext,
-                  marginBottom: 10,
-                  borderBottom: `1px solid ${theme.border}`,
-                  paddingBottom: 6,
-                }}
-              >
-                Back Cover Content
-              </div>
+            {/* Back Cover Content */}
+            <div style={styles.glassCard}>
+              <h3 style={{ margin: "0 0 12px", fontSize: 14, fontWeight: 600, color: theme.text }}>
+                📘 Back Cover
+              </h3>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+                  <input
+                    type="checkbox"
+                    checked={showBackCover}
+                    onChange={(e) => setShowBackCover(e.target.checked)}
+                  />
+                  <span style={{ fontSize: 12 }}>Show Back Cover</span>
+                </label>
 
-              <div
-                style={{
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: 8,
-                }}
-              >
-                {/* Description / Blurb */}
                 <div>
-                  <label
-                    style={{
-                      fontSize: 10,
-                      textTransform: "uppercase",
-                      letterSpacing: 0.5,
-                      color: theme.subtext,
-                      marginBottom: 4,
-                      display: "block",
-                    }}
-                  >
-                    Description / Blurb
-                  </label>
+                  <div style={styles.label}>Book Description / Blurb</div>
                   <textarea
+                    style={{ ...styles.input, minHeight: 100, resize: "vertical" }}
                     value={backBlurb}
                     onChange={(e) => setBackBlurb(e.target.value)}
-                    rows={4}
                     placeholder="Your book description..."
-                    style={{
-                      borderRadius: 6,
-                      border: `1px solid ${theme.border}`,
-                      padding: "8px 10px",
-                      fontSize: 13,
-                      width: "100%",
-                      background: "#fff",
-                      color: theme.text,
-                      boxSizing: "border-box",
-                      resize: "vertical",
-                      minHeight: 80,
-                      fontFamily: "inherit",
-                    }}
+                    rows={5}
                   />
                 </div>
 
-                {/* Author Bio */}
                 <div>
-                  <label
-                    style={{
-                      fontSize: 10,
-                      textTransform: "uppercase",
-                      letterSpacing: 0.5,
-                      color: theme.subtext,
-                      marginBottom: 4,
-                      display: "block",
-                    }}
-                  >
-                    Author Bio
-                  </label>
+                  <div style={styles.label}>About the Author</div>
                   <textarea
+                    style={{ ...styles.input, minHeight: 70, resize: "vertical" }}
                     value={aboutAuthor}
                     onChange={(e) => setAboutAuthor(e.target.value)}
-                    rows={3}
                     placeholder="Short author bio..."
-                    style={{
-                      borderRadius: 6,
-                      border: `1px solid ${theme.border}`,
-                      padding: "8px 10px",
-                      fontSize: 13,
-                      width: "100%",
-                      background: "#fff",
-                      color: theme.text,
-                      boxSizing: "border-box",
-                      resize: "vertical",
-                      minHeight: 60,
-                      fontFamily: "inherit",
-                    }}
+                    rows={3}
                   />
                 </div>
 
-                {/* ISBN Note */}
-                <div
-                  style={{
-                    fontSize: 10,
-                    color: theme.subtext,
-                    marginTop: 4,
-                  }}
-                >
-                  ISBN barcode placeholder shown automatically
-                </div>
+                <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+                  <input
+                    type="checkbox"
+                    checked={showSpine}
+                    onChange={(e) => setShowSpine(e.target.checked)}
+                  />
+                  <span style={{ fontSize: 12 }}>Show Spine (for full wrap)</span>
+                </label>
+
+                {showSpine && (
+                  <div>
+                    <div style={styles.label}>Spine Text</div>
+                    <input
+                      style={styles.input}
+                      value={spineText}
+                      onChange={(e) => setSpineText(e.target.value)}
+                      placeholder="TITLE • AUTHOR"
+                    />
+                  </div>
+                )}
               </div>
             </div>
-          </div>
 
-          {/* ========== Footer Status Bar ========== */}
-          <div
-            style={{
-              marginTop: 16,
-              paddingTop: 12,
-              borderTop: `1px solid ${theme.border}`,
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              fontSize: 11,
-              color: theme.subtext,
-            }}
-          >
-            <div>
-              Design both sides of your book. Print-ready previews update in real time.
+            {/* Export Settings */}
+            <div style={styles.glassCard}>
+              <h3 style={{ margin: "0 0 12px", fontSize: 14, fontWeight: 600, color: theme.text }}>
+                📦 Export Settings
+              </h3>
+              <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                <div>
+                  <div style={styles.label}>Trim Size</div>
+                  <select
+                    style={styles.input}
+                    value={trimKey}
+                    onChange={(e) => setTrimKey(e.target.value)}
+                  >
+                    {TRIM_PRESETS.map((t) => (
+                      <option key={t.key} value={t.key}>{t.label}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <div style={styles.label}>DPI</div>
+                  <select
+                    style={styles.input}
+                    value={dpi}
+                    onChange={(e) => setDpi(Number(e.target.value))}
+                  >
+                    <option value={300}>300 DPI (print quality)</option>
+                    <option value={150}>150 DPI (draft)</option>
+                  </select>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleExportPNG}
+                  style={{ ...styles.btnPrimary, marginTop: 4 }}
+                >
+                  📦 Export PNG
+                </button>
+
+                <p style={{ fontSize: 10, color: theme.subtext, margin: 0 }}>
+                  Exports visible covers. KDP requires 300 DPI for print.
+                </p>
+              </div>
             </div>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 12,
-              }}
-            >
-              <span>✅ Auto-saving</span>
-              <span>•</span>
-              <span>
-                {selectedTrim.label} @ {dpi} DPI
-              </span>
-            </div>
+          </aside>
+
+        </div>
+
+        {/* ========== FOOTER STATUS BAR ========== */}
+        <footer
+          style={{
+            background: "#1e293b",
+            color: "#94a3b8",
+            padding: "10px 24px",
+            fontSize: 11,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
+          <div>
+            Design both sides of your book. Print-ready previews update in real time.
+          </div>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <span>✅ Auto-saving</span>
+            <span>•</span>
+            <span>{selectedTrim.label} @ {dpi} DPI</span>
           </div>
         </footer>
       </div>
