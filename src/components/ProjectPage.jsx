@@ -1,5 +1,11 @@
 // src/components/ProjectPage.jsx
-import React, { useEffect, useState } from "react";
+// FIXED: Uses unified storage system (same as ComposePage/useProjectStore)
+// FIXED: Cloud sync disabled check
+// FIXED: Proper title editing
+// FIXED: Shows Project ID
+// FIXED: Import with name prompt
+
+import React, { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   BookOpen,
@@ -25,48 +31,75 @@ import {
   AlertCircle,
   Cloud,
   CloudOff,
+  Hash,
+  Copy,
 } from "lucide-react";
 import heic2any from "heic2any";
 
-// Import the new project system
-import {
-  getLocalAuthorProfile,
-  setLocalAuthorProfile,
-  completeAuthorSetup,
-  isAuthorSetupComplete,
-} from "../lib/authorService";
-import {
-  listProjects,
-  createProject,
-  deleteProject as deleteProjectService,
-  loadProject,
-  saveProject,
-  getCurrentProject,
-  setCurrentProject,
-} from "../lib/projectsService";
-import { migrateLegacyData, needsMigration } from "../lib/projectSystem";
+// Use the SAME storage system as ComposePage
 import { storage } from "../lib/storage";
+import { useProjectStore } from "../hooks/useProjectStore";
+import { documentParser } from "../utils/documentParser";
 
-// -------------------- Storage helpers (legacy, for backward compat) --------------------
-const PROJECTS_KEY = "userProjects";
+// -------------------- UNIFIED Storage Keys (same as useProjectStore) --------------------
+const PROJECTS_LIST_KEY = "dahtruth-projects-list";
+const CURRENT_PROJECT_KEY = "dahtruth-current-project-id";
+const PROJECT_DATA_PREFIX = "dahtruth-project-";
 
-function loadLegacyProjects() {
+// -------------------- Helper Functions --------------------
+function generateId() {
+  return `project-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function getProjectDataKey(projectId) {
+  return `${PROJECT_DATA_PREFIX}${projectId}`;
+}
+
+function loadProjectsList() {
   try {
-    const raw = storage.getItem(PROJECTS_KEY);
+    const raw = storage.getItem(PROJECTS_LIST_KEY);
     if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    return JSON.parse(raw);
   } catch {
     return [];
   }
 }
 
-function saveLegacyProjects(projects) {
+function saveProjectsList(projects) {
   try {
-    storage.setItem(PROJECTS_KEY, JSON.stringify(projects));
-    window.dispatchEvent(new Event("project:change"));
+    storage.setItem(PROJECTS_LIST_KEY, JSON.stringify(projects));
+    window.dispatchEvent(new Event("projects:change"));
   } catch (err) {
-    console.error("Failed to save projects:", err);
+    console.error("Failed to save projects list:", err);
+  }
+}
+
+function loadProjectData(projectId) {
+  try {
+    const key = getProjectDataKey(projectId);
+    const raw = storage.getItem(key);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+function saveProjectData(projectId, data) {
+  try {
+    const key = getProjectDataKey(projectId);
+    storage.setItem(key, JSON.stringify(data));
+  } catch (err) {
+    console.error("Failed to save project data:", err);
+  }
+}
+
+// Check if cloud sync is disabled
+function isCloudSyncDisabled() {
+  try {
+    return localStorage.getItem('dt_cloud_sync_disabled') === 'true';
+  } catch {
+    return true; // Default to disabled if can't read
   }
 }
 
@@ -92,161 +125,88 @@ function saveApiKeys(keys) {
   }
 }
 
-// -------------------- COMPLETE Project Deletion Helper --------------------
-// This function removes ALL storage keys associated with a project from ALL systems
+// -------------------- Author Profile Helpers --------------------
+function getAuthorProfile() {
+  try {
+    const raw = storage.getItem("dahtruth_author_profile");
+    if (raw) return JSON.parse(raw);
+    
+    // Fallback to other keys
+    const keys = ["dt_profile", "userProfile", "profile"];
+    for (const key of keys) {
+      const data = storage.getItem(key);
+      if (data) {
+        const parsed = JSON.parse(data);
+        if (parsed.name || parsed.author || parsed.displayName) {
+          return {
+            name: parsed.name || parsed.author || parsed.displayName || "New Author",
+            email: parsed.email || "",
+          };
+        }
+      }
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+function saveAuthorProfile(profile) {
+  try {
+    storage.setItem("dahtruth_author_profile", JSON.stringify(profile));
+    window.dispatchEvent(new Event("profile:updated"));
+  } catch (err) {
+    console.error("Failed to save author profile:", err);
+  }
+}
+
+// -------------------- Project Cleanup Helper --------------------
 function cleanupProjectStorage(projectId) {
   if (!projectId) return;
 
-  console.log(`[ProjectPage] ========== COMPLETE CLEANUP for project: ${projectId} ==========`);
+  console.log(`[ProjectPage] Cleaning up project: ${projectId}`);
 
-  // All known project-scoped key base names (comprehensive list from ALL systems)
-  const projectScopedKeyBases = [
-    // projectsService.ts keys
-    "dahtruth_projects_cache",
-    // useProjectStore.js keys
-    "dahtruth-project",
-    // StoryLab modules
-    "dahtruth-story-lab-toc-v3",
-    "dahtruth-hfl-data-v2",
-    "dahtruth-priorities-v2",
-    "dahtruth-character-roadmap",
-    "dahtruth-clothesline-v2",
-    "dahtruth-dialogue-lab-v1",
-    "dahtruth-narrative-arc-v2",
-    "dahtruth-plot-builder-v2",
-    "dahtruth-project-genre",
-    "dt_arc_chars_v2",
-    // Publishing / Cover
-    "dahtruth_cover_settings",
-    "dahtruth_cover_designs",
-    "dahtruth_cover_image_url",
-    "dahtruth_cover_image_meta",
-    "dt_publishing_meta",
-    "publishingDraft",
-    "dahtruth_project_meta",
-    // Chapters / Characters
-    "dahtruth_chapters",
-    "chapters",
-    "dahtruth_characters",
-    // Workshop modules
-    "dahtruth-workshop-data",
-    "dahtruth-workshop-cohort",
-  ];
-
-  let removedCount = 0;
-
-  // Remove project-specific keys (try both - and _ separators)
-  projectScopedKeyBases.forEach((baseKey) => {
-    [`${baseKey}-${projectId}`, `${baseKey}_${projectId}`].forEach((key) => {
-      try {
-        if (storage.getItem(key) !== null) {
-          storage.removeItem(key);
-          console.log(`  ✓ Removed: ${key}`);
-          removedCount++;
-        }
-      } catch {}
-    });
-  });
-
-  // Clean up dahtruth_projects_index (projectsService)
+  // Remove project data
   try {
-    const indexRaw = storage.getItem("dahtruth_projects_index");
-    if (indexRaw) {
-      const index = JSON.parse(indexRaw);
-      if (Array.isArray(index)) {
-        const filtered = index.filter((p) => p.id !== projectId);
-        if (filtered.length !== index.length) {
-          storage.setItem("dahtruth_projects_index", JSON.stringify(filtered));
-          console.log(`  ✓ Removed from dahtruth_projects_index`);
-          removedCount++;
-        }
-      }
+    storage.removeItem(getProjectDataKey(projectId));
+  } catch {}
+
+  // Remove from projects list
+  try {
+    const list = loadProjectsList();
+    const filtered = list.filter((p) => p.id !== projectId);
+    saveProjectsList(filtered);
+  } catch {}
+
+  // Clear current project if it's this one
+  try {
+    if (storage.getItem(CURRENT_PROJECT_KEY) === projectId) {
+      storage.removeItem(CURRENT_PROJECT_KEY);
     }
   } catch {}
 
-  // Clean up dahtruth-projects-list (useProjectStore)
-  try {
-    const listRaw = storage.getItem("dahtruth-projects-list");
-    if (listRaw) {
-      const list = JSON.parse(listRaw);
-      if (Array.isArray(list)) {
-        const filtered = list.filter((p) => p.id !== projectId);
-        if (filtered.length !== list.length) {
-          storage.setItem("dahtruth-projects-list", JSON.stringify(filtered));
-          console.log(`  ✓ Removed from dahtruth-projects-list`);
-          removedCount++;
-        }
-      }
-    }
-  } catch {}
-
-  // Clean up dahtruth-project-store
-  try {
-    const projectStoreRaw = storage.getItem("dahtruth-project-store");
-    if (projectStoreRaw) {
-      const projectStore = JSON.parse(projectStoreRaw);
-      let modified = false;
-
-      if (projectStore.selectedProjectId === projectId) {
-        projectStore.selectedProjectId = null;
-        modified = true;
-      }
-      if (projectStore.currentProjectId === projectId) {
-        projectStore.currentProjectId = null;
-        modified = true;
-      }
-      if (Array.isArray(projectStore.projects)) {
-        const originalLength = projectStore.projects.length;
-        projectStore.projects = projectStore.projects.filter(p => p.id !== projectId);
-        if (projectStore.projects.length !== originalLength) modified = true;
-      }
-
-      if (modified) {
-        storage.setItem("dahtruth-project-store", JSON.stringify(projectStore));
-        console.log(`  ✓ Cleaned dahtruth-project-store`);
-        removedCount++;
-      }
-    }
-  } catch {}
-
-  // Clean up selected/current project IDs
-  ["dahtruth-selected-project-id", "dahtruth-current-project-id", "dahtruth_current_project_id"].forEach((key) => {
-    try {
-      if (storage.getItem(key) === projectId) {
-        storage.removeItem(key);
-        console.log(`  ✓ Cleared ${key}`);
-        removedCount++;
-      }
-    } catch {}
-  });
-
-  // Clean up currentStory
+  // Clear currentStory if it's this project
   try {
     const currentStoryRaw = storage.getItem("currentStory");
     if (currentStoryRaw) {
       const currentStory = JSON.parse(currentStoryRaw);
       if (currentStory?.id === projectId) {
         storage.removeItem("currentStory");
-        console.log(`  ✓ Cleared currentStory`);
-        removedCount++;
       }
     }
   } catch {}
 
-  // Clean up dahtruth_current_project
+  // Also clean userProjects (legacy)
   try {
-    const currentProjectRaw = storage.getItem("dahtruth_current_project");
-    if (currentProjectRaw) {
-      const currentProject = JSON.parse(currentProjectRaw);
-      if (currentProject?.id === projectId) {
-        storage.removeItem("dahtruth_current_project");
-        console.log(`  ✓ Cleared dahtruth_current_project`);
-        removedCount++;
-      }
+    const userProjectsRaw = storage.getItem("userProjects");
+    if (userProjectsRaw) {
+      const userProjects = JSON.parse(userProjectsRaw);
+      const filtered = userProjects.filter((p) => p.id !== projectId);
+      storage.setItem("userProjects", JSON.stringify(filtered));
     }
   } catch {}
 
-  console.log(`[ProjectPage] ========== CLEANUP COMPLETE: Removed ${removedCount} items ==========`);
+  console.log(`[ProjectPage] Cleanup complete for: ${projectId}`);
 }
 
 // -------------------- Image helpers --------------------
@@ -284,49 +244,20 @@ async function downscaleDataUrl(dataUrl, maxDim = 2000, quality = 0.9) {
 
 // -------------------- Misc helpers --------------------
 const getReadingTime = (wordCount) => Math.ceil((wordCount || 0) / 200);
-const progressPct = (cur, tgt) =>
-  Math.min((cur / Math.max(tgt || 1, 1)) * 100, 100);
+const progressPct = (cur, tgt) => Math.min((cur / Math.max(tgt || 1, 1)) * 100, 100);
 
 const statusColors = {
-  Idea: {
-    bg: "linear-gradient(135deg, rgba(202,177,214,0.25), rgba(202,177,214,0.1))",
-    text: "#6B4F7A",
-    border: "rgba(202,177,214,0.4)",
-  },
-  Outline: {
-    bg: "linear-gradient(135deg, rgba(147,197,253,0.25), rgba(147,197,253,0.1))",
-    text: "#1e40af",
-    border: "rgba(147,197,253,0.4)",
-  },
-  Draft: {
-    bg: "linear-gradient(135deg, rgba(251,191,36,0.25), rgba(251,191,36,0.1))",
-    text: "#92400e",
-    border: "rgba(251,191,36,0.4)",
-  },
-  Revision: {
-    bg: "linear-gradient(135deg, rgba(251,146,60,0.25), rgba(251,146,60,0.1))",
-    text: "#9a3412",
-    border: "rgba(251,146,60,0.4)",
-  },
-  Editing: {
-    bg: "linear-gradient(135deg, rgba(52,211,153,0.25), rgba(52,211,153,0.1))",
-    text: "#065f46",
-    border: "rgba(52,211,153,0.4)",
-  },
-  Published: {
-    bg: "linear-gradient(135deg, rgba(212,175,55,0.25), rgba(212,175,55,0.1))",
-    text: "#78350f",
-    border: "rgba(212,175,55,0.4)",
-  },
+  Idea: { bg: "linear-gradient(135deg, rgba(202,177,214,0.25), rgba(202,177,214,0.1))", text: "#6B4F7A", border: "rgba(202,177,214,0.4)" },
+  Outline: { bg: "linear-gradient(135deg, rgba(147,197,253,0.25), rgba(147,197,253,0.1))", text: "#1e40af", border: "rgba(147,197,253,0.4)" },
+  Draft: { bg: "linear-gradient(135deg, rgba(251,191,36,0.25), rgba(251,191,36,0.1))", text: "#92400e", border: "rgba(251,191,36,0.4)" },
+  Revision: { bg: "linear-gradient(135deg, rgba(251,146,60,0.25), rgba(251,146,60,0.1))", text: "#9a3412", border: "rgba(251,146,60,0.4)" },
+  Editing: { bg: "linear-gradient(135deg, rgba(52,211,153,0.25), rgba(52,211,153,0.1))", text: "#065f46", border: "rgba(52,211,153,0.4)" },
+  Published: { bg: "linear-gradient(135deg, rgba(212,175,55,0.25), rgba(212,175,55,0.1))", text: "#78350f", border: "rgba(212,175,55,0.4)" },
 };
 
 const getStatusStyle = (status) => {
   const colors = statusColors[status] || statusColors.Draft;
-  return {
-    background: colors.bg,
-    color: colors.text,
-    border: `1px solid ${colors.border}`,
-  };
+  return { background: colors.bg, color: colors.text, border: `1px solid ${colors.border}` };
 };
 
 // -------------------- API Settings Panel --------------------
@@ -335,10 +266,6 @@ function ApiSettingsPanel({ isOpen, onClose }) {
   const [showOpenAI, setShowOpenAI] = useState(false);
   const [showAnthropic, setShowAnthropic] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [testingOpenAI, setTestingOpenAI] = useState(false);
-  const [testingAnthropic, setTestingAnthropic] = useState(false);
-  const [openAIStatus, setOpenAIStatus] = useState(null); // null, 'valid', 'invalid'
-  const [anthropicStatus, setAnthropicStatus] = useState(null);
 
   useEffect(() => {
     setKeys(loadApiKeys());
@@ -348,46 +275,6 @@ function ApiSettingsPanel({ isOpen, onClose }) {
     saveApiKeys(keys);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
-  };
-
-  const testOpenAIKey = async () => {
-    if (!keys.openai) return;
-    setTestingOpenAI(true);
-    setOpenAIStatus(null);
-    
-    try {
-      // Simple test: list models endpoint
-      const res = await fetch("https://api.openai.com/v1/models", {
-        headers: { Authorization: `Bearer ${keys.openai}` },
-      });
-      setOpenAIStatus(res.ok ? "valid" : "invalid");
-    } catch {
-      setOpenAIStatus("invalid");
-    } finally {
-      setTestingOpenAI(false);
-    }
-  };
-
-  const testAnthropicKey = async () => {
-    if (!keys.anthropic) return;
-    setTestingAnthropic(true);
-    setAnthropicStatus(null);
-    
-    try {
-      // Anthropic doesn't have a simple test endpoint, so we'll just validate format
-      // Keys should start with "sk-ant-"
-      const isValidFormat = keys.anthropic.startsWith("sk-ant-");
-      setAnthropicStatus(isValidFormat ? "valid" : "invalid");
-    } catch {
-      setAnthropicStatus("invalid");
-    } finally {
-      setTestingAnthropic(false);
-    }
-  };
-
-  const maskKey = (key) => {
-    if (!key || key.length < 12) return key;
-    return key.slice(0, 7) + "•".repeat(Math.min(key.length - 11, 20)) + key.slice(-4);
   };
 
   if (!isOpen) return null;
@@ -400,61 +287,31 @@ function ApiSettingsPanel({ isOpen, onClose }) {
     >
       <div
         className="w-full max-w-lg rounded-3xl overflow-hidden"
-        style={{
-          background: "#fff",
-          boxShadow: "0 25px 80px rgba(15, 23, 42, 0.25)",
-        }}
+        style={{ background: "#fff", boxShadow: "0 25px 80px rgba(15, 23, 42, 0.25)" }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header */}
-        <div
-          className="px-6 py-5"
-          style={{
-            background: "linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%)",
-          }}
-        >
+        <div className="px-6 py-5" style={{ background: "linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%)" }}>
           <div className="flex items-center gap-3">
-            <div
-              className="w-10 h-10 rounded-xl flex items-center justify-center"
-              style={{ background: "rgba(255,255,255,0.15)" }}
-            >
+            <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "rgba(255,255,255,0.15)" }}>
               <Key size={20} className="text-white" />
             </div>
             <div>
               <h2 className="text-lg font-semibold text-white">API Settings</h2>
-              <p className="text-xs text-white/70">
-                Configure your AI provider keys for writing assistance
-              </p>
+              <p className="text-xs text-white/70">Configure your AI provider keys</p>
             </div>
           </div>
         </div>
 
-        {/* Body */}
         <div className="p-6 space-y-6">
-          {/* Info Banner */}
-          <div
-            className="p-4 rounded-xl flex items-start gap-3"
-            style={{ background: "rgba(99, 102, 241, 0.08)", border: "1px solid rgba(99, 102, 241, 0.2)" }}
-          >
+          <div className="p-4 rounded-xl flex items-start gap-3" style={{ background: "rgba(99, 102, 241, 0.08)", border: "1px solid rgba(99, 102, 241, 0.2)" }}>
             <AlertCircle size={18} className="text-indigo-600 mt-0.5 flex-shrink-0" />
             <div className="text-sm text-gray-600">
-              <strong className="text-gray-800">Your keys are stored locally</strong> on this device only. 
-              They are never sent to our servers. You can get API keys from{" "}
-              <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" className="text-indigo-600 underline">
-                OpenAI
-              </a>{" "}
-              or{" "}
-              <a href="https://console.anthropic.com/" target="_blank" rel="noopener noreferrer" className="text-indigo-600 underline">
-                Anthropic
-              </a>.
+              <strong className="text-gray-800">Your keys are stored locally</strong> on this device only.
             </div>
           </div>
 
-          {/* OpenAI Key */}
           <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-              OpenAI API Key
-            </label>
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">OpenAI API Key</label>
             <div className="flex gap-2">
               <div className="flex-1 relative">
                 <input
@@ -462,48 +319,17 @@ function ApiSettingsPanel({ isOpen, onClose }) {
                   value={keys.openai}
                   onChange={(e) => setKeys({ ...keys, openai: e.target.value })}
                   placeholder="sk-..."
-                  className="w-full px-4 py-3 pr-10 rounded-xl border border-gray-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition-all text-sm font-mono"
+                  className="w-full px-4 py-3 pr-10 rounded-xl border border-gray-200 focus:border-indigo-400 outline-none text-sm font-mono"
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowOpenAI(!showOpenAI)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                >
+                <button type="button" onClick={() => setShowOpenAI(!showOpenAI)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
                   {showOpenAI ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
-              <button
-                onClick={testOpenAIKey}
-                disabled={!keys.openai || testingOpenAI}
-                className="px-4 py-2 rounded-xl text-sm font-medium transition-all disabled:opacity-50"
-                style={{
-                  background: openAIStatus === "valid" ? "rgba(34, 197, 94, 0.1)" : "rgba(99, 102, 241, 0.1)",
-                  color: openAIStatus === "valid" ? "#16a34a" : "#6366f1",
-                  border: `1px solid ${openAIStatus === "valid" ? "rgba(34, 197, 94, 0.3)" : "rgba(99, 102, 241, 0.3)"}`,
-                }}
-              >
-                {testingOpenAI ? (
-                  <Loader2 size={16} className="animate-spin" />
-                ) : openAIStatus === "valid" ? (
-                  <Check size={16} />
-                ) : (
-                  "Test"
-                )}
-              </button>
             </div>
-            {openAIStatus === "invalid" && (
-              <p className="mt-2 text-xs text-red-600">Invalid API key. Please check and try again.</p>
-            )}
-            {openAIStatus === "valid" && (
-              <p className="mt-2 text-xs text-green-600">✓ Key is valid and working</p>
-            )}
           </div>
 
-          {/* Anthropic Key */}
           <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-              Anthropic (Claude) API Key
-            </label>
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Anthropic (Claude) API Key</label>
             <div className="flex gap-2">
               <div className="flex-1 relative">
                 <input
@@ -511,109 +337,24 @@ function ApiSettingsPanel({ isOpen, onClose }) {
                   value={keys.anthropic}
                   onChange={(e) => setKeys({ ...keys, anthropic: e.target.value })}
                   placeholder="sk-ant-..."
-                  className="w-full px-4 py-3 pr-10 rounded-xl border border-gray-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition-all text-sm font-mono"
+                  className="w-full px-4 py-3 pr-10 rounded-xl border border-gray-200 focus:border-indigo-400 outline-none text-sm font-mono"
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowAnthropic(!showAnthropic)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                >
+                <button type="button" onClick={() => setShowAnthropic(!showAnthropic)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
                   {showAnthropic ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               </div>
-              <button
-                onClick={testAnthropicKey}
-                disabled={!keys.anthropic || testingAnthropic}
-                className="px-4 py-2 rounded-xl text-sm font-medium transition-all disabled:opacity-50"
-                style={{
-                  background: anthropicStatus === "valid" ? "rgba(34, 197, 94, 0.1)" : "rgba(99, 102, 241, 0.1)",
-                  color: anthropicStatus === "valid" ? "#16a34a" : "#6366f1",
-                  border: `1px solid ${anthropicStatus === "valid" ? "rgba(34, 197, 94, 0.3)" : "rgba(99, 102, 241, 0.3)"}`,
-                }}
-              >
-                {testingAnthropic ? (
-                  <Loader2 size={16} className="animate-spin" />
-                ) : anthropicStatus === "valid" ? (
-                  <Check size={16} />
-                ) : (
-                  "Test"
-                )}
-              </button>
-            </div>
-            {anthropicStatus === "invalid" && (
-              <p className="mt-2 text-xs text-red-600">Invalid key format. Claude keys start with "sk-ant-"</p>
-            )}
-            {anthropicStatus === "valid" && (
-              <p className="mt-2 text-xs text-green-600">✓ Key format is valid</p>
-            )}
-          </div>
-
-          {/* Default Provider */}
-          <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-              Preferred AI Provider
-            </label>
-            <div className="flex gap-3">
-              {[
-                { id: "openai", label: "OpenAI (GPT-4)", icon: "🤖" },
-                { id: "anthropic", label: "Anthropic (Claude)", icon: "🧠" },
-              ].map((provider) => {
-                const isSelected = loadApiKeys().preferred === provider.id || 
-                  (!loadApiKeys().preferred && provider.id === "openai");
-                return (
-                  <button
-                    key={provider.id}
-                    onClick={() => {
-                      const updated = { ...keys, preferred: provider.id };
-                      setKeys(updated);
-                      saveApiKeys(updated);
-                    }}
-                    className="flex-1 p-4 rounded-xl text-left transition-all"
-                    style={{
-                      background: isSelected ? "rgba(99, 102, 241, 0.1)" : "rgba(248, 250, 252, 0.9)",
-                      border: `2px solid ${isSelected ? "#6366f1" : "rgba(148, 163, 184, 0.3)"}`,
-                    }}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="text-xl">{provider.icon}</span>
-                      <span className="text-sm font-medium text-gray-800">{provider.label}</span>
-                    </div>
-                  </button>
-                );
-              })}
             </div>
           </div>
         </div>
 
-        {/* Footer */}
-        <div
-          className="px-6 py-4 flex justify-end gap-3"
-          style={{ background: "rgba(248, 250, 252, 0.9)", borderTop: "1px solid rgba(148, 163, 184, 0.2)" }}
-        >
+        <div className="px-6 py-4 flex justify-end gap-3" style={{ background: "rgba(248, 250, 252, 0.9)", borderTop: "1px solid rgba(148, 163, 184, 0.2)" }}>
+          <button onClick={onClose} className="px-5 py-2.5 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-100">Cancel</button>
           <button
-            onClick={onClose}
-            className="px-5 py-2.5 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-100 transition-all"
+            onClick={() => { handleSave(); setTimeout(onClose, 500); }}
+            className="px-5 py-2.5 rounded-xl text-sm font-semibold text-white"
+            style={{ background: saved ? "linear-gradient(135deg, #22c55e, #16a34a)" : "linear-gradient(135deg, #6366f1, #4f46e5)" }}
           >
-            Cancel
-          </button>
-          <button
-            onClick={() => {
-              handleSave();
-              setTimeout(onClose, 500);
-            }}
-            className="px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-all hover:scale-105"
-            style={{
-              background: saved ? "linear-gradient(135deg, #22c55e, #16a34a)" : "linear-gradient(135deg, #6366f1, #4f46e5)",
-              boxShadow: "0 4px 14px rgba(99, 102, 241, 0.4)",
-            }}
-          >
-            {saved ? (
-              <span className="flex items-center gap-2">
-                <Check size={16} /> Saved!
-              </span>
-            ) : (
-              "Save Settings"
-            )}
+            {saved ? <span className="flex items-center gap-2"><Check size={16} /> Saved!</span> : "Save Settings"}
           </button>
         </div>
       </div>
@@ -624,7 +365,6 @@ function ApiSettingsPanel({ isOpen, onClose }) {
 // -------------------- Author Setup Modal --------------------
 function AuthorSetupModal({ isOpen, onComplete }) {
   const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
   if (!isOpen) return null;
@@ -632,86 +372,91 @@ function AuthorSetupModal({ isOpen, onComplete }) {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!name.trim()) return;
-
     setIsLoading(true);
     try {
-      await onComplete(name.trim(), email.trim() || undefined);
+      await onComplete(name.trim());
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: "rgba(15, 23, 42, 0.6)", backdropFilter: "blur(4px)" }}
-    >
-      <div
-        className="w-full max-w-md rounded-3xl overflow-hidden"
-        style={{
-          background: "#fff",
-          boxShadow: "0 25px 80px rgba(15, 23, 42, 0.25)",
-        }}
-      >
-        {/* Header */}
-        <div
-          className="px-6 py-8 text-center"
-          style={{
-            background: "linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%)",
-          }}
-        >
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(15, 23, 42, 0.6)", backdropFilter: "blur(4px)" }}>
+      <div className="w-full max-w-md rounded-3xl overflow-hidden" style={{ background: "#fff", boxShadow: "0 25px 80px rgba(15, 23, 42, 0.25)" }}>
+        <div className="px-6 py-8 text-center" style={{ background: "linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%)" }}>
           <div className="text-5xl mb-3">✍️</div>
           <h2 className="text-2xl font-semibold text-white">Welcome to DahTruth StoryLab</h2>
-          <p className="text-sm text-white/70 mt-2">
-            Let's set up your author profile to get started
-          </p>
+          <p className="text-sm text-white/70 mt-2">Let's set up your author profile</p>
         </div>
-
-        {/* Form */}
         <form onSubmit={handleSubmit} className="p-6 space-y-5">
           <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-              Your Name / Pen Name *
-            </label>
+            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Your Name / Pen Name *</label>
             <input
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="How you want to be known as an author"
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition-all"
+              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-indigo-400 outline-none"
               autoFocus
               required
             />
           </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-              Email (optional, for cross-device access)
-            </label>
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="your@email.com"
-              className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition-all"
-            />
-            <p className="mt-2 text-xs text-gray-500">
-              Add your email to access your projects from any device
-            </p>
-          </div>
-
           <button
             type="submit"
             disabled={isLoading || !name.trim()}
-            className="w-full py-3.5 rounded-xl text-base font-semibold text-white transition-all hover:scale-[1.02] disabled:opacity-50"
-            style={{
-              background: "linear-gradient(135deg, #6366f1, #4f46e5)",
-              boxShadow: "0 4px 14px rgba(99, 102, 241, 0.4)",
-            }}
+            className="w-full py-3.5 rounded-xl text-base font-semibold text-white disabled:opacity-50"
+            style={{ background: "linear-gradient(135deg, #6366f1, #4f46e5)" }}
           >
             {isLoading ? "Setting up..." : "Start Writing →"}
           </button>
         </form>
+      </div>
+    </div>
+  );
+}
+
+// -------------------- Edit Title Modal --------------------
+function EditTitleModal({ isOpen, currentTitle, projectId, onSave, onClose }) {
+  const [title, setTitle] = useState(currentTitle || "");
+
+  useEffect(() => {
+    setTitle(currentTitle || "");
+  }, [currentTitle, isOpen]);
+
+  if (!isOpen) return null;
+
+  const handleSave = () => {
+    if (title.trim()) {
+      onSave(projectId, title.trim());
+      onClose();
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(15, 23, 42, 0.6)", backdropFilter: "blur(4px)" }} onClick={onClose}>
+      <div className="w-full max-w-md rounded-3xl overflow-hidden" style={{ background: "#fff", boxShadow: "0 25px 80px rgba(15, 23, 42, 0.25)" }} onClick={(e) => e.stopPropagation()}>
+        <div className="px-6 py-5" style={{ background: "linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%)" }}>
+          <h2 className="text-lg font-semibold text-white">Edit Project Title</h2>
+          <p className="text-xs text-white/70 mt-1">ID: {projectId}</p>
+        </div>
+        <div className="p-6">
+          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Project Title</label>
+          <input
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Enter project title..."
+            className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-indigo-400 outline-none text-lg"
+            autoFocus
+            onKeyDown={(e) => e.key === "Enter" && handleSave()}
+          />
+        </div>
+        <div className="px-6 py-4 flex justify-end gap-3" style={{ background: "rgba(248, 250, 252, 0.9)", borderTop: "1px solid rgba(148, 163, 184, 0.2)" }}>
+          <button onClick={onClose} className="px-5 py-2.5 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-100">Cancel</button>
+          <button onClick={handleSave} className="px-5 py-2.5 rounded-xl text-sm font-semibold text-white" style={{ background: "linear-gradient(135deg, #6366f1, #4f46e5)" }}>
+            Save Title
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -724,280 +469,327 @@ export default function ProjectPage() {
   const [coverUploadId, setCoverUploadId] = useState(null);
   const [viewMode, setViewMode] = useState("grid");
   const [authorName, setAuthorName] = useState("New Author");
-  const [authorAvatar, setAuthorAvatar] = useState("");
   const [showApiSettings, setShowApiSettings] = useState(false);
   const [showAuthorSetup, setShowAuthorSetup] = useState(false);
-  const [syncStatus, setSyncStatus] = useState("idle"); // idle, syncing, synced, error
+  const [syncStatus, setSyncStatus] = useState("offline"); // offline since cloud is disabled
+  const [editingProject, setEditingProject] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  
+  const importInputRef = useRef(null);
 
   // Initialize
   useEffect(() => {
-    // Check if author setup is needed
-    const profile = getLocalAuthorProfile();
+    const profile = getAuthorProfile();
     if (!profile) {
       setShowAuthorSetup(true);
     } else {
       setAuthorName(profile.name);
     }
 
-    // Check for legacy migration
-    if (needsMigration()) {
-      console.log("[ProjectPage] Migrating legacy data...");
-      migrateLegacyData();
-    }
-
-    // Load projects
-    loadProjectsList();
+    loadProjectsFromStorage();
   }, []);
 
-  const loadProjectsList = async () => {
-    setSyncStatus("syncing");
+  // Load projects from unified storage
+  const loadProjectsFromStorage = () => {
+    setIsLoading(true);
     try {
-      // Load from new system
-      const entries = await listProjects({ refreshFromCloud: true });
+      const list = loadProjectsList();
+      console.log(`[ProjectPage] Loaded ${list.length} projects from storage`);
       
-      // Also load legacy projects for backward compat
-      const legacy = loadLegacyProjects();
+      // Enrich with project data (word counts, etc.)
+      const enriched = list.map((entry) => {
+        const data = loadProjectData(entry.id);
+        const wordCount = data?.chapters?.reduce((sum, ch) => sum + (ch.wordCount || 0), 0) || entry.wordCount || 0;
+        const chapterCount = data?.chapters?.length || entry.chapterCount || 0;
+        
+        return {
+          ...entry,
+          wordCount,
+          chapterCount,
+          cover: data?.cover || entry.cover || "",
+          targetWords: data?.targetWords || entry.targetWords || 50000,
+          logline: data?.logline || entry.logline || "",
+        };
+      });
       
-      // Merge: convert legacy to new format if needed
-      const mergedProjects = [...entries];
-      
-      // Add legacy projects not in new system
-      for (const lp of legacy) {
-        if (!mergedProjects.find((p) => p.id === lp.id)) {
-          mergedProjects.push({
-            id: lp.id,
-            title: lp.title || "Untitled",
-            author: lp.author || authorName,
-            status: lp.status || "draft",
-            wordCount: lp.wordCount || 0,
-            chapterCount: lp.chapterCount || 0,
-            updatedAt: lp.lastModified || new Date().toISOString(),
-            createdAt: lp.createdAt || new Date().toISOString(),
-            // Keep legacy fields
-            _legacy: lp,
-          });
-        }
-      }
-
-      setProjects(mergedProjects);
-      setSyncStatus("synced");
+      setProjects(enriched);
+      setSyncStatus(isCloudSyncDisabled() ? "offline" : "synced");
     } catch (err) {
       console.error("[ProjectPage] Failed to load projects:", err);
-      // Fall back to legacy
-      const legacy = loadLegacyProjects();
-      setProjects(legacy.map((lp) => ({
-        id: lp.id,
-        title: lp.title || "Untitled",
-        author: lp.author || authorName,
-        status: lp.status || "draft",
-        wordCount: lp.wordCount || 0,
-        chapterCount: lp.chapterCount || 0,
-        updatedAt: lp.lastModified || new Date().toISOString(),
-        createdAt: lp.createdAt || new Date().toISOString(),
-        _legacy: lp,
-      })));
+      setProjects([]);
       setSyncStatus("error");
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  // Sync listener
+  // Listen for changes
   useEffect(() => {
-    const sync = () => loadProjectsList();
+    const sync = () => loadProjectsFromStorage();
     window.addEventListener("storage", sync);
     window.addEventListener("project:change", sync);
-    window.addEventListener("profile:updated", sync);
+    window.addEventListener("projects:change", sync);
+    window.addEventListener("storage:ready", sync);
     return () => {
       window.removeEventListener("storage", sync);
       window.removeEventListener("project:change", sync);
-      window.removeEventListener("profile:updated", sync);
+      window.removeEventListener("projects:change", sync);
+      window.removeEventListener("storage:ready", sync);
     };
-  }, [authorName]);
+  }, []);
 
   const handleGoBack = () => {
-    if (window.history.length > 1) {
-      navigate(-1);
-    } else {
-      navigate("/dashboard");
-    }
+    if (window.history.length > 1) navigate(-1);
+    else navigate("/dashboard");
   };
 
-  const handleAuthorSetupComplete = async (name, email) => {
-    const profile = completeAuthorSetup(name, email);
-    setAuthorName(profile.name);
+  const handleAuthorSetupComplete = async (name) => {
+    saveAuthorProfile({ name, createdAt: new Date().toISOString() });
+    setAuthorName(name);
     setShowAuthorSetup(false);
   };
 
   const handleAuthorNameSave = (newName) => {
     const trimmed = (newName || "").trim() || "New Author";
     setAuthorName(trimmed);
-
-    // Update author profile
-    const profile = getLocalAuthorProfile();
-    if (profile) {
-      profile.name = trimmed;
-      profile.updatedAt = new Date().toISOString();
-      setLocalAuthorProfile(profile);
-    }
-
-    // Update all projects' author field
-    setProjects((prev) => {
-      const updated = prev.map((p) => ({
-        ...p,
-        author: trimmed,
-      }));
-      // Save legacy format too
-      saveLegacyProjects(updated.map((p) => p._legacy || p));
-      return updated;
-    });
-
-    window.dispatchEvent(new Event("profile:updated"));
+    saveAuthorProfile({ name: trimmed, updatedAt: new Date().toISOString() });
   };
 
-  const addProject = async () => {
-    const now = new Date().toISOString();
-    const profile = getLocalAuthorProfile();
+  // Create new project with name prompt
+  const addProject = () => {
+    const title = window.prompt("Enter a title for your new project:", "Untitled Project");
+    if (!title) return; // User cancelled
     
-    try {
-      // Create in new system
-      const project = await createProject("Untitled Project", {
-        authorName: profile?.name || authorName,
-        saveToCloud: true,
-      });
+    const projectId = generateId();
+    const now = new Date().toISOString();
 
-      // Also add to legacy for backward compat
-      const legacyProject = {
-        id: project.id,
-        title: project.title,
-        author: project.author,
-        logline: "",
-        synopsis: "",
-        genre: [],
-        status: "Draft",
-        targetWords: 50000,
-        wordCount: 0,
-        chapterCount: 0,
-        characterCount: 0,
-        cover: "",
-        createdAt: now,
-        lastModified: now,
-      };
+    const project = {
+      id: projectId,
+      title: title.trim(),
+      status: "Draft",
+      source: "New",
+      createdAt: now,
+      updatedAt: now,
+      wordCount: 0,
+      chapterCount: 1,
+    };
 
-      const legacy = loadLegacyProjects();
-      saveLegacyProjects([legacyProject, ...legacy]);
+    // Create default project data
+    const data = {
+      book: { title: title.trim() },
+      chapters: [{ id: `chapter-${Date.now()}`, title: "Chapter 1", content: "", preview: "", wordCount: 0, lastEdited: now, status: "draft", order: 0 }],
+      daily: { goal: 500, counts: {} },
+      settings: { theme: "light", focusMode: false },
+      tocOutline: [],
+    };
 
-      // Refresh list
-      loadProjectsList();
-    } catch (err) {
-      console.error("[ProjectPage] Failed to create project:", err);
-      // Fall back to legacy-only creation
-      const legacyProject = {
-        id: Date.now().toString(),
-        title: "Untitled Project",
-        author: authorName,
-        logline: "",
-        synopsis: "",
-        genre: [],
-        status: "Draft",
-        targetWords: 50000,
-        wordCount: 0,
-        chapterCount: 0,
-        characterCount: 0,
-        cover: "",
-        createdAt: now,
-        lastModified: now,
-      };
-      const legacy = loadLegacyProjects();
-      saveLegacyProjects([legacyProject, ...legacy]);
-      loadProjectsList();
-    }
-  };
+    // Save to storage
+    saveProjectData(projectId, data);
+    
+    // Add to projects list
+    const updated = [project, ...projects];
+    saveProjectsList(updated);
+    setProjects(updated);
 
-  const updateProject = (id, patch) => {
-    setProjects((prev) => {
-      const now = new Date().toISOString();
-      const updated = prev.map((p) =>
-        p.id === id ? { ...p, ...patch, updatedAt: now } : p
-      );
-      // Save to legacy
-      const legacyUpdated = updated.map((p) => ({
-        ...(p._legacy || {}),
-        ...p,
-        lastModified: p.updatedAt,
-      }));
-      saveLegacyProjects(legacyUpdated);
-      return updated;
-    });
-  };
+    // Set as current project
+    storage.setItem(CURRENT_PROJECT_KEY, projectId);
+    storage.setItem("currentStory", JSON.stringify({ id: projectId, title: title.trim(), wordCount: 0, status: "Draft" }));
 
-  const handleDeleteProject = async (id) => {
-    if (!window.confirm("Delete this project? This cannot be undone.")) return;
-
-    console.log(`[ProjectPage] ========== DELETING PROJECT: ${id} ==========`);
-
-    // 1. Delete from cloud service (projectsService)
-    try {
-      await deleteProjectService(id);
-      console.log(`[ProjectPage] ✓ Deleted from cloud service`);
-    } catch (err) {
-      console.error("[ProjectPage] Cloud delete failed:", err);
-    }
-
-    // 2. Delete from legacy projects array (userProjects)
-    const legacy = loadLegacyProjects();
-    saveLegacyProjects(legacy.filter((p) => p.id !== id));
-    console.log(`[ProjectPage] ✓ Removed from userProjects`);
-
-    // 3. COMPLETE CLEANUP: Remove ALL project-scoped storage keys from ALL systems
-    cleanupProjectStorage(id);
-
-    // 4. Dispatch events to notify all modules/hooks
+    console.log(`[ProjectPage] Created project: "${title.trim()}" (${projectId})`);
+    
+    // Dispatch events
     window.dispatchEvent(new Event("project:change"));
     window.dispatchEvent(new Event("projects:change"));
-    window.dispatchEvent(new Event("storage"));
-
-    // 5. Refresh list
-    await loadProjectsList();
-
-    console.log(`[ProjectPage] ========== PROJECT DELETION COMPLETE ==========`);
   };
 
-  const openInWriter = async (project) => {
-    try {
-      // Try to load from new system first
-      const loaded = await loadProject(project.id);
-      
-      if (loaded) {
-        setCurrentProject(loaded);
-      } else {
-        // Fall back to legacy snapshot
-        const snapshot = {
-          id: project.id,
-          title: project.title || project._legacy?.title || "Untitled",
-          wordCount: project.wordCount || project._legacy?.wordCount || 0,
-          lastModified: project.updatedAt || new Date().toISOString(),
-          status: project.status || "Draft",
-          targetWords: project.targetWords || project._legacy?.targetWords || 50000,
-        };
-        storage.setItem("currentStory", JSON.stringify(snapshot));
-      }
-      
-      window.dispatchEvent(new Event("project:change"));
-    } catch (err) {
-      console.error("[ProjectPage] Failed to load project:", err);
-      // Use legacy snapshot
-      const snapshot = {
-        id: project.id,
-        title: project.title,
-        wordCount: project.wordCount || 0,
-        lastModified: project.updatedAt || new Date().toISOString(),
-        status: project.status || "Draft",
-        targetWords: project.targetWords || 50000,
-      };
-      storage.setItem("currentStory", JSON.stringify(snapshot));
-      window.dispatchEvent(new Event("project:change"));
+  // Update project title (and sync everywhere)
+  const updateProjectTitle = (projectId, newTitle) => {
+    console.log(`[ProjectPage] Updating title for ${projectId} to "${newTitle}"`);
+    
+    // Update projects list
+    const updated = projects.map((p) =>
+      p.id === projectId ? { ...p, title: newTitle, updatedAt: new Date().toISOString() } : p
+    );
+    saveProjectsList(updated);
+    setProjects(updated);
+
+    // Update project data
+    const data = loadProjectData(projectId);
+    if (data) {
+      data.book = { ...data.book, title: newTitle };
+      saveProjectData(projectId, data);
     }
 
-    navigate("/compose");
+    // Update currentStory if this is the current project
+    const currentId = storage.getItem(CURRENT_PROJECT_KEY);
+    if (currentId === projectId) {
+      const currentStoryRaw = storage.getItem("currentStory");
+      if (currentStoryRaw) {
+        const currentStory = JSON.parse(currentStoryRaw);
+        currentStory.title = newTitle;
+        storage.setItem("currentStory", JSON.stringify(currentStory));
+      }
+    }
+
+    // Also update userProjects (legacy)
+    try {
+      const userProjectsRaw = storage.getItem("userProjects");
+      if (userProjectsRaw) {
+        const userProjects = JSON.parse(userProjectsRaw);
+        const updatedUserProjects = userProjects.map((p) =>
+          p.id === projectId ? { ...p, title: newTitle } : p
+        );
+        storage.setItem("userProjects", JSON.stringify(updatedUserProjects));
+      }
+    } catch {}
+
+    // Dispatch events
+    window.dispatchEvent(new Event("project:change"));
+    window.dispatchEvent(new Event("projects:change"));
+  };
+
+  // Update project (general)
+  const updateProject = (id, patch) => {
+    const now = new Date().toISOString();
+    const updated = projects.map((p) =>
+      p.id === id ? { ...p, ...patch, updatedAt: now } : p
+    );
+    saveProjectsList(updated);
+    setProjects(updated);
+
+    // If updating title, also update project data
+    if (patch.title) {
+      const data = loadProjectData(id);
+      if (data) {
+        data.book = { ...data.book, title: patch.title };
+        saveProjectData(id, data);
+      }
+    }
+
+    // If updating cover or other data, save to project data
+    if (patch.cover || patch.logline || patch.targetWords) {
+      const data = loadProjectData(id) || {};
+      if (patch.cover) data.cover = patch.cover;
+      if (patch.logline) data.logline = patch.logline;
+      if (patch.targetWords) data.targetWords = patch.targetWords;
+      saveProjectData(id, data);
+    }
+
+    window.dispatchEvent(new Event("project:change"));
+  };
+
+  // Delete project
+  const handleDeleteProject = (id) => {
+    if (!window.confirm("Delete this project? This cannot be undone.")) return;
+    
+    cleanupProjectStorage(id);
+    setProjects((prev) => prev.filter((p) => p.id !== id));
+    
+    window.dispatchEvent(new Event("project:change"));
+    window.dispatchEvent(new Event("projects:change"));
+  };
+
+  // Open project in writer
+  const openInWriter = (project) => {
+    // Set as current project
+    storage.setItem(CURRENT_PROJECT_KEY, project.id);
+    storage.setItem("currentStory", JSON.stringify({
+      id: project.id,
+      title: project.title,
+      wordCount: project.wordCount || 0,
+      status: project.status || "Draft",
+    }));
+    
+    window.dispatchEvent(new Event("project:change"));
+    navigate("/writer");
+  };
+
+  // Import manuscript
+  const handleImportClick = () => {
+    importInputRef.current?.click();
+  };
+
+  const handleImportFile = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      // Ask for project name FIRST
+      const defaultName = file.name.replace(/\.(docx|doc|txt|html|htm|rtf)$/i, "").trim() || "Imported Project";
+      const projectName = window.prompt("Enter a name for this project:", defaultName);
+      if (!projectName) {
+        e.target.value = "";
+        return; // User cancelled
+      }
+
+      setIsLoading(true);
+
+      // Parse the document
+      const parsed = await documentParser.parseFile(file);
+      
+      // Create new project
+      const projectId = generateId();
+      const now = new Date().toISOString();
+      const totalWords = parsed.chapters.reduce((sum, ch) => sum + (ch.wordCount || 0), 0);
+
+      const project = {
+        id: projectId,
+        title: projectName.trim(), // Use user-entered name, NOT parsed title
+        status: "Draft",
+        source: "Imported",
+        createdAt: now,
+        updatedAt: now,
+        wordCount: totalWords,
+        chapterCount: parsed.chapters.length,
+      };
+
+      // Create project data
+      const chapters = parsed.chapters.map((ch, idx) => ({
+        id: ch.id || `chapter-${Date.now()}-${idx}`,
+        title: ch.title,
+        content: ch.content,
+        preview: ch.preview || "",
+        wordCount: ch.wordCount || 0,
+        lastEdited: now,
+        status: "draft",
+        order: idx,
+      }));
+
+      const data = {
+        book: { title: projectName.trim() }, // Use user-entered name
+        chapters: chapters,
+        daily: { goal: 500, counts: {} },
+        settings: { theme: "light", focusMode: false },
+        tocOutline: parsed.tableOfContents || [],
+      };
+
+      // Save to storage
+      saveProjectData(projectId, data);
+      
+      // Add to projects list
+      const updated = [project, ...projects];
+      saveProjectsList(updated);
+      setProjects(updated);
+
+      // Set as current project
+      storage.setItem(CURRENT_PROJECT_KEY, projectId);
+      storage.setItem("currentStory", JSON.stringify({ id: projectId, title: projectName.trim(), wordCount: totalWords, status: "Draft" }));
+
+      console.log(`[ProjectPage] Imported project: "${projectName.trim()}" (${chapters.length} chapters, ${totalWords} words)`);
+      
+      // Dispatch events
+      window.dispatchEvent(new Event("project:change"));
+      window.dispatchEvent(new Event("projects:change"));
+
+      // Navigate to writer
+      navigate("/writer");
+    } catch (err) {
+      console.error("[ProjectPage] Import failed:", err);
+      alert("Failed to import file. Please try a different file format.");
+    } finally {
+      setIsLoading(false);
+      e.target.value = "";
+    }
   };
 
   // Handle cover upload
@@ -1012,11 +804,7 @@ export default function ProjectPage() {
         return;
       }
 
-      const isHEIC =
-        file.name.toLowerCase().endsWith(".heic") ||
-        file.name.toLowerCase().endsWith(".heif") ||
-        file.type === "image/heic" ||
-        file.type === "image/heif";
+      const isHEIC = file.name.toLowerCase().endsWith(".heic") || file.name.toLowerCase().endsWith(".heif");
 
       let dataUrl = "";
       if (isHEIC) {
@@ -1036,21 +824,26 @@ export default function ProjectPage() {
       updateProject(projectId, { cover: dataUrl });
     } catch (err) {
       console.error("Error uploading cover:", err);
-      alert("Failed to upload image. Please try again or use a different image.");
+      alert("Failed to upload image.");
     } finally {
       setCoverUploadId(null);
       fileInputEvent.target.value = "";
     }
   };
 
+  // Copy project ID to clipboard
+  const copyProjectId = (id) => {
+    navigator.clipboard.writeText(id).then(() => {
+      alert("Project ID copied to clipboard!");
+    }).catch(() => {
+      alert(`Project ID: ${id}`);
+    });
+  };
+
   // Calculate totals
   const totalWords = projects.reduce((sum, p) => sum + (p.wordCount || 0), 0);
-  const inProgress = projects.filter(
-    (p) => !["Published", "Idea", "published", "completed", "archived"].includes(p.status)
-  ).length;
-  const published = projects.filter(
-    (p) => p.status === "Published" || p.status === "published" || p.status === "completed"
-  ).length;
+  const inProgress = projects.filter((p) => !["Published", "Idea", "published", "completed", "archived"].includes(p.status)).length;
+  const published = projects.filter((p) => p.status === "Published" || p.status === "published" || p.status === "completed").length;
 
   const formatDate = (dateStr) => {
     if (!dateStr) return "—";
@@ -1058,38 +851,39 @@ export default function ProjectPage() {
     const now = new Date();
     const diff = now - date;
     const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-
     if (days === 0) return "Today";
     if (days === 1) return "Yesterday";
     if (days < 7) return `${days} days ago`;
-    return date.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-    });
+    return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
   };
 
-  // Check if API keys are configured
   const apiKeys = loadApiKeys();
   const hasApiKeys = !!(apiKeys.openai || apiKeys.anthropic);
 
   return (
-    <div
-      className="min-h-screen text-gray-800"
-      style={{
-        background:
-          "linear-gradient(135deg, #fef5ff 0%, #f8e8ff 50%, #fff5f7 100%)",
-      }}
-    >
-      {/* Author Setup Modal */}
-      <AuthorSetupModal
-        isOpen={showAuthorSetup}
-        onComplete={handleAuthorSetupComplete}
+    <div className="min-h-screen text-gray-800" style={{ background: "linear-gradient(135deg, #fef5ff 0%, #f8e8ff 50%, #fff5f7 100%)" }}>
+      {/* Hidden import input */}
+      <input
+        ref={importInputRef}
+        type="file"
+        accept=".docx,.doc,.txt,.html,.htm,.rtf"
+        className="hidden"
+        onChange={handleImportFile}
       />
 
+      {/* Author Setup Modal */}
+      <AuthorSetupModal isOpen={showAuthorSetup} onComplete={handleAuthorSetupComplete} />
+
       {/* API Settings Modal */}
-      <ApiSettingsPanel
-        isOpen={showApiSettings}
-        onClose={() => setShowApiSettings(false)}
+      <ApiSettingsPanel isOpen={showApiSettings} onClose={() => setShowApiSettings(false)} />
+
+      {/* Edit Title Modal */}
+      <EditTitleModal
+        isOpen={!!editingProject}
+        currentTitle={editingProject?.title}
+        projectId={editingProject?.id}
+        onSave={updateProjectTitle}
+        onClose={() => setEditingProject(null)}
       />
 
       <div className="mx-auto max-w-7xl px-6 py-8">
@@ -1097,184 +891,72 @@ export default function ProjectPage() {
         <button
           onClick={handleGoBack}
           className="mb-6 inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all hover:scale-105"
-          style={{
-            background: "linear-gradient(135deg, #D4AF37, #f5e6b3)",
-            color: "#1f2937",
-            border: "1px solid rgba(180,142,38,0.9)",
-            boxShadow: "0 6px 18px rgba(180,142,38,0.35)",
-          }}
+          style={{ background: "linear-gradient(135deg, #D4AF37, #f5e6b3)", color: "#1f2937", border: "1px solid rgba(180,142,38,0.9)", boxShadow: "0 6px 18px rgba(180,142,38,0.35)" }}
         >
           <ArrowLeft size={16} />
           Dashboard
         </button>
 
         {/* Page Header */}
-        <div
-          className="rounded-3xl p-8 mb-8"
-          style={{
-            background: "rgba(255,255,255,0.9)",
-            backdropFilter: "blur(20px)",
-            border: "1px solid rgba(148,163,184,0.3)",
-            boxShadow: "0 14px 45px rgba(15,23,42,0.08)",
-          }}
-        >
+        <div className="rounded-3xl p-8 mb-8" style={{ background: "rgba(255,255,255,0.9)", backdropFilter: "blur(20px)", border: "1px solid rgba(148,163,184,0.3)", boxShadow: "0 14px 45px rgba(15,23,42,0.08)" }}>
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
             <div className="flex items-center gap-5">
-              <div
-                className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl"
-                style={{
-                  background: "linear-gradient(135deg, #b897d6, #e3c8ff)",
-                  boxShadow: "0 10px 30px rgba(155,123,201,0.35)",
-                }}
-              >
+              <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl" style={{ background: "linear-gradient(135deg, #b897d6, #e3c8ff)", boxShadow: "0 10px 30px rgba(155,123,201,0.35)" }}>
                 📚
               </div>
               <div>
-                <h1
-                  className="text-4xl font-semibold mb-1"
-                  style={{
-                    fontFamily: "'EB Garamond', Georgia, serif",
-                    color: "#111827",
-                  }}
-                >
+                <h1 className="text-4xl font-semibold mb-1" style={{ fontFamily: "'EB Garamond', Georgia, serif", color: "#111827" }}>
                   Projects
                 </h1>
-
                 <p className="text-sm text-gray-500">
-                  Author{" "}
-                  <span className="font-medium text-gray-800">{authorName}</span>
+                  Author <span className="font-medium text-gray-800">{authorName}</span>
                   <button
                     type="button"
                     onClick={() => {
-                      const current = authorName === "New Author" ? "" : authorName;
-                      const next = window.prompt("Update author / pen name:", current);
-                      if (next !== null) {
-                        handleAuthorNameSave(next);
-                      }
+                      const next = window.prompt("Update author / pen name:", authorName === "New Author" ? "" : authorName);
+                      if (next !== null) handleAuthorNameSave(next);
                     }}
                     className="inline-flex items-center gap-1 ml-2 text-xs text-purple-600 hover:text-purple-800"
                   >
-                    <PencilLine size={14} />
-                    Edit
+                    <PencilLine size={14} /> Edit
                   </button>
                 </p>
-
                 <p className="text-xs text-gray-500 mt-1 flex items-center gap-2">
                   {projects.length} projects • {totalWords.toLocaleString()} total words
-                  {/* Sync status indicator */}
                   <span
                     className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium"
                     style={{
-                      background:
-                        syncStatus === "synced"
-                          ? "rgba(34, 197, 94, 0.1)"
-                          : syncStatus === "syncing"
-                          ? "rgba(59, 130, 246, 0.1)"
-                          : syncStatus === "error"
-                          ? "rgba(239, 68, 68, 0.1)"
-                          : "rgba(148, 163, 184, 0.1)",
-                      color:
-                        syncStatus === "synced"
-                          ? "#16a34a"
-                          : syncStatus === "syncing"
-                          ? "#3b82f6"
-                          : syncStatus === "error"
-                          ? "#dc2626"
-                          : "#64748b",
+                      background: syncStatus === "offline" ? "rgba(148, 163, 184, 0.1)" : syncStatus === "error" ? "rgba(239, 68, 68, 0.1)" : "rgba(34, 197, 94, 0.1)",
+                      color: syncStatus === "offline" ? "#64748b" : syncStatus === "error" ? "#dc2626" : "#16a34a",
                     }}
                   >
-                    {syncStatus === "synced" ? (
-                      <>
-                        <Cloud size={10} /> Synced
-                      </>
-                    ) : syncStatus === "syncing" ? (
-                      <>
-                        <Loader2 size={10} className="animate-spin" /> Syncing...
-                      </>
-                    ) : syncStatus === "error" ? (
-                      <>
-                        <CloudOff size={10} /> Offline
-                      </>
-                    ) : (
-                      "Ready"
-                    )}
+                    {syncStatus === "offline" ? <><CloudOff size={10} /> Local</> : syncStatus === "error" ? <><CloudOff size={10} /> Error</> : <><Cloud size={10} /> Synced</>}
                   </span>
                 </p>
               </div>
             </div>
 
             <div className="flex items-center gap-3 flex-wrap">
-              {/* API Settings Button */}
-              <button
-                onClick={() => setShowApiSettings(true)}
-                className="inline-flex items-center gap-2 px-4 py-3 rounded-2xl text-sm font-medium transition-all hover:scale-105"
-                style={{
-                  background: hasApiKeys
-                    ? "rgba(34, 197, 94, 0.08)"
-                    : "rgba(251, 191, 36, 0.1)",
-                  border: `1px solid ${hasApiKeys ? "rgba(34, 197, 94, 0.3)" : "rgba(251, 191, 36, 0.4)"}`,
-                  color: hasApiKeys ? "#16a34a" : "#92400e",
-                }}
-              >
+              <button onClick={() => setShowApiSettings(true)} className="inline-flex items-center gap-2 px-4 py-3 rounded-2xl text-sm font-medium transition-all hover:scale-105" style={{ background: hasApiKeys ? "rgba(34, 197, 94, 0.08)" : "rgba(251, 191, 36, 0.1)", border: `1px solid ${hasApiKeys ? "rgba(34, 197, 94, 0.3)" : "rgba(251, 191, 36, 0.4)"}`, color: hasApiKeys ? "#16a34a" : "#92400e" }}>
                 <Key size={16} />
                 {hasApiKeys ? "API Keys ✓" : "Add API Keys"}
               </button>
 
-              {/* View Toggle */}
-              <div
-                className="flex rounded-xl p-1"
-                style={{
-                  background: "rgba(248,250,252,0.95)",
-                  border: "1px solid rgba(148,163,184,0.4)",
-                }}
-              >
-                <button
-                  onClick={() => setViewMode("grid")}
-                  className={`p-2 rounded-lg transition-all ${
-                    viewMode === "grid"
-                      ? "bg-white shadow-md text-purple-700"
-                      : "text-gray-400 hover:text-gray-600"
-                  }`}
-                  title="Grid View"
-                >
+              <div className="flex rounded-xl p-1" style={{ background: "rgba(248,250,252,0.95)", border: "1px solid rgba(148,163,184,0.4)" }}>
+                <button onClick={() => setViewMode("grid")} className={`p-2 rounded-lg transition-all ${viewMode === "grid" ? "bg-white shadow-md text-purple-700" : "text-gray-400 hover:text-gray-600"}`} title="Grid View">
                   <Grid size={18} />
                 </button>
-                <button
-                  onClick={() => setViewMode("list")}
-                  className={`p-2 rounded-lg transition-all ${
-                    viewMode === "list"
-                      ? "bg-white shadow-md text-purple-700"
-                      : "text-gray-400 hover:text-gray-600"
-                  }`}
-                  title="List View"
-                >
+                <button onClick={() => setViewMode("list")} className={`p-2 rounded-lg transition-all ${viewMode === "list" ? "bg-white shadow-md text-purple-700" : "text-gray-400 hover:text-gray-600"}`} title="List View">
                   <List size={18} />
                 </button>
               </div>
 
-              {/* Import Button */}
-              <button
-                type="button"
-                onClick={() => navigate("/compose")}
-                className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl text-sm font-semibold transition-all hover:scale-105"
-                style={{
-                  background: "rgba(255,255,255,0.9)",
-                  border: "1px solid rgba(148,163,184,0.4)",
-                }}
-              >
+              <button onClick={handleImportClick} className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl text-sm font-semibold transition-all hover:scale-105" style={{ background: "rgba(255,255,255,0.9)", border: "1px solid rgba(148,163,184,0.4)" }}>
                 <Upload size={16} />
                 Import Manuscript
               </button>
 
-              {/* New Project Button */}
-              <button
-                onClick={addProject}
-                className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl text-sm font-semibold text-white transition-all hover:scale-105"
-                style={{
-                  background: "linear-gradient(135deg, #9b7bc9, #b897d6)",
-                  boxShadow: "0 8px 24px rgba(155,123,201,0.5)",
-                }}
-              >
+              <button onClick={addProject} className="inline-flex items-center gap-2 px-5 py-3 rounded-2xl text-sm font-semibold text-white transition-all hover:scale-105" style={{ background: "linear-gradient(135deg, #9b7bc9, #b897d6)", boxShadow: "0 8px 24px rgba(155,123,201,0.5)" }}>
                 <Plus size={16} />
                 New Project
               </button>
@@ -1282,207 +964,78 @@ export default function ProjectPage() {
           </div>
         </div>
 
-        {/* API Keys Warning Banner */}
-        {!hasApiKeys && (
-          <div
-            className="rounded-2xl p-5 mb-8 flex items-center gap-4"
-            style={{
-              background: "linear-gradient(135deg, rgba(251, 191, 36, 0.12), rgba(251, 146, 60, 0.08))",
-              border: "1px solid rgba(251, 191, 36, 0.35)",
-            }}
-          >
-            <div
-              className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
-              style={{ background: "rgba(251, 191, 36, 0.2)" }}
-            >
-              <Key size={24} className="text-amber-600" />
-            </div>
-            <div className="flex-1">
-              <h3 className="font-semibold text-gray-800 mb-1">Set Up AI Features</h3>
-              <p className="text-sm text-gray-600">
-                Add your OpenAI or Claude API key to enable AI-powered writing assistance, grammar checking, and story analysis.
-              </p>
-            </div>
-            <button
-              onClick={() => setShowApiSettings(true)}
-              className="px-5 py-2.5 rounded-xl text-sm font-semibold text-white flex-shrink-0 transition-all hover:scale-105"
-              style={{
-                background: "linear-gradient(135deg, #f59e0b, #d97706)",
-                boxShadow: "0 4px 14px rgba(245, 158, 11, 0.4)",
-              }}
-            >
-              Add API Keys
-            </button>
-          </div>
-        )}
-
         {/* Stats Row */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
           {[
-            {
-              icon: <BookOpen size={18} />,
-              value: projects.length,
-              label: "Projects",
-            },
-            {
-              icon: <FileText size={18} />,
-              value: totalWords.toLocaleString(),
-              label: "Words Written",
-            },
-            {
-              icon: <Edit3 size={18} />,
-              value: inProgress,
-              label: "In Progress",
-            },
-            {
-              icon: <Trophy size={18} />,
-              value: published,
-              label: "Published",
-            },
+            { icon: <BookOpen size={18} />, value: projects.length, label: "Projects" },
+            { icon: <FileText size={18} />, value: totalWords.toLocaleString(), label: "Words Written" },
+            { icon: <Edit3 size={18} />, value: inProgress, label: "In Progress" },
+            { icon: <Trophy size={18} />, value: published, label: "Published" },
           ].map((stat, i) => (
-            <div
-              key={i}
-              className="rounded-2xl p-5 flex items-center gap-4 transition-all hover:-translate-y-1"
-              style={{
-                background: "rgba(255,255,255,0.95)",
-                border: "1px solid rgba(148,163,184,0.35)",
-              }}
-            >
-              <div
-                className="w-10 h-10 rounded-xl flex items-center justify-center"
-                style={{ background: "rgba(155,123,201,0.12)" }}
-              >
+            <div key={i} className="rounded-2xl p-5 flex items-center gap-4 transition-all hover:-translate-y-1" style={{ background: "rgba(255,255,255,0.95)", border: "1px solid rgba(148,163,184,0.35)" }}>
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "rgba(155,123,201,0.12)" }}>
                 <span className="text-purple-700">{stat.icon}</span>
               </div>
               <div>
-                <div
-                  className="text-2xl font-semibold"
-                  style={{
-                    fontFamily: "'EB Garamond', Georgia, serif",
-                    color: "#111827",
-                  }}
-                >
-                  {stat.value}
-                </div>
-                <div className="text-xs text-gray-500 uppercase tracking-wide">
-                  {stat.label}
-                </div>
+                <div className="text-2xl font-semibold" style={{ fontFamily: "'EB Garamond', Georgia, serif", color: "#111827" }}>{stat.value}</div>
+                <div className="text-xs text-gray-500 uppercase tracking-wide">{stat.label}</div>
               </div>
             </div>
           ))}
         </div>
 
-        {/* Empty State / Grid / List */}
-        {projects.length === 0 ? (
-          <div
-            className="rounded-3xl p-16 text-center"
-            style={{
-              background: "rgba(255,255,255,0.95)",
-              backdropFilter: "blur(20px)",
-              border: "1px solid rgba(148,163,184,0.35)",
-            }}
-          >
-            <div
-              className="w-16 h-16 rounded-full flex items-center justify-center text-3xl mx-auto mb-4"
-              style={{ background: "rgba(155,123,201,0.12)" }}
-            >
-              📚
+        {/* Loading State */}
+        {isLoading ? (
+          <div className="rounded-3xl p-16 text-center" style={{ background: "rgba(255,255,255,0.95)", border: "1px solid rgba(148,163,184,0.35)" }}>
+            <Loader2 size={40} className="animate-spin text-purple-400 mx-auto mb-4" />
+            <p className="text-gray-500">Loading projects...</p>
+          </div>
+        ) : projects.length === 0 ? (
+          /* Empty State */
+          <div className="rounded-3xl p-16 text-center" style={{ background: "rgba(255,255,255,0.95)", backdropFilter: "blur(20px)", border: "1px solid rgba(148,163,184,0.35)" }}>
+            <div className="w-16 h-16 rounded-full flex items-center justify-center text-3xl mx-auto mb-4" style={{ background: "rgba(155,123,201,0.12)" }}>📚</div>
+            <h2 className="text-3xl font-semibold mb-3" style={{ fontFamily: "'EB Garamond', Georgia, serif", color: "#111827" }}>No Projects Yet</h2>
+            <p className="text-gray-500 max-w-md mx-auto mb-8 leading-relaxed">Create your first project or import an existing manuscript to get started.</p>
+            <div className="flex gap-4 justify-center">
+              <button onClick={handleImportClick} className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl text-base font-semibold transition-all hover:scale-105" style={{ background: "rgba(255,255,255,0.9)", border: "1px solid rgba(148,163,184,0.4)" }}>
+                <Upload size={18} /> Import Manuscript
+              </button>
+              <button onClick={addProject} className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl text-base font-semibold text-white transition-all hover:scale-105" style={{ background: "linear-gradient(135deg, #9b7bc9, #b897d6)", boxShadow: "0 8px 24px rgba(155,123,201,0.5)" }}>
+                <Plus size={18} /> Create New Project
+              </button>
             </div>
-            <h2
-              className="text-3xl font-semibold mb-3"
-              style={{
-                fontFamily: "'EB Garamond', Georgia, serif",
-                color: "#111827",
-              }}
-            >
-              No Projects Yet
-            </h2>
-            <p className="text-gray-500 max-w-md mx-auto mb-8 leading-relaxed">
-              Create your first project to start tracking your novels, covers,
-              word counts, and story details in one place.
-            </p>
-            <button
-              onClick={addProject}
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl text-base font-semibold text-white transition-all hover:scale-105"
-              style={{
-                background: "linear-gradient(135deg, #9b7bc9, #b897d6)",
-                boxShadow: "0 8px 24px rgba(155,123,201,0.5)",
-              }}
-            >
-              <Plus size={18} />
-              Create Your First Project
-            </button>
           </div>
         ) : viewMode === "grid" ? (
           /* Grid View */
           <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-2">
             {projects.map((project) => {
-              const legacyData = project._legacy || project;
-              const wordCount = project.wordCount || legacyData.wordCount || 0;
-              const targetWords = legacyData.targetWords || 50000;
+              const wordCount = project.wordCount || 0;
+              const targetWords = project.targetWords || 50000;
               const pct = progressPct(wordCount, targetWords);
               const readTime = getReadingTime(wordCount);
 
               return (
-                <div
-                  key={project.id}
-                  className="rounded-3xl overflow-hidden transition-all hover:-translate-y-2"
-                  style={{
-                    background: "rgba(255,255,255,0.96)",
-                    backdropFilter: "blur(20px)",
-                    border: "1px solid rgba(148,163,184,0.35)",
-                    boxShadow: "0 8px 24px rgba(15,23,42,0.06)",
-                  }}
-                >
+                <div key={project.id} className="rounded-3xl overflow-hidden transition-all hover:-translate-y-2" style={{ background: "rgba(255,255,255,0.96)", backdropFilter: "blur(20px)", border: "1px solid rgba(148,163,184,0.35)", boxShadow: "0 8px 24px rgba(15,23,42,0.06)" }}>
                   <div className="flex">
                     {/* Cover */}
-                    <div
-                      className="w-40 flex-shrink-0 relative"
-                      style={{
-                        background: "linear-gradient(135deg, #e8dff5, #f5e6ff)",
-                      }}
-                    >
+                    <div className="w-40 flex-shrink-0 relative" style={{ background: "linear-gradient(135deg, #e8dff5, #f5e6ff)" }}>
                       {coverUploadId === project.id ? (
                         <div className="w-full h-full min-h-[280px] flex flex-col items-center justify-center">
-                          <Loader2
-                            size={24}
-                            className="animate-spin text-purple-400 mb-2"
-                          />
-                          <span className="text-xs text-gray-500">
-                            Processing...
-                          </span>
+                          <Loader2 size={24} className="animate-spin text-purple-400 mb-2" />
+                          <span className="text-xs text-gray-500">Processing...</span>
                         </div>
-                      ) : legacyData.cover ? (
-                        <img
-                          src={legacyData.cover}
-                          alt={`${project.title} cover`}
-                          className="w-full h-full min-h-[280px] object-cover"
-                        />
+                      ) : project.cover ? (
+                        <img src={project.cover} alt={`${project.title} cover`} className="w-full h-full min-h-[280px] object-cover" />
                       ) : (
                         <div className="w-full h-full min-h-[280px] flex flex-col items-center justify-center p-4">
                           <ImageIcon size={40} className="text-purple-300 mb-3" />
-                          <span className="text-xs text-gray-400 text-center">
-                            Add book cover
-                          </span>
+                          <span className="text-xs text-gray-400 text-center">Add book cover</span>
                         </div>
                       )}
-
-                      <label
-                        className="absolute bottom-3 left-1/2 -translate-x-1/2 inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold cursor-pointer transition-all hover:scale-105"
-                        style={{
-                          background: "rgba(255,255,255,0.98)",
-                          backdropFilter: "blur(10px)",
-                          border: "1px solid rgba(148,163,184,0.5)",
-                        }}
-                      >
+                      <label className="absolute bottom-3 left-1/2 -translate-x-1/2 inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold cursor-pointer transition-all hover:scale-105" style={{ background: "rgba(255,255,255,0.98)", backdropFilter: "blur(10px)", border: "1px solid rgba(148,163,184,0.5)" }}>
                         <Upload size={12} />
-                        {legacyData.cover ? "Change" : "Upload"}
-                        <input
-                          type="file"
-                          accept="image/*,.heic,.heif"
-                          className="hidden"
-                          onChange={(e) => handleCoverChange(project.id, e)}
-                        />
+                        {project.cover ? "Change" : "Upload"}
+                        <input type="file" accept="image/*,.heic,.heif" className="hidden" onChange={(e) => handleCoverChange(project.id, e)} />
                       </label>
                     </div>
 
@@ -1491,103 +1044,59 @@ export default function ProjectPage() {
                       {/* Header */}
                       <div className="flex justify-between items-start mb-1">
                         <div className="flex-1 min-w-0">
-                          <input
-                            value={project.title || ""}
-                            onChange={(e) =>
-                              updateProject(project.id, {
-                                title: e.target.value,
-                              })
-                            }
-                            placeholder="Project title..."
-                            className="w-full bg-transparent text-xl font-semibold outline-none border-b-2 border-transparent hover:border-purple-200 focus:border-purple-400 transition-colors pb-1"
-                            style={{
-                              fontFamily: "'EB Garamond', Georgia, serif",
-                              color: "#111827",
-                            }}
-                          />
-                          <div className="flex items-center gap-2 mt-2 text-sm text-gray-500">
-                            <div
-                              className="w-5 h-5 rounded-full flex items-center justify-center text-xs text-white font-semibold"
-                              style={{
-                                background:
-                                  "linear-gradient(135deg, #D4AF37, #9b7bc9)",
-                              }}
-                            >
-                              {(project.author || authorName)
-                                ?.charAt(0)
-                                ?.toUpperCase() || "A"}
-                            </div>
-                            <span>by {project.author || authorName}</span>
+                          <div className="flex items-center gap-2">
+                            <h3 className="text-xl font-semibold truncate" style={{ fontFamily: "'EB Garamond', Georgia, serif", color: "#111827" }}>
+                              {project.title || "Untitled"}
+                            </h3>
+                            <button onClick={() => setEditingProject(project)} className="text-purple-400 hover:text-purple-600" title="Edit Title">
+                              <Edit3 size={14} />
+                            </button>
                           </div>
+                          <div className="flex items-center gap-2 mt-2 text-sm text-gray-500">
+                            <div className="w-5 h-5 rounded-full flex items-center justify-center text-xs text-white font-semibold" style={{ background: "linear-gradient(135deg, #D4AF37, #9b7bc9)" }}>
+                              {authorName?.charAt(0)?.toUpperCase() || "A"}
+                            </div>
+                            <span>by {authorName}</span>
+                          </div>
+                          {/* Project ID */}
+                          <button 
+                            onClick={() => copyProjectId(project.id)} 
+                            className="flex items-center gap-1 mt-1 text-[10px] text-gray-400 hover:text-gray-600 font-mono"
+                            title="Click to copy Project ID"
+                          >
+                            <Hash size={10} />
+                            {project.id.slice(-12)}
+                            <Copy size={10} />
+                          </button>
                         </div>
                         <select
-                          value={legacyData.status || "Draft"}
-                          onChange={(e) =>
-                            updateProject(project.id, {
-                              status: e.target.value,
-                            })
-                          }
+                          value={project.status || "Draft"}
+                          onChange={(e) => updateProject(project.id, { status: e.target.value })}
                           className="ml-3 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide rounded-full cursor-pointer outline-none"
-                          style={getStatusStyle(legacyData.status || "Draft")}
+                          style={getStatusStyle(project.status || "Draft")}
                         >
-                          {[
-                            "Idea",
-                            "Outline",
-                            "Draft",
-                            "Revision",
-                            "Editing",
-                            "Published",
-                          ].map((s) => (
-                            <option key={s} value={s}>
-                              {s}
-                            </option>
+                          {["Idea", "Outline", "Draft", "Revision", "Editing", "Published"].map((s) => (
+                            <option key={s} value={s}>{s}</option>
                           ))}
                         </select>
                       </div>
 
                       {/* Logline */}
                       <input
-                        value={legacyData.logline || ""}
-                        onChange={(e) =>
-                          updateProject(project.id, {
-                            logline: e.target.value,
-                            _legacy: { ...legacyData, logline: e.target.value },
-                          })
-                        }
+                        value={project.logline || ""}
+                        onChange={(e) => updateProject(project.id, { logline: e.target.value })}
                         placeholder="One-sentence logline describing your story..."
                         className="mt-3 w-full bg-transparent text-sm text-gray-600 italic outline-none"
                       />
 
                       {/* Progress */}
-                      <div
-                        className="mt-4 p-4 rounded-2xl"
-                        style={{
-                          background: "rgba(248,250,252,0.9)",
-                        }}
-                      >
+                      <div className="mt-4 p-4 rounded-2xl" style={{ background: "rgba(248,250,252,0.9)" }}>
                         <div className="flex justify-between items-center mb-2">
-                          <span className="text-xs text-gray-500 font-medium">
-                            Word Count Progress
-                          </span>
-                          <span className="text-sm font-bold text-purple-900">
-                            {wordCount.toLocaleString()} /{" "}
-                            {targetWords.toLocaleString()}
-                          </span>
+                          <span className="text-xs text-gray-500 font-medium">Word Count Progress</span>
+                          <span className="text-sm font-bold text-purple-900">{wordCount.toLocaleString()} / {targetWords.toLocaleString()}</span>
                         </div>
-                        <div
-                          className="h-2 rounded-full overflow-hidden"
-                          style={{
-                            background: "rgba(148,163,184,0.25)",
-                          }}
-                        >
-                          <div
-                            className="h-full rounded-full transition-all duration-500"
-                            style={{
-                              width: `${pct}%`,
-                              background:
-                                "linear-gradient(90deg, #9b7bc9, #D4AF37)",
-                            }}
-                          />
+                        <div className="h-2 rounded-full overflow-hidden" style={{ background: "rgba(148,163,184,0.25)" }}>
+                          <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: "linear-gradient(90deg, #9b7bc9, #D4AF37)" }} />
                         </div>
                         <div className="flex justify-between mt-2 text-xs text-gray-400">
                           <span>{Math.round(pct)}% complete</span>
@@ -1598,68 +1107,24 @@ export default function ProjectPage() {
                       {/* Mini Stats */}
                       <div className="grid grid-cols-3 gap-3 mt-4">
                         {[
-                          {
-                            icon: <FileText size={16} />,
-                            value: project.chapterCount || legacyData.chapterCount || 0,
-                            label: "Chapters",
-                          },
-                          {
-                            icon: <Users size={16} />,
-                            value: legacyData.characterCount || 0,
-                            label: "Characters",
-                          },
-                          {
-                            icon: <Calendar size={16} />,
-                            value: formatDate(project.updatedAt || legacyData.lastModified),
-                            label: "Last Edit",
-                          },
+                          { icon: <FileText size={16} />, value: project.chapterCount || 0, label: "Chapters" },
+                          { icon: <Users size={16} />, value: project.characterCount || 0, label: "Characters" },
+                          { icon: <Calendar size={16} />, value: formatDate(project.updatedAt), label: "Last Edit" },
                         ].map((stat, i) => (
-                          <div
-                            key={i}
-                            className="text-center p-3 rounded-xl"
-                            style={{
-                              background: "rgba(248,250,252,0.9)",
-                            }}
-                          >
-                            <div className="text-purple-400 flex justify-center mb-1">
-                              {stat.icon}
-                            </div>
-                            <div
-                              className="text-base font-bold text-purple-900"
-                              style={{
-                                fontFamily: "'EB Garamond', Georgia, serif",
-                              }}
-                            >
-                              {stat.value}
-                            </div>
-                            <div className="text-[10px] text-gray-400 uppercase">
-                              {stat.label}
-                            </div>
+                          <div key={i} className="text-center p-3 rounded-xl" style={{ background: "rgba(248,250,252,0.9)" }}>
+                            <div className="text-purple-400 flex justify-center mb-1">{stat.icon}</div>
+                            <div className="text-base font-bold text-purple-900" style={{ fontFamily: "'EB Garamond', Georgia, serif" }}>{stat.value}</div>
+                            <div className="text-[10px] text-gray-400 uppercase">{stat.label}</div>
                           </div>
                         ))}
                       </div>
 
                       {/* Actions */}
                       <div className="flex gap-3 mt-auto pt-4 border-t border-gray-100">
-                        <button
-                          onClick={() => openInWriter(project)}
-                          className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold text-white transition-all hover:scale-105"
-                          style={{
-                            background:
-                              "linear-gradient(135deg, #9b7bc9, #b897d6)",
-                          }}
-                        >
+                        <button onClick={() => openInWriter(project)} className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-sm font-semibold text-white transition-all hover:scale-105" style={{ background: "linear-gradient(135deg, #9b7bc9, #b897d6)" }}>
                           <Edit3 size={16} /> Write
                         </button>
-                        <button
-                          onClick={() => handleDeleteProject(project.id)}
-                          className="px-4 py-3 rounded-xl text-sm transition-all hover:scale-105"
-                          style={{
-                            background: "rgba(239,68,68,0.06)",
-                            color: "#dc2626",
-                            border: "1px solid rgba(239,68,68,0.35)",
-                          }}
-                        >
+                        <button onClick={() => handleDeleteProject(project.id)} className="px-4 py-3 rounded-xl text-sm transition-all hover:scale-105" style={{ background: "rgba(239,68,68,0.06)", color: "#dc2626", border: "1px solid rgba(239,68,68,0.35)" }}>
                           <Trash2 size={16} />
                         </button>
                       </div>
@@ -1670,170 +1135,50 @@ export default function ProjectPage() {
             })}
 
             {/* New Project Card */}
-            <div
-              onClick={addProject}
-              className="rounded-3xl p-10 text-center cursor-pointer transition-all hover:-translate-y-2 flex flex-col items-center justify-center min-h-[320px]"
-              style={{
-                background:
-                  "linear-gradient(135deg, rgba(155,123,201,0.06), rgba(212,175,55,0.04))",
-                border: "1px dashed rgba(155,123,201,0.35)",
-              }}
-            >
-              <div
-                className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl text-white mb-4"
-                style={{
-                  background: "linear-gradient(135deg, #9b7bc9, #D4AF37)",
-                }}
-              >
-                +
-              </div>
-              <div
-                className="text-xl font-semibold"
-                style={{
-                  fontFamily: "'EB Garamond', Georgia, serif",
-                  color: "#4b3b61",
-                }}
-              >
-                Create New Project
-              </div>
-              <div className="text-sm text-gray-400 mt-2">
-                Start your next story
-              </div>
+            <div onClick={addProject} className="rounded-3xl p-10 text-center cursor-pointer transition-all hover:-translate-y-2 flex flex-col items-center justify-center min-h-[320px]" style={{ background: "linear-gradient(135deg, rgba(155,123,201,0.06), rgba(212,175,55,0.04))", border: "1px dashed rgba(155,123,201,0.35)" }}>
+              <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-3xl text-white mb-4" style={{ background: "linear-gradient(135deg, #9b7bc9, #D4AF37)" }}>+</div>
+              <div className="text-xl font-semibold" style={{ fontFamily: "'EB Garamond', Georgia, serif", color: "#4b3b61" }}>Create New Project</div>
+              <div className="text-sm text-gray-400 mt-2">Start your next story</div>
             </div>
           </div>
         ) : (
           /* List View */
-          <div
-            className="rounded-3xl overflow-hidden"
-            style={{
-              background: "rgba(255,255,255,0.96)",
-              backdropFilter: "blur(20px)",
-              border: "1px solid rgba(148,163,184,0.35)",
-            }}
-          >
-            {/* List Header */}
-            <div
-              className="grid gap-4 px-6 py-4 text-xs font-semibold uppercase tracking-wide text-gray-500"
-              style={{
-                gridTemplateColumns:
-                  "60px 2fr 1fr 100px 80px 100px 120px 100px",
-                background: "rgba(148,163,184,0.12)",
-                borderBottom: "1px solid rgba(15,23,42,0.06)",
-              }}
-            >
+          <div className="rounded-3xl overflow-hidden" style={{ background: "rgba(255,255,255,0.96)", backdropFilter: "blur(20px)", border: "1px solid rgba(148,163,184,0.35)" }}>
+            <div className="grid gap-4 px-6 py-4 text-xs font-semibold uppercase tracking-wide text-gray-500" style={{ gridTemplateColumns: "60px 2fr 100px 80px 100px 100px 100px", background: "rgba(148,163,184,0.12)", borderBottom: "1px solid rgba(15,23,42,0.06)" }}>
               <span>Cover</span>
-              <span>Title / Author</span>
-              <span>Genre</span>
+              <span>Title / ID</span>
               <span>Words</span>
               <span>Chapters</span>
               <span>Last Edit</span>
-              <span>Progress</span>
+              <span>Status</span>
               <span>Actions</span>
             </div>
 
-            {/* List Rows */}
             {projects.map((project) => {
-              const legacyData = project._legacy || project;
-              const wordCount = project.wordCount || legacyData.wordCount || 0;
-              const targetWords = legacyData.targetWords || 50000;
+              const wordCount = project.wordCount || 0;
+              const targetWords = project.targetWords || 50000;
               const pct = progressPct(wordCount, targetWords);
 
               return (
-                <div
-                  key={project.id}
-                  className="grid gap-4 px-6 py-4 items-center transition-colors hover:bg-white/60"
-                  style={{
-                    gridTemplateColumns:
-                      "60px 2fr 1fr 100px 80px 100px 120px 100px",
-                    borderBottom: "1px solid rgba(15,23,42,0.04)",
-                  }}
-                >
-                  {/* Cover */}
-                  <div
-                    className="w-12 h-16 rounded-lg flex items-center justify-center text-xl overflow-hidden"
-                    style={{
-                      background: "linear-gradient(135deg, #e8dff5, #f5e6ff)",
-                    }}
-                  >
-                    {legacyData.cover ? (
-                      <img
-                        src={legacyData.cover}
-                        alt=""
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      "📕"
-                    )}
+                <div key={project.id} className="grid gap-4 px-6 py-4 items-center transition-colors hover:bg-white/60" style={{ gridTemplateColumns: "60px 2fr 100px 80px 100px 100px 100px", borderBottom: "1px solid rgba(15,23,42,0.04)" }}>
+                  <div className="w-12 h-16 rounded-lg flex items-center justify-center text-xl overflow-hidden" style={{ background: "linear-gradient(135deg, #e8dff5, #f5e6ff)" }}>
+                    {project.cover ? <img src={project.cover} alt="" className="w-full h-full object-cover" /> : "📕"}
                   </div>
-
-                  {/* Title / Author */}
                   <div>
-                    <div
-                      className="font-semibold"
-                      style={{
-                        fontFamily: "'EB Garamond', Georgia, serif",
-                        color: "#111827",
-                      }}
-                    >
-                      {project.title || "Untitled"}
+                    <div className="flex items-center gap-2">
+                      <div className="font-semibold" style={{ fontFamily: "'EB Garamond', Georgia, serif", color: "#111827" }}>{project.title || "Untitled"}</div>
+                      <button onClick={() => setEditingProject(project)} className="text-purple-400 hover:text-purple-600"><Edit3 size={12} /></button>
                     </div>
-                    <div className="text-xs text-gray-500 mt-0.5">
-                      by {project.author || authorName}
-                    </div>
+                    <div className="text-[10px] text-gray-400 font-mono mt-0.5">{project.id.slice(-12)}</div>
                   </div>
-
-                  {/* Genre */}
-                  <div className="text-sm text-gray-600">
-                    {legacyData.genre?.join(", ") || "—"}
-                  </div>
-
-                  {/* Words */}
-                  <div className="font-semibold text-purple-900">
-                    {wordCount.toLocaleString()}
-                  </div>
-
-                  {/* Chapters */}
-                  <div className="text-gray-600">
-                    {project.chapterCount || legacyData.chapterCount || 0}
-                  </div>
-
-                  {/* Last Edit */}
-                  <div className="text-sm text-gray-500">
-                    {formatDate(project.updatedAt || legacyData.lastModified)}
-                  </div>
-
-                  {/* Progress */}
+                  <div className="font-semibold text-purple-900">{wordCount.toLocaleString()}</div>
+                  <div className="text-gray-600">{project.chapterCount || 0}</div>
+                  <div className="text-sm text-gray-500">{formatDate(project.updatedAt)}</div>
                   <div>
-                    <div
-                      className="h-1.5 rounded-full overflow-hidden mb-1"
-                      style={{
-                        background: "rgba(148,163,184,0.25)",
-                      }}
-                    >
-                      <div
-                        className="h-full rounded-full"
-                        style={{
-                          width: `${pct}%`,
-                          background:
-                            "linear-gradient(90deg, #9b7bc9, #D4AF37)",
-                        }}
-                      />
-                    </div>
-                    <div className="text-[10px] text-gray-400">
-                      {Math.round(pct)}% • {legacyData.status || "Draft"}
-                    </div>
+                    <span className="px-2 py-1 text-[10px] font-semibold uppercase rounded-full" style={getStatusStyle(project.status || "Draft")}>{project.status || "Draft"}</span>
                   </div>
-
-                  {/* Actions */}
-                  <div>
-                    <button
-                      onClick={() => openInWriter(project)}
-                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold text-white transition-all hover:scale-105"
-                      style={{
-                        background:
-                          "linear-gradient(135deg, #9b7bc9, #b897d6)",
-                      }}
-                    >
+                  <div className="flex gap-2">
+                    <button onClick={() => openInWriter(project)} className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold text-white transition-all hover:scale-105" style={{ background: "linear-gradient(135deg, #9b7bc9, #b897d6)" }}>
                       <Edit3 size={12} /> Write
                     </button>
                   </div>
