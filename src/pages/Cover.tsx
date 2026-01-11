@@ -1,13 +1,13 @@
 // src/pages/Cover.jsx
-// UPDATED: Persists cover image + settings to BOTH project-scoped storage AND the Project record (IndexedDB)
-// Fixes: cover image not saving across navigation + cross-project “legacy key” bleed
+// FIXED: Added robust project ID detection that checks multiple storage locations
+// Fixes: cover image not saving because getCurrentProjectId() returns undefined
 
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import PageShell from "../components/layout/PageShell.tsx";
 import { uploadImage } from "../lib/uploads";
 import { toPng } from "html-to-image";
 import { storage } from "../lib/storage";
-import { getCurrentProjectId, loadProject, saveProject } from "../lib/projectsService";
+import { loadProject, saveProject } from "../lib/projectsService";
 
 const theme = {
   bg: "var(--brand-bg, #0f172a)",
@@ -21,6 +21,67 @@ const theme = {
   white: "var(--brand-white, #ffffff)",
   gold: "var(--brand-gold, #facc15)",
 };
+
+// ✅ FIXED: Robust project ID detection that checks multiple storage locations
+function getActiveProjectId() {
+  // Check multiple possible storage keys for project ID
+  const possibleKeys = [
+    'dahtruth-current-project-id',
+    'dahtruth_current_project_id',
+    'dahtruth-selected-project-id',
+    'currentProjectId',
+    'dt_current_project_id'
+  ];
+
+  for (const key of possibleKeys) {
+    try {
+      const id = storage.getItem(key);
+      if (id && id !== 'undefined' && id !== 'null' && id !== 'default') {
+        console.log('[Cover] Found project ID in', key, ':', id);
+        return id;
+      }
+    } catch {}
+  }
+
+  // Also check currentStory
+  try {
+    const storyRaw = storage.getItem('currentStory');
+    if (storyRaw) {
+      const story = JSON.parse(storyRaw);
+      if (story?.id && story.id !== 'default') {
+        console.log('[Cover] Found project ID in currentStory:', story.id);
+        return story.id;
+      }
+    }
+  } catch {}
+
+  // Check dahtruth-projects-list for first project
+  try {
+    const listRaw = storage.getItem('dahtruth-projects-list');
+    if (listRaw) {
+      const list = JSON.parse(listRaw);
+      if (Array.isArray(list) && list.length > 0 && list[0]?.id) {
+        console.log('[Cover] Using first project from list:', list[0].id);
+        return list[0].id;
+      }
+    }
+  } catch {}
+
+  // Check userProjects as fallback
+  try {
+    const userProjectsRaw = storage.getItem('userProjects');
+    if (userProjectsRaw) {
+      const projects = JSON.parse(userProjectsRaw);
+      if (Array.isArray(projects) && projects.length > 0 && projects[0]?.id) {
+        console.log('[Cover] Using first project from userProjects:', projects[0].id);
+        return projects[0].id;
+      }
+    }
+  } catch {}
+
+  console.log('[Cover] No project ID found, using default');
+  return 'default';
+}
 
 // Preset color swatches for quick selection
 const COLOR_SWATCHES = [
@@ -562,6 +623,11 @@ export default function Cover() {
         if (typeof settings.useCustomBg === "boolean") setUseCustomBg(settings.useCustomBg);
         if (settings.customBgColor1) setCustomBgColor1(settings.customBgColor1);
         if (settings.customBgColor2) setCustomBgColor2(settings.customBgColor2);
+        
+        // ✅ Also load backgroundImage from settings if present
+        if (settings.backgroundImage) {
+          setCoverImageUrl(settings.backgroundImage);
+        }
       } else {
         const pTitle = getProjectTitle(pid);
         if (pTitle) setTitle(pTitle);
@@ -579,14 +645,21 @@ export default function Cover() {
     }
   }, []);
 
-  // ✅ Initialize project ID and listen for changes
+  // ✅ FIXED: Initialize project ID using robust detection
   useEffect(() => {
     const initProject = () => {
       try {
-        const id = getCurrentProjectId() || "default";
+        // Use our robust project ID detection instead of getCurrentProjectId()
+        const id = getActiveProjectId();
+        console.log("[Cover] Initializing with project ID:", id);
         setProjectId(id);
         setCoverLoaded(false);
         loadCoverData(id);
+        
+        // ✅ Also ensure the project ID is saved to standard keys for consistency
+        if (id && id !== 'default') {
+          storage.setItem('dahtruth-current-project-id', id);
+        }
       } catch (e) {
         console.error("[Cover] Failed to get project ID:", e);
         setProjectId("default");
@@ -630,6 +703,7 @@ export default function Cover() {
         useCustomBg,
         customBgColor1,
         customBgColor2,
+        backgroundImage: coverImageUrl, // ✅ Also save image URL in settings
       };
 
       storage.setItem(coverSettingsKeyForProject(projectId), JSON.stringify(settings));
@@ -704,8 +778,8 @@ export default function Cover() {
     const file = input.files?.[0];
     if (!file) return;
 
-    // Snapshot projectId so we don't save to the wrong project if it changes mid-upload
-    const pid = projectId || getCurrentProjectId() || "default";
+    // ✅ Use robust project ID detection
+    const pid = projectId || getActiveProjectId();
 
     try {
       setCoverImageUploading(true);
@@ -722,6 +796,12 @@ export default function Cover() {
           coverImageMetaKeyForProject(pid),
           JSON.stringify({ fit: coverImageFit, filter: coverImageFilter })
         );
+
+        // ✅ Also save to settings so it persists
+        const settingsRaw = storage.getItem(coverSettingsKeyForProject(pid));
+        const settings = safeJsonParse(settingsRaw, {});
+        settings.backgroundImage = result.viewUrl;
+        storage.setItem(coverSettingsKeyForProject(pid), JSON.stringify(settings));
 
         // Optional legacy writes (safe but can be removed later)
         storage.setItem(COVER_IMAGE_URL_KEY, result.viewUrl);
@@ -752,7 +832,7 @@ export default function Cover() {
   };
 
   const handleClearCoverImage = async () => {
-    const pid = projectId || getCurrentProjectId() || "default";
+    const pid = projectId || getActiveProjectId();
 
     setCoverImageUrl("");
 
@@ -760,7 +840,13 @@ export default function Cover() {
       storage.removeItem(coverImageUrlKeyForProject(pid));
       storage.removeItem(coverImageMetaKeyForProject(pid));
 
-      // Clear legacy keys too so it doesn't “come back”
+      // Clear from settings too
+      const settingsRaw = storage.getItem(coverSettingsKeyForProject(pid));
+      const settings = safeJsonParse(settingsRaw, {});
+      delete settings.backgroundImage;
+      storage.setItem(coverSettingsKeyForProject(pid), JSON.stringify(settings));
+
+      // Clear legacy keys too so it doesn't "come back"
       storage.removeItem(COVER_IMAGE_URL_KEY);
       storage.removeItem(COVER_IMAGE_META_KEY);
     }
