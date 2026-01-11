@@ -273,7 +273,7 @@ function getProjectTitle(projectId) {
 
 const styles = {
   outer: {
-    maxWidth: 1300,
+    maxWidth: 1400,  // ✅ Increased for back+spine+front spread
     margin: "32px auto",
     background: "var(--brand-white, #ffffff)",
     borderRadius: 16,
@@ -463,6 +463,11 @@ async function persistCoverToProjectRecord(projectId, payload) {
     if (payload.coverImageFit !== undefined) project.cover.imageFit = payload.coverImageFit;
     if (payload.coverImageFilter !== undefined) project.cover.imageFilter = payload.coverImageFilter;
 
+    // ✅ Back cover fields
+    if (payload.backBlurb !== undefined) project.cover.backBlurb = payload.backBlurb || "";
+    if (payload.aboutAuthor !== undefined) project.cover.aboutAuthor = payload.aboutAuthor || "";
+    if (payload.spineText !== undefined) project.cover.spineText = payload.spineText || "";
+
     // Timestamp
     project.cover.updatedAt = new Date().toISOString();
 
@@ -490,6 +495,9 @@ export default function Cover() {
   
   // ✅ FIX C: Keep stable URL to prevent flicker
   const stableCoverUrlRef = useRef("");
+  
+  // ✅ FIX D: Prevent concurrent loads
+  const isLoadingRef = useRef(false);
 
   // Project ID and name
   const [projectId, setProjectId] = useState("");
@@ -533,6 +541,15 @@ export default function Cover() {
   const [aiBusy, setAiBusy] = useState(false);
   const [coverLoaded, setCoverLoaded] = useState(false);
 
+  // ✅ Back cover content
+  const [backBlurb, setBackBlurb] = useState("");
+  const [aboutAuthor, setAboutAuthor] = useState("");
+  const [showBackCover, setShowBackCover] = useState(true);
+
+  // ✅ Spine
+  const [showSpine, setShowSpine] = useState(false);
+  const [spineText, setSpineText] = useState("");
+
   // Export settings
   const [trimKey, setTrimKey] = useState("6x9");
   const [dpi, setDpi] = useState(300);
@@ -574,12 +591,20 @@ export default function Cover() {
 
   // Debounced persist into Project record
   const schedulePersistToProjectRecord = useCallback((pid, payload) => {
-    if (!pid) return;  // ✅ REMOVED "default" check
+    if (!pid) return;
+    
+    // ✅ FIX: Don't persist while loading/hydrating
+    if (isHydratingRef.current || isLoadingRef.current) {
+      console.log("[Cover] Skipping persist during hydration/loading");
+      return;
+    }
 
     if (persistTimerRef.current) clearTimeout(persistTimerRef.current);
     persistTimerRef.current = setTimeout(() => {
+      // Double-check we're not hydrating when timeout fires
+      if (isHydratingRef.current || isLoadingRef.current) return;
       void persistCoverToProjectRecord(pid, payload);
-    }, 250);
+    }, 500);  // Increased debounce to 500ms
   }, []);
 
   useEffect(() => {
@@ -589,6 +614,13 @@ export default function Cover() {
   // ✅ CHANGED: Load cover data - now fetches fresh viewUrl from saved key
   const loadCoverData = useCallback(async (pid) => {
     if (!pid) return;
+    
+    // ✅ FIX D: Prevent concurrent loads
+    if (isLoadingRef.current) {
+      console.log("[Cover] Already loading, skipping");
+      return;
+    }
+    isLoadingRef.current = true;
 
     console.log("[Cover] Loading data for project:", pid);
     
@@ -599,22 +631,19 @@ export default function Cover() {
       const pName = getProjectTitle(pid);
       setProjectName(pName || "");
 
-      // ✅ CHANGED: Load the KEY (stable), then get fresh viewUrl
+      // ✅ SIMPLIFIED: Use direct S3 URL (no async call = no re-render)
       const savedKey = storage.getItem(coverImageKeyForProject(pid));
       if (savedKey) {
         setCoverImageKey(savedKey);
         console.log("[Cover] Found saved image key:", savedKey);
-        try {
-          const freshUrl = await getViewUrl(savedKey);
-          setCoverImageUrl(freshUrl);
-          console.log("[Cover] Got fresh viewUrl for key");
-        } catch (e) {
-          console.warn("[Cover] Could not get fresh viewUrl, trying direct S3:", e);
-          // Fallback: try direct S3 URL (if bucket is public)
-          const bucket = import.meta.env.VITE_S3_BUCKET || "dahtruth-user-stories";
-          const directUrl = `https://${bucket}.s3.amazonaws.com/${savedKey}`;
-          setCoverImageUrl(directUrl);
-        }
+        
+        // Build direct S3 URL - no async call needed
+        const bucket = import.meta.env.VITE_S3_BUCKET || "dahtruth-user-stories";
+        const region = import.meta.env.VITE_S3_REGION || "us-east-1";
+        const directUrl = `https://${bucket}.s3.${region}.amazonaws.com/${savedKey}`;
+        setCoverImageUrl(directUrl);
+        stableCoverUrlRef.current = directUrl;
+        console.log("[Cover] Using direct S3 URL:", directUrl);
       } else {
         setCoverImageKey("");
         setCoverImageUrl("");
@@ -651,6 +680,15 @@ export default function Cover() {
         if (typeof settings.useCustomBg === "boolean") setUseCustomBg(settings.useCustomBg);
         if (settings.customBgColor1) setCustomBgColor1(settings.customBgColor1);
         if (settings.customBgColor2) setCustomBgColor2(settings.customBgColor2);
+
+        // ✅ Back cover settings
+        if (settings.backBlurb !== undefined) setBackBlurb(settings.backBlurb);
+        if (settings.aboutAuthor !== undefined) setAboutAuthor(settings.aboutAuthor);
+        if (typeof settings.showBackCover === "boolean") setShowBackCover(settings.showBackCover);
+
+        // ✅ Spine settings
+        if (typeof settings.showSpine === "boolean") setShowSpine(settings.showSpine);
+        if (settings.spineText !== undefined) setSpineText(settings.spineText);
       } else {
         const pTitle = getProjectTitle(pid);
         if (pTitle) setTitle(pTitle);
@@ -664,9 +702,14 @@ export default function Cover() {
     } catch (e) {
       console.error("[Cover] Failed to load cover data:", e);
     } finally {
-      // ✅ FIX B: Re-enable auto-save after hydration
-      isHydratingRef.current = false;
-      setCoverLoaded(true);
+      // ✅ FIX D: Allow future loads
+      isLoadingRef.current = false;
+      
+      // ✅ FIX: Small delay before enabling auto-save to let state settle
+      setTimeout(() => {
+        isHydratingRef.current = false;
+        setCoverLoaded(true);
+      }, 100);
     }
   }, []);
 
@@ -727,6 +770,13 @@ export default function Cover() {
         useCustomBg,
         customBgColor1,
         customBgColor2,
+        // ✅ Back cover
+        backBlurb,
+        aboutAuthor,
+        showBackCover,
+        // ✅ Spine
+        showSpine,
+        spineText,
       };
 
       storage.setItem(coverSettingsKeyForProject(projectId), JSON.stringify(settings));
@@ -757,9 +807,13 @@ export default function Cover() {
           subtitle,
           author,
           tagline,
-          coverImageKey,  // ✅ CHANGED: Save key not URL
+          coverImageKey,
           coverImageFit,
           coverImageFilter,
+          // ✅ Back cover
+          backBlurb,
+          aboutAuthor,
+          spineText,
         });
       }
     } catch (e) {
@@ -784,9 +838,15 @@ export default function Cover() {
     useCustomBg,
     customBgColor1,
     customBgColor2,
-    coverImageKey,  // ✅ CHANGED: Watch key not URL
+    coverImageKey,
     coverImageFit,
     coverImageFilter,
+    // ✅ Back cover dependencies
+    backBlurb,
+    aboutAuthor,
+    showBackCover,
+    showSpine,
+    spineText,
   ]);
 
   // ✅ CHANGED: Save KEY not URL on upload
@@ -887,7 +947,7 @@ export default function Cover() {
       tagline,
       genrePresetKey,
       layoutKey,
-      coverImageKey,  // ✅ CHANGED: Save key not URL
+      coverImageKey,
       coverImageFit,
       coverImageFilter,
       useCustomColors,
@@ -900,6 +960,12 @@ export default function Cover() {
       customBgColor1,
       customBgColor2,
       trimKey,
+      // ✅ Back cover
+      backBlurb,
+      aboutAuthor,
+      showBackCover,
+      showSpine,
+      spineText,
     };
   };
 
@@ -940,6 +1006,13 @@ export default function Cover() {
     setCustomBgColor1(d.customBgColor1 ?? "#111827");
     setCustomBgColor2(d.customBgColor2 ?? "#1e293b");
     if (d.trimKey) setTrimKey(d.trimKey);
+    
+    // ✅ Back cover
+    setBackBlurb(d.backBlurb ?? "");
+    setAboutAuthor(d.aboutAuthor ?? "");
+    setShowBackCover(d.showBackCover ?? true);
+    setShowSpine(d.showSpine ?? false);
+    setSpineText(d.spineText ?? "");
   };
 
   const handleSaveDesign = () => {
@@ -1354,6 +1427,67 @@ Story description: ${aiPrompt}`,
               </div>
             </div>
 
+            {/* 📘 Back Cover */}
+            <div style={styles.glassCard}>
+              <h3 style={{ margin: "0 0 10px", fontSize: 15, fontWeight: 600, color: theme.text }}>
+                📘 Back Cover
+              </h3>
+
+              <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", marginBottom: 10 }}>
+                <input
+                  type="checkbox"
+                  checked={showBackCover}
+                  onChange={(e) => setShowBackCover(e.target.checked)}
+                />
+                <span style={{ fontSize: 12, color: theme.text }}>Show back cover in preview</span>
+              </label>
+
+              <div style={{ display: "grid", gap: 10 }}>
+                <div>
+                  <div style={styles.label}>Back Blurb</div>
+                  <textarea
+                    rows={6}
+                    value={backBlurb}
+                    onChange={(e) => setBackBlurb(e.target.value)}
+                    placeholder="Paste your back-cover description here..."
+                    style={{ ...styles.input, minHeight: 120, resize: "vertical" }}
+                  />
+                </div>
+
+                <div>
+                  <div style={styles.label}>About the Author</div>
+                  <textarea
+                    rows={3}
+                    value={aboutAuthor}
+                    onChange={(e) => setAboutAuthor(e.target.value)}
+                    placeholder="Short bio..."
+                    style={{ ...styles.input, minHeight: 80, resize: "vertical" }}
+                  />
+                </div>
+
+                <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+                  <input
+                    type="checkbox"
+                    checked={showSpine}
+                    onChange={(e) => setShowSpine(e.target.checked)}
+                  />
+                  <span style={{ fontSize: 12, color: theme.text }}>Show spine (optional)</span>
+                </label>
+
+                {showSpine && (
+                  <div>
+                    <div style={styles.label}>Spine Text</div>
+                    <input
+                      style={styles.input}
+                      value={spineText}
+                      onChange={(e) => setSpineText(e.target.value)}
+                      placeholder="TITLE • AUTHOR"
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+
             {/* Colors & Fonts */}
             <div style={styles.glassCard}>
               <h3 style={{ margin: "0 0 10px", fontSize: 15, fontWeight: 600, color: theme.text }}>
@@ -1658,128 +1792,233 @@ Story description: ${aiPrompt}`,
                 <div style={{ fontSize: 11, color: theme.subtext }}>Auto-saves as you edit</div>
               </div>
 
-              <div style={{ display: "flex", justifyContent: "center", alignItems: "center", flex: 1, padding: "20px 0" }}>
+              <div style={{ display: "flex", justifyContent: "center", alignItems: "center", flex: 1, padding: "20px 0", overflowX: "auto" }}>
+                {/* ✅ Full spread container: Back | Spine | Front */}
                 <div
                   ref={coverRef}
                   style={{
-                    width: 420,
-                    height: coverPreviewHeight,
+                    display: "flex",
+                    gap: 0,
                     borderRadius: 12,
-                    position: "relative",
                     overflow: "hidden",
                     border: "1px solid rgba(15,23,42,0.6)",
-                    // ✅ FIX C: Use effectiveCoverUrl to prevent flicker
-                    backgroundImage: effectiveCoverUrl ? `url(${effectiveCoverUrl})` : undefined,
-                    background: effectiveCoverUrl ? undefined : activeBackground,
-                    backgroundSize: effectiveCoverUrl
-                      ? coverImageFit === "cover"
-                        ? "cover"
-                        : "contain"
-                      : "cover",
-                    backgroundPosition: "center",
-                    backgroundRepeat: "no-repeat",
                     boxShadow: "0 30px 80px rgba(15, 23, 42, 0.5)",
-                    display: "flex",
-                    flexDirection: "column",
-                    justifyContent,
-                    padding: "40px 32px",
                   }}
                 >
-                  <div
-                    style={{
-                      position: "absolute",
-                      inset: 0,
-                      background: overlayBackground,
-                    }}
-                  />
+                  {/* BACK COVER */}
+                  {showBackCover && (
+                    <div
+                      style={{
+                        width: 420,
+                        height: coverPreviewHeight,
+                        position: "relative",
+                        padding: "32px 28px",
+                        backgroundImage: effectiveCoverUrl ? `url(${effectiveCoverUrl})` : undefined,
+                        background: effectiveCoverUrl ? undefined : activeBackground,
+                        backgroundSize: effectiveCoverUrl
+                          ? coverImageFit === "cover" ? "cover" : "contain"
+                          : "cover",
+                        backgroundPosition: "center",
+                        backgroundRepeat: "no-repeat",
+                        display: "flex",
+                        flexDirection: "column",
+                        justifyContent: "space-between",
+                      }}
+                    >
+                      <div style={{ position: "absolute", inset: 0, background: overlayBackground }} />
 
-                  <div
-                    style={{
-                      position: "relative",
-                      zIndex: 1,
-                      textAlign: "center",
-                      fontFamily: activeFontFamily,
-                      display: "flex",
-                      flexDirection: "column",
-                      gap: 10,
-                    }}
-                  >
-                    {tagline && (
+                      <div style={{ position: "relative", zIndex: 1, fontFamily: activeFontFamily, color: "#fff" }}>
+                        <div style={{ fontSize: 11, letterSpacing: 2, textTransform: "uppercase", opacity: 0.7, marginBottom: 8 }}>
+                          Back Cover
+                        </div>
+
+                        {backBlurb?.trim() ? (
+                          <div style={{ fontSize: 13, lineHeight: 1.6, color: activeSubtitleColor, whiteSpace: "pre-wrap" }}>
+                            {backBlurb}
+                          </div>
+                        ) : (
+                          <div style={{ fontSize: 12, opacity: 0.6, fontStyle: "italic" }}>
+                            Add your back-cover blurb in the left panel...
+                          </div>
+                        )}
+
+                        {aboutAuthor?.trim() && (
+                          <div style={{ marginTop: 24 }}>
+                            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", color: activeTitleColor, marginBottom: 8 }}>
+                              About the Author
+                            </div>
+                            <div style={{ fontSize: 12, lineHeight: 1.5, color: activeSubtitleColor, whiteSpace: "pre-wrap" }}>
+                              {aboutAuthor}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Barcode placeholder */}
                       <div
                         style={{
-                          fontSize: 20,
-                          letterSpacing: 4,
-                          textTransform: "uppercase",
-                          color: activeTaglineColor,
+                          position: "relative",
+                          zIndex: 1,
+                          alignSelf: "flex-end",
+                          width: 120,
+                          height: 60,
+                          background: "rgba(255,255,255,0.9)",
+                          borderRadius: 6,
+                          border: "1px solid rgba(0,0,0,0.15)",
+                          display: "grid",
+                          placeItems: "center",
+                          color: "#374151",
+                          fontSize: 10,
+                          fontWeight: 500,
                         }}
+                        title="Barcode placeholder"
                       >
-                        {tagline}
+                        ISBN BARCODE
                       </div>
-                    )}
+                    </div>
+                  )}
+
+                  {/* SPINE */}
+                  {showSpine && (
+                    <div
+                      style={{
+                        width: 40,
+                        height: coverPreviewHeight,
+                        background: "rgba(15,23,42,0.95)",
+                        color: activeTitleColor,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        writingMode: "vertical-rl",
+                        transform: "rotate(180deg)",
+                        fontFamily: activeFontFamily,
+                        letterSpacing: 2,
+                        fontSize: 11,
+                        fontWeight: 600,
+                        padding: 6,
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      {spineText || `${title || "TITLE"} • ${author || "AUTHOR"}`}
+                    </div>
+                  )}
+
+                  {/* FRONT COVER */}
+                  <div
+                    style={{
+                      width: 420,
+                      height: coverPreviewHeight,
+                      position: "relative",
+                      overflow: "hidden",
+                      backgroundImage: effectiveCoverUrl ? `url(${effectiveCoverUrl})` : undefined,
+                      background: effectiveCoverUrl ? undefined : activeBackground,
+                      backgroundSize: effectiveCoverUrl
+                        ? coverImageFit === "cover" ? "cover" : "contain"
+                        : "cover",
+                      backgroundPosition: "center",
+                      backgroundRepeat: "no-repeat",
+                      display: "flex",
+                      flexDirection: "column",
+                      justifyContent,
+                      padding: "40px 32px",
+                    }}
+                  >
+                    <div
+                      style={{
+                        position: "absolute",
+                        inset: 0,
+                        background: overlayBackground,
+                      }}
+                    />
 
                     <div
                       style={{
-                        fontSize: 38,
-                        lineHeight: 1.1,
-                        fontWeight: 700,
-                        textTransform: "uppercase",
-                        color: activeTitleColor,
+                        position: "relative",
+                        zIndex: 1,
+                        textAlign: "center",
+                        fontFamily: activeFontFamily,
+                        display: "flex",
+                        flexDirection: "column",
+                        gap: 10,
                       }}
                     >
-                      {title || "YOUR TITLE HERE"}
-                    </div>
+                      {tagline && (
+                        <div
+                          style={{
+                            fontSize: 20,
+                            letterSpacing: 4,
+                            textTransform: "uppercase",
+                            color: activeTaglineColor,
+                          }}
+                        >
+                          {tagline}
+                        </div>
+                      )}
 
-                    {subtitle && (
+                      <div
+                        style={{
+                          fontSize: 38,
+                          lineHeight: 1.1,
+                          fontWeight: 700,
+                          textTransform: "uppercase",
+                          color: activeTitleColor,
+                        }}
+                      >
+                        {title || "YOUR TITLE HERE"}
+                      </div>
+
+                      {subtitle && (
+                        <div
+                          style={{
+                            fontSize: 16,
+                            marginTop: 8,
+                            color: activeSubtitleColor,
+                            maxWidth: 320,
+                            marginInline: "auto",
+                          }}
+                        >
+                          {subtitle}
+                        </div>
+                      )}
+
                       <div
                         style={{
                           fontSize: 16,
-                          marginTop: 8,
-                          color: activeSubtitleColor,
-                          maxWidth: 320,
-                          marginInline: "auto",
+                          marginTop: 32,
+                          letterSpacing: 4,
+                          textTransform: "uppercase",
+                          color: activeAuthorColor,
                         }}
                       >
-                        {subtitle}
+                        {author || "AUTHOR NAME"}
                       </div>
-                    )}
+                    </div>
 
                     <div
                       style={{
-                        fontSize: 16,
-                        marginTop: 32,
-                        letterSpacing: 4,
+                        position: "absolute",
+                        bottom: 14,
+                        right: 16,
+                        zIndex: 1,
+                        fontSize: 10,
+                        letterSpacing: 1.5,
                         textTransform: "uppercase",
-                        color: activeAuthorColor,
+                        color: "#e5e7eb",
+                        background: "rgba(15,23,42,0.7)",
+                        padding: "5px 10px",
+                        borderRadius: 999,
+                        border: "1px solid rgba(249,250,251,0.2)",
                       }}
                     >
-                      {author || "AUTHOR NAME"}
+                      DahTruth StoryLab
                     </div>
-                  </div>
-
-                  <div
-                    style={{
-                      position: "absolute",
-                      bottom: 14,
-                      right: 16,
-                      zIndex: 1,
-                      fontSize: 10,
-                      letterSpacing: 1.5,
-                      textTransform: "uppercase",
-                      color: "#e5e7eb",
-                      background: "rgba(15,23,42,0.7)",
-                      padding: "5px 10px",
-                      borderRadius: 999,
-                      border: "1px solid rgba(249,250,251,0.2)",
-                    }}
-                  >
-                    DahTruth StoryLab
                   </div>
                 </div>
               </div>
             </div>
 
             <div style={{ fontSize: 11, color: theme.subtext, textAlign: "right" }}>
-              Coming soon: spine/back design and full AI cover generation.
+              Full wrap export coming soon. Spine width varies by page count.
             </div>
           </section>
         </div>
