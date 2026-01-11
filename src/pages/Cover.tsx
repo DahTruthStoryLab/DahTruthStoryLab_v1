@@ -484,6 +484,12 @@ export default function Cover() {
   // Debounce project-record writes
   const persistTimerRef = useRef(null);
   const schedulePersistRef = useRef(null);
+  
+  // ✅ FIX B: Prevent auto-save during hydration
+  const isHydratingRef = useRef(false);
+  
+  // ✅ FIX C: Keep stable URL to prevent flicker
+  const stableCoverUrlRef = useRef("");
 
   // Project ID and name
   const [projectId, setProjectId] = useState("");
@@ -555,6 +561,13 @@ export default function Cover() {
     ? `linear-gradient(145deg, ${customBgColor1}, ${customBgColor2})`
     : selectedPreset.bg;
 
+  // ✅ FIX C: Keep stable URL to prevent flicker during transient state updates
+  useEffect(() => {
+    if (coverImageUrl) stableCoverUrlRef.current = coverImageUrl;
+  }, [coverImageUrl]);
+
+  const effectiveCoverUrl = coverImageUrl || stableCoverUrlRef.current;
+
   let justifyContent = "center";
   if (layoutKey === "top") justifyContent = "flex-start";
   if (layoutKey === "bottom") justifyContent = "flex-end";
@@ -578,6 +591,9 @@ export default function Cover() {
     if (!pid) return;
 
     console.log("[Cover] Loading data for project:", pid);
+    
+    // ✅ FIX B: Block auto-save during hydration
+    isHydratingRef.current = true;
 
     try {
       const pName = getProjectTitle(pid);
@@ -648,6 +664,8 @@ export default function Cover() {
     } catch (e) {
       console.error("[Cover] Failed to load cover data:", e);
     } finally {
+      // ✅ FIX B: Re-enable auto-save after hydration
+      isHydratingRef.current = false;
       setCoverLoaded(true);
     }
   }, []);
@@ -678,18 +696,18 @@ export default function Cover() {
     const handleProjectChange = () => initProject();
 
     window.addEventListener("project:change", handleProjectChange);
-    window.addEventListener("storage", handleProjectChange);
+    // ✅ REMOVED storage listener - was causing infinite re-render loop
 
     return () => {
       window.removeEventListener("project:change", handleProjectChange);
-      window.removeEventListener("storage", handleProjectChange);
       if (persistTimerRef.current) clearTimeout(persistTimerRef.current);
     };
   }, [loadCoverData]);
 
   // ✅ CHANGED: Auto-save - removed "default" guard, saves KEY not URL
   useEffect(() => {
-    if (!coverLoaded || !projectId) return;  // ✅ REMOVED "default" check
+    // ✅ FIX B: Don't save while hydrating
+    if (!coverLoaded || isHydratingRef.current || !projectId) return;
 
     try {
       const settings = {
@@ -1063,7 +1081,8 @@ Story description: ${aiPrompt}`,
     }
   };
 
-  const overlayBackground = coverImageUrl
+  // ✅ FIX C: Use effectiveCoverUrl for overlay too
+  const overlayBackground = effectiveCoverUrl
     ? coverImageFilter === "soft-dark"
       ? "linear-gradient(180deg, rgba(15,23,42,0.55), rgba(15,23,42,0.8))"
       : coverImageFilter === "soft-blur"
@@ -1649,9 +1668,10 @@ Story description: ${aiPrompt}`,
                     position: "relative",
                     overflow: "hidden",
                     border: "1px solid rgba(15,23,42,0.6)",
-                    backgroundImage: coverImageUrl ? `url(${coverImageUrl})` : undefined,
-                    background: coverImageUrl ? undefined : activeBackground,
-                    backgroundSize: coverImageUrl
+                    // ✅ FIX C: Use effectiveCoverUrl to prevent flicker
+                    backgroundImage: effectiveCoverUrl ? `url(${effectiveCoverUrl})` : undefined,
+                    background: effectiveCoverUrl ? undefined : activeBackground,
+                    backgroundSize: effectiveCoverUrl
                       ? coverImageFit === "cover"
                         ? "cover"
                         : "contain"
@@ -1767,3 +1787,4 @@ Story description: ${aiPrompt}`,
     </PageShell>
   );
 }
+
