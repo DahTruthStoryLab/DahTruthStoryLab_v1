@@ -1163,14 +1163,7 @@ Story description: ${aiPrompt}`,
       : "transparent"
     : selectedPreset.overlay;
 
-  // Preview size - adjusted for stacked layout
-  const COVER_PREVIEW_WIDTH = 340;
-  const coverPreviewHeight = Math.round(
-    COVER_PREVIEW_WIDTH * (selectedTrim.hIn / selectedTrim.wIn)
-  );
-
-
-  // Preview dimensions
+  // Preview dimensions for sidebar layout
   const COVER_PREVIEW_WIDTH = 360;
   const coverPreviewHeight = Math.round(
     COVER_PREVIEW_WIDTH * (selectedTrim.hIn / selectedTrim.wIn)
