@@ -1,10 +1,13 @@
 // src/pages/Cover.jsx
-// FIXED: Added robust project ID detection that checks multiple storage locations
-// Fixes: cover image not saving because getCurrentProjectId() returns undefined
+// FIXED VERSION:
+// 1. Saves S3 KEY (stable) instead of viewUrl (expires)
+// 2. Calls getViewUrl(key) on load to get fresh signed URL
+// 3. Removed "default" guard so it always saves
+// 4. Robust project ID detection
 
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import PageShell from "../components/layout/PageShell.tsx";
-import { uploadImage } from "../lib/uploads";
+import { uploadImage, getViewUrl } from "../lib/uploads";  // ✅ ADDED getViewUrl
 import { toPng } from "html-to-image";
 import { storage } from "../lib/storage";
 import { loadProject, saveProject } from "../lib/projectsService";
@@ -22,9 +25,8 @@ const theme = {
   gold: "var(--brand-gold, #facc15)",
 };
 
-// ✅ FIXED: Robust project ID detection that checks multiple storage locations
+// ✅ ADDED: Robust project ID detection that checks multiple storage locations
 function getActiveProjectId() {
-  // Check multiple possible storage keys for project ID
   const possibleKeys = [
     'dahtruth-current-project-id',
     'dahtruth_current_project_id',
@@ -43,7 +45,6 @@ function getActiveProjectId() {
     } catch {}
   }
 
-  // Also check currentStory
   try {
     const storyRaw = storage.getItem('currentStory');
     if (storyRaw) {
@@ -55,7 +56,6 @@ function getActiveProjectId() {
     }
   } catch {}
 
-  // Check dahtruth-projects-list for first project
   try {
     const listRaw = storage.getItem('dahtruth-projects-list');
     if (listRaw) {
@@ -67,7 +67,6 @@ function getActiveProjectId() {
     }
   } catch {}
 
-  // Check userProjects as fallback
   try {
     const userProjectsRaw = storage.getItem('userProjects');
     if (userProjectsRaw) {
@@ -220,19 +219,18 @@ const TRIM_PRESETS = [
   { key: "8.5x11", label: '8.5" × 11"', wIn: 8.5, hIn: 11 },
 ];
 
-// Project-scoped storage keys
+// ✅ CHANGED: Storage keys now store KEY not URL
 const coverDesignsKeyForProject = (projectId) => `dahtruth_cover_designs_${projectId}`;
-const coverImageUrlKeyForProject = (projectId) => `dahtruth_cover_image_url_${projectId}`;
+const coverImageKeyForProject = (projectId) => `dahtruth_cover_image_key_${projectId}`;  // ✅ Changed from _url to _key
 const coverImageMetaKeyForProject = (projectId) => `dahtruth_cover_image_meta_${projectId}`;
 const coverSettingsKeyForProject = (projectId) => `dahtruth_cover_settings_${projectId}`;
 
 // Project data key (to get project title)
 const projectDataKeyForProject = (projectId) => `dahtruth-project-${projectId}`;
 
-// Legacy keys (kept ONLY for backwards compat writing; we do NOT read from them anymore)
+// Legacy keys (kept ONLY for backwards compat writing)
 const COVER_DESIGNS_KEY = "dahtruth_cover_designs_v1";
-const COVER_IMAGE_URL_KEY = "dahtruth_cover_image_url";
-const COVER_IMAGE_META_KEY = "dahtruth_cover_image_meta";
+const COVER_IMAGE_KEY_LEGACY = "dahtruth_cover_image_key";
 
 function safeJsonParse(value, fallback) {
   try {
@@ -421,10 +419,10 @@ function ColorPickerField({ label, value, onChange }) {
 
 /**
  * Persist cover fields into the *actual* Project record (IndexedDB).
- * This is what makes Publishing/Writing reliably see the cover.
+ * ✅ CHANGED: Now saves coverImageKey instead of coverImageUrl
  */
 async function persistCoverToProjectRecord(projectId, payload) {
-  if (!projectId || projectId === "default") return;
+  if (!projectId) return;  // ✅ REMOVED "default" check
 
   try {
     const project = await loadProject(projectId, { preferCloud: false });
@@ -439,7 +437,7 @@ async function persistCoverToProjectRecord(projectId, payload) {
     project.publishing = project.publishing || {};
     project.publishing.meta = project.publishing.meta || {};
 
-    // Keep titles in sync (project.title, publishing.meta.title, cover.title)
+    // Keep titles in sync
     if (payload.title !== undefined) {
       const nextTitle = payload.title || "";
       project.title = nextTitle;
@@ -456,11 +454,10 @@ async function persistCoverToProjectRecord(projectId, payload) {
     }
     if (payload.tagline !== undefined) project.cover.tagline = payload.tagline || "";
 
-    // Cover image fields
-    if (payload.coverImageUrl !== undefined) {
-      const url = payload.coverImageUrl || "";
-      project.cover.imageUrl = url;
-      project.publishing.coverImageUrl = url; // in case other pages read from publishing
+    // ✅ CHANGED: Save imageKey (stable) instead of imageUrl (expires)
+    if (payload.coverImageKey !== undefined) {
+      project.cover.imageKey = payload.coverImageKey || "";
+      project.publishing.coverImageKey = payload.coverImageKey || "";
     }
 
     if (payload.coverImageFit !== undefined) project.cover.imageFit = payload.coverImageFit;
@@ -469,7 +466,6 @@ async function persistCoverToProjectRecord(projectId, payload) {
     // Timestamp
     project.cover.updatedAt = new Date().toISOString();
 
-    // ✅ IMPORTANT: Don't cloud-sync on every keystroke.
     await saveProject(project, { updateIndex: true, cloudSync: false });
 
     window.dispatchEvent(
@@ -485,7 +481,7 @@ async function persistCoverToProjectRecord(projectId, payload) {
 export default function Cover() {
   const coverRef = useRef(null);
 
-  // Debounce project-record writes so we don't spam IndexedDB on every keystroke
+  // Debounce project-record writes
   const persistTimerRef = useRef(null);
   const schedulePersistRef = useRef(null);
 
@@ -518,7 +514,8 @@ export default function Cover() {
   const [customBgColor2, setCustomBgColor2] = useState("#1e293b");
   const [useCustomBg, setUseCustomBg] = useState(false);
 
-  // Cover image
+  // ✅ CHANGED: Store both KEY (stable, persisted) and URL (temporary, for display)
+  const [coverImageKey, setCoverImageKey] = useState("");
   const [coverImageUrl, setCoverImageUrl] = useState("");
   const [coverImageUploading, setCoverImageUploading] = useState(false);
   const [coverImageFit, setCoverImageFit] = useState("cover");
@@ -562,9 +559,9 @@ export default function Cover() {
   if (layoutKey === "top") justifyContent = "flex-start";
   if (layoutKey === "bottom") justifyContent = "flex-end";
 
-  // Debounced persist into Project record (IndexedDB)
+  // Debounced persist into Project record
   const schedulePersistToProjectRecord = useCallback((pid, payload) => {
-    if (!pid || pid === "default") return;
+    if (!pid) return;  // ✅ REMOVED "default" check
 
     if (persistTimerRef.current) clearTimeout(persistTimerRef.current);
     persistTimerRef.current = setTimeout(() => {
@@ -572,13 +569,12 @@ export default function Cover() {
     }, 250);
   }, []);
 
-  // keep a ref so effects can call without extra deps churn
   useEffect(() => {
     schedulePersistRef.current = schedulePersistToProjectRecord;
   }, [schedulePersistToProjectRecord]);
 
-  // ✅ Load cover data for a project
-  const loadCoverData = useCallback((pid) => {
+  // ✅ CHANGED: Load cover data - now fetches fresh viewUrl from saved key
+  const loadCoverData = useCallback(async (pid) => {
     if (!pid) return;
 
     console.log("[Cover] Loading data for project:", pid);
@@ -587,12 +583,28 @@ export default function Cover() {
       const pName = getProjectTitle(pid);
       setProjectName(pName || "");
 
-      // Load cover image URL (project-scoped only — NO legacy fallback to avoid cross-project bleed)
-      const savedUrl = storage.getItem(coverImageUrlKeyForProject(pid));
-      if (savedUrl) setCoverImageUrl(savedUrl);
-      else setCoverImageUrl("");
+      // ✅ CHANGED: Load the KEY (stable), then get fresh viewUrl
+      const savedKey = storage.getItem(coverImageKeyForProject(pid));
+      if (savedKey) {
+        setCoverImageKey(savedKey);
+        console.log("[Cover] Found saved image key:", savedKey);
+        try {
+          const freshUrl = await getViewUrl(savedKey);
+          setCoverImageUrl(freshUrl);
+          console.log("[Cover] Got fresh viewUrl for key");
+        } catch (e) {
+          console.warn("[Cover] Could not get fresh viewUrl, trying direct S3:", e);
+          // Fallback: try direct S3 URL (if bucket is public)
+          const bucket = import.meta.env.VITE_S3_BUCKET || "dahtruth-user-stories";
+          const directUrl = `https://${bucket}.s3.amazonaws.com/${savedKey}`;
+          setCoverImageUrl(directUrl);
+        }
+      } else {
+        setCoverImageKey("");
+        setCoverImageUrl("");
+      }
 
-      // Load cover image meta (project-scoped; legacy read intentionally avoided)
+      // Load cover image meta
       const savedMeta = storage.getItem(coverImageMetaKeyForProject(pid));
       if (savedMeta) {
         const meta = safeJsonParse(savedMeta, {});
@@ -623,17 +635,12 @@ export default function Cover() {
         if (typeof settings.useCustomBg === "boolean") setUseCustomBg(settings.useCustomBg);
         if (settings.customBgColor1) setCustomBgColor1(settings.customBgColor1);
         if (settings.customBgColor2) setCustomBgColor2(settings.customBgColor2);
-        
-        // ✅ Also load backgroundImage from settings if present
-        if (settings.backgroundImage) {
-          setCoverImageUrl(settings.backgroundImage);
-        }
       } else {
         const pTitle = getProjectTitle(pid);
         if (pTitle) setTitle(pTitle);
       }
 
-      // Load saved designs (project-scoped first; legacy fallback ONLY for reading designs)
+      // Load saved designs
       let savedDesigns = storage.getItem(coverDesignsKeyForProject(pid));
       if (!savedDesigns) savedDesigns = storage.getItem(COVER_DESIGNS_KEY);
       const designsArray = safeJsonParse(savedDesigns, []);
@@ -645,18 +652,17 @@ export default function Cover() {
     }
   }, []);
 
-  // ✅ FIXED: Initialize project ID using robust detection
+  // ✅ CHANGED: Initialize with robust project ID detection
   useEffect(() => {
     const initProject = () => {
       try {
-        // Use our robust project ID detection instead of getCurrentProjectId()
         const id = getActiveProjectId();
         console.log("[Cover] Initializing with project ID:", id);
         setProjectId(id);
         setCoverLoaded(false);
         loadCoverData(id);
         
-        // ✅ Also ensure the project ID is saved to standard keys for consistency
+        // Ensure project ID is saved consistently
         if (id && id !== 'default') {
           storage.setItem('dahtruth-current-project-id', id);
         }
@@ -681,9 +687,9 @@ export default function Cover() {
     };
   }, [loadCoverData]);
 
-  // Auto-save cover settings when they change (project-scoped storage + debounced project-record persist)
+  // ✅ CHANGED: Auto-save - removed "default" guard, saves KEY not URL
   useEffect(() => {
-    if (!coverLoaded || !projectId || projectId === "default") return;
+    if (!coverLoaded || !projectId) return;  // ✅ REMOVED "default" check
 
     try {
       const settings = {
@@ -703,45 +709,37 @@ export default function Cover() {
         useCustomBg,
         customBgColor1,
         customBgColor2,
-        backgroundImage: coverImageUrl, // ✅ Also save image URL in settings
       };
 
       storage.setItem(coverSettingsKeyForProject(projectId), JSON.stringify(settings));
 
-      // Save image URL (project-scoped only)
-      if (coverImageUrl) {
-        storage.setItem(coverImageUrlKeyForProject(projectId), coverImageUrl);
-        // Legacy write kept ONLY for backward compatibility with older builds (optional)
-        storage.setItem(COVER_IMAGE_URL_KEY, coverImageUrl);
+      // ✅ CHANGED: Save KEY (stable) not URL (expires)
+      if (coverImageKey) {
+        storage.setItem(coverImageKeyForProject(projectId), coverImageKey);
+        storage.setItem(COVER_IMAGE_KEY_LEGACY, coverImageKey);
       } else {
-        storage.removeItem(coverImageUrlKeyForProject(projectId));
-        storage.removeItem(COVER_IMAGE_URL_KEY);
+        storage.removeItem(coverImageKeyForProject(projectId));
+        storage.removeItem(COVER_IMAGE_KEY_LEGACY);
       }
 
       // Save image meta
-      if (coverImageUrl) {
+      if (coverImageKey) {
         storage.setItem(
           coverImageMetaKeyForProject(projectId),
           JSON.stringify({ fit: coverImageFit, filter: coverImageFilter })
         );
-        // Legacy write kept ONLY for backward compatibility (optional)
-        storage.setItem(
-          COVER_IMAGE_META_KEY,
-          JSON.stringify({ fit: coverImageFit, filter: coverImageFilter })
-        );
       } else {
         storage.removeItem(coverImageMetaKeyForProject(projectId));
-        storage.removeItem(COVER_IMAGE_META_KEY);
       }
 
-      // ✅ Persist into Project record (IndexedDB) so Publishing/Writing can read it
+      // Persist into Project record (IndexedDB)
       if (schedulePersistRef.current) {
         schedulePersistRef.current(projectId, {
           title,
           subtitle,
           author,
           tagline,
-          coverImageUrl,
+          coverImageKey,  // ✅ CHANGED: Save key not URL
           coverImageFit,
           coverImageFilter,
         });
@@ -768,56 +766,48 @@ export default function Cover() {
     useCustomBg,
     customBgColor1,
     customBgColor2,
-    coverImageUrl,
+    coverImageKey,  // ✅ CHANGED: Watch key not URL
     coverImageFit,
     coverImageFilter,
   ]);
 
+  // ✅ CHANGED: Save KEY not URL on upload
   const handleCoverFileChange = async (event) => {
     const input = event.target;
     const file = input.files?.[0];
     if (!file) return;
 
-    // ✅ Use robust project ID detection
     const pid = projectId || getActiveProjectId();
 
     try {
       setCoverImageUploading(true);
 
       const result = await uploadImage(file);
-      if (!result?.viewUrl) throw new Error("No viewUrl in upload response");
+      if (!result?.key) throw new Error("No key in upload response");
 
+      // ✅ CHANGED: Save the KEY (stable), use viewUrl for immediate display
+      setCoverImageKey(result.key);
       setCoverImageUrl(result.viewUrl);
 
-      // Save immediately to project-scoped storage
-      if (pid && pid !== "default") {
-        storage.setItem(coverImageUrlKeyForProject(pid), result.viewUrl);
+      console.log("[Cover] Image uploaded, key:", result.key);
+
+      // ✅ CHANGED: Always save, removed "default" check
+      if (pid) {
+        storage.setItem(coverImageKeyForProject(pid), result.key);
         storage.setItem(
           coverImageMetaKeyForProject(pid),
           JSON.stringify({ fit: coverImageFit, filter: coverImageFilter })
         );
-
-        // ✅ Also save to settings so it persists
-        const settingsRaw = storage.getItem(coverSettingsKeyForProject(pid));
-        const settings = safeJsonParse(settingsRaw, {});
-        settings.backgroundImage = result.viewUrl;
-        storage.setItem(coverSettingsKeyForProject(pid), JSON.stringify(settings));
-
-        // Optional legacy writes (safe but can be removed later)
-        storage.setItem(COVER_IMAGE_URL_KEY, result.viewUrl);
-        storage.setItem(
-          COVER_IMAGE_META_KEY,
-          JSON.stringify({ fit: coverImageFit, filter: coverImageFilter })
-        );
+        storage.setItem(COVER_IMAGE_KEY_LEGACY, result.key);
       }
 
-      // ✅ Persist to Project record (IndexedDB) so Publishing sees it
+      // Persist to Project record
       await persistCoverToProjectRecord(pid, {
         title,
         subtitle,
         author,
         tagline,
-        coverImageUrl: result.viewUrl,
+        coverImageKey: result.key,  // ✅ CHANGED: Save key not URL
         coverImageFit,
         coverImageFilter,
       });
@@ -834,21 +824,13 @@ export default function Cover() {
   const handleClearCoverImage = async () => {
     const pid = projectId || getActiveProjectId();
 
+    setCoverImageKey("");
     setCoverImageUrl("");
 
-    if (pid && pid !== "default") {
-      storage.removeItem(coverImageUrlKeyForProject(pid));
+    if (pid) {
+      storage.removeItem(coverImageKeyForProject(pid));
       storage.removeItem(coverImageMetaKeyForProject(pid));
-
-      // Clear from settings too
-      const settingsRaw = storage.getItem(coverSettingsKeyForProject(pid));
-      const settings = safeJsonParse(settingsRaw, {});
-      delete settings.backgroundImage;
-      storage.setItem(coverSettingsKeyForProject(pid), JSON.stringify(settings));
-
-      // Clear legacy keys too so it doesn't "come back"
-      storage.removeItem(COVER_IMAGE_URL_KEY);
-      storage.removeItem(COVER_IMAGE_META_KEY);
+      storage.removeItem(COVER_IMAGE_KEY_LEGACY);
     }
 
     await persistCoverToProjectRecord(pid, {
@@ -856,7 +838,7 @@ export default function Cover() {
       subtitle,
       author,
       tagline,
-      coverImageUrl: "",
+      coverImageKey: "",
       coverImageFit,
       coverImageFilter,
     });
@@ -870,6 +852,7 @@ export default function Cover() {
     setUseCustomColors(true);
   };
 
+  // ✅ CHANGED: Build design with key not URL
   const buildCurrentDesign = () => {
     const id =
       typeof crypto !== "undefined" && crypto?.randomUUID
@@ -886,7 +869,7 @@ export default function Cover() {
       tagline,
       genrePresetKey,
       layoutKey,
-      coverImageUrl,
+      coverImageKey,  // ✅ CHANGED: Save key not URL
       coverImageFit,
       coverImageFilter,
       useCustomColors,
@@ -902,7 +885,8 @@ export default function Cover() {
     };
   };
 
-  const applyDesign = (d) => {
+  // ✅ CHANGED: Apply design loads key and fetches fresh URL
+  const applyDesign = async (d) => {
     if (!d) return;
     setTitle(d.title ?? "Working Title");
     setSubtitle(d.subtitle ?? "");
@@ -910,7 +894,22 @@ export default function Cover() {
     setTagline(d.tagline ?? "A NOVEL");
     setGenrePresetKey(d.genrePresetKey ?? "general");
     setLayoutKey(d.layoutKey ?? "center");
-    setCoverImageUrl(d.coverImageUrl ?? "");
+    
+    // ✅ CHANGED: Load key and fetch fresh URL
+    if (d.coverImageKey) {
+      setCoverImageKey(d.coverImageKey);
+      try {
+        const freshUrl = await getViewUrl(d.coverImageKey);
+        setCoverImageUrl(freshUrl);
+      } catch (e) {
+        console.warn("[Cover] Could not get viewUrl for design:", e);
+        setCoverImageUrl("");
+      }
+    } else {
+      setCoverImageKey("");
+      setCoverImageUrl(d.coverImageUrl ?? "");  // Fallback for old designs
+    }
+    
     setCoverImageFit(d.coverImageFit ?? "cover");
     setCoverImageFilter(d.coverImageFilter ?? "soft-dark");
     setUseCustomColors(d.useCustomColors ?? false);
@@ -930,9 +929,8 @@ export default function Cover() {
     const updated = [next, ...designs];
     setDesigns(updated);
 
-    if (projectId && projectId !== "default") {
+    if (projectId) {  // ✅ REMOVED "default" check
       storage.setItem(coverDesignsKeyForProject(projectId), JSON.stringify(updated));
-      // legacy write kept for backward compatibility
       storage.setItem(COVER_DESIGNS_KEY, JSON.stringify(updated));
     }
 
@@ -954,7 +952,7 @@ export default function Cover() {
     const updated = designs.filter((d) => d.id !== selectedDesignId);
     setDesigns(updated);
 
-    if (projectId && projectId !== "default") {
+    if (projectId) {  // ✅ REMOVED "default" check
       storage.setItem(coverDesignsKeyForProject(projectId), JSON.stringify(updated));
       storage.setItem(COVER_DESIGNS_KEY, JSON.stringify(updated));
     }
@@ -1149,7 +1147,7 @@ Story description: ${aiPrompt}`,
                 {projectName || title || "Untitled Project"}
               </div>
               <div style={{ opacity: 0.8 }}>Changes auto-save to your project</div>
-              {coverImageUrl && (
+              {coverImageKey && (
                 <div
                   style={{
                     marginTop: 4,
