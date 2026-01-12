@@ -4,6 +4,7 @@
 // FIXED: Proper title editing
 // FIXED: Shows Project ID
 // FIXED: Import with name prompt
+// FIXED: Title truncation for long titles
 
 import React, { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
@@ -1039,24 +1040,30 @@ export default function ProjectPage() {
                       </label>
                     </div>
 
-                    {/* Details */}
-                    <div className="flex-1 p-6 flex flex-col">
-                      {/* Header */}
-                      <div className="flex justify-between items-start mb-1">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <h3 className="text-xl font-semibold truncate" style={{ fontFamily: "'EB Garamond', Georgia, serif", color: "#111827" }}>
+                    {/* Details - FIXED: Added min-w-0 overflow-hidden for proper truncation */}
+                    <div className="flex-1 p-6 flex flex-col min-w-0 overflow-hidden">
+                      {/* Header - FIXED: Added gap and overflow handling */}
+                      <div className="flex justify-between items-start mb-1 gap-3">
+                        {/* FIXED: Title container with proper overflow handling */}
+                        <div className="flex-1 min-w-0 overflow-hidden">
+                          <div className="flex items-center gap-2 min-w-0">
+                            {/* FIXED: Title with truncate and title attribute for tooltip */}
+                            <h3 
+                              className="text-xl font-semibold truncate" 
+                              style={{ fontFamily: "'EB Garamond', Georgia, serif", color: "#111827" }}
+                              title={project.title || "Untitled"}
+                            >
                               {project.title || "Untitled"}
                             </h3>
-                            <button onClick={() => setEditingProject(project)} className="text-purple-400 hover:text-purple-600" title="Edit Title">
+                            <button onClick={() => setEditingProject(project)} className="text-purple-400 hover:text-purple-600 flex-shrink-0" title="Edit Title">
                               <Edit3 size={14} />
                             </button>
                           </div>
                           <div className="flex items-center gap-2 mt-2 text-sm text-gray-500">
-                            <div className="w-5 h-5 rounded-full flex items-center justify-center text-xs text-white font-semibold" style={{ background: "linear-gradient(135deg, #D4AF37, #9b7bc9)" }}>
+                            <div className="w-5 h-5 rounded-full flex items-center justify-center text-xs text-white font-semibold flex-shrink-0" style={{ background: "linear-gradient(135deg, #D4AF37, #9b7bc9)" }}>
                               {authorName?.charAt(0)?.toUpperCase() || "A"}
                             </div>
-                            <span>by {authorName}</span>
+                            <span className="truncate">by {authorName}</span>
                           </div>
                           {/* Project ID */}
                           <button 
@@ -1064,15 +1071,15 @@ export default function ProjectPage() {
                             className="flex items-center gap-1 mt-1 text-[10px] text-gray-400 hover:text-gray-600 font-mono"
                             title="Click to copy Project ID"
                           >
-                            <Hash size={10} />
-                            {project.id.slice(-12)}
-                            <Copy size={10} />
+                            <Hash size={10} className="flex-shrink-0" />
+                            <span className="truncate">{project.id.slice(-12)}</span>
+                            <Copy size={10} className="flex-shrink-0" />
                           </button>
                         </div>
                         <select
                           value={project.status || "Draft"}
                           onChange={(e) => updateProject(project.id, { status: e.target.value })}
-                          className="ml-3 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide rounded-full cursor-pointer outline-none"
+                          className="ml-2 px-3 py-1.5 text-xs font-semibold uppercase tracking-wide rounded-full cursor-pointer outline-none flex-shrink-0"
                           style={getStatusStyle(project.status || "Draft")}
                         >
                           {["Idea", "Outline", "Draft", "Revision", "Editing", "Published"].map((s) => (
@@ -1164,12 +1171,20 @@ export default function ProjectPage() {
                   <div className="w-12 h-16 rounded-lg flex items-center justify-center text-xl overflow-hidden" style={{ background: "linear-gradient(135deg, #e8dff5, #f5e6ff)" }}>
                     {project.cover ? <img src={project.cover} alt="" className="w-full h-full object-cover" /> : "📕"}
                   </div>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <div className="font-semibold" style={{ fontFamily: "'EB Garamond', Georgia, serif", color: "#111827" }}>{project.title || "Untitled"}</div>
-                      <button onClick={() => setEditingProject(project)} className="text-purple-400 hover:text-purple-600"><Edit3 size={12} /></button>
+                  {/* FIXED: List view title with proper truncation */}
+                  <div className="min-w-0 overflow-hidden">
+                    <div className="flex items-center gap-2 min-w-0">
+                      {/* FIXED: Added truncate class and title attribute */}
+                      <span 
+                        className="font-semibold truncate" 
+                        style={{ fontFamily: "'EB Garamond', Georgia, serif", color: "#111827" }}
+                        title={project.title || "Untitled"}
+                      >
+                        {project.title || "Untitled"}
+                      </span>
+                      <button onClick={() => setEditingProject(project)} className="text-purple-400 hover:text-purple-600 flex-shrink-0"><Edit3 size={12} /></button>
                     </div>
-                    <div className="text-[10px] text-gray-400 font-mono mt-0.5">{project.id.slice(-12)}</div>
+                    <div className="text-[10px] text-gray-400 font-mono mt-0.5 truncate">{project.id.slice(-12)}</div>
                   </div>
                   <div className="font-semibold text-purple-900">{wordCount.toLocaleString()}</div>
                   <div className="text-gray-600">{project.chapterCount || 0}</div>
@@ -1191,3 +1206,4 @@ export default function ProjectPage() {
     </div>
   );
 }
+
