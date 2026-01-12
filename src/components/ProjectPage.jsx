@@ -497,29 +497,73 @@ function EditTitleModal({ isOpen, currentTitle, projectId, onSave, onClose }) {
 }
 
 // -------------------- Genre Picker Modal --------------------
+// -------------------- Genre Picker Modal (type + pick) --------------------
 function GenrePickerModal({ open, initialValue, onCancel, onSave }) {
-  const [value, setValue] = useState(initialValue || "General / Undeclared");
+  const [query, setQuery] = useState(initialValue || "General / Undeclared");
+  const [activeIndex, setActiveIndex] = useState(0);
 
   useEffect(() => {
-    setValue(initialValue || "General / Undeclared");
+    if (!open) return;
+    setQuery(initialValue || "General / Undeclared");
+    setActiveIndex(0);
   }, [initialValue, open]);
 
   if (!open) return null;
+
+  const q = (query || "").trim().toLowerCase();
+  const filtered = GENRES.filter((g) => g.toLowerCase().includes(q));
+  const list = filtered.length ? filtered : GENRES;
+
+  const commit = (value) => {
+    const v = (value || "").trim();
+    if (!v) return;
+    onSave(v);
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      onCancel();
+      return;
+    }
+
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setActiveIndex((i) => Math.min(i + 1, list.length - 1));
+      return;
+    }
+
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setActiveIndex((i) => Math.max(i - 1, 0));
+      return;
+    }
+
+    if (e.key === "Enter") {
+      e.preventDefault();
+      // If they have a query, save it; otherwise pick the highlighted option
+      if ((query || "").trim()) commit(query);
+      else commit(list[activeIndex] || "General / Undeclared");
+    }
+  };
 
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
       style={{ background: "rgba(15, 23, 42, 0.6)", backdropFilter: "blur(4px)" }}
-      onClick={onCancel}
+      onMouseDown={(e) => {
+        // click outside closes
+        if (e.target === e.currentTarget) onCancel();
+      }}
     >
       <div
         className="w-full max-w-md rounded-3xl overflow-hidden"
         style={{ background: "#fff", boxShadow: "0 25px 80px rgba(15, 23, 42, 0.25)" }}
-        onClick={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
       >
         <div className="px-6 py-5" style={{ background: "linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%)" }}>
           <h2 className="text-lg font-semibold text-white">Select Genre</h2>
-          <p className="text-xs text-white/70 mt-1">Choose a primary genre for this project.</p>
+          <p className="text-xs text-white/70 mt-1">Type to search, or pick from the list.</p>
         </div>
 
         <div className="p-6 space-y-4">
@@ -527,25 +571,69 @@ function GenrePickerModal({ open, initialValue, onCancel, onSave }) {
             Primary Genre
           </label>
 
-          <select
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
+          {/* Type-to-search + custom entry */}
+          <input
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setActiveIndex(0);
+            }}
+            onKeyDown={handleKeyDown}
+            placeholder="Type to search or enter a custom genre…"
             className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-indigo-400 outline-none text-sm"
+            autoFocus
+          />
+
+          {/* Pick list */}
+          <div
+            className="max-h-64 overflow-auto rounded-xl border border-gray-200"
+            role="listbox"
+            aria-label="Genre options"
           >
-            {GENRES.map((g) => (
-              <option key={g} value={g}>
-                {g}
-              </option>
-            ))}
-          </select>
+            {list.map((g, idx) => {
+              const isActive = idx === activeIndex;
+              return (
+                <button
+                  type="button"
+                  key={g}
+                  className="w-full text-left px-4 py-3 text-sm flex items-center justify-between"
+                  style={{
+                    background: isActive ? "rgba(99,102,241,0.10)" : "#fff",
+                    borderBottom: "1px solid rgba(229,231,235,1)",
+                  }}
+                  onMouseEnter={() => setActiveIndex(idx)}
+                  onClick={() => commit(g)}
+                >
+                  <span>{g}</span>
+                  {normalizeGenre(query) === g ? (
+                    <span className="text-xs font-semibold" style={{ color: "#4f46e5" }}>
+                      Selected
+                    </span>
+                  ) : null}
+                </button>
+              );
+            })}
+          </div>
+
+          <p className="text-xs text-gray-500">
+            Tip: press <span className="font-semibold">Enter</span> to save what you typed, or use ↑/↓ then Enter to pick.
+          </p>
         </div>
 
-        <div className="px-6 py-4 flex justify-end gap-3" style={{ background: "rgba(248, 250, 252, 0.9)", borderTop: "1px solid rgba(148, 163, 184, 0.2)" }}>
-          <button onClick={onCancel} className="px-5 py-2.5 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-100">
+        <div
+          className="px-6 py-4 flex justify-end gap-3"
+          style={{ background: "rgba(248, 250, 252, 0.9)", borderTop: "1px solid rgba(148, 163, 184, 0.2)" }}
+        >
+          <button
+            type="button"
+            onClick={onCancel}
+            className="px-5 py-2.5 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-100"
+          >
             Cancel
           </button>
           <button
-            onClick={() => onSave(value)}
+            type="button"
+            onClick={() => commit(query)}
             className="px-5 py-2.5 rounded-xl text-sm font-semibold text-white"
             style={{ background: "linear-gradient(135deg, #6366f1, #4f46e5)" }}
           >
