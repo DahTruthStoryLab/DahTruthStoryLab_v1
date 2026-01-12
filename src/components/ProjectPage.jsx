@@ -8,6 +8,8 @@
 // NEW: Genre is a first-class project attribute (stored in list + project data)
 // NEW: Genre shown + editable in grid and list views
 // NEW: Safe default for legacy projects (General / Undeclared)
+// FIXED: Genre modal state is inside component (hooks rule)
+// FIXED: addProject uses Genre modal (no dead code / undefined vars)
 
 import React, { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
@@ -42,7 +44,6 @@ import heic2any from "heic2any";
 
 // Use the SAME storage system as ComposePage
 import { storage } from "../lib/storage";
-import { useProjectStore } from "../hooks/useProjectStore";
 import { documentParser } from "../utils/documentParser";
 
 // -------------------- UNIFIED Storage Keys (same as useProjectStore) --------------------
@@ -495,6 +496,67 @@ function EditTitleModal({ isOpen, currentTitle, projectId, onSave, onClose }) {
   );
 }
 
+// -------------------- Genre Picker Modal --------------------
+function GenrePickerModal({ open, initialValue, onCancel, onSave }) {
+  const [value, setValue] = useState(initialValue || "General / Undeclared");
+
+  useEffect(() => {
+    setValue(initialValue || "General / Undeclared");
+  }, [initialValue, open]);
+
+  if (!open) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: "rgba(15, 23, 42, 0.6)", backdropFilter: "blur(4px)" }}
+      onClick={onCancel}
+    >
+      <div
+        className="w-full max-w-md rounded-3xl overflow-hidden"
+        style={{ background: "#fff", boxShadow: "0 25px 80px rgba(15, 23, 42, 0.25)" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="px-6 py-5" style={{ background: "linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%)" }}>
+          <h2 className="text-lg font-semibold text-white">Select Genre</h2>
+          <p className="text-xs text-white/70 mt-1">Choose a primary genre for this project.</p>
+        </div>
+
+        <div className="p-6 space-y-4">
+          <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide">
+            Primary Genre
+          </label>
+
+          <select
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-indigo-400 outline-none text-sm"
+          >
+            {GENRES.map((g) => (
+              <option key={g} value={g}>
+                {g}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="px-6 py-4 flex justify-end gap-3" style={{ background: "rgba(248, 250, 252, 0.9)", borderTop: "1px solid rgba(148, 163, 184, 0.2)" }}>
+          <button onClick={onCancel} className="px-5 py-2.5 rounded-xl text-sm font-medium text-gray-600 hover:bg-gray-100">
+            Cancel
+          </button>
+          <button
+            onClick={() => onSave(value)}
+            className="px-5 py-2.5 rounded-xl text-sm font-semibold text-white"
+            style={{ background: "linear-gradient(135deg, #6366f1, #4f46e5)" }}
+          >
+            Save Genre
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // -------------------- Main Component --------------------
 export default function ProjectPage() {
   const navigate = useNavigate();
@@ -504,20 +566,26 @@ export default function ProjectPage() {
   const [authorName, setAuthorName] = useState("New Author");
   const [showApiSettings, setShowApiSettings] = useState(false);
   const [showAuthorSetup, setShowAuthorSetup] = useState(false);
-  const [syncStatus, setSyncStatus] = useState("offline"); // offline since cloud is disabled
+  const [syncStatus, setSyncStatus] = useState("offline");
   const [editingProject, setEditingProject] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  // ✅ FIX: hooks belong inside the component
+  const [genreModal, setGenreModal] = useState({
+    open: false,
+    projectId: null,
+    initial: "General / Undeclared",
+    context: "new", // "new" | "import" | "edit"
+    payload: null,
+  });
 
   const importInputRef = useRef(null);
 
   // Initialize
   useEffect(() => {
     const profile = getAuthorProfile();
-    if (!profile) {
-      setShowAuthorSetup(true);
-    } else {
-      setAuthorName(profile.name);
-    }
+    if (!profile) setShowAuthorSetup(true);
+    else setAuthorName(profile.name);
 
     loadProjectsFromStorage();
   }, []);
@@ -527,15 +595,10 @@ export default function ProjectPage() {
     setIsLoading(true);
     try {
       const list = loadProjectsList();
-      console.log(`[ProjectPage] Loaded ${list.length} projects from storage`);
-
-      // Enrich with project data (word counts, etc.)
       const enriched = list.map((entry) => {
         const data = loadProjectData(entry.id);
         const wordCount = data?.chapters?.reduce((sum, ch) => sum + (ch.wordCount || 0), 0) || entry.wordCount || 0;
         const chapterCount = data?.chapters?.length || entry.chapterCount || 0;
-
-        // NEW: safe default for legacy projects
         const primaryGenre = normalizeGenre(data?.primaryGenre || entry.primaryGenre);
 
         return {
@@ -592,7 +655,7 @@ export default function ProjectPage() {
     saveAuthorProfile({ name: trimmed, updatedAt: new Date().toISOString() });
   };
 
-  // NEW: Update project genre (list + project data)
+  // Update project genre (list + project data)
   const updateProjectGenre = (projectId, nextGenreRaw) => {
     const primaryGenre = normalizeGenre(nextGenreRaw);
     const now = new Date().toISOString();
@@ -607,7 +670,6 @@ export default function ProjectPage() {
     data.primaryGenre = primaryGenre;
     saveProjectData(projectId, data);
 
-    // keep currentStory in sync if this is current
     try {
       const currentId = storage.getItem(CURRENT_PROJECT_KEY);
       if (currentId === projectId) {
@@ -624,81 +686,36 @@ export default function ProjectPage() {
     window.dispatchEvent(new Event("projects:change"));
   };
 
-  // Create new project with name prompt
+  // ✅ FIXED: Create new project -> open Genre modal (no dead code)
   const addProject = () => {
     const title = window.prompt("Enter a title for your new project:", "Untitled Project");
-    if (!title) return; // User cancelled
-
-    // NEW: prompt genre
-    const genreInput = window.prompt(
-      "Enter a genre (or leave blank for General / Undeclared):\n\n" + GENRES.join("\n"),
-      "General / Undeclared"
-    );
-    const primaryGenre = normalizeGenre(genreInput);
+    if (!title) return;
 
     const projectId = generateId();
-    const now = new Date().toISOString();
 
-    const project = {
-      id: projectId,
-      title: title.trim(),
-      status: "Draft",
-      source: "New",
-      createdAt: now,
-      updatedAt: now,
-      wordCount: 0,
-      chapterCount: 1,
-      primaryGenre, // NEW
-    };
-
-    // Create default project data
-    const data = {
-      book: { title: title.trim() },
-      primaryGenre, // NEW
-      chapters: [{ id: `chapter-${Date.now()}`, title: "Chapter 1", content: "", preview: "", wordCount: 0, lastEdited: now, status: "draft", order: 0 }],
-      daily: { goal: 500, counts: {} },
-      settings: { theme: "light", focusMode: false },
-      tocOutline: [],
-    };
-
-    // Save to storage
-    saveProjectData(projectId, data);
-
-    // Add to projects list
-    const updated = [project, ...projects];
-    saveProjectsList(updated);
-    setProjects(updated);
-
-    // Set as current project
-    storage.setItem(CURRENT_PROJECT_KEY, projectId);
-    storage.setItem("currentStory", JSON.stringify({ id: projectId, title: title.trim(), wordCount: 0, status: "Draft", primaryGenre }));
-
-    console.log(`[ProjectPage] Created project: "${title.trim()}" (${projectId}) genre="${primaryGenre}"`);
-
-    // Dispatch events
-    window.dispatchEvent(new Event("project:change"));
-    window.dispatchEvent(new Event("projects:change"));
+    setGenreModal({
+      open: true,
+      context: "new",
+      projectId,
+      initial: "General / Undeclared",
+      payload: { projectId, title: title.trim() },
+    });
   };
 
-  // Update project title (and sync everywhere)
+  // Update project title
   const updateProjectTitle = (projectId, newTitle) => {
-    console.log(`[ProjectPage] Updating title for ${projectId} to "${newTitle}"`);
-
-    // Update projects list
     const updated = projects.map((p) =>
       p.id === projectId ? { ...p, title: newTitle, updatedAt: new Date().toISOString() } : p
     );
     saveProjectsList(updated);
     setProjects(updated);
 
-    // Update project data
     const data = loadProjectData(projectId);
     if (data) {
       data.book = { ...data.book, title: newTitle };
       saveProjectData(projectId, data);
     }
 
-    // Update currentStory if this is the current project
     const currentId = storage.getItem(CURRENT_PROJECT_KEY);
     if (currentId === projectId) {
       const currentStoryRaw = storage.getItem("currentStory");
@@ -709,7 +726,6 @@ export default function ProjectPage() {
       }
     }
 
-    // Also update userProjects (legacy)
     try {
       const userProjectsRaw = storage.getItem("userProjects");
       if (userProjectsRaw) {
@@ -721,7 +737,6 @@ export default function ProjectPage() {
       }
     } catch {}
 
-    // Dispatch events
     window.dispatchEvent(new Event("project:change"));
     window.dispatchEvent(new Event("projects:change"));
   };
@@ -735,22 +750,12 @@ export default function ProjectPage() {
     saveProjectsList(updated);
     setProjects(updated);
 
-    // Update project data
     const data = loadProjectData(id) || {};
-
-    // If updating title, also update project data
-    if (patch.title) {
-      data.book = { ...(data.book || {}), title: patch.title };
-    }
-
-    // Keep these in the project data blob as well
+    if (patch.title) data.book = { ...(data.book || {}), title: patch.title };
     if (patch.cover) data.cover = patch.cover;
     if (patch.logline !== undefined) data.logline = patch.logline;
     if (patch.targetWords) data.targetWords = patch.targetWords;
-
-    // NEW: persist genre if patch includes it
     if (patch.primaryGenre !== undefined) data.primaryGenre = normalizeGenre(patch.primaryGenre);
-
     saveProjectData(id, data);
 
     window.dispatchEvent(new Event("project:change"));
@@ -759,17 +764,14 @@ export default function ProjectPage() {
   // Delete project
   const handleDeleteProject = (id) => {
     if (!window.confirm("Delete this project? This cannot be undone.")) return;
-
     cleanupProjectStorage(id);
     setProjects((prev) => prev.filter((p) => p.id !== id));
-
     window.dispatchEvent(new Event("project:change"));
     window.dispatchEvent(new Event("projects:change"));
   };
 
   // Open project in writer
   const openInWriter = (project) => {
-    // Set as current project
     storage.setItem(CURRENT_PROJECT_KEY, project.id);
     storage.setItem("currentStory", JSON.stringify({
       id: project.id,
@@ -778,7 +780,6 @@ export default function ProjectPage() {
       status: project.status || "Draft",
       primaryGenre: project.primaryGenre || "General / Undeclared",
     }));
-
     window.dispatchEvent(new Event("project:change"));
     navigate("/writer");
   };
@@ -788,93 +789,42 @@ export default function ProjectPage() {
     importInputRef.current?.click();
   };
 
+  // ✅ Uses modal for genre too
   const handleImportFile = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     try {
-      // Ask for project name FIRST
-      const defaultName = file.name.replace(/\.(docx|doc|txt|html|htm|rtf)$/i, "").trim() || "Imported Project";
+      const defaultName =
+        file.name.replace(/\.(docx|doc|txt|html|htm|rtf)$/i, "").trim() ||
+        "Imported Project";
+
       const projectName = window.prompt("Enter a name for this project:", defaultName);
       if (!projectName) {
         e.target.value = "";
-        return; // User cancelled
+        return;
       }
-
-      // NEW: ask genre for imported project
-      const genreInput = window.prompt(
-        "Enter a genre for this imported project (or leave blank for General / Undeclared):\n\n" + GENRES.join("\n"),
-        "General / Undeclared"
-      );
-      const primaryGenre = normalizeGenre(genreInput);
 
       setIsLoading(true);
 
-      // Parse the document
       const parsed = await documentParser.parseFile(file);
-
-      // Create new project
       const projectId = generateId();
-      const now = new Date().toISOString();
-      const totalWords = parsed.chapters.reduce((sum, ch) => sum + (ch.wordCount || 0), 0);
 
-      const project = {
-        id: projectId,
-        title: projectName.trim(), // Use user-entered name, NOT parsed title
-        status: "Draft",
-        source: "Imported",
-        createdAt: now,
-        updatedAt: now,
-        wordCount: totalWords,
-        chapterCount: parsed.chapters.length,
-        primaryGenre, // NEW
-      };
-
-      // Create project data
-      const chapters = parsed.chapters.map((ch, idx) => ({
-        id: ch.id || `chapter-${Date.now()}-${idx}`,
-        title: ch.title,
-        content: ch.content,
-        preview: ch.preview || "",
-        wordCount: ch.wordCount || 0,
-        lastEdited: now,
-        status: "draft",
-        order: idx,
-      }));
-
-      const data = {
-        book: { title: projectName.trim() }, // Use user-entered name
-        primaryGenre, // NEW
-        chapters: chapters,
-        daily: { goal: 500, counts: {} },
-        settings: { theme: "light", focusMode: false },
-        tocOutline: parsed.tableOfContents || [],
-      };
-
-      // Save to storage
-      saveProjectData(projectId, data);
-
-      // Add to projects list
-      const updated = [project, ...projects];
-      saveProjectsList(updated);
-      setProjects(updated);
-
-      // Set as current project
-      storage.setItem(CURRENT_PROJECT_KEY, projectId);
-      storage.setItem("currentStory", JSON.stringify({ id: projectId, title: projectName.trim(), wordCount: totalWords, status: "Draft", primaryGenre }));
-
-      console.log(`[ProjectPage] Imported project: "${projectName.trim()}" (${chapters.length} chapters, ${totalWords} words) genre="${primaryGenre}"`);
-
-      // Dispatch events
-      window.dispatchEvent(new Event("project:change"));
-      window.dispatchEvent(new Event("projects:change"));
-
-      // Navigate to writer
-      navigate("/writer");
+      // open modal and finish import in modal onSave
+      setGenreModal({
+        open: true,
+        context: "import",
+        projectId,
+        initial: "General / Undeclared",
+        payload: {
+          projectId,
+          title: projectName.trim(),
+          parsed,
+        },
+      });
     } catch (err) {
       console.error("[ProjectPage] Import failed:", err);
       alert("Failed to import file. Please try a different file format.");
-    } finally {
       setIsLoading(false);
       e.target.value = "";
     }
@@ -973,6 +923,170 @@ export default function ProjectPage() {
         onSave={updateProjectTitle}
         onClose={() => setEditingProject(null)}
       />
+
+      <GenrePickerModal
+  open={genreModal.open}
+  initialValue={genreModal.initial}
+  onCancel={() => {
+    // If they cancel import, stop loading + clear file input
+    if (genreModal.context === "import") {
+      setIsLoading(false);
+      if (importInputRef.current) importInputRef.current.value = "";
+    }
+    setGenreModal({
+      open: false,
+      projectId: null,
+      initial: "General / Undeclared",
+      context: "new",
+      payload: null,
+    });
+  }}
+  onSave={(picked) => {
+    const primaryGenre = normalizeGenre(picked);
+
+    // ---------- NEW ----------
+    if (genreModal.context === "new") {
+      const { projectId, title } = genreModal.payload || {};
+      if (!projectId || !title) {
+        setIsLoading(false);
+        setGenreModal({ open: false, projectId: null, initial: "General / Undeclared", context: "new", payload: null });
+        return;
+      }
+
+      const now = new Date().toISOString();
+
+      const project = {
+        id: projectId,
+        title,
+        status: "Draft",
+        source: "New",
+        createdAt: now,
+        updatedAt: now,
+        wordCount: 0,
+        chapterCount: 1,
+        primaryGenre,
+      };
+
+      const data = {
+        book: { title },
+        primaryGenre,
+        chapters: [
+          {
+            id: `chapter-${Date.now()}`,
+            title: "Chapter 1",
+            content: "",
+            preview: "",
+            wordCount: 0,
+            lastEdited: now,
+            status: "draft",
+            order: 0,
+          },
+        ],
+        daily: { goal: 500, counts: {} },
+        settings: { theme: "light", focusMode: false },
+        tocOutline: [],
+      };
+
+      saveProjectData(projectId, data);
+      const updated = [project, ...projects];
+      saveProjectsList(updated);
+      setProjects(updated);
+
+      storage.setItem(CURRENT_PROJECT_KEY, projectId);
+      storage.setItem(
+        "currentStory",
+        JSON.stringify({ id: projectId, title, wordCount: 0, status: "Draft", primaryGenre })
+      );
+
+      window.dispatchEvent(new Event("project:change"));
+      window.dispatchEvent(new Event("projects:change"));
+
+      setIsLoading(false);
+    }
+
+    // ---------- IMPORT ----------
+    if (genreModal.context === "import") {
+      const { projectId, title, parsed } = genreModal.payload || {};
+      if (!projectId || !title || !parsed?.chapters?.length) {
+        setIsLoading(false);
+        if (importInputRef.current) importInputRef.current.value = "";
+        setGenreModal({ open: false, projectId: null, initial: "General / Undeclared", context: "new", payload: null });
+        return;
+      }
+
+      const now = new Date().toISOString();
+      const totalWords = parsed.chapters.reduce((sum, ch) => sum + (ch.wordCount || 0), 0);
+
+      const project = {
+        id: projectId,
+        title,
+        status: "Draft",
+        source: "Imported",
+        createdAt: now,
+        updatedAt: now,
+        wordCount: totalWords,
+        chapterCount: parsed.chapters.length,
+        primaryGenre,
+      };
+
+      const chapters = parsed.chapters.map((ch, idx) => ({
+        id: ch.id || `chapter-${Date.now()}-${idx}`,
+        title: ch.title,
+        content: ch.content,
+        preview: ch.preview || "",
+        wordCount: ch.wordCount || 0,
+        lastEdited: now,
+        status: "draft",
+        order: idx,
+      }));
+
+      const data = {
+        book: { title },
+        primaryGenre,
+        chapters,
+        daily: { goal: 500, counts: {} },
+        settings: { theme: "light", focusMode: false },
+        tocOutline: parsed.tableOfContents || [],
+      };
+
+      saveProjectData(projectId, data);
+      const updated = [project, ...projects];
+      saveProjectsList(updated);
+      setProjects(updated);
+
+      storage.setItem(CURRENT_PROJECT_KEY, projectId);
+      storage.setItem(
+        "currentStory",
+        JSON.stringify({ id: projectId, title, wordCount: totalWords, status: "Draft", primaryGenre })
+      );
+
+      window.dispatchEvent(new Event("project:change"));
+      window.dispatchEvent(new Event("projects:change"));
+
+      // clear loading BEFORE navigate (safe)
+      setIsLoading(false);
+      if (importInputRef.current) importInputRef.current.value = "";
+
+      navigate("/writer");
+    }
+
+    // ---------- EDIT ----------
+    if (genreModal.context === "edit") {
+      if (genreModal.projectId) updateProjectGenre(genreModal.projectId, primaryGenre);
+      setIsLoading(false);
+    }
+
+    // close modal (always)
+    setGenreModal({
+      open: false,
+      projectId: null,
+      initial: "General / Undeclared",
+      context: "new",
+      payload: null,
+    });
+  }}
+/>
+
 
       <div className="mx-auto max-w-7xl px-6 py-8">
         {/* Dashboard Button */}
