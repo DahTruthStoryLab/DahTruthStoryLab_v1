@@ -546,6 +546,12 @@ export default function Cover() {
   const [aboutAuthor, setAboutAuthor] = useState("");
   const [showBackCover, setShowBackCover] = useState(true);
 
+  // ✅ Back cover image (separate from front)
+  const [backCoverImageKey, setBackCoverImageKey] = useState("");
+  const [backCoverImageUrl, setBackCoverImageUrl] = useState("");
+  const [backCoverImageUploading, setBackCoverImageUploading] = useState(false);
+  const [useBackCoverImage, setUseBackCoverImage] = useState(false); // toggle: use separate image or same as front
+
   // ✅ Spine
   const [showSpine, setShowSpine] = useState(false);
   const [spineText, setSpineText] = useState("");
@@ -657,6 +663,18 @@ export default function Cover() {
         if (meta.filter) setCoverImageFilter(meta.filter);
       }
 
+      // ✅ Load back cover image (separate from front)
+      const savedBackKey = storage.getItem(`dahtruth_back_cover_image_key_${pid}`);
+      if (savedBackKey) {
+        setBackCoverImageKey(savedBackKey);
+        const bucket = import.meta.env.VITE_S3_BUCKET || "dahtruth-user-stories";
+        const region = import.meta.env.VITE_S3_REGION || "us-east-1";
+        const backUrl = `https://${bucket}.s3.${region}.amazonaws.com/${savedBackKey}`;
+        setBackCoverImageUrl(backUrl);
+        setUseBackCoverImage(true);
+        console.log("[Cover] Loaded back cover image key:", savedBackKey);
+      }
+
       // Load cover settings (colors, fonts, etc.)
       const savedSettings = storage.getItem(coverSettingsKeyForProject(pid));
       if (savedSettings) {
@@ -689,6 +707,9 @@ export default function Cover() {
         // ✅ Spine settings
         if (typeof settings.showSpine === "boolean") setShowSpine(settings.showSpine);
         if (settings.spineText !== undefined) setSpineText(settings.spineText);
+
+        // ✅ Back cover image settings
+        if (typeof settings.useBackCoverImage === "boolean") setUseBackCoverImage(settings.useBackCoverImage);
       } else {
         const pTitle = getProjectTitle(pid);
         if (pTitle) setTitle(pTitle);
@@ -777,6 +798,8 @@ export default function Cover() {
         // ✅ Spine
         showSpine,
         spineText,
+        // ✅ Back cover image
+        useBackCoverImage,
       };
 
       storage.setItem(coverSettingsKeyForProject(projectId), JSON.stringify(settings));
@@ -788,6 +811,13 @@ export default function Cover() {
       } else {
         storage.removeItem(coverImageKeyForProject(projectId));
         storage.removeItem(COVER_IMAGE_KEY_LEGACY);
+      }
+
+      // ✅ Save back cover image key
+      if (backCoverImageKey) {
+        storage.setItem(`dahtruth_back_cover_image_key_${projectId}`, backCoverImageKey);
+      } else {
+        storage.removeItem(`dahtruth_back_cover_image_key_${projectId}`);
       }
 
       // Save image meta
@@ -847,6 +877,9 @@ export default function Cover() {
     showBackCover,
     showSpine,
     spineText,
+    // ✅ Back cover image dependencies
+    backCoverImageKey,
+    useBackCoverImage,
   ]);
 
   // ✅ CHANGED: Save KEY not URL on upload
@@ -920,6 +953,51 @@ export default function Cover() {
       coverImageFit,
       coverImageFilter,
     });
+  };
+
+  // ✅ Back cover image handlers
+  const handleBackCoverFileChange = async (event) => {
+    const input = event.target;
+    const file = input.files?.[0];
+    if (!file) return;
+
+    const pid = projectId || getActiveProjectId();
+
+    try {
+      setBackCoverImageUploading(true);
+
+      const result = await uploadImage(file);
+      if (!result?.key) throw new Error("No key in upload response");
+
+      setBackCoverImageKey(result.key);
+      setBackCoverImageUrl(result.viewUrl);
+      setUseBackCoverImage(true);
+
+      console.log("[Cover] Back cover image uploaded, key:", result.key);
+
+      if (pid) {
+        storage.setItem(`dahtruth_back_cover_image_key_${pid}`, result.key);
+      }
+
+      input.value = "";
+    } catch (err) {
+      console.error("[Cover] Back cover upload error:", err);
+      alert(err?.message || "Back cover image upload failed.");
+    } finally {
+      setBackCoverImageUploading(false);
+    }
+  };
+
+  const handleClearBackCoverImage = () => {
+    const pid = projectId || getActiveProjectId();
+
+    setBackCoverImageKey("");
+    setBackCoverImageUrl("");
+    setUseBackCoverImage(false);
+
+    if (pid) {
+      storage.removeItem(`dahtruth_back_cover_image_key_${pid}`);
+    }
   };
 
   const applyPresetToCustom = () => {
@@ -1301,8 +1379,6 @@ Story description: ${aiPrompt}`,
               display: "flex",
               flexDirection: "column",
               gap: 16,
-              overflowY: "auto",
-              maxHeight: "calc(100vh - 140px)",
             }}
           >
             {/* Save & Load Designs */}
@@ -1680,8 +1756,12 @@ Story description: ${aiPrompt}`,
                       overflow: "hidden",
                       borderRadius: 10,
                       boxShadow: "0 20px 50px rgba(0,0,0,0.4)",
-                      backgroundImage: effectiveCoverUrl ? `url(${effectiveCoverUrl})` : undefined,
-                      background: effectiveCoverUrl
+                      backgroundImage: useBackCoverImage && backCoverImageUrl
+                        ? `url(${backCoverImageUrl})`
+                        : effectiveCoverUrl
+                        ? `url(${effectiveCoverUrl})`
+                        : undefined,
+                      background: (useBackCoverImage && backCoverImageUrl) || effectiveCoverUrl
                         ? undefined
                         : useCustomBg
                         ? `linear-gradient(145deg, ${customBgColor1}, ${customBgColor2})`
@@ -1806,14 +1886,12 @@ Story description: ${aiPrompt}`,
               display: "flex",
               flexDirection: "column",
               gap: 16,
-              overflowY: "auto",
-              maxHeight: "calc(100vh - 140px)",
             }}
           >
-            {/* Background Image */}
+            {/* Front Cover Image */}
             <div style={styles.glassCard}>
               <h3 style={{ margin: "0 0 12px", fontSize: 14, fontWeight: 600, color: theme.text }}>
-                🖼️ Background Image
+                🖼️ Front Cover Image
               </h3>
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
                 <label
@@ -1915,6 +1993,58 @@ Story description: ${aiPrompt}`,
                   />
                   <span style={{ fontSize: 12 }}>Show Back Cover</span>
                 </label>
+
+                {/* Back Cover Image Option */}
+                <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
+                  <input
+                    type="checkbox"
+                    checked={useBackCoverImage}
+                    onChange={(e) => setUseBackCoverImage(e.target.checked)}
+                  />
+                  <span style={{ fontSize: 12 }}>Use Different Image for Back</span>
+                </label>
+
+                {useBackCoverImage && (
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    <label
+                      style={{
+                        padding: "10px 14px",
+                        borderRadius: 6,
+                        border: "2px dashed #cbd5e1",
+                        background: "#f8fafc",
+                        cursor: "pointer",
+                        fontSize: 11,
+                        textAlign: "center",
+                        display: "block",
+                      }}
+                    >
+                      📁 {backCoverImageUploading ? "Uploading..." : "Upload Back Cover Image"}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        style={{ display: "none" }}
+                        onChange={handleBackCoverFileChange}
+                        disabled={backCoverImageUploading}
+                      />
+                    </label>
+
+                    {backCoverImageUrl && (
+                      <button
+                        type="button"
+                        onClick={handleClearBackCoverImage}
+                        style={{
+                          ...styles.btn,
+                          border: "1px solid #ef4444",
+                          color: "#b91c1c",
+                          background: "#fef2f2",
+                          fontSize: 11,
+                        }}
+                      >
+                        Remove Back Image
+                      </button>
+                    )}
+                  </div>
+                )}
 
                 <div>
                   <div style={styles.label}>Book Description / Blurb</div>
