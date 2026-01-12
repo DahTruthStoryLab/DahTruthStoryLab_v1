@@ -5,6 +5,9 @@
 // FIXED: Shows Project ID
 // FIXED: Import with name prompt
 // FIXED: Title truncation for long titles
+// NEW: Genre is a first-class project attribute (stored in list + project data)
+// NEW: Genre shown + editable in grid and list views
+// NEW: Safe default for legacy projects (General / Undeclared)
 
 import React, { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
@@ -46,6 +49,35 @@ import { documentParser } from "../utils/documentParser";
 const PROJECTS_LIST_KEY = "dahtruth-projects-list";
 const CURRENT_PROJECT_KEY = "dahtruth-current-project-id";
 const PROJECT_DATA_PREFIX = "dahtruth-project-";
+
+// -------------------- Genre helpers --------------------
+const GENRES = [
+  "General / Undeclared",
+  "Literary Fiction",
+  "Contemporary Fiction",
+  "Historical Fiction",
+  "Mystery / Crime",
+  "Thriller / Suspense",
+  "Romance",
+  "Fantasy",
+  "Science Fiction",
+  "Horror",
+  "Young Adult",
+  "Children’s",
+  "Memoir",
+  "Biography",
+  "Essays",
+  "Cultural Commentary",
+  "Self-Help",
+  "Christian / Faith-Based",
+  "Poetry",
+  "Drama / Screenplay",
+];
+
+function normalizeGenre(g) {
+  const x = (g || "").trim();
+  return x || "General / Undeclared";
+}
 
 // -------------------- Helper Functions --------------------
 function generateId() {
@@ -98,7 +130,7 @@ function saveProjectData(projectId, data) {
 // Check if cloud sync is disabled
 function isCloudSyncDisabled() {
   try {
-    return localStorage.getItem('dt_cloud_sync_disabled') === 'true';
+    return localStorage.getItem("dt_cloud_sync_disabled") === "true";
   } catch {
     return true; // Default to disabled if can't read
   }
@@ -131,7 +163,7 @@ function getAuthorProfile() {
   try {
     const raw = storage.getItem("dahtruth_author_profile");
     if (raw) return JSON.parse(raw);
-    
+
     // Fallback to other keys
     const keys = ["dt_profile", "userProfile", "profile"];
     for (const key of keys) {
@@ -475,7 +507,7 @@ export default function ProjectPage() {
   const [syncStatus, setSyncStatus] = useState("offline"); // offline since cloud is disabled
   const [editingProject, setEditingProject] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
-  
+
   const importInputRef = useRef(null);
 
   // Initialize
@@ -496,15 +528,19 @@ export default function ProjectPage() {
     try {
       const list = loadProjectsList();
       console.log(`[ProjectPage] Loaded ${list.length} projects from storage`);
-      
+
       // Enrich with project data (word counts, etc.)
       const enriched = list.map((entry) => {
         const data = loadProjectData(entry.id);
         const wordCount = data?.chapters?.reduce((sum, ch) => sum + (ch.wordCount || 0), 0) || entry.wordCount || 0;
         const chapterCount = data?.chapters?.length || entry.chapterCount || 0;
-        
+
+        // NEW: safe default for legacy projects
+        const primaryGenre = normalizeGenre(data?.primaryGenre || entry.primaryGenre);
+
         return {
           ...entry,
+          primaryGenre,
           wordCount,
           chapterCount,
           cover: data?.cover || entry.cover || "",
@@ -512,7 +548,7 @@ export default function ProjectPage() {
           logline: data?.logline || entry.logline || "",
         };
       });
-      
+
       setProjects(enriched);
       setSyncStatus(isCloudSyncDisabled() ? "offline" : "synced");
     } catch (err) {
@@ -556,11 +592,50 @@ export default function ProjectPage() {
     saveAuthorProfile({ name: trimmed, updatedAt: new Date().toISOString() });
   };
 
+  // NEW: Update project genre (list + project data)
+  const updateProjectGenre = (projectId, nextGenreRaw) => {
+    const primaryGenre = normalizeGenre(nextGenreRaw);
+    const now = new Date().toISOString();
+
+    const updated = projects.map((p) =>
+      p.id === projectId ? { ...p, primaryGenre, updatedAt: now } : p
+    );
+    saveProjectsList(updated);
+    setProjects(updated);
+
+    const data = loadProjectData(projectId) || {};
+    data.primaryGenre = primaryGenre;
+    saveProjectData(projectId, data);
+
+    // keep currentStory in sync if this is current
+    try {
+      const currentId = storage.getItem(CURRENT_PROJECT_KEY);
+      if (currentId === projectId) {
+        const raw = storage.getItem("currentStory");
+        if (raw) {
+          const cs = JSON.parse(raw);
+          cs.primaryGenre = primaryGenre;
+          storage.setItem("currentStory", JSON.stringify(cs));
+        }
+      }
+    } catch {}
+
+    window.dispatchEvent(new Event("project:change"));
+    window.dispatchEvent(new Event("projects:change"));
+  };
+
   // Create new project with name prompt
   const addProject = () => {
     const title = window.prompt("Enter a title for your new project:", "Untitled Project");
     if (!title) return; // User cancelled
-    
+
+    // NEW: prompt genre
+    const genreInput = window.prompt(
+      "Enter a genre (or leave blank for General / Undeclared):\n\n" + GENRES.join("\n"),
+      "General / Undeclared"
+    );
+    const primaryGenre = normalizeGenre(genreInput);
+
     const projectId = generateId();
     const now = new Date().toISOString();
 
@@ -573,11 +648,13 @@ export default function ProjectPage() {
       updatedAt: now,
       wordCount: 0,
       chapterCount: 1,
+      primaryGenre, // NEW
     };
 
     // Create default project data
     const data = {
       book: { title: title.trim() },
+      primaryGenre, // NEW
       chapters: [{ id: `chapter-${Date.now()}`, title: "Chapter 1", content: "", preview: "", wordCount: 0, lastEdited: now, status: "draft", order: 0 }],
       daily: { goal: 500, counts: {} },
       settings: { theme: "light", focusMode: false },
@@ -586,7 +663,7 @@ export default function ProjectPage() {
 
     // Save to storage
     saveProjectData(projectId, data);
-    
+
     // Add to projects list
     const updated = [project, ...projects];
     saveProjectsList(updated);
@@ -594,10 +671,10 @@ export default function ProjectPage() {
 
     // Set as current project
     storage.setItem(CURRENT_PROJECT_KEY, projectId);
-    storage.setItem("currentStory", JSON.stringify({ id: projectId, title: title.trim(), wordCount: 0, status: "Draft" }));
+    storage.setItem("currentStory", JSON.stringify({ id: projectId, title: title.trim(), wordCount: 0, status: "Draft", primaryGenre }));
 
-    console.log(`[ProjectPage] Created project: "${title.trim()}" (${projectId})`);
-    
+    console.log(`[ProjectPage] Created project: "${title.trim()}" (${projectId}) genre="${primaryGenre}"`);
+
     // Dispatch events
     window.dispatchEvent(new Event("project:change"));
     window.dispatchEvent(new Event("projects:change"));
@@ -606,7 +683,7 @@ export default function ProjectPage() {
   // Update project title (and sync everywhere)
   const updateProjectTitle = (projectId, newTitle) => {
     console.log(`[ProjectPage] Updating title for ${projectId} to "${newTitle}"`);
-    
+
     // Update projects list
     const updated = projects.map((p) =>
       p.id === projectId ? { ...p, title: newTitle, updatedAt: new Date().toISOString() } : p
@@ -658,23 +735,23 @@ export default function ProjectPage() {
     saveProjectsList(updated);
     setProjects(updated);
 
+    // Update project data
+    const data = loadProjectData(id) || {};
+
     // If updating title, also update project data
     if (patch.title) {
-      const data = loadProjectData(id);
-      if (data) {
-        data.book = { ...data.book, title: patch.title };
-        saveProjectData(id, data);
-      }
+      data.book = { ...(data.book || {}), title: patch.title };
     }
 
-    // If updating cover or other data, save to project data
-    if (patch.cover || patch.logline || patch.targetWords) {
-      const data = loadProjectData(id) || {};
-      if (patch.cover) data.cover = patch.cover;
-      if (patch.logline) data.logline = patch.logline;
-      if (patch.targetWords) data.targetWords = patch.targetWords;
-      saveProjectData(id, data);
-    }
+    // Keep these in the project data blob as well
+    if (patch.cover) data.cover = patch.cover;
+    if (patch.logline !== undefined) data.logline = patch.logline;
+    if (patch.targetWords) data.targetWords = patch.targetWords;
+
+    // NEW: persist genre if patch includes it
+    if (patch.primaryGenre !== undefined) data.primaryGenre = normalizeGenre(patch.primaryGenre);
+
+    saveProjectData(id, data);
 
     window.dispatchEvent(new Event("project:change"));
   };
@@ -682,10 +759,10 @@ export default function ProjectPage() {
   // Delete project
   const handleDeleteProject = (id) => {
     if (!window.confirm("Delete this project? This cannot be undone.")) return;
-    
+
     cleanupProjectStorage(id);
     setProjects((prev) => prev.filter((p) => p.id !== id));
-    
+
     window.dispatchEvent(new Event("project:change"));
     window.dispatchEvent(new Event("projects:change"));
   };
@@ -699,8 +776,9 @@ export default function ProjectPage() {
       title: project.title,
       wordCount: project.wordCount || 0,
       status: project.status || "Draft",
+      primaryGenre: project.primaryGenre || "General / Undeclared",
     }));
-    
+
     window.dispatchEvent(new Event("project:change"));
     navigate("/writer");
   };
@@ -723,11 +801,18 @@ export default function ProjectPage() {
         return; // User cancelled
       }
 
+      // NEW: ask genre for imported project
+      const genreInput = window.prompt(
+        "Enter a genre for this imported project (or leave blank for General / Undeclared):\n\n" + GENRES.join("\n"),
+        "General / Undeclared"
+      );
+      const primaryGenre = normalizeGenre(genreInput);
+
       setIsLoading(true);
 
       // Parse the document
       const parsed = await documentParser.parseFile(file);
-      
+
       // Create new project
       const projectId = generateId();
       const now = new Date().toISOString();
@@ -742,6 +827,7 @@ export default function ProjectPage() {
         updatedAt: now,
         wordCount: totalWords,
         chapterCount: parsed.chapters.length,
+        primaryGenre, // NEW
       };
 
       // Create project data
@@ -758,6 +844,7 @@ export default function ProjectPage() {
 
       const data = {
         book: { title: projectName.trim() }, // Use user-entered name
+        primaryGenre, // NEW
         chapters: chapters,
         daily: { goal: 500, counts: {} },
         settings: { theme: "light", focusMode: false },
@@ -766,7 +853,7 @@ export default function ProjectPage() {
 
       // Save to storage
       saveProjectData(projectId, data);
-      
+
       // Add to projects list
       const updated = [project, ...projects];
       saveProjectsList(updated);
@@ -774,10 +861,10 @@ export default function ProjectPage() {
 
       // Set as current project
       storage.setItem(CURRENT_PROJECT_KEY, projectId);
-      storage.setItem("currentStory", JSON.stringify({ id: projectId, title: projectName.trim(), wordCount: totalWords, status: "Draft" }));
+      storage.setItem("currentStory", JSON.stringify({ id: projectId, title: projectName.trim(), wordCount: totalWords, status: "Draft", primaryGenre }));
 
-      console.log(`[ProjectPage] Imported project: "${projectName.trim()}" (${chapters.length} chapters, ${totalWords} words)`);
-      
+      console.log(`[ProjectPage] Imported project: "${projectName.trim()}" (${chapters.length} chapters, ${totalWords} words) genre="${primaryGenre}"`);
+
       // Dispatch events
       window.dispatchEvent(new Event("project:change"));
       window.dispatchEvent(new Event("projects:change"));
@@ -1040,16 +1127,13 @@ export default function ProjectPage() {
                       </label>
                     </div>
 
-                    {/* Details - FIXED: Added min-w-0 overflow-hidden for proper truncation */}
+                    {/* Details */}
                     <div className="flex-1 p-6 flex flex-col min-w-0 overflow-hidden">
-                      {/* Header - FIXED: Added gap and overflow handling */}
                       <div className="flex justify-between items-start mb-1 gap-3">
-                        {/* FIXED: Title container with proper overflow handling */}
                         <div className="flex-1 min-w-0 overflow-hidden">
                           <div className="flex items-center gap-2 min-w-0">
-                            {/* FIXED: Title with truncate and title attribute for tooltip */}
-                            <h3 
-                              className="text-xl font-semibold truncate" 
+                            <h3
+                              className="text-xl font-semibold truncate"
                               style={{ fontFamily: "'EB Garamond', Georgia, serif", color: "#111827" }}
                               title={project.title || "Untitled"}
                             >
@@ -1059,15 +1143,42 @@ export default function ProjectPage() {
                               <Edit3 size={14} />
                             </button>
                           </div>
+
                           <div className="flex items-center gap-2 mt-2 text-sm text-gray-500">
                             <div className="w-5 h-5 rounded-full flex items-center justify-center text-xs text-white font-semibold flex-shrink-0" style={{ background: "linear-gradient(135deg, #D4AF37, #9b7bc9)" }}>
                               {authorName?.charAt(0)?.toUpperCase() || "A"}
                             </div>
                             <span className="truncate">by {authorName}</span>
                           </div>
+
+                          {/* Genre badge + quick change */}
+                          <div className="mt-2 flex items-center gap-2">
+                            <span
+                              className="px-2 py-1 rounded-full text-[10px] font-semibold"
+                              style={{ background: "rgba(155,123,201,0.12)", color: "#5b21b6" }}
+                              title="Primary Genre"
+                            >
+                              {project.primaryGenre || "General / Undeclared"}
+                            </span>
+
+                            <button
+                              type="button"
+                              className="text-[10px] text-purple-600 hover:text-purple-800"
+                              onClick={() => {
+                                const next = window.prompt(
+                                  "Update genre:\n\n" + GENRES.join("\n"),
+                                  project.primaryGenre || "General / Undeclared"
+                                );
+                                if (next !== null) updateProjectGenre(project.id, next);
+                              }}
+                            >
+                              Change
+                            </button>
+                          </div>
+
                           {/* Project ID */}
-                          <button 
-                            onClick={() => copyProjectId(project.id)} 
+                          <button
+                            onClick={() => copyProjectId(project.id)}
                             className="flex items-center gap-1 mt-1 text-[10px] text-gray-400 hover:text-gray-600 font-mono"
                             title="Click to copy Project ID"
                           >
@@ -1076,6 +1187,7 @@ export default function ProjectPage() {
                             <Copy size={10} className="flex-shrink-0" />
                           </button>
                         </div>
+
                         <select
                           value={project.status || "Draft"}
                           onChange={(e) => updateProject(project.id, { status: e.target.value })}
@@ -1151,9 +1263,10 @@ export default function ProjectPage() {
         ) : (
           /* List View */
           <div className="rounded-3xl overflow-hidden" style={{ background: "rgba(255,255,255,0.96)", backdropFilter: "blur(20px)", border: "1px solid rgba(148,163,184,0.35)" }}>
-            <div className="grid gap-4 px-6 py-4 text-xs font-semibold uppercase tracking-wide text-gray-500" style={{ gridTemplateColumns: "60px 2fr 100px 80px 100px 100px 100px", background: "rgba(148,163,184,0.12)", borderBottom: "1px solid rgba(15,23,42,0.06)" }}>
+            <div className="grid gap-4 px-6 py-4 text-xs font-semibold uppercase tracking-wide text-gray-500" style={{ gridTemplateColumns: "60px 2fr 140px 100px 80px 100px 100px 100px", background: "rgba(148,163,184,0.12)", borderBottom: "1px solid rgba(15,23,42,0.06)" }}>
               <span>Cover</span>
               <span>Title / ID</span>
+              <span>Genre</span>
               <span>Words</span>
               <span>Chapters</span>
               <span>Last Edit</span>
@@ -1163,20 +1276,17 @@ export default function ProjectPage() {
 
             {projects.map((project) => {
               const wordCount = project.wordCount || 0;
-              const targetWords = project.targetWords || 50000;
-              const pct = progressPct(wordCount, targetWords);
 
               return (
-                <div key={project.id} className="grid gap-4 px-6 py-4 items-center transition-colors hover:bg-white/60" style={{ gridTemplateColumns: "60px 2fr 100px 80px 100px 100px 100px", borderBottom: "1px solid rgba(15,23,42,0.04)" }}>
+                <div key={project.id} className="grid gap-4 px-6 py-4 items-center transition-colors hover:bg-white/60" style={{ gridTemplateColumns: "60px 2fr 140px 100px 80px 100px 100px 100px", borderBottom: "1px solid rgba(15,23,42,0.04)" }}>
                   <div className="w-12 h-16 rounded-lg flex items-center justify-center text-xl overflow-hidden" style={{ background: "linear-gradient(135deg, #e8dff5, #f5e6ff)" }}>
                     {project.cover ? <img src={project.cover} alt="" className="w-full h-full object-cover" /> : "📕"}
                   </div>
-                  {/* FIXED: List view title with proper truncation */}
+
                   <div className="min-w-0 overflow-hidden">
                     <div className="flex items-center gap-2 min-w-0">
-                      {/* FIXED: Added truncate class and title attribute */}
-                      <span 
-                        className="font-semibold truncate" 
+                      <span
+                        className="font-semibold truncate"
                         style={{ fontFamily: "'EB Garamond', Georgia, serif", color: "#111827" }}
                         title={project.title || "Untitled"}
                       >
@@ -1186,6 +1296,26 @@ export default function ProjectPage() {
                     </div>
                     <div className="text-[10px] text-gray-400 font-mono mt-0.5 truncate">{project.id.slice(-12)}</div>
                   </div>
+
+                  {/* Genre column */}
+                  <div className="min-w-0">
+                    <button
+                      type="button"
+                      className="px-2 py-1 rounded-full text-[10px] font-semibold text-left max-w-full truncate"
+                      style={{ background: "rgba(155,123,201,0.12)", color: "#5b21b6" }}
+                      title="Click to change genre"
+                      onClick={() => {
+                        const next = window.prompt(
+                          "Update genre:\n\n" + GENRES.join("\n"),
+                          project.primaryGenre || "General / Undeclared"
+                        );
+                        if (next !== null) updateProjectGenre(project.id, next);
+                      }}
+                    >
+                      {project.primaryGenre || "General / Undeclared"}
+                    </button>
+                  </div>
+
                   <div className="font-semibold text-purple-900">{wordCount.toLocaleString()}</div>
                   <div className="text-gray-600">{project.chapterCount || 0}</div>
                   <div className="text-sm text-gray-500">{formatDate(project.updatedAt)}</div>
@@ -1206,4 +1336,3 @@ export default function ProjectPage() {
     </div>
   );
 }
-
