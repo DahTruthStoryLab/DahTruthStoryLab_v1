@@ -496,7 +496,6 @@ function EditTitleModal({ isOpen, currentTitle, projectId, onSave, onClose }) {
   );
 }
 
-// -------------------- Genre Picker Modal --------------------
 // -------------------- Genre Picker Modal (type + pick) --------------------
 function GenrePickerModal({ open, initialValue, onCancel, onSave }) {
   const [query, setQuery] = useState(initialValue || "General / Undeclared");
@@ -541,7 +540,6 @@ function GenrePickerModal({ open, initialValue, onCancel, onSave }) {
 
     if (e.key === "Enter") {
       e.preventDefault();
-      // If they have a query, save it; otherwise pick the highlighted option
       if ((query || "").trim()) commit(query);
       else commit(list[activeIndex] || "General / Undeclared");
     }
@@ -551,17 +549,20 @@ function GenrePickerModal({ open, initialValue, onCancel, onSave }) {
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
       style={{ background: "rgba(15, 23, 42, 0.6)", backdropFilter: "blur(4px)" }}
-      onMouseDown={(e) => {
-        // click outside closes
+      // ✅ IMPORTANT: use onClick (NOT onMouseDown) to avoid killing option clicks
+      onClick={(e) => {
         if (e.target === e.currentTarget) onCancel();
       }}
     >
       <div
         className="w-full max-w-md rounded-3xl overflow-hidden"
         style={{ background: "#fff", boxShadow: "0 25px 80px rgba(15, 23, 42, 0.25)" }}
-        onMouseDown={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
       >
-        <div className="px-6 py-5" style={{ background: "linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%)" }}>
+        <div
+          className="px-6 py-5"
+          style={{ background: "linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%)" }}
+        >
           <h2 className="text-lg font-semibold text-white">Select Genre</h2>
           <p className="text-xs text-white/70 mt-1">Type to search, or pick from the list.</p>
         </div>
@@ -571,7 +572,6 @@ function GenrePickerModal({ open, initialValue, onCancel, onSave }) {
             Primary Genre
           </label>
 
-          {/* Type-to-search + custom entry */}
           <input
             value={query}
             onChange={(e) => {
@@ -584,7 +584,6 @@ function GenrePickerModal({ open, initialValue, onCancel, onSave }) {
             autoFocus
           />
 
-          {/* Pick list */}
           <div
             className="max-h-64 overflow-auto rounded-xl border border-gray-200"
             role="listbox"
@@ -644,6 +643,7 @@ function GenrePickerModal({ open, initialValue, onCancel, onSave }) {
     </div>
   );
 }
+
 
 // -------------------- Main Component --------------------
 export default function ProjectPage() {
