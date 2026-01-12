@@ -512,6 +512,7 @@ export default function Cover() {
   // Preset & layout
   const [genrePresetKey, setGenrePresetKey] = useState("general");
   const [layoutKey, setLayoutKey] = useState("center");
+  const [textAlign, setTextAlign] = useState("center"); // left, center, right
 
   // Custom colors (override preset colors)
   const [useCustomColors, setUseCustomColors] = useState(false);
@@ -685,6 +686,7 @@ export default function Cover() {
         if (settings.tagline !== undefined) setTagline(settings.tagline);
         if (settings.genrePresetKey) setGenrePresetKey(settings.genrePresetKey);
         if (settings.layoutKey) setLayoutKey(settings.layoutKey);
+        if (settings.textAlign) setTextAlign(settings.textAlign);
         if (settings.trimKey) setTrimKey(settings.trimKey);
 
         if (typeof settings.useCustomColors === "boolean") setUseCustomColors(settings.useCustomColors);
@@ -781,6 +783,7 @@ export default function Cover() {
         tagline,
         genrePresetKey,
         layoutKey,
+        textAlign,
         trimKey,
         useCustomColors,
         customTitleColor,
@@ -858,6 +861,7 @@ export default function Cover() {
     tagline,
     genrePresetKey,
     layoutKey,
+    textAlign,
     trimKey,
     useCustomColors,
     customTitleColor,
@@ -1517,6 +1521,29 @@ Story description: ${aiPrompt}`,
                     ))}
                   </div>
                 </div>
+                <div>
+                  <div style={styles.label}>Text Align</div>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    {[
+                      { key: "left", label: "Left" },
+                      { key: "center", label: "Center" },
+                      { key: "right", label: "Right" },
+                    ].map((a) => (
+                      <button
+                        key={a.key}
+                        type="button"
+                        onClick={() => setTextAlign(a.key)}
+                        style={{
+                          ...styles.btn,
+                          border: textAlign === a.key ? `2px solid ${theme.accent}` : `1px solid ${theme.border}`,
+                          background: textAlign === a.key ? "#eef2ff" : theme.white,
+                        }}
+                      >
+                        {a.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -1636,7 +1663,7 @@ Story description: ${aiPrompt}`,
                     display: "flex",
                     flexDirection: "column",
                     justifyContent,
-                    alignItems: "center",
+                    alignItems: textAlign === "center" ? "center" : textAlign === "right" ? "flex-end" : "flex-start",
                     padding: "28px 22px",
                   }}
                 >
@@ -1655,10 +1682,11 @@ Story description: ${aiPrompt}`,
                     style={{
                       position: "relative",
                       zIndex: 1,
-                      textAlign: "center",
+                      textAlign: textAlign,
                       fontFamily: activeFontFamily,
                       display: "flex",
                       flexDirection: "column",
+                      alignItems: textAlign === "center" ? "center" : textAlign === "right" ? "flex-end" : "flex-start",
                       gap: 6,
                     }}
                   >
