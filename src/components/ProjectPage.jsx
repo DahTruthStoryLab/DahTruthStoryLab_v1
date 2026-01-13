@@ -10,6 +10,7 @@
 // NEW: Safe default for legacy projects (General / Undeclared)
 // FIXED: Genre modal state is inside component (hooks rule)
 // FIXED: addProject uses Genre modal (no dead code / undefined vars)
+// NEW: Export/Import backup functionality for cross-computer sync
 
 import React, { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
@@ -17,6 +18,7 @@ import {
   BookOpen,
   Plus,
   Upload,
+  Download,
   Trash2,
   PencilLine,
   ArrowLeft,
@@ -45,6 +47,7 @@ import heic2any from "heic2any";
 // Use the SAME storage system as ComposePage
 import { storage } from "../lib/storage";
 import { documentParser } from "../utils/documentParser";
+import { exportAllProjects, importProjects } from "../lib/backup";
 
 // -------------------- UNIFIED Storage Keys (same as useProjectStore) --------------------
 const PROJECTS_LIST_KEY = "dahtruth-projects-list";
@@ -64,7 +67,7 @@ const GENRES = [
   "Science Fiction",
   "Horror",
   "Young Adult",
-  "Children’s",
+  "Children's",
   "Memoir",
   "Biography",
   "Essays",
@@ -549,7 +552,6 @@ function GenrePickerModal({ open, initialValue, onCancel, onSave }) {
     <div
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
       style={{ background: "rgba(15, 23, 42, 0.6)", backdropFilter: "blur(4px)" }}
-      // ✅ IMPORTANT: use onClick (NOT onMouseDown) to avoid killing option clicks
       onClick={(e) => {
         if (e.target === e.currentTarget) onCancel();
       }}
@@ -579,10 +581,14 @@ function GenrePickerModal({ open, initialValue, onCancel, onSave }) {
               setActiveIndex(0);
             }}
             onKeyDown={handleKeyDown}
-            placeholder="Type to search or enter a custom genre…"
+            placeholder="Type your own genre or search the list…"
             className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-indigo-400 outline-none text-sm"
             autoFocus
           />
+
+          <p className="text-xs text-purple-600 font-medium">
+            💡 You can type any custom genre — it doesn't have to be from the list!
+          </p>
 
           <div
             className="max-h-64 overflow-auto rounded-xl border border-gray-200"
@@ -615,7 +621,7 @@ function GenrePickerModal({ open, initialValue, onCancel, onSave }) {
           </div>
 
           <p className="text-xs text-gray-500">
-            Tip: press <span className="font-semibold">Enter</span> to save what you typed, or use ↑/↓ then Enter to pick.
+            Press <span className="font-semibold">Enter</span> to save your custom genre, or click any option above.
           </p>
         </div>
 
@@ -658,7 +664,7 @@ export default function ProjectPage() {
   const [editingProject, setEditingProject] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // ✅ FIX: hooks belong inside the component
+  // Genre modal state
   const [genreModal, setGenreModal] = useState({
     open: false,
     projectId: null,
@@ -668,6 +674,7 @@ export default function ProjectPage() {
   });
 
   const importInputRef = useRef(null);
+  const backupInputRef = useRef(null);
 
   // Initialize
   useEffect(() => {
@@ -774,7 +781,7 @@ export default function ProjectPage() {
     window.dispatchEvent(new Event("projects:change"));
   };
 
-  // ✅ FIXED: Create new project -> open Genre modal (no dead code)
+  // Create new project -> open Genre modal
   const addProject = () => {
     const title = window.prompt("Enter a title for your new project:", "Untitled Project");
     if (!title) return;
@@ -877,7 +884,6 @@ export default function ProjectPage() {
     importInputRef.current?.click();
   };
 
-  // ✅ Uses modal for genre too
   const handleImportFile = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -915,6 +921,35 @@ export default function ProjectPage() {
       alert("Failed to import file. Please try a different file format.");
       setIsLoading(false);
       e.target.value = "";
+    }
+  };
+
+  // Export backup
+  const handleExportBackup = () => {
+    exportAllProjects();
+  };
+
+  // Import from backup file
+  const handleBackupImport = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const confirmMerge = window.confirm(
+      'Do you want to MERGE with existing projects?\n\n' +
+      'Click OK to merge (keep existing + add new)\n' +
+      'Click Cancel to replace all projects'
+    );
+
+    setIsLoading(true);
+    try {
+      await importProjects(file, {
+        merge: confirmMerge,
+        skipDuplicates: true
+      });
+      loadProjectsFromStorage();
+    } finally {
+      setIsLoading(false);
+      e.target.value = '';
     }
   };
 
@@ -997,6 +1032,15 @@ export default function ProjectPage() {
         onChange={handleImportFile}
       />
 
+      {/* Hidden backup import input */}
+      <input
+        ref={backupInputRef}
+        type="file"
+        accept=".json"
+        className="hidden"
+        onChange={handleBackupImport}
+      />
+
       {/* Author Setup Modal */}
       <AuthorSetupModal isOpen={showAuthorSetup} onComplete={handleAuthorSetupComplete} />
 
@@ -1013,167 +1057,167 @@ export default function ProjectPage() {
       />
 
       <GenrePickerModal
-  open={genreModal.open}
-  initialValue={genreModal.initial}
-  onCancel={() => {
-    // If they cancel import, stop loading + clear file input
-    if (genreModal.context === "import") {
-      setIsLoading(false);
-      if (importInputRef.current) importInputRef.current.value = "";
-    }
-    setGenreModal({
-      open: false,
-      projectId: null,
-      initial: "General / Undeclared",
-      context: "new",
-      payload: null,
-    });
-  }}
-  onSave={(picked) => {
-    const primaryGenre = normalizeGenre(picked);
+        open={genreModal.open}
+        initialValue={genreModal.initial}
+        onCancel={() => {
+          // If they cancel import, stop loading + clear file input
+          if (genreModal.context === "import") {
+            setIsLoading(false);
+            if (importInputRef.current) importInputRef.current.value = "";
+          }
+          setGenreModal({
+            open: false,
+            projectId: null,
+            initial: "General / Undeclared",
+            context: "new",
+            payload: null,
+          });
+        }}
+        onSave={(picked) => {
+          const primaryGenre = normalizeGenre(picked);
 
-    // ---------- NEW ----------
-    if (genreModal.context === "new") {
-      const { projectId, title } = genreModal.payload || {};
-      if (!projectId || !title) {
-        setIsLoading(false);
-        setGenreModal({ open: false, projectId: null, initial: "General / Undeclared", context: "new", payload: null });
-        return;
-      }
+          // ---------- NEW ----------
+          if (genreModal.context === "new") {
+            const { projectId, title } = genreModal.payload || {};
+            if (!projectId || !title) {
+              setIsLoading(false);
+              setGenreModal({ open: false, projectId: null, initial: "General / Undeclared", context: "new", payload: null });
+              return;
+            }
 
-      const now = new Date().toISOString();
+            const now = new Date().toISOString();
 
-      const project = {
-        id: projectId,
-        title,
-        status: "Draft",
-        source: "New",
-        createdAt: now,
-        updatedAt: now,
-        wordCount: 0,
-        chapterCount: 1,
-        primaryGenre,
-      };
+            const project = {
+              id: projectId,
+              title,
+              status: "Draft",
+              source: "New",
+              createdAt: now,
+              updatedAt: now,
+              wordCount: 0,
+              chapterCount: 1,
+              primaryGenre,
+            };
 
-      const data = {
-        book: { title },
-        primaryGenre,
-        chapters: [
-          {
-            id: `chapter-${Date.now()}`,
-            title: "Chapter 1",
-            content: "",
-            preview: "",
-            wordCount: 0,
-            lastEdited: now,
-            status: "draft",
-            order: 0,
-          },
-        ],
-        daily: { goal: 500, counts: {} },
-        settings: { theme: "light", focusMode: false },
-        tocOutline: [],
-      };
+            const data = {
+              book: { title },
+              primaryGenre,
+              chapters: [
+                {
+                  id: `chapter-${Date.now()}`,
+                  title: "Chapter 1",
+                  content: "",
+                  preview: "",
+                  wordCount: 0,
+                  lastEdited: now,
+                  status: "draft",
+                  order: 0,
+                },
+              ],
+              daily: { goal: 500, counts: {} },
+              settings: { theme: "light", focusMode: false },
+              tocOutline: [],
+            };
 
-      saveProjectData(projectId, data);
-      const updated = [project, ...projects];
-      saveProjectsList(updated);
-      setProjects(updated);
+            saveProjectData(projectId, data);
+            const updated = [project, ...projects];
+            saveProjectsList(updated);
+            setProjects(updated);
 
-      storage.setItem(CURRENT_PROJECT_KEY, projectId);
-      storage.setItem(
-        "currentStory",
-        JSON.stringify({ id: projectId, title, wordCount: 0, status: "Draft", primaryGenre })
-      );
+            storage.setItem(CURRENT_PROJECT_KEY, projectId);
+            storage.setItem(
+              "currentStory",
+              JSON.stringify({ id: projectId, title, wordCount: 0, status: "Draft", primaryGenre })
+            );
 
-      window.dispatchEvent(new Event("project:change"));
-      window.dispatchEvent(new Event("projects:change"));
+            window.dispatchEvent(new Event("project:change"));
+            window.dispatchEvent(new Event("projects:change"));
 
-      setIsLoading(false);
-    }
+            setIsLoading(false);
+          }
 
-    // ---------- IMPORT ----------
-    if (genreModal.context === "import") {
-      const { projectId, title, parsed } = genreModal.payload || {};
-      if (!projectId || !title || !parsed?.chapters?.length) {
-        setIsLoading(false);
-        if (importInputRef.current) importInputRef.current.value = "";
-        setGenreModal({ open: false, projectId: null, initial: "General / Undeclared", context: "new", payload: null });
-        return;
-      }
+          // ---------- IMPORT ----------
+          if (genreModal.context === "import") {
+            const { projectId, title, parsed } = genreModal.payload || {};
+            if (!projectId || !title || !parsed?.chapters?.length) {
+              setIsLoading(false);
+              if (importInputRef.current) importInputRef.current.value = "";
+              setGenreModal({ open: false, projectId: null, initial: "General / Undeclared", context: "new", payload: null });
+              return;
+            }
 
-      const now = new Date().toISOString();
-      const totalWords = parsed.chapters.reduce((sum, ch) => sum + (ch.wordCount || 0), 0);
+            const now = new Date().toISOString();
+            const totalWords = parsed.chapters.reduce((sum, ch) => sum + (ch.wordCount || 0), 0);
 
-      const project = {
-        id: projectId,
-        title,
-        status: "Draft",
-        source: "Imported",
-        createdAt: now,
-        updatedAt: now,
-        wordCount: totalWords,
-        chapterCount: parsed.chapters.length,
-        primaryGenre,
-      };
+            const project = {
+              id: projectId,
+              title,
+              status: "Draft",
+              source: "Imported",
+              createdAt: now,
+              updatedAt: now,
+              wordCount: totalWords,
+              chapterCount: parsed.chapters.length,
+              primaryGenre,
+            };
 
-      const chapters = parsed.chapters.map((ch, idx) => ({
-        id: ch.id || `chapter-${Date.now()}-${idx}`,
-        title: ch.title,
-        content: ch.content,
-        preview: ch.preview || "",
-        wordCount: ch.wordCount || 0,
-        lastEdited: now,
-        status: "draft",
-        order: idx,
-      }));
+            const chapters = parsed.chapters.map((ch, idx) => ({
+              id: ch.id || `chapter-${Date.now()}-${idx}`,
+              title: ch.title,
+              content: ch.content,
+              preview: ch.preview || "",
+              wordCount: ch.wordCount || 0,
+              lastEdited: now,
+              status: "draft",
+              order: idx,
+            }));
 
-      const data = {
-        book: { title },
-        primaryGenre,
-        chapters,
-        daily: { goal: 500, counts: {} },
-        settings: { theme: "light", focusMode: false },
-        tocOutline: parsed.tableOfContents || [],
-      };
+            const data = {
+              book: { title },
+              primaryGenre,
+              chapters,
+              daily: { goal: 500, counts: {} },
+              settings: { theme: "light", focusMode: false },
+              tocOutline: parsed.tableOfContents || [],
+            };
 
-      saveProjectData(projectId, data);
-      const updated = [project, ...projects];
-      saveProjectsList(updated);
-      setProjects(updated);
+            saveProjectData(projectId, data);
+            const updated = [project, ...projects];
+            saveProjectsList(updated);
+            setProjects(updated);
 
-      storage.setItem(CURRENT_PROJECT_KEY, projectId);
-      storage.setItem(
-        "currentStory",
-        JSON.stringify({ id: projectId, title, wordCount: totalWords, status: "Draft", primaryGenre })
-      );
+            storage.setItem(CURRENT_PROJECT_KEY, projectId);
+            storage.setItem(
+              "currentStory",
+              JSON.stringify({ id: projectId, title, wordCount: totalWords, status: "Draft", primaryGenre })
+            );
 
-      window.dispatchEvent(new Event("project:change"));
-      window.dispatchEvent(new Event("projects:change"));
+            window.dispatchEvent(new Event("project:change"));
+            window.dispatchEvent(new Event("projects:change"));
 
-      // clear loading BEFORE navigate (safe)
-      setIsLoading(false);
-      if (importInputRef.current) importInputRef.current.value = "";
+            // clear loading BEFORE navigate (safe)
+            setIsLoading(false);
+            if (importInputRef.current) importInputRef.current.value = "";
 
-      navigate("/writer");
-    }
+            navigate("/writer");
+          }
 
-    // ---------- EDIT ----------
-    if (genreModal.context === "edit") {
-      if (genreModal.projectId) updateProjectGenre(genreModal.projectId, primaryGenre);
-      setIsLoading(false);
-    }
+          // ---------- EDIT ----------
+          if (genreModal.context === "edit") {
+            if (genreModal.projectId) updateProjectGenre(genreModal.projectId, primaryGenre);
+            setIsLoading(false);
+          }
 
-    // close modal (always)
-    setGenreModal({
-      open: false,
-      projectId: null,
-      initial: "General / Undeclared",
-      context: "new",
-      payload: null,
-    });
-  }}
-/>
+          // close modal (always)
+          setGenreModal({
+            open: false,
+            projectId: null,
+            initial: "General / Undeclared",
+            context: "new",
+            payload: null,
+          });
+        }}
+      />
 
 
       <div className="mx-auto max-w-7xl px-6 py-8">
@@ -1232,6 +1276,36 @@ export default function ProjectPage() {
                 {hasApiKeys ? "API Keys ✓" : "Add API Keys"}
               </button>
 
+              {/* Export Backup Button */}
+              <button
+                onClick={handleExportBackup}
+                className="inline-flex items-center gap-2 px-4 py-3 rounded-2xl text-sm font-medium transition-all hover:scale-105"
+                style={{
+                  background: "rgba(34, 197, 94, 0.08)",
+                  border: "1px solid rgba(34, 197, 94, 0.3)",
+                  color: "#16a34a"
+                }}
+                title="Download a backup of all your projects"
+              >
+                <Download size={16} />
+                Backup
+              </button>
+
+              {/* Import Backup Button */}
+              <button
+                onClick={() => backupInputRef.current?.click()}
+                className="inline-flex items-center gap-2 px-4 py-3 rounded-2xl text-sm font-medium transition-all hover:scale-105"
+                style={{
+                  background: "rgba(99, 102, 241, 0.08)",
+                  border: "1px solid rgba(99, 102, 241, 0.3)",
+                  color: "#4f46e5"
+                }}
+                title="Restore projects from a backup file"
+              >
+                <Upload size={16} />
+                Restore
+              </button>
+
               <div className="flex rounded-xl p-1" style={{ background: "rgba(248,250,252,0.95)", border: "1px solid rgba(148,163,184,0.4)" }}>
                 <button onClick={() => setViewMode("grid")} className={`p-2 rounded-lg transition-all ${viewMode === "grid" ? "bg-white shadow-md text-purple-700" : "text-gray-400 hover:text-gray-600"}`} title="Grid View">
                   <Grid size={18} />
@@ -1286,7 +1360,10 @@ export default function ProjectPage() {
             <div className="w-16 h-16 rounded-full flex items-center justify-center text-3xl mx-auto mb-4" style={{ background: "rgba(155,123,201,0.12)" }}>📚</div>
             <h2 className="text-3xl font-semibold mb-3" style={{ fontFamily: "'EB Garamond', Georgia, serif", color: "#111827" }}>No Projects Yet</h2>
             <p className="text-gray-500 max-w-md mx-auto mb-8 leading-relaxed">Create your first project or import an existing manuscript to get started.</p>
-            <div className="flex gap-4 justify-center">
+            <div className="flex gap-4 justify-center flex-wrap">
+              <button onClick={() => backupInputRef.current?.click()} className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl text-base font-semibold transition-all hover:scale-105" style={{ background: "rgba(99, 102, 241, 0.08)", border: "1px solid rgba(99, 102, 241, 0.3)", color: "#4f46e5" }}>
+                <Upload size={18} /> Restore Backup
+              </button>
               <button onClick={handleImportClick} className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl text-base font-semibold transition-all hover:scale-105" style={{ background: "rgba(255,255,255,0.9)", border: "1px solid rgba(148,163,184,0.4)" }}>
                 <Upload size={18} /> Import Manuscript
               </button>
@@ -1367,11 +1444,13 @@ export default function ProjectPage() {
                               type="button"
                               className="text-[10px] text-purple-600 hover:text-purple-800"
                               onClick={() => {
-                                const next = window.prompt(
-                                  "Update genre:\n\n" + GENRES.join("\n"),
-                                  project.primaryGenre || "General / Undeclared"
-                                );
-                                if (next !== null) updateProjectGenre(project.id, next);
+                                setGenreModal({
+                                  open: true,
+                                  context: "edit",
+                                  projectId: project.id,
+                                  initial: project.primaryGenre || "General / Undeclared",
+                                  payload: null,
+                                });
                               }}
                             >
                               Change
@@ -1507,11 +1586,13 @@ export default function ProjectPage() {
                       style={{ background: "rgba(155,123,201,0.12)", color: "#5b21b6" }}
                       title="Click to change genre"
                       onClick={() => {
-                        const next = window.prompt(
-                          "Update genre:\n\n" + GENRES.join("\n"),
-                          project.primaryGenre || "General / Undeclared"
-                        );
-                        if (next !== null) updateProjectGenre(project.id, next);
+                        setGenreModal({
+                          open: true,
+                          context: "edit",
+                          projectId: project.id,
+                          initial: project.primaryGenre || "General / Undeclared",
+                          payload: null,
+                        });
                       }}
                     >
                       {project.primaryGenre || "General / Undeclared"}
@@ -1538,3 +1619,4 @@ export default function ProjectPage() {
     </div>
   );
 }
+
