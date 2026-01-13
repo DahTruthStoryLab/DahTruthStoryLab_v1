@@ -63,7 +63,6 @@ import {
    Constants
 ============================================================================= */
 const CURRENT_STORY_KEY = "currentStory";
-const USER_PROJECTS_KEY = "userProjects";
 const PUBLISHING_DRAFT_KEY = "publishingDraft";
 
 const DEBUG_IMPORT = false;
@@ -135,45 +134,6 @@ function saveCurrentStorySnapshot({ id, title }) {
     storage.setItem(CURRENT_STORY_KEY, JSON.stringify(snapshot));
   } catch (err) {
     console.error("Failed to save currentStory:", err);
-  }
-}
-
-// Maintain a small list of projects/novels in localStorage
-function upsertUserProject({ title, ...rest }) {
-  if (!title) return;
-  try {
-    const t = title.trim();
-    if (!t) return;
-
-    const raw = storage.getItem(USER_PROJECTS_KEY);
-    let arr = [];
-    try {
-      arr = raw ? JSON.parse(raw) : [];
-    } catch {
-      arr = [];
-    }
-    if (!Array.isArray(arr)) arr = [];
-
-    const index = arr.findIndex((p) => p && p.title === t);
-
-    const base = {
-      title: t,
-      status: "Draft",
-      source: "Project",
-      updatedAt: new Date().toISOString(),
-      ...rest,
-    };
-
-    if (index >= 0) {
-      arr[index] = { ...arr[index], ...base };
-    } else {
-      arr.push(base);
-    }
-
-    storage.setItem(USER_PROJECTS_KEY, JSON.stringify(arr));
-    window.dispatchEvent(new Event("project:change"));
-  } catch (err) {
-    console.error("Failed to update userProjects:", err);
   }
 }
 
@@ -2169,7 +2129,6 @@ export default function ComposePage() {
       storage.setItem("dahtruth_project_meta", JSON.stringify(meta));
       storage.setItem(PUBLISHING_DRAFT_KEY, JSON.stringify(payload));
 
-      upsertUserProject({ title: safeBookTitle });
       navigate("/publishing");
     } catch (err) {
       console.error("Failed to send manuscript to publishing:", err);
