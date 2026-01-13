@@ -1,6 +1,7 @@
 // src/lib/storage/storage.ts
 // Storage service that provides localStorage-like API but uses IndexedDB
 // This solves the quota exceeded error for large manuscripts
+// FIXED: No longer writes to localStorage (was causing quota errors)
 
 import { db, initDB, isIndexedDBAvailable, StorageEntry, ProjectEntry } from './db';
 
@@ -30,6 +31,7 @@ async function ensureReady(): Promise<void> {
       try {
         await initDB();
         initialized = true;
+        console.log('[Storage] IndexedDB initialized successfully');
       } catch (error) {
         console.error('[Storage] Failed to init IndexedDB, falling back to localStorage:', error);
         fallbackToLocalStorage = true;
@@ -107,6 +109,10 @@ export async function removeItem(key: string): Promise<void> {
   
   try {
     await db.storage.delete(key);
+    // Also remove from localStorage if it exists there
+    try {
+      localStorage.removeItem(key);
+    } catch {}
   } catch (error) {
     console.error(`[Storage] Failed to remove "${key}":`, error);
   }
@@ -279,7 +285,7 @@ export async function listProjectIds(): Promise<string[]> {
    These functions provide a synchronous-looking API that matches localStorage.
    They queue operations and return immediately, with actual storage happening async.
    
-   NOTE: Use the async versions above when possible for better error handling.
+   FIXED: No longer writes to localStorage (was causing quota errors)
    ============================================================================ */
 
 // Operation queue for sync wrapper
@@ -326,8 +332,16 @@ export async function hydrateFromIndexedDB(): Promise<void> {
     await ensureReady();
     
     if (fallbackToLocalStorage) {
-      console.log('[Storage] Using localStorage fallback, no hydration needed');
+      // Hydrate cache from localStorage
+      console.log('[Storage] Hydrating from localStorage (fallback mode)...');
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key) {
+          readCache.set(key, localStorage.getItem(key));
+        }
+      }
       isHydrated = true;
+      window.dispatchEvent(new Event('storage:ready'));
       return;
     }
     
@@ -338,12 +352,6 @@ export async function hydrateFromIndexedDB(): Promise<void> {
       let loadedCount = 0;
       for (const entry of allEntries) {
         readCache.set(entry.key, entry.value);
-        // Also populate localStorage as backup (ignore errors for large items)
-        try {
-          localStorage.setItem(entry.key, entry.value);
-        } catch (e) {
-          // Ignore - item too large for localStorage
-        }
         loadedCount++;
       }
       
@@ -384,10 +392,11 @@ hydrateFromIndexedDB().catch(err => {
 /**
  * Synchronous-style storage wrapper
  * Provides localStorage-compatible API but uses IndexedDB under the hood
+ * FIXED: No longer writes to localStorage - only uses IndexedDB + cache
  */
 export const storage = {
   /**
-   * Get item (uses cache for sync access, async fetch for fresh data)
+   * Get item (uses cache for sync access, queues async fetch for fresh data)
    */
   getItem(key: string): string | null {
     // Return from cache if available
@@ -395,13 +404,16 @@ export const storage = {
       return readCache.get(key) ?? null;
     }
     
-    // Try localStorage as immediate fallback
-    const localValue = localStorage.getItem(key);
-    if (localValue !== null) {
-      readCache.set(key, localValue);
+    // ONLY use localStorage as fallback if IndexedDB isn't available
+    if (fallbackToLocalStorage) {
+      const localValue = localStorage.getItem(key);
+      if (localValue !== null) {
+        readCache.set(key, localValue);
+      }
+      return localValue;
     }
     
-    // Queue async fetch to update cache (in case localStorage was stale)
+    // Queue async fetch to populate cache
     operationQueue.push(async () => {
       const value = await getItem(key);
       if (value !== null) {
@@ -410,30 +422,34 @@ export const storage = {
     });
     processQueue();
     
-    return localValue;
+    // Return null for now - the async fetch will populate for next read
+    return null;
   },
   
   /**
    * Set item (queues async write, updates cache immediately)
+   * FIXED: No longer writes to localStorage
    */
   setItem(key: string, value: string): void {
     // Update cache immediately for sync reads
     readCache.set(key, value);
     
-    // Also write to localStorage as backup (may fail for large items)
-    try {
-      localStorage.setItem(key, value);
-    } catch (e) {
-      // Ignore localStorage errors - IndexedDB will handle it
-      console.debug(`[Storage] localStorage failed for "${key}", using IndexedDB`);
+    // If using localStorage fallback, write there
+    if (fallbackToLocalStorage) {
+      try {
+        localStorage.setItem(key, value);
+      } catch (e) {
+        console.error(`[Storage] localStorage quota exceeded for "${key}"`);
+        alert('Storage full! Please delete some old projects to free up space.');
+      }
+      return;
     }
     
-    // Queue async write to IndexedDB
+    // Queue async write to IndexedDB (NO localStorage write!)
     operationQueue.push(async () => {
       try {
         await setItem(key, value);
       } catch (error) {
-        // If IndexedDB also fails, we have a real problem
         console.error(`[Storage] Failed to save "${key}":`, error);
         
         // Show user-friendly error for quota issues
@@ -450,7 +466,11 @@ export const storage = {
    */
   removeItem(key: string): void {
     readCache.delete(key);
-    localStorage.removeItem(key);
+    
+    if (fallbackToLocalStorage) {
+      localStorage.removeItem(key);
+      return;
+    }
     
     operationQueue.push(async () => {
       await removeItem(key);
@@ -463,7 +483,11 @@ export const storage = {
    */
   clear(): void {
     readCache.clear();
-    localStorage.clear();
+    
+    if (fallbackToLocalStorage) {
+      localStorage.clear();
+      return;
+    }
     
     operationQueue.push(async () => {
       await clear();
@@ -542,6 +566,12 @@ export async function migrateFromLocalStorage(): Promise<{
   
   // Mark migration as complete
   await setItem(MIGRATION_KEY, 'complete');
+  
+  // ADDED: Clear localStorage after successful migration to free up space
+  if (result.migrated > 0 && result.failed === 0) {
+    console.log('[Storage] Clearing localStorage after successful migration...');
+    localStorage.clear();
+  }
   
   console.log(`[Storage] Migration complete: ${result.migrated} items migrated, ${result.failed} failed`);
   
