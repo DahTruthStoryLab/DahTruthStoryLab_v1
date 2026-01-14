@@ -1419,9 +1419,9 @@ export default function ComposePage() {
 
   const hasChapter = !!selectedId && !!selectedChapter;
   const hasAnyChapters = Array.isArray(chapters) && chapters.length > 0;
-  // Get genre from current project (defaults to General if not set)
+   // Get genre from current project (defaults to General if not set)
   const primaryGenre = currentProject?.primaryGenre || currentProject?.genre || 'General / Undeclared';
- 
+  console.log('DEBUG Genre:', primaryGenre, 'Category:', getGenreCategory(primaryGenre));
   const fileInputRef = useRef(null);
   const newProjectFileInputRef = useRef(null);
 
