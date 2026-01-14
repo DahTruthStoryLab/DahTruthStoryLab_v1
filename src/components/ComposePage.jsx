@@ -2477,45 +2477,19 @@ export default function ComposePage() {
                   />
                 )}
 
-                <ChapterSidebar
-                  chapters={chapters}
-                  selectedId={selectedId}
-                  onSelectChapter={setSelectedId}
-                  onAddChapter={addChapter}
-                  onDeleteMultiple={handleDeleteMultiple}
-                  selectMode={selectMode}
-                  selectedIds={selectedIds}
-                  onToggleSelect={toggleSelect}
-                  onRangeSelect={(idx) => rangeSelect(idx)}
-                  lastClickedIndexRef={lastClickedIndexRef}
-                  onRenameChapter={handleRenameChapter}
-                />
-
-                <ChapterSidebar
-  chapters={chapters}
-  selectedId={selectedId}
-  onSelectChapter={setSelectedId}
-  onAddChapter={addChapter}
-  onDeleteMultiple={handleDeleteMultiple}
-  selectMode={selectMode}
-  selectedIds={selectedIds}
-  onToggleSelect={toggleSelect}
-  onRangeSelect={(idx) => rangeSelect(idx)}
-  lastClickedIndexRef={lastClickedIndexRef}
-  onRenameChapter={handleRenameChapter}
-/>
-
-{/* Genre-Aware Story Elements Sidebar */}
-<SidebarRouter
-  genre={primaryGenre}
-  chapters={chapters}
-  projectId={projectId}
-  projectTitle={bookTitle}
-  wordCount={totalWords}
-  targetWords={50000}
-  onRefresh={() => console.log('Refresh story elements')}
-  hasAnyChapters={chapters.length > 0}
-/>
+          {/* Genre-Aware Story Elements Sidebar */}
+{getGenreCategory(primaryGenre) !== GENRE_CATEGORIES.CHARACTER && (
+  <SidebarRouter
+    genre={primaryGenre}
+    chapters={chapters}
+    projectId={currentProjectId}
+    projectTitle={bookTitle}
+    wordCount={totalWordCount}
+    targetWords={50000}
+    onRefresh={() => console.log('Refresh story elements')}
+    hasAnyChapters={hasAnyChapters}
+  />
+)}
                 {headings.length > 0 && (
                   <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
                     <div className="text-xs font-semibold text-slate-700 mb-2">
