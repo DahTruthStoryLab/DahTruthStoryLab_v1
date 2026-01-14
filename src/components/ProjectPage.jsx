@@ -585,7 +585,6 @@ function GenrePickerModal({ open, initialValue, onCancel, onSave }) {
             className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-indigo-400 outline-none text-sm"
             autoFocus
           />
-
           <p className="text-xs text-purple-600 font-medium">
             💡 You can type any custom genre — it doesn't have to be from the list!
           </p>
