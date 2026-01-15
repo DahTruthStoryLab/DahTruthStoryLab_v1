@@ -9,36 +9,16 @@ import {
   GENRE_CATEGORIES,
 } from "../../lib/genreConfig";
 
-// Import sidebar components that exist
+// Import all sidebar components
 import ThemeSidebar from "./ThemeSidebar";
 import RecipeSidebar from "./RecipeSidebar";
 import HybridSidebar from "./HybridSidebar";
-
-// These may or may not exist yet in your repo.
-// If any of these imports error, comment that import out and the fallback logic below will still work.
 import ReferenceSidebar from "./ReferenceSidebar";
 import CollectionSidebar from "./CollectionSidebar";
 import GeneralSidebar from "./GeneralSidebar";
 
 /**
  * SidebarRouter - Renders the appropriate sidebar based on genre category
- *
- * @param {string} genre - The project's primary genre
- * @param {Array} chapters - Array of chapter objects
- * @param {string} projectId - Current project ID
- * @param {string} projectTitle - Current project title
- * @param {number} wordCount - Total word count
- * @param {number} targetWords - Target word count
- * @param {Function} onRefresh - Callback to refresh/rescan content
- * @param {Function} onSelectChapter - Callback when a chapter is selected
- * @param {Function} onAddTag - Callback to add a tag: (namespace, value) => void
- * @param {boolean} hasAnyChapters - Whether any chapters exist
- *
- * Character-specific passthrough (optional):
- * @param {number} characterCount
- * @param {string[]} characters
- * @param {Function} onCharacterRefresh
- * @param {React.ComponentType} CharacterSidebarComponent
  */
 export default function SidebarRouter({
   genre,
@@ -52,43 +32,26 @@ export default function SidebarRouter({
   onAddTag,
   hasAnyChapters = false,
 
-  // Character-specific props (optional)
-  characterCount,
-  characters,
+  // Character-specific pass-through
+  characterCount = 0,
+  characters = [],
   onCharacterRefresh,
   CharacterSidebarComponent,
 }) {
+  // Derive category/config
   const category = getGenreCategory(genre);
-  // config is available if you want it later for labels/features, etc.
-  // const config = getConfigForGenre(genre);
-  getConfigForGenre(genre); // keeps behavior consistent even if you later use it
+  const config = getConfigForGenre(genre);
 
+  // Common props shared across sidebars
   const commonProps = {
     chapters,
     onRefresh,
     hasAnyChapters,
   };
 
-  const renderGeneralFallback = () => {
-    // If GeneralSidebar exists, use it; otherwise render nothing safely.
-    if (GeneralSidebar) {
-      return (
-        <GeneralSidebar
-          {...commonProps}
-          projectId={projectId}
-          projectTitle={projectTitle}
-          wordCount={wordCount}
-          targetWords={targetWords}
-        />
-      );
-    }
-    return null;
-  };
-
   switch (category) {
     case GENRE_CATEGORIES.CHARACTER: {
-      // Fiction: never return null — StoryLab should always show something.
-      // If you have a full CharacterSidebar component, render it.
+      // If you have a CharacterSidebar implementation, render it
       if (CharacterSidebarComponent) {
         return (
           <CharacterSidebarComponent
@@ -101,8 +64,16 @@ export default function SidebarRouter({
         );
       }
 
-      // Otherwise, show a safe fallback panel so the area doesn't disappear.
-      return renderGeneralFallback();
+      // Safe fallback so StoryLab doesn't disappear for fiction projects
+      return (
+        <GeneralSidebar
+          {...commonProps}
+          projectId={projectId}
+          projectTitle={projectTitle}
+          wordCount={wordCount}
+          targetWords={targetWords}
+        />
+      );
     }
 
     case GENRE_CATEGORIES.THEME:
@@ -117,9 +88,7 @@ export default function SidebarRouter({
       return (
         <RecipeSidebar
           {...commonProps}
-          onAddIngredientTag={(ingredient) =>
-            onAddTag?.("ingredient", ingredient)
-          }
+          onAddIngredientTag={(ingredient) => onAddTag?.("ingredient", ingredient)}
         />
       );
 
@@ -132,32 +101,33 @@ export default function SidebarRouter({
         />
       );
 
-    case GENRE_CATEGORIES.REFERENCE: {
-      // If ReferenceSidebar doesn't exist yet, fall back safely.
-      if (ReferenceSidebar) {
-        return (
-          <ReferenceSidebar
-            {...commonProps}
-            onAddTermTag={(term) => onAddTag?.("term", term)}
-          />
-        );
-      }
-      return renderGeneralFallback();
-    }
+    case GENRE_CATEGORIES.REFERENCE:
+      return (
+        <ReferenceSidebar
+          {...commonProps}
+          onAddTermTag={(term) => onAddTag?.("term", term)}
+        />
+      );
 
-    case GENRE_CATEGORIES.COLLECTION: {
-      // If CollectionSidebar doesn't exist yet, fall back safely.
-      if (CollectionSidebar) {
-        return (
-          <CollectionSidebar {...commonProps} onSelectPiece={onSelectChapter} />
-        );
-      }
-      return renderGeneralFallback();
-    }
+    case GENRE_CATEGORIES.COLLECTION:
+      return (
+        <CollectionSidebar
+          {...commonProps}
+          onSelectPiece={onSelectChapter}
+        />
+      );
 
     case GENRE_CATEGORIES.GENERAL:
     default:
-      return renderGeneralFallback();
+      return (
+        <GeneralSidebar
+          {...commonProps}
+          projectId={projectId}
+          projectTitle={projectTitle}
+          wordCount={wordCount}
+          targetWords={targetWords}
+        />
+      );
   }
 }
 
@@ -173,7 +143,7 @@ export function useGenreConfig(genre) {
     config,
     chapterLabel: config.chapterLabel,
     chapterLabelPlural: config.chapterLabelPlural,
-    primaryStatLabel: config.stats?.primary?.label,
+    primaryStatLabel: config.stats?.primary?.label || "Chapters",
     tagPrefix: `@${config.primaryTag}:`,
     isCharacterBased: category === GENRE_CATEGORIES.CHARACTER,
     isThemeBased: category === GENRE_CATEGORIES.THEME,
