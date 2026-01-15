@@ -2477,19 +2477,18 @@ export default function ComposePage() {
                   />
                 )}
 
-          {/* Genre-Aware Story Elements Sidebar */}
-{getGenreCategory(primaryGenre) !== GENRE_CATEGORIES.CHARACTER && (
-  <SidebarRouter
-    genre={primaryGenre}
-    chapters={chapters}
-    projectId={currentProjectId}
-    projectTitle={bookTitle}
-    wordCount={totalWordCount}
-    targetWords={50000}
-    onRefresh={() => console.log('Refresh story elements')}
-    hasAnyChapters={hasAnyChapters}
-  />
-)}
+  {/* Genre-Aware StoryLab Sidebar (always shows; it chooses the right modules) */}
+              <SidebarRouter
+                genre={primaryGenre}
+                chapters={chapters}
+                projectId={currentProjectId}
+                projectTitle={bookTitle}
+                wordCount={totalWordCount}
+                targetWords={50000}
+                hasAnyChapters={hasAnyChapters}
+                onRefresh={() => console.log("Refresh story elements")}
+              />
+                
                 {headings.length > 0 && (
                   <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
                     <div className="text-xs font-semibold text-slate-700 mb-2">
