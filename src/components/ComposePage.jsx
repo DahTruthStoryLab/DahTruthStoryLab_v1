@@ -2090,18 +2090,25 @@ export default function ComposePage() {
         };
       });
 
-      const normalizedForPublishing = cleanedChapters.map((ch, index) => {
-        const htmlForPublishing = ch.content || "";
-        const plainForPublishing = stripHtml(htmlForPublishing).trim();
-
-        return {
-          id: ch.id || `c_${index + 1}`,
-          title: ch.title || `Chapter ${index + 1}`,
-          included: typeof ch.included === "boolean" ? ch.included : true,
-          text: plainForPublishing,
-          textHTML: htmlForPublishing || undefined,
-        };
-      });
+     const normalizedForPublishing = cleanedChapters.map((ch, index) => {
+      const htmlForPublishing = ch.content || "";
+      const plainForPublishing = htmlToPlainText(htmlForPublishing);
+    
+      return {
+        id: ch.id || `c_${index + 1}`,
+        title: ch.title || `Chapter ${index + 1}`,
+        included: typeof ch.included === "boolean" ? ch.included : true,
+    
+        // ✅ Primary source for formatting & export
+        html: htmlForPublishing,
+    
+        // ✅ Backward compatibility (do not remove yet)
+        textHTML: htmlForPublishing,
+    
+        // ✅ Helper only (search / AI / fallback)
+        text: plainForPublishing,
+      };
+    });
 
       const safeBookTitle = bookTitle?.trim() || book?.title?.trim() || "Untitled Book";
 
@@ -2134,12 +2141,8 @@ export default function ComposePage() {
       storage.setItem(chaptersKey, JSON.stringify(normalizedForPublishing));
       storage.setItem(metaKey, JSON.stringify(meta));
       storage.setItem(draftKey, JSON.stringify(payload));
-
-      storage.setItem("dahtruth_chapters", JSON.stringify(normalizedForPublishing));
-      storage.setItem("dahtruth_project_meta", JSON.stringify(meta));
-      storage.setItem(PUBLISHING_DRAFT_KEY, JSON.stringify(payload));
-
-      navigate("/publishing");
+      
+    navigate("/publishing");
     } catch (err) {
       console.error("Failed to send manuscript to publishing:", err);
       alert("Something went wrong sending this to Publishing. Please try again.");
