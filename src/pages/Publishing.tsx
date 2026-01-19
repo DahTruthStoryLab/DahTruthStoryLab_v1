@@ -63,6 +63,9 @@ const publishingMatterKeyForProject = (projectId: string) =>
 const publishingMetaKeyForProject = (projectId: string) =>
   `dt_publishing_meta_${projectId}`;
 
+const publishingPlatformKeyForProject = (projectId: string) =>
+  `dt_publishing_platform_${projectId}`;
+
 const publishingManuscriptKeyForProject = (projectId: string) =>
   `dahtruth_publishing_manuscript_${projectId}`;
 
@@ -922,6 +925,23 @@ export default function Publishing(): JSX.Element {
   const [platformPreset, setPlatformPreset] =
     useState<PlatformPresetKey>("Generic_Manuscript_Submission");
 
+  // ✅ Load saved platform preset (project-scoped)
+  useEffect(() => {
+    if (!projectId) return;
+
+    const saved = storage.getItem(publishingPlatformKeyForProject(projectId));
+    if (saved) {
+      setPlatformPreset(saved as PlatformPresetKey);
+    }
+  }, [projectId]);
+
+  // ✅ Save platform preset when it changes (project-scoped)
+  useEffect(() => {
+    if (!projectId) return;
+
+    storage.setItem(publishingPlatformKeyForProject(projectId), platformPreset);
+  }, [platformPreset, projectId]);
+
   const [msOverrides, setMsOverrides] = useState<
     Partial<(typeof MANUSCRIPT_PRESETS)[ManuscriptPresetKey]>
   >({});
@@ -1550,6 +1570,28 @@ export default function Publishing(): JSX.Element {
                 Based on your selected platform, this preview approximates page size
                 and margins for the editor.
               </p>
+
+              {/* ✅ NEW: Trim Size Dropdown */}
+              <div style={{ marginBottom: 12 }}>
+                <label style={{ ...styles.label, display: "block", marginBottom: 4 }}>
+                  Trim Size
+                </label>
+                <select
+                  value={platformPreset}
+                  onChange={(e) => setPlatformPreset(e.target.value as PlatformPresetKey)}
+                  style={styles.input}
+                >
+                  <option value="KDP_Paperback_5x8">5 × 8 in (KDP)</option>
+                  <option value="KDP_Paperback_5_25x8">5.25 × 8 in (KDP)</option>
+                  <option value="KDP_Paperback_5_5x8_5">5.5 × 8.5 in (KDP)</option>
+                  <option value="KDP_Paperback_6x9">6 × 9 in (KDP)</option>
+                  <option value="KDP_Paperback_7x10">7 × 10 in (KDP)</option>
+                  <option value="KDP_Paperback_8x10">8 × 10 in (KDP)</option>
+                  <option value="KDP_Ebook">Kindle eBook (reflowable)</option>
+                  <option value="Generic_Manuscript_Submission">Generic Manuscript Submission</option>
+                </select>
+              </div>
+
               <div
                 style={{
                   fontSize: 11,
