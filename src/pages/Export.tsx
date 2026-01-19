@@ -2,6 +2,21 @@
 import React from "react";
 import { useNavigate } from "react-router-dom";
 import PageShell from "../components/layout/PageShell.tsx";
+import { storage } from "../lib/storage";
+import {
+  ensureSelectedProject,
+  getSelectedProjectId,
+} from "../lib/projectsSync";
+
+/* ---------- Project-aware storage keys ---------- */
+const publishingManuscriptKeyForProject = (projectId: string) =>
+  `dahtruth_publishing_manuscript_${projectId}`;
+
+const publishingMetaKeyForProject = (projectId: string) =>
+  `dt_publishing_meta_${projectId}`;
+
+const publishingPlatformKeyForProject = (projectId: string) =>
+  `dt_publishing_platform_${projectId}`;
 
 /* ---------- Theme ---------- */
 const theme = {
@@ -68,40 +83,74 @@ function htmlEscape(s: string) {
   return s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
 }
 
+/* ---------- Trim Presets ---------- */
+const TRIM_PRESETS: Record<string, { w: number; h: number }> = {
+  KDP_Paperback_5x8: { w: 5, h: 8 },
+  KDP_Paperback_5_25x8: { w: 5.25, h: 8 },
+  KDP_Paperback_5_5x8_5: { w: 5.5, h: 8.5 },
+  KDP_Paperback_6x9: { w: 6, h: 9 },
+  KDP_Paperback_7x10: { w: 7, h: 10 },
+  KDP_Paperback_8x10: { w: 8, h: 10 },
+};
+
 /* ---------- Component ---------- */
 export default function Export(): JSX.Element {
   const navigate = useNavigate();
 
-  // Mock data - in real app, pass via props/context/state
-  const meta = {
-    title: "Working Title",
-    author: "Your Name",
-    year: new Date().getFullYear().toString(),
+  /* ---------- Helper to load manuscript data ---------- */
+  const getManuscriptData = () => {
+    const project = ensureSelectedProject();
+    const projectId = project?.id || getSelectedProjectId();
+
+    if (!projectId) {
+      return { projectId: null, manuscript: null, meta: null, platformPreset: "KDP_Paperback_6x9" };
+    }
+
+    const manuscript = storage.getItem(publishingManuscriptKeyForProject(projectId));
+    const metaRaw = storage.getItem(publishingMetaKeyForProject(projectId));
+    const platformPreset =
+      storage.getItem(publishingPlatformKeyForProject(projectId)) || "KDP_Paperback_6x9";
+
+    const meta = metaRaw ? JSON.parse(metaRaw) : {};
+
+    return { projectId, manuscript, meta, platformPreset };
   };
 
-  const compiledHTML = `
-    <!DOCTYPE html>
-    <html>
-      <head>
-        <meta charset="utf-8">
-        <title>${htmlEscape(meta.title)}</title>
-        <style>
-          body { font-family: 'Times New Roman', serif; font-size: 12pt; margin: 1in; line-height: 2.0; }
-          h1, h2 { text-align: center; margin: 2em 0 1em 0; }
-          p { margin: 0 0 1em 0; text-indent: 0.5in; }
-        </style>
-      </head>
-      <body>
-        <h1>${htmlEscape(meta.title)}</h1>
-        <p style="text-align:center;">by ${htmlEscape(meta.author)} • ${meta.year}</p>
-        <p>The morning held the kind of quiet that asks for a first sentence...</p>
-      </body>
-    </html>
-  `;
-
-  const compiledPlain = `${meta.title}\nby ${meta.author}\n\nThe morning held the kind of quiet that asks for a first sentence...`;
-
   const exportPDF = () => {
+    const { manuscript, meta } = getManuscriptData();
+
+    if (!manuscript) {
+      alert("No compiled manuscript found. Open Publishing first.");
+      return;
+    }
+
+    const title = meta?.title || "Manuscript";
+    const author = meta?.author || "";
+    const year = meta?.year || new Date().getFullYear().toString();
+
+    const compiledHTML = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <title>${htmlEscape(title)}</title>
+          <style>
+            body { font-family: 'Times New Roman', serif; font-size: 12pt; margin: 1in; line-height: 2.0; }
+            h1, h2 { text-align: center; margin: 2em 0 1em 0; }
+            p { margin: 0 0 1em 0; text-indent: 0.5in; }
+          </style>
+        </head>
+        <body>
+          <h1>${htmlEscape(title)}</h1>
+          <p style="text-align:center;">by ${htmlEscape(author)} • ${year}</p>
+          ${manuscript
+            .split("\n\n")
+            .map((b: string) => "<p>" + htmlEscape(b).replaceAll("\n", "<br/>") + "</p>")
+            .join("\n")}
+        </body>
+      </html>
+    `;
+
     const w = window.open("", "_blank");
     if (!w) {
       alert("Please allow popups to export PDF");
@@ -120,31 +169,147 @@ export default function Export(): JSX.Element {
     try {
       const { saveAs } = await import("file-saver");
       const docx = await import("docx");
-      const { Document, Packer, Paragraph, HeadingLevel, AlignmentType, convertInchesToTwip } = docx as any;
+      const {
+        Document,
+        Packer,
+        Paragraph,
+        TextRun,
+        AlignmentType,
+        HeadingLevel,
+        PageBreak,
+        convertInchesToTwip,
+      } = docx as any;
 
-      const children: any[] = [
-        new Paragraph({ text: meta.title, heading: HeadingLevel.TITLE, alignment: AlignmentType.CENTER }),
-        new Paragraph({ text: `by ${meta.author}`, alignment: AlignmentType.CENTER }),
-        new Paragraph({ text: `${meta.year}`, alignment: AlignmentType.CENTER }),
-      ];
+      // 🔹 Load selected project
+      const project = ensureSelectedProject();
+      const projectId = project?.id || getSelectedProjectId();
+      if (!projectId) {
+        alert("No active project selected.");
+        return;
+      }
 
-      compiledPlain.split("\n\n").forEach((block) => {
-        children.push(new Paragraph({ text: "" }));
-        block.split("\n").forEach((line) => {
-          children.push(new Paragraph({ text: line }));
-        });
-      });
+      // 🔹 Load manuscript + meta from Publishing
+      const manuscript = storage.getItem(
+        publishingManuscriptKeyForProject(projectId)
+      );
+      const metaRaw = storage.getItem(
+        publishingMetaKeyForProject(projectId)
+      );
+      const platformPreset =
+        storage.getItem(publishingPlatformKeyForProject(projectId)) ||
+        "KDP_Paperback_6x9";
 
+      if (!manuscript) {
+        alert("No compiled manuscript found. Open Publishing first.");
+        return;
+      }
+
+      const meta = metaRaw ? JSON.parse(metaRaw) : {};
+      const title = meta.title || "Manuscript";
+      const author = meta.author || "";
+      const year = meta.year || new Date().getFullYear().toString();
+
+      // 🔹 Trim size
+      const trim = TRIM_PRESETS[platformPreset] || TRIM_PRESETS.KDP_Paperback_6x9;
+
+      // 🔹 KDP-safe margins
+      const top = 0.75;
+      const bottom = 0.75;
+      const outside = 0.6;
+      const inside = 0.85; // includes gutter
+      const gutter = 0.25;
+
+      // 🔹 Build Word paragraphs cleanly
+      const lines = manuscript.split("\n");
+      const children: any[] = [];
+
+      // Title page
+      children.push(
+        new Paragraph({
+          text: title,
+          heading: HeadingLevel.TITLE,
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 300 },
+        })
+      );
+
+      if (author) {
+        children.push(
+          new Paragraph({
+            text: `by ${author}`,
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 200 },
+          })
+        );
+      }
+
+      children.push(
+        new Paragraph({
+          text: year,
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 600 },
+        })
+      );
+
+      children.push(new Paragraph({ children: [new PageBreak()] }));
+
+      // Body
+      let buffer: string[] = [];
+      const flush = () => {
+        if (!buffer.length) return;
+        children.push(
+          new Paragraph({
+            children: [new TextRun(buffer.join(" "))],
+            alignment: AlignmentType.JUSTIFIED,
+            indent: { firstLine: convertInchesToTwip(0.25) },
+            spacing: { after: 120 },
+          })
+        );
+        buffer = [];
+      };
+
+      for (const line of lines) {
+        const t = line.trim();
+        if (!t) {
+          flush();
+          continue;
+        }
+
+        if (/^chapter\s+\d+/i.test(t)) {
+          flush();
+          children.push(new Paragraph({ children: [new PageBreak()] }));
+          children.push(
+            new Paragraph({
+              text: t,
+              heading: HeadingLevel.HEADING_1,
+              alignment: AlignmentType.CENTER,
+              spacing: { before: 240, after: 240 },
+            })
+          );
+          continue;
+        }
+
+        buffer.push(t);
+      }
+      flush();
+
+      // 🔹 Create DOCX
       const doc = new Document({
         sections: [
           {
             properties: {
               page: {
+                size: {
+                  width: convertInchesToTwip(trim.w),
+                  height: convertInchesToTwip(trim.h),
+                },
                 margin: {
-                  top: convertInchesToTwip(1),
-                  right: convertInchesToTwip(1),
-                  bottom: convertInchesToTwip(1),
-                  left: convertInchesToTwip(1),
+                  top: convertInchesToTwip(top),
+                  bottom: convertInchesToTwip(bottom),
+                  left: convertInchesToTwip(inside),
+                  right: convertInchesToTwip(outside),
+                  gutter: convertInchesToTwip(gutter),
+                  mirror: true,
                 },
               },
             },
@@ -154,27 +319,36 @@ export default function Export(): JSX.Element {
       });
 
       const blob = await Packer.toBlob(doc);
-      saveAs(blob, `${safeFile(meta.title)}.docx`);
-    } catch (error) {
-      console.error("Export DOCX error:", error);
-      alert("Failed to export DOCX. Make sure the required libraries are installed.");
+      saveAs(blob, `${safeFile(title)}_${trim.w}x${trim.h}.docx`);
+    } catch (err) {
+      console.error("DOCX export failed:", err);
+      alert("DOCX export failed. See console for details.");
     }
   };
 
   const exportEPUBXHTML = (): void => {
+    const { manuscript, meta } = getManuscriptData();
+
+    if (!manuscript) {
+      alert("No compiled manuscript found. Open Publishing first.");
+      return;
+    }
+
+    const title = meta?.title || "Manuscript";
+
     const xhtml = [
       '<?xml version="1.0" encoding="UTF-8"?>',
       "<!DOCTYPE html>",
       '<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">',
       "<head>",
       '  <meta charset="utf-8"/>',
-      `  <title>${htmlEscape(meta.title)}</title>`,
+      `  <title>${htmlEscape(title)}</title>`,
       "  <style>body{font-family:serif;line-height:1.45;margin:1em;} p{margin:0 0 1em 0;}</style>",
       "</head>",
       "<body>",
-      compiledPlain
+      manuscript
         .split("\n\n")
-        .map((b) => "<p>" + htmlEscape(b).replaceAll("\n", "<br/>") + "</p>")
+        .map((b: string) => "<p>" + htmlEscape(b).replaceAll("\n", "<br/>") + "</p>")
         .join("\n"),
       "</body>",
       "</html>",
@@ -183,19 +357,30 @@ export default function Export(): JSX.Element {
     const blob = new Blob([xhtml], { type: "application/xhtml+xml;charset=utf-8" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = `${safeFile(meta.title)}.xhtml`;
+    a.download = `${safeFile(title)}.xhtml`;
     a.click();
     URL.revokeObjectURL(a.href);
   };
 
   const exportEPUB = async (): Promise<void> => {
     try {
+      const { manuscript, meta } = getManuscriptData();
+
+      if (!manuscript) {
+        alert("No compiled manuscript found. Open Publishing first.");
+        return;
+      }
+
+      const title = meta?.title || "Manuscript";
+      const author = meta?.author || "";
+      const year = meta?.year || new Date().getFullYear().toString();
+
       const JSZip = (await import("jszip")).default;
       const esc = htmlEscape;
 
-      const body = compiledPlain
+      const body = manuscript
         .split("\n\n")
-        .map((p) => "<p>" + esc(p).replaceAll("\n", "<br/>") + "</p>")
+        .map((p: string) => "<p>" + esc(p).replaceAll("\n", "<br/>") + "</p>")
         .join("\n");
 
       const titleXhtml = [
@@ -204,12 +389,12 @@ export default function Export(): JSX.Element {
         '<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">',
         "<head>",
         '  <meta charset="utf-8"/>',
-        `  <title>${esc(meta.title)}</title>`,
+        `  <title>${esc(title)}</title>`,
         '  <link rel="stylesheet" type="text/css" href="styles.css"/>',
         "</head>",
         "<body>",
-        `<h1 style="text-align:center">${esc(meta.title)}</h1>`,
-        `<div style="text-align:center">by ${esc(meta.author)} • ${esc(meta.year)}</div>`,
+        `<h1 style="text-align:center">${esc(title)}</h1>`,
+        `<div style="text-align:center">by ${esc(author)} • ${esc(year)}</div>`,
         "<hr/>",
         body,
         "</body>",
@@ -237,8 +422,8 @@ export default function Export(): JSX.Element {
         '<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="pub-id">',
         '  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">',
         `    <dc:identifier id="pub-id">urn:uuid:${uid}</dc:identifier>`,
-        `    <dc:title>${esc(meta.title)}</dc:title>`,
-        `    <dc:creator>${esc(meta.author)}</dc:creator>`,
+        `    <dc:title>${esc(title)}</dc:title>`,
+        `    <dc:creator>${esc(author)}</dc:creator>`,
         "    <dc:language>en</dc:language>",
         `    <meta property="dcterms:modified">${new Date().toISOString().replace(/\..*/, "")}Z</meta>`,
         "  </metadata>",
@@ -275,7 +460,7 @@ export default function Export(): JSX.Element {
       const blob = await zip.generateAsync({ type: "blob", mimeType: "application/epub+zip" });
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
-      a.download = `${safeFile(meta.title)}.epub`;
+      a.download = `${safeFile(title)}.epub`;
       a.click();
       URL.revokeObjectURL(a.href);
     } catch (error) {
@@ -348,7 +533,7 @@ export default function Export(): JSX.Element {
 
           {/* Export Options Grid */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 20 }}>
-            {/* PDF Export */}
+            {/* DOCX Export */}
             <div
               style={styles.exportCard}
               onMouseEnter={(e) => {
@@ -363,7 +548,7 @@ export default function Export(): JSX.Element {
               <div style={{ fontSize: 48, marginBottom: 12 }}>📄</div>
               <h3 style={{ margin: "0 0 8px 0", fontSize: 18, color: theme.text }}>DOCX</h3>
               <p style={{ margin: "0 0 16px 0", fontSize: 13, color: theme.subtext, lineHeight: 1.6 }}>
-                Microsoft Word format with proper margins and formatting. Edit further in Word or LibreOffice.
+                Microsoft Word format with KDP-ready margins and formatting. Uses your selected trim size.
               </p>
               <button style={styles.btn} onClick={exportDOCX}>
                 Export DOCX
@@ -430,4 +615,4 @@ export default function Export(): JSX.Element {
     </PageShell>
   );
 }
-       
+
