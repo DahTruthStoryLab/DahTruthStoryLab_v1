@@ -3,14 +3,15 @@ import React from "react";
 import { useNavigate } from "react-router-dom";
 import PageShell from "../components/layout/PageShell.tsx";
 import { storage } from "../lib/storage";
-import {
-  ensureSelectedProject,
-  getSelectedProjectId,
-} from "../lib/projectsSync";
+import { ensureSelectedProject, getSelectedProjectId } from "../lib/projectsSync";
 
 /* ---------- Project-aware storage keys ---------- */
 const publishingManuscriptKeyForProject = (projectId: string) =>
   `dahtruth_publishing_manuscript_${projectId}`;
+
+// NEW: HTML manuscript (preferred if present)
+const publishingManuscriptHtmlKeyForProject = (projectId: string) =>
+  `dahtruth_publishing_manuscript_html_${projectId}`;
 
 const publishingMetaKeyForProject = (projectId: string) =>
   `dt_publishing_meta_${projectId}`;
@@ -80,7 +81,102 @@ function safeFile(name: string): string {
 }
 
 function htmlEscape(s: string) {
-  return s.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+  return (s || "")
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;");
+}
+
+/**
+ * VERY lightweight HTML -> text extraction (safe for DOCX paragraphing)
+ * - preserves <br> as newline
+ * - strips tags
+ */
+function htmlToPlainTextLoose(html: string): string {
+  if (!html) return "";
+  const withBreaks = html
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n\n")
+    .replace(/<\/h[1-6]>/gi, "\n\n");
+  const stripped = withBreaks.replace(/<[^>]+>/g, "");
+  return stripped.replace(/\u00a0/g, " ").trim();
+}
+
+/**
+ * Split plain text into paragraphs (blank line = paragraph break)
+ */
+function splitPlainParagraphs(text: string): string[] {
+  return (text || "")
+    .replace(/\r\n/g, "\n")
+    .split(/\n\s*\n/g)
+    .map((p) => p.trim())
+    .filter(Boolean);
+}
+
+/**
+ * Extract readable blocks from HTML without a full HTML parser.
+ * Goal: preserve H1/H2 + Poetry markers + paragraphs.
+ *
+ * Supports:
+ * - <h1>, <h2>, <h3>
+ * - <p> ... </p>
+ * - <p data-style="poetry">Line<br/>Line</p>
+ *
+ * If HTML is messy, we fall back to plain text.
+ */
+type HtmlBlock =
+  | { type: "h1" | "h2" | "h3"; text: string }
+  | { type: "p"; text: string }
+  | { type: "poetry"; lines: string[] };
+
+function extractBlocksFromHtml(html: string): HtmlBlock[] {
+  const input = (html || "").trim();
+  if (!input) return [];
+
+  // Normalize line breaks
+  const h = input.replace(/\r\n/g, "\n");
+
+  const blocks: HtmlBlock[] = [];
+
+  // Match headings and paragraphs in order
+  const re =
+    /<(h1|h2|h3)\b[^>]*>([\s\S]*?)<\/\1>|<p\b([^>]*)>([\s\S]*?)<\/p>/gi;
+
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(h))) {
+    if (match[1]) {
+      // heading
+      const level = match[1].toLowerCase() as "h1" | "h2" | "h3";
+      const inner = match[2] || "";
+      const text = htmlToPlainTextLoose(inner).replace(/\s+/g, " ").trim();
+      if (text) blocks.push({ type: level, text });
+      continue;
+    }
+
+    // paragraph
+    const pAttrs = match[3] || "";
+    const pInner = match[4] || "";
+
+    const isPoetry = /data-style\s*=\s*["']poetry["']/i.test(pAttrs);
+    if (isPoetry) {
+      const lines = (pInner || "")
+        .replace(/\r\n/g, "\n")
+        .replace(/<br\s*\/?>/gi, "\n")
+        .replace(/<[^>]+>/g, "")
+        .split("\n")
+        .map((x) => x.trimEnd())
+        .filter((x) => x.length > 0);
+
+      if (lines.length) blocks.push({ type: "poetry", lines });
+      continue;
+    }
+
+    const text = htmlToPlainTextLoose(pInner).replace(/\s+/g, " ").trim();
+    if (text) blocks.push({ type: "p", text });
+  }
+
+  // If we found nothing (e.g., HTML not in expected tags), return empty so caller can fallback.
+  return blocks;
 }
 
 /* ---------- Trim Presets ---------- */
@@ -103,23 +199,56 @@ export default function Export(): JSX.Element {
     const projectId = project?.id || getSelectedProjectId();
 
     if (!projectId) {
-      return { projectId: null, manuscript: null, meta: null, platformPreset: "KDP_Paperback_6x9" };
+      return {
+        projectId: null as string | null,
+        manuscript: null as string | null,
+        manuscriptHtml: null as string | null,
+        meta: null as any,
+        platformPreset: "KDP_Paperback_6x9",
+      };
     }
 
     const manuscript = storage.getItem(publishingManuscriptKeyForProject(projectId));
+    const manuscriptHtml = storage.getItem(
+      publishingManuscriptHtmlKeyForProject(projectId)
+    );
+
     const metaRaw = storage.getItem(publishingMetaKeyForProject(projectId));
     const platformPreset =
       storage.getItem(publishingPlatformKeyForProject(projectId)) || "KDP_Paperback_6x9";
 
     const meta = metaRaw ? JSON.parse(metaRaw) : {};
 
-    return { projectId, manuscript, meta, platformPreset };
+    return { projectId, manuscript, manuscriptHtml, meta, platformPreset };
+  };
+
+  /**
+   * Build export blocks from HTML if available; otherwise from plain text.
+   * This keeps poetry + headings when possible.
+   */
+  const getExportBlocks = () => {
+    const { manuscriptHtml, manuscript } = getManuscriptData();
+
+    if (manuscriptHtml && manuscriptHtml.trim()) {
+      const blocks = extractBlocksFromHtml(manuscriptHtml);
+      if (blocks.length) return { source: "html" as const, blocks };
+      // if HTML exists but we can't parse it, fallback to plain text
+    }
+
+    if (manuscript && manuscript.trim()) {
+      const paras = splitPlainParagraphs(manuscript);
+      const blocks: HtmlBlock[] = paras.map((p) => ({ type: "p", text: p }));
+      return { source: "plain" as const, blocks };
+    }
+
+    return { source: "none" as const, blocks: [] as HtmlBlock[] };
   };
 
   const exportPDF = () => {
-    const { manuscript, meta } = getManuscriptData();
+    const { meta } = getManuscriptData();
+    const { source, blocks } = getExportBlocks();
 
-    if (!manuscript) {
+    if (!blocks.length) {
       alert("No compiled manuscript found. Open Publishing first.");
       return;
     }
@@ -127,6 +256,24 @@ export default function Export(): JSX.Element {
     const title = meta?.title || "Manuscript";
     const author = meta?.author || "";
     const year = meta?.year || new Date().getFullYear().toString();
+
+    const bodyHtml =
+      source === "html"
+        ? // If HTML source, we prefer a very simple rendering of blocks (not raw HTML injection)
+          blocks
+            .map((b) => {
+              if (b.type === "h1") return `<h1>${htmlEscape(b.text)}</h1>`;
+              if (b.type === "h2") return `<h2>${htmlEscape(b.text)}</h2>`;
+              if (b.type === "h3") return `<h3>${htmlEscape(b.text)}</h3>`;
+              if (b.type === "poetry")
+                return `<p class="poetry">${b.lines.map((l) => htmlEscape(l)).join("<br/>")}</p>`;
+              return `<p>${htmlEscape(b.text).replaceAll("\n", "<br/>")}</p>`;
+            })
+            .join("\n")
+        : // Plain fallback
+          blocks
+            .map((b) => `<p>${htmlEscape((b as any).text || "").replaceAll("\n", "<br/>")}</p>`)
+            .join("\n");
 
     const compiledHTML = `
       <!DOCTYPE html>
@@ -136,17 +283,16 @@ export default function Export(): JSX.Element {
           <title>${htmlEscape(title)}</title>
           <style>
             body { font-family: 'Times New Roman', serif; font-size: 12pt; margin: 1in; line-height: 2.0; }
-            h1, h2 { text-align: center; margin: 2em 0 1em 0; }
+            h1, h2, h3 { text-align: center; margin: 2em 0 1em 0; }
             p { margin: 0 0 1em 0; text-indent: 0.5in; }
+            p.poetry { text-indent: 0; margin-left: 0.5in; }
           </style>
         </head>
         <body>
           <h1>${htmlEscape(title)}</h1>
-          <p style="text-align:center;">by ${htmlEscape(author)} • ${year}</p>
-          ${manuscript
-            .split("\n\n")
-            .map((b: string) => "<p>" + htmlEscape(b).replaceAll("\n", "<br/>") + "</p>")
-            .join("\n")}
+          <p style="text-align:center; text-indent:0;">by ${htmlEscape(author)} • ${htmlEscape(year)}</p>
+          <div style="height:2em;"></div>
+          ${bodyHtml}
         </body>
       </html>
     `;
@@ -180,7 +326,7 @@ export default function Export(): JSX.Element {
         convertInchesToTwip,
       } = docx as any;
 
-      // 🔹 Load selected project
+      // Load project
       const project = ensureSelectedProject();
       const projectId = project?.id || getSelectedProjectId();
       if (!projectId) {
@@ -188,39 +334,28 @@ export default function Export(): JSX.Element {
         return;
       }
 
-      // 🔹 Load manuscript + meta from Publishing
-      const manuscript = storage.getItem(
-        publishingManuscriptKeyForProject(projectId)
-      );
-      const metaRaw = storage.getItem(
-        publishingMetaKeyForProject(projectId)
-      );
-      const platformPreset =
-        storage.getItem(publishingPlatformKeyForProject(projectId)) ||
-        "KDP_Paperback_6x9";
+      const { meta, platformPreset } = getManuscriptData();
+      const { blocks } = getExportBlocks();
 
-      if (!manuscript) {
+      if (!blocks.length) {
         alert("No compiled manuscript found. Open Publishing first.");
         return;
       }
 
-      const meta = metaRaw ? JSON.parse(metaRaw) : {};
-      const title = meta.title || "Manuscript";
-      const author = meta.author || "";
-      const year = meta.year || new Date().getFullYear().toString();
+      const title = meta?.title || "Manuscript";
+      const author = meta?.author || "";
+      const year = meta?.year || new Date().getFullYear().toString();
 
-      // 🔹 Trim size
+      // Trim size
       const trim = TRIM_PRESETS[platformPreset] || TRIM_PRESETS.KDP_Paperback_6x9;
 
-      // 🔹 KDP-safe margins
+      // KDP-safe margins
       const top = 0.75;
       const bottom = 0.75;
       const outside = 0.6;
       const inside = 0.85; // includes gutter
       const gutter = 0.25;
 
-      // 🔹 Build Word paragraphs cleanly
-      const lines = manuscript.split("\n");
       const children: any[] = [];
 
       // Title page
@@ -253,34 +388,14 @@ export default function Export(): JSX.Element {
 
       children.push(new Paragraph({ children: [new PageBreak()] }));
 
-      // Body
-      let buffer: string[] = [];
-      const flush = () => {
-        if (!buffer.length) return;
-        children.push(
-          new Paragraph({
-            children: [new TextRun(buffer.join(" "))],
-            alignment: AlignmentType.JUSTIFIED,
-            indent: { firstLine: convertInchesToTwip(0.25) },
-            spacing: { after: 120 },
-          })
-        );
-        buffer = [];
-      };
-
-      for (const line of lines) {
-        const t = line.trim();
-        if (!t) {
-          flush();
-          continue;
-        }
-
-        if (/^chapter\s+\d+/i.test(t)) {
-          flush();
+      // Body blocks
+      for (const b of blocks) {
+        if (b.type === "h1") {
+          // New chapter/major heading: start on a new page
           children.push(new Paragraph({ children: [new PageBreak()] }));
           children.push(
             new Paragraph({
-              text: t,
+              text: b.text,
               heading: HeadingLevel.HEADING_1,
               alignment: AlignmentType.CENTER,
               spacing: { before: 240, after: 240 },
@@ -289,11 +404,61 @@ export default function Export(): JSX.Element {
           continue;
         }
 
-        buffer.push(t);
-      }
-      flush();
+        if (b.type === "h2") {
+          children.push(
+            new Paragraph({
+              text: b.text,
+              heading: HeadingLevel.HEADING_2,
+              alignment: AlignmentType.CENTER,
+              spacing: { before: 200, after: 160 },
+            })
+          );
+          continue;
+        }
 
-      // 🔹 Create DOCX
+        if (b.type === "h3") {
+          children.push(
+            new Paragraph({
+              text: b.text,
+              heading: HeadingLevel.HEADING_3,
+              alignment: AlignmentType.LEFT,
+              spacing: { before: 160, after: 120 },
+            })
+          );
+          continue;
+        }
+
+        if (b.type === "poetry") {
+          // Poetry: no first-line indent, preserve line breaks
+          const runs = b.lines.map((line, idx) => {
+            const isLast = idx === b.lines.length - 1;
+            return new TextRun({ text: line + (isLast ? "" : "\n") });
+          });
+
+          children.push(
+            new Paragraph({
+              children: runs,
+              alignment: AlignmentType.LEFT,
+              indent: {
+                left: convertInchesToTwip(0.5),
+              },
+              spacing: { after: 160 },
+            })
+          );
+          continue;
+        }
+
+        // Normal paragraph
+        children.push(
+          new Paragraph({
+            children: [new TextRun(b.text)],
+            alignment: AlignmentType.JUSTIFIED,
+            indent: { firstLine: convertInchesToTwip(0.25) },
+            spacing: { after: 120 },
+          })
+        );
+      }
+
       const doc = new Document({
         sections: [
           {
@@ -327,9 +492,10 @@ export default function Export(): JSX.Element {
   };
 
   const exportEPUBXHTML = (): void => {
-    const { manuscript, meta } = getManuscriptData();
+    const { meta } = getManuscriptData();
+    const { blocks } = getExportBlocks();
 
-    if (!manuscript) {
+    if (!blocks.length) {
       alert("No compiled manuscript found. Open Publishing first.");
       return;
     }
@@ -343,13 +509,22 @@ export default function Export(): JSX.Element {
       "<head>",
       '  <meta charset="utf-8"/>',
       `  <title>${htmlEscape(title)}</title>`,
-      "  <style>body{font-family:serif;line-height:1.45;margin:1em;} p{margin:0 0 1em 0;}</style>",
+      "  <style>",
+      "    body{font-family:serif;line-height:1.45;margin:1em;}",
+      "    h1,h2,h3{text-align:center;}",
+      "    p{margin:0 0 1em 0;}",
+      "    p.poetry{margin-left:1em;}",
+      "  </style>",
       "</head>",
       "<body>",
-      manuscript
-        .split("\n\n")
-        .map((b: string) => "<p>" + htmlEscape(b).replaceAll("\n", "<br/>") + "</p>")
-        .join("\n"),
+      ...blocks.map((b) => {
+        if (b.type === "h1") return `<h1>${htmlEscape(b.text)}</h1>`;
+        if (b.type === "h2") return `<h2>${htmlEscape(b.text)}</h2>`;
+        if (b.type === "h3") return `<h3>${htmlEscape(b.text)}</h3>`;
+        if (b.type === "poetry")
+          return `<p class="poetry">${b.lines.map((l) => htmlEscape(l)).join("<br/>")}</p>`;
+        return `<p>${htmlEscape(b.text).replaceAll("\n", "<br/>")}</p>`;
+      }),
       "</body>",
       "</html>",
     ].join("\n");
@@ -364,9 +539,10 @@ export default function Export(): JSX.Element {
 
   const exportEPUB = async (): Promise<void> => {
     try {
-      const { manuscript, meta } = getManuscriptData();
+      const { meta } = getManuscriptData();
+      const { blocks } = getExportBlocks();
 
-      if (!manuscript) {
+      if (!blocks.length) {
         alert("No compiled manuscript found. Open Publishing first.");
         return;
       }
@@ -378,9 +554,15 @@ export default function Export(): JSX.Element {
       const JSZip = (await import("jszip")).default;
       const esc = htmlEscape;
 
-      const body = manuscript
-        .split("\n\n")
-        .map((p: string) => "<p>" + esc(p).replaceAll("\n", "<br/>") + "</p>")
+      const body = blocks
+        .map((b) => {
+          if (b.type === "h1") return `<h1>${esc(b.text)}</h1>`;
+          if (b.type === "h2") return `<h2>${esc(b.text)}</h2>`;
+          if (b.type === "h3") return `<h3>${esc(b.text)}</h3>`;
+          if (b.type === "poetry")
+            return `<p class="poetry">${b.lines.map((l) => esc(l)).join("<br/>")}</p>`;
+          return `<p>${esc(b.text).replaceAll("\n", "<br/>")}</p>`;
+        })
         .join("\n");
 
       const titleXhtml = [
@@ -414,7 +596,13 @@ export default function Export(): JSX.Element {
         "</html>",
       ].join("\n");
 
-      const css = "body{font-family:serif;line-height:1.45;margin:1em;} h1{text-align:center} p{margin:0 0 1em 0;}";
+      const css = [
+        "body{font-family:serif;line-height:1.45;margin:1em;}",
+        "h1,h2,h3{text-align:center}",
+        "p{margin:0 0 1em 0;}",
+        "p.poetry{margin-left:1em;}",
+      ].join("\n");
+
       const uid = "storylab-" + Date.now();
 
       const packageOpf = [
@@ -425,7 +613,9 @@ export default function Export(): JSX.Element {
         `    <dc:title>${esc(title)}</dc:title>`,
         `    <dc:creator>${esc(author)}</dc:creator>`,
         "    <dc:language>en</dc:language>",
-        `    <meta property="dcterms:modified">${new Date().toISOString().replace(/\..*/, "")}Z</meta>`,
+        `    <meta property="dcterms:modified">${new Date()
+          .toISOString()
+          .replace(/\..*/, "")}Z</meta>`,
         "  </metadata>",
         "  <manifest>",
         '    <item id="title" href="title.xhtml" media-type="application/xhtml+xml"/>',
@@ -570,7 +760,8 @@ export default function Export(): JSX.Element {
               <div style={{ fontSize: 48, marginBottom: 12 }}>📖</div>
               <h3 style={{ margin: "0 0 8px 0", fontSize: 18, color: theme.text }}>EPUB</h3>
               <p style={{ margin: "0 0 16px 0", fontSize: 13, color: theme.subtext, lineHeight: 1.6 }}>
-                eBook format (.epub) ready for Kindle, Apple Books, and other eReaders. Packaged and validated.
+                eBook format (.epub) ready for Kindle, Apple Books, and other eReaders.
+                (Preview with Kindle Previewer or Calibre, not Microsoft Word.)
               </p>
               <button style={styles.btn} onClick={exportEPUB}>
                 Export EPUB
@@ -592,10 +783,32 @@ export default function Export(): JSX.Element {
               <div style={{ fontSize: 48, marginBottom: 12 }}>📑</div>
               <h3 style={{ margin: "0 0 8px 0", fontSize: 18, color: theme.text }}>XHTML</h3>
               <p style={{ margin: "0 0 16px 0", fontSize: 13, color: theme.subtext, lineHeight: 1.6 }}>
-                Clean XHTML file for web publishing or custom eBook creation. Simple and flexible.
+                Clean XHTML file for web publishing or custom eBook creation.
               </p>
               <button style={styles.btn} onClick={exportEPUBXHTML}>
                 Export XHTML
+              </button>
+            </div>
+
+            {/* PDF Export */}
+            <div
+              style={styles.exportCard}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.boxShadow = "0 8px 24px rgba(2,20,40,0.12)";
+                e.currentTarget.style.transform = "translateY(-2px)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.boxShadow = "none";
+                e.currentTarget.style.transform = "translateY(0)";
+              }}
+            >
+              <div style={{ fontSize: 48, marginBottom: 12 }}>🖨️</div>
+              <h3 style={{ margin: "0 0 8px 0", fontSize: 18, color: theme.text }}>PDF</h3>
+              <p style={{ margin: "0 0 16px 0", fontSize: 13, color: theme.subtext, lineHeight: 1.6 }}>
+                Print-style PDF via browser print. For a press-ready PDF pipeline, we can add a true PDF renderer later.
+              </p>
+              <button style={styles.btn} onClick={exportPDF}>
+                Export PDF
               </button>
             </div>
           </div>
@@ -604,10 +817,10 @@ export default function Export(): JSX.Element {
           <div style={{ ...styles.glassCard, marginTop: 24, background: theme.highlight }}>
             <h4 style={{ margin: "0 0 12px 0", fontSize: 16, color: theme.text }}>💡 Export Tips</h4>
             <ul style={{ margin: 0, paddingLeft: 20, color: theme.text, fontSize: 13, lineHeight: 1.8 }}>
-              <li><strong>For submissions:</strong> Use PDF or DOCX with proper formatting and headers</li>
-              <li><strong>For self-publishing:</strong> EPUB for Kindle Direct Publishing, Apple Books, etc.</li>
-              <li><strong>For print books:</strong> Export DOCX, finalize in Word/LibreOffice, then save as PDF</li>
-              <li><strong>Need headers/footers?</strong> Export DOCX and add them in Word with page numbers</li>
+              <li><strong>EPUB preview:</strong> Use Kindle Previewer or Calibre (Word is not an EPUB viewer).</li>
+              <li><strong>Chapters & poetry:</strong> Best results when Publishing saves an HTML manuscript.</li>
+              <li><strong>For print books:</strong> Export DOCX, finalize in Word/LibreOffice, then save as PDF.</li>
+              <li><strong>Headers/footers:</strong> Add them in Word after export if needed.</li>
             </ul>
           </div>
         </div>
@@ -615,4 +828,3 @@ export default function Export(): JSX.Element {
     </PageShell>
   );
 }
-
