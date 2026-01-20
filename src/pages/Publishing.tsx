@@ -663,16 +663,21 @@ export default function Publishing(): JSX.Element {
   // ✅ NEW: Project ID state
   const [projectId, setProjectId] = useState<string>("");
 
-  // ✅ Initialize selected project on mount
-  useEffect(() => {
-    try {
-      const p = ensureSelectedProject();
-      const id = p?.id || getSelectedProjectId() || "";
-      setProjectId(id);
-    } catch (e) {
-      console.error("Failed to init selected project in Publishing:", e);
-    }
-  }, []);
+ // ✅ Initialize selected project on mount
+useEffect(() => {
+  try {
+    const p = ensureSelectedProject();
+    const id = p?.id || getSelectedProjectId() || "";
+
+    setProjectId(id);
+
+    // 🔹 Keep Publishing Prep & other pages in sync
+    storage.setItem("dahtruth-current-project-id", id);
+    window.dispatchEvent(new Event("project:change"));
+  } catch (e) {
+    console.error("Failed to init selected project in Publishing:", e);
+  }
+}, []);
 
   // ---------- Meta (shared with Writing) ----------
   const [meta, setMeta] = useState<Meta>({
