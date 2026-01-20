@@ -1,8 +1,13 @@
 // src/pages/PublishingPrep.tsx
-// UPDATED: Uses storage wrapper and project-scoped keys
-// Properly tracks project switches via project:change events
+// UPDATED: Project-scoped storage + proper “Story Materials → Publishing Prep” imports
+// Fixes:
+// 1) If you generate Back Cover / Logline / Query from Publishing.tsx Story Materials,
+//    this page now imports it into the correct field + switches to the right tab.
+// 2) Prevents loadAllData() from overwriting the imported generated field on first load.
+// 3) Avoids double-saving projects in handleSave (single source of truth).
+// 4) Applies the imported generated content only once per navigation.
 
-import React, { useEffect, useMemo, useState, useCallback } from "react";
+import React, { useEffect, useMemo, useState, useCallback, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import PageShell from "../components/layout/PageShell.tsx";
 import {
@@ -25,7 +30,6 @@ import {
   generateBackCoverBlurb,
 } from "../lib/api";
 
-// ✅ Import the storage wrapper
 import { storage } from "../lib/storage";
 
 /* ---------- Theme ---------- */
@@ -60,6 +64,13 @@ const styles = {
     border: `1px solid ${theme.border}`,
     borderRadius: 16,
     padding: 24,
+    boxShadow: "0 8px 30px rgba(2,20,40,.06)",
+  } as React.CSSProperties,
+  rightCard: {
+    background: theme.surface,
+    border: `1px solid ${theme.border}`,
+    borderRadius: 16,
+    padding: 18,
     boxShadow: "0 8px 30px rgba(2,20,40,.06)",
   } as React.CSSProperties,
 } as const;
@@ -118,8 +129,6 @@ interface PublishingPrepData {
 }
 
 /* ---------- Helpers ---------- */
-
-// ✅ Use storage wrapper instead of localStorage
 function loadProfile() {
   try {
     const raw = storage.getItem(PROFILE_KEY);
@@ -168,22 +177,17 @@ function loadCurrentStory() {
   }
 }
 
-// ✅ Load publishing prep data from project-scoped key
 function loadPublishingPrepData(projectId: string): PublishingPrepData | null {
   if (!projectId) return null;
-  
+
   try {
-    // First try the dedicated publishing prep key
     const prepRaw = storage.getItem(publishingPrepKeyForProject(projectId));
-    if (prepRaw) {
-      return JSON.parse(prepRaw);
-    }
-    
-    // Fall back to publishing draft key (from Publishing.tsx)
+    if (prepRaw) return JSON.parse(prepRaw);
+
+    // fallback: legacy-ish “draft” bucket if it exists
     const draftRaw = storage.getItem(publishingDraftKeyForProject(projectId));
     if (draftRaw) {
       const draft = JSON.parse(draftRaw);
-      // Extract relevant fields
       return {
         synopsis: draft.synopsis,
         queryLetter: draft.queryLetter,
@@ -194,48 +198,42 @@ function loadPublishingPrepData(projectId: string): PublishingPrepData | null {
         launchPlan: draft.launchPlan,
       };
     }
-    
     return null;
   } catch {
     return null;
   }
 }
 
-// ✅ Save publishing prep data to project-scoped key
 function savePublishingPrepData(projectId: string, data: PublishingPrepData) {
   if (!projectId) return;
-  
+
   try {
     const toSave = {
       ...data,
       lastModified: new Date().toISOString(),
     };
     storage.setItem(publishingPrepKeyForProject(projectId), JSON.stringify(toSave));
-    
-    // Also update the main project data if it exists
+
+    // also mirror into the project list for dashboard summaries
     const projectsRaw = storage.getItem(PROJECTS_KEY);
     if (projectsRaw) {
       const projects = JSON.parse(projectsRaw);
-      const updated = projects.map((p: Project) =>
-        p.id === projectId
-          ? { ...p, ...data, lastModified: new Date().toISOString() }
-          : p
+      const updated = (Array.isArray(projects) ? projects : []).map((p: Project) =>
+        p.id === projectId ? { ...p, ...toSave } : p
       );
       storage.setItem(PROJECTS_KEY, JSON.stringify(updated));
     }
-    
+
     window.dispatchEvent(new Event("project:change"));
   } catch (err) {
     console.error("Failed to save publishing prep data:", err);
   }
 }
 
-// ✅ Load project metadata (title, author, word count) from project data
 function loadProjectMeta(projectId: string): Partial<Project> | null {
   if (!projectId) return null;
-  
+
   try {
-    // Try main project data key first
     const dataRaw = storage.getItem(projectDataKeyForProject(projectId));
     if (dataRaw) {
       const data = JSON.parse(dataRaw);
@@ -245,17 +243,15 @@ function loadProjectMeta(projectId: string): Partial<Project> | null {
       );
       return {
         title: data.book?.title || "Untitled",
+        author: data.book?.author || "",
         wordCount: totalWords,
         chapterCount: (data.chapters || []).length,
       };
     }
-    
-    // Try publishing meta key
+
     const metaRaw = storage.getItem(publishingMetaKeyForProject(projectId));
-    if (metaRaw) {
-      return JSON.parse(metaRaw);
-    }
-    
+    if (metaRaw) return JSON.parse(metaRaw);
+
     return null;
   } catch {
     return null;
@@ -279,41 +275,35 @@ const DEFAULT_CHECKLIST = [
   { id: "synopsis-done", label: "Clear 1–3 paragraph synopsis drafted" },
   { id: "query-draft", label: "Query letter drafted and proofread" },
   { id: "back-cover", label: "Back cover copy written" },
-  {
-    id: "metadata",
-    label: "Basic metadata defined (genre, audience, comps)",
-  },
+  { id: "metadata", label: "Basic metadata defined (genre, audience, comps)" },
 ];
 
 const getWordCount = (str: string = "") =>
   str.trim() ? str.trim().split(/\s+/).length : 0;
+
+type TabKey = "synopsis" | "query" | "pitch" | "checklist" | "marketing";
 
 /* ---------- Component ---------- */
 export default function PublishingPrep(): JSX.Element {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // State passed from StoryMaterials → PublishingPrep
   const locationState = (location.state || {}) as {
     from?: string;
-    materialType?: string;
+    materialType?: string; // "synopsis-short" | "synopsis-long" | "back-cover" | "logline" | "query-letter"
     manuscriptMeta?: any;
     manuscriptText?: string;
     generated?: string;
   };
 
-  const initialMaterialType = locationState.materialType || null;
-  const initialGenerated = locationState.generated || "";
-
   const cameFromStoryMaterials = locationState.from === "story-materials";
-  const isSynopsisMaterial =
-    !!initialMaterialType &&
-    initialMaterialType.toString().startsWith("synopsis");
+  const incomingMaterialType = (locationState.materialType || "") as string;
+  const incomingGenerated = (locationState.generated || "") as string;
 
-  // ✅ NEW: Track current project ID
-  const [projectId, setProjectId] = useState<string>(() => {
-    return getCurrentProjectId() || "";
-  });
+  // Apply imported generated content only once (per navigation)
+  const appliedIncomingRef = useRef(false);
+
+  const [projectId, setProjectId] = useState<string>(() => getCurrentProjectId() || "");
 
   // Core app state
   const [profile, setProfile] = useState<any | null>(null);
@@ -321,9 +311,7 @@ export default function PublishingPrep(): JSX.Element {
   const [currentStory, setCurrentStory] = useState<any | null>(null);
   const [projectMeta, setProjectMeta] = useState<Partial<Project> | null>(null);
 
-  const [activeTab, setActiveTab] = useState<
-    "synopsis" | "query" | "pitch" | "checklist" | "marketing"
-  >("synopsis");
+  const [activeTab, setActiveTab] = useState<TabKey>("synopsis");
 
   // Main content states
   const [synopsis, setSynopsis] = useState<string>("");
@@ -337,8 +325,7 @@ export default function PublishingPrep(): JSX.Element {
   const [isGeneratingBackCover, setIsGeneratingBackCover] = useState(false);
 
   // Checklist + marketing
-  const [checklistState, setChecklistState] =
-    useState<PublishingChecklist>({});
+  const [checklistState, setChecklistState] = useState<PublishingChecklist>({});
   const [marketingNotes, setMarketingNotes] = useState<string>("");
   const [launchPlan, setLaunchPlan] = useState<string>("");
 
@@ -346,66 +333,78 @@ export default function PublishingPrep(): JSX.Element {
   const [isSaving, setIsSaving] = useState(false);
   const [showSaved, setShowSaved] = useState(false);
 
-  // ✅ Load all data for the current project
+  // Determine which field should be protected from overwrite due to incoming generated content
+  const protectField = useMemo(() => {
+    if (!cameFromStoryMaterials || !incomingGenerated?.trim()) return null;
+    if (incomingMaterialType.startsWith("synopsis")) return "synopsis";
+    if (incomingMaterialType === "query-letter") return "queryLetter";
+    if (incomingMaterialType === "back-cover") return "backCover";
+    if (incomingMaterialType === "logline") return "logline";
+    return null;
+  }, [cameFromStoryMaterials, incomingMaterialType, incomingGenerated]);
+
+  // Load all data for current project
   const loadAllData = useCallback(() => {
     const currentProjId = getCurrentProjectId() || "";
     setProjectId(currentProjId);
-    setProfile(loadProfile());
-    setProjects(loadProjects());
-    setCurrentStory(loadCurrentStory());
-    
-    if (currentProjId) {
-      setProjectMeta(loadProjectMeta(currentProjId));
-      
-      // Load publishing prep data for this project
-      const prepData = loadPublishingPrepData(currentProjId);
-      if (prepData) {
-        // Only set if we didn't come from story materials with generated content
-        if (!(cameFromStoryMaterials && isSynopsisMaterial && initialGenerated)) {
-          setSynopsis(prepData.synopsis || "");
-        }
-        setQueryLetter(prepData.queryLetter || "");
-        setBackCover(prepData.backCover || "");
-        setLogline(prepData.logline || "");
-        
-        const storedChecklist = prepData.publishingChecklist || {};
-        const baseState: PublishingChecklist = {};
-        DEFAULT_CHECKLIST.forEach((item) => {
-          baseState[item.id] = !!storedChecklist[item.id];
-        });
-        setChecklistState(baseState);
-        
-        setMarketingNotes(prepData.marketingNotes || "");
-        setLaunchPlan(prepData.launchPlan || "");
-      } else {
-        // Reset fields if no data for this project
-        if (!(cameFromStoryMaterials && isSynopsisMaterial && initialGenerated)) {
-          setSynopsis("");
-        }
-        setQueryLetter("");
-        setBackCover("");
-        setLogline("");
-        setChecklistState({});
-        setMarketingNotes("");
-        setLaunchPlan("");
-      }
-    }
-  }, [cameFromStoryMaterials, isSynopsisMaterial, initialGenerated]);
 
-  // ✅ Initial load + listen for project changes
+    const p = loadProfile();
+    const projs = loadProjects();
+    const story = loadCurrentStory();
+
+    setProfile(p);
+    setProjects(projs);
+    setCurrentStory(story);
+
+    if (!currentProjId) {
+      // no project selected
+      setProjectMeta(null);
+      return;
+    }
+
+    const meta = loadProjectMeta(currentProjId);
+    setProjectMeta(meta);
+
+    const prepData = loadPublishingPrepData(currentProjId);
+    if (prepData) {
+      // Only overwrite fields that are NOT protected by incoming generated content
+      if (protectField !== "synopsis") setSynopsis(prepData.synopsis || "");
+      if (protectField !== "queryLetter") setQueryLetter(prepData.queryLetter || "");
+      if (protectField !== "backCover") setBackCover(prepData.backCover || "");
+      if (protectField !== "logline") setLogline(prepData.logline || "");
+
+      const storedChecklist = prepData.publishingChecklist || {};
+      const baseState: PublishingChecklist = {};
+      DEFAULT_CHECKLIST.forEach((item) => {
+        baseState[item.id] = !!storedChecklist[item.id];
+      });
+      setChecklistState(baseState);
+
+      setMarketingNotes(prepData.marketingNotes || "");
+      setLaunchPlan(prepData.launchPlan || "");
+    } else {
+      // Reset if no data — but respect protected field
+      if (protectField !== "synopsis") setSynopsis("");
+      if (protectField !== "queryLetter") setQueryLetter("");
+      if (protectField !== "backCover") setBackCover("");
+      if (protectField !== "logline") setLogline("");
+      setChecklistState({});
+      setMarketingNotes("");
+      setLaunchPlan("");
+    }
+  }, [protectField]);
+
+  // Initial load + listeners
   useEffect(() => {
     loadAllData();
-    
-    // If we came from story materials with generated synopsis, set it
-    if (cameFromStoryMaterials && isSynopsisMaterial && initialGenerated) {
-      setSynopsis(initialGenerated);
-    }
 
     const handleProjectChange = () => {
       console.log("[PublishingPrep] Project changed, reloading data...");
+      appliedIncomingRef.current = false; // allow incoming content to apply again if user navigates again
       loadAllData();
     };
 
+    // storage fires cross-tab; project:change fires same-tab
     window.addEventListener("storage", handleProjectChange);
     window.addEventListener("project:change", handleProjectChange);
     window.addEventListener("profile:updated", () => setProfile(loadProfile()));
@@ -415,83 +414,92 @@ export default function PublishingPrep(): JSX.Element {
       window.removeEventListener("project:change", handleProjectChange);
       window.removeEventListener("profile:updated", () => setProfile(loadProfile()));
     };
-  }, [loadAllData, cameFromStoryMaterials, isSynopsisMaterial, initialGenerated]);
+  }, [loadAllData]);
 
-  // Resolve active project from currentStory or fall back to first
+  // Apply incoming generated content to the correct field + tab (only once)
+  useEffect(() => {
+    if (!cameFromStoryMaterials) return;
+    if (!incomingGenerated?.trim()) return;
+    if (appliedIncomingRef.current) return;
+
+    appliedIncomingRef.current = true;
+
+    // Set correct field + tab
+    if (incomingMaterialType.startsWith("synopsis")) {
+      setActiveTab("synopsis");
+      setSynopsis(incomingGenerated);
+    } else if (incomingMaterialType === "query-letter") {
+      setActiveTab("query");
+      setQueryLetter(incomingGenerated);
+    } else if (incomingMaterialType === "back-cover") {
+      setActiveTab("pitch");
+      setBackCover(incomingGenerated);
+    } else if (incomingMaterialType === "logline") {
+      setActiveTab("pitch");
+      setLogline(incomingGenerated);
+    }
+  }, [cameFromStoryMaterials, incomingMaterialType, incomingGenerated]);
+
   const activeProject: Project | null = useMemo(() => {
     if (!projects || projects.length === 0) return null;
-    
-    // First try to find by projectId (most reliable)
+
+    // prefer explicit projectId
     if (projectId) {
       const found = projects.find((p) => p.id === projectId);
       if (found) {
-        // Merge with projectMeta for accurate word count
         return {
           ...found,
           title: projectMeta?.title || found.title,
+          author: projectMeta?.author || found.author,
           wordCount: projectMeta?.wordCount ?? found.wordCount,
           chapterCount: projectMeta?.chapterCount ?? found.chapterCount,
         };
       }
     }
-    
-    // Fall back to currentStory
+
+    // fallback to currentStory
     if (currentStory?.id) {
       const found = projects.find((p) => p.id === currentStory.id);
       if (found) return found;
     }
-    
+
     return projects[0];
   }, [projects, projectId, currentStory, projectMeta]);
 
   const authorName =
-    activeProject?.author || profile?.displayName || profile?.name || "Author";
+    activeProject?.author ||
+    profile?.displayName ||
+    profile?.name ||
+    "Author";
 
-  // Bundle author + project metadata into helpful strings for the AI
   const authorProfileText = useMemo(() => {
     if (!profile && !activeProject) return "";
     const parts: string[] = [];
-
-    if (authorName) {
-      parts.push(`Author Name: ${authorName}`);
-    }
-    if (activeProject?.title) {
-      parts.push(`Project Title: ${activeProject.title}`);
-    }
-    if (activeProject?.wordCount) {
-      parts.push(`Approx Word Count: ${activeProject.wordCount}`);
-    }
+    if (authorName) parts.push(`Author Name: ${authorName}`);
+    if (activeProject?.title) parts.push(`Project Title: ${activeProject.title}`);
+    if (activeProject?.wordCount) parts.push(`Approx Word Count: ${activeProject.wordCount}`);
     if (profile) {
       parts.push("Author Profile JSON:");
       parts.push(JSON.stringify(profile, null, 2));
     }
-
     return parts.join("\n");
   }, [profile, activeProject, authorName]);
 
-  const handleBackToPublishing = () => {
-    navigate("/publishing");
-  };
-
-  // ✅ Refresh data from storage
-  const handleRefreshData = () => {
-    loadAllData();
-  };
+  const handleBackToPublishing = () => navigate("/publishing");
+  const handleRefreshData = () => loadAllData();
 
   const handleToggleChecklist = (id: string) => {
-    setChecklistState((prev) => ({
-      ...prev,
-      [id]: !prev[id],
-    }));
+    setChecklistState((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
-  // ✅ Updated save handler - saves to project-scoped key
+  // Save (single path)
   const handleSave = async () => {
-    if (!projectId) {
+    const currentProjId = getCurrentProjectId() || projectId;
+    if (!currentProjId) {
       alert("No project selected. Please go back and select a project first.");
       return;
     }
-    
+
     setIsSaving(true);
     try {
       const prepData: PublishingPrepData = {
@@ -503,22 +511,13 @@ export default function PublishingPrep(): JSX.Element {
         marketingNotes: marketingNotes || "",
         launchPlan: launchPlan || "",
       };
-      
-      savePublishingPrepData(projectId, prepData);
-      
-      // Also update the projects array
-      const updatedProjects = projects.map((p) =>
-        p.id === projectId
-          ? {
-              ...p,
-              ...prepData,
-              lastModified: new Date().toISOString(),
-            }
-          : p
-      );
+
+      savePublishingPrepData(currentProjId, prepData);
+
+      // update local state for UI continuity
+      const updatedProjects = loadProjects();
       setProjects(updatedProjects);
-      saveProjects(updatedProjects);
-      
+
       setShowSaved(true);
       setTimeout(() => setShowSaved(false), 2500);
     } catch (err) {
@@ -535,12 +534,9 @@ export default function PublishingPrep(): JSX.Element {
   const backCoverWords = getWordCount(backCover);
 
   /* ---------- AI Handlers ---------- */
-
   const handleGenerateQueryLetter = async () => {
     if (!synopsis.trim()) {
-      alert(
-        "Please add or paste a synopsis first. The query letter is built from it."
-      );
+      alert("Please add or paste a synopsis first. The query letter is built from it.");
       return;
     }
     if (!activeProject) {
@@ -556,22 +552,19 @@ export default function PublishingPrep(): JSX.Element {
         projectTitle: activeProject.title,
         genre: (locationState.manuscriptMeta as any)?.genre,
       });
+
       const text =
         (res as any).queryLetter ||
         (res as any).result ||
         (res as any).text ||
         "";
-      if (!text.trim()) {
-        throw new Error("Empty response from query-letter endpoint.");
-      }
+
+      if (!text.trim()) throw new Error("Empty response from query-letter endpoint.");
       setQueryLetter(text.trim());
+      setActiveTab("query");
     } catch (err: any) {
       console.error("Query letter generation failed:", err);
-      alert(
-        `Query letter generation failed: ${
-          err?.message || "Unknown error"
-        }`
-      );
+      alert(`Query letter generation failed: ${err?.message || "Unknown error"}`);
     } finally {
       setIsGeneratingQuery(false);
     }
@@ -594,22 +587,19 @@ export default function PublishingPrep(): JSX.Element {
         projectTitle: activeProject.title,
         genre: (locationState.manuscriptMeta as any)?.genre,
       });
+
       const text =
         (res as any).logline ||
         (res as any).result ||
         (res as any).text ||
         "";
-      if (!text.trim()) {
-        throw new Error("Empty response from logline endpoint.");
-      }
+
+      if (!text.trim()) throw new Error("Empty response from logline endpoint.");
       setLogline(text.trim());
+      setActiveTab("pitch");
     } catch (err: any) {
       console.error("Logline generation failed:", err);
-      alert(
-        `Logline generation failed: ${
-          err?.message || "Unknown error"
-        }`
-      );
+      alert(`Logline generation failed: ${err?.message || "Unknown error"}`);
     } finally {
       setIsGeneratingLogline(false);
     }
@@ -617,9 +607,7 @@ export default function PublishingPrep(): JSX.Element {
 
   const handleGenerateBackCover = async () => {
     if (!synopsis.trim()) {
-      alert(
-        "Please add or paste a synopsis first. The back cover blurb is built from it."
-      );
+      alert("Please add or paste a synopsis first. The back cover blurb is built from it.");
       return;
     }
     if (!activeProject) {
@@ -634,22 +622,19 @@ export default function PublishingPrep(): JSX.Element {
         projectTitle: activeProject.title,
         genre: (locationState.manuscriptMeta as any)?.genre,
       });
+
       const text =
         (res as any).backCover ||
         (res as any).result ||
         (res as any).text ||
         "";
-      if (!text.trim()) {
-        throw new Error("Empty response from back-cover endpoint.");
-      }
+
+      if (!text.trim()) throw new Error("Empty response from back-cover endpoint.");
       setBackCover(text.trim());
+      setActiveTab("pitch");
     } catch (err: any) {
       console.error("Back cover blurb generation failed:", err);
-      alert(
-        `Back cover blurb generation failed: ${
-          err?.message || "Unknown error"
-        }`
-      );
+      alert(`Back cover blurb generation failed: ${err?.message || "Unknown error"}`);
     } finally {
       setIsGeneratingBackCover(false);
     }
@@ -657,12 +642,7 @@ export default function PublishingPrep(): JSX.Element {
 
   /* ---------- Render ---------- */
   return (
-    <PageShell
-      style={{
-        background: theme.bg,
-        minHeight: "100vh",
-      }}
-    >
+    <PageShell style={{ background: theme.bg, minHeight: "100vh" }}>
       <div style={styles.outer}>
         {/* Header */}
         <div
@@ -703,31 +683,13 @@ export default function PublishingPrep(): JSX.Element {
               Back to Publishing
             </button>
 
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 10,
-                textAlign: "center",
-              }}
-            >
+            <div style={{ display: "flex", alignItems: "center", gap: 10, textAlign: "center" }}>
               <BookOpen size={22} />
               <div>
-                <h1
-                  style={{
-                    margin: 0,
-                    fontSize: 20,
-                    fontWeight: 600,
-                  }}
-                >
+                <h1 style={{ margin: 0, fontSize: 20, fontWeight: 600 }}>
                   Publishing Preparation
                 </h1>
-                <div
-                  style={{
-                    fontSize: 13,
-                    opacity: 0.9,
-                  }}
-                >
+                <div style={{ fontSize: 13, opacity: 0.9 }}>
                   {activeProject ? (
                     <>
                       <span style={{ fontWeight: 600, fontSize: 14 }}>
@@ -745,7 +707,6 @@ export default function PublishingPrep(): JSX.Element {
             </div>
 
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              {/* ✅ Refresh button */}
               <button
                 onClick={handleRefreshData}
                 title="Refresh data from storage"
@@ -762,21 +723,17 @@ export default function PublishingPrep(): JSX.Element {
               >
                 <RefreshCw size={16} />
               </button>
-              
+
               <div style={{ textAlign: "right", fontSize: 12 }}>
-                {activeProject?.wordCount && (
+                {activeProject?.wordCount ? (
                   <div>
                     {activeProject.wordCount.toLocaleString()} words
-                    {activeProject.chapterCount && (
-                      <> • {activeProject.chapterCount} chapters</>
-                    )}
+                    {activeProject.chapterCount ? <> • {activeProject.chapterCount} chapters</> : null}
                   </div>
-                )}
-                {activeProject?.lastModified && (
-                  <div style={{ opacity: 0.8 }}>
-                    Updated: {formatDate(activeProject.lastModified)}
-                  </div>
-                )}
+                ) : null}
+                <div style={{ opacity: 0.8 }}>
+                  Updated: {formatDate(activeProject?.lastModified)}
+                </div>
               </div>
             </div>
           </div>
@@ -785,40 +742,13 @@ export default function PublishingPrep(): JSX.Element {
         {/* Content */}
         <div style={{ ...styles.inner, ...styles.sectionShell }}>
           {/* Tabs */}
-          <div
-            style={{
-              display: "flex",
-              gap: 8,
-              marginBottom: 16,
-              flexWrap: "wrap",
-            }}
-          >
+          <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
             {[
-              {
-                id: "synopsis" as const,
-                icon: <Feather size={16} />,
-                label: "Synopsis",
-              },
-              {
-                id: "query" as const,
-                icon: <FileText size={16} />,
-                label: "Query Letter",
-              },
-              {
-                id: "pitch" as const,
-                icon: <Sparkles size={16} />,
-                label: "Logline & Blurb",
-              },
-              {
-                id: "checklist" as const,
-                icon: <ClipboardList size={16} />,
-                label: "Checklist",
-              },
-              {
-                id: "marketing" as const,
-                icon: <Megaphone size={16} />,
-                label: "Marketing & Launch",
-              },
+              { id: "synopsis" as const, icon: <Feather size={16} />, label: "Synopsis" },
+              { id: "query" as const, icon: <FileText size={16} />, label: "Query Letter" },
+              { id: "pitch" as const, icon: <Sparkles size={16} />, label: "Logline & Blurb" },
+              { id: "checklist" as const, icon: <ClipboardList size={16} />, label: "Checklist" },
+              { id: "marketing" as const, icon: <Megaphone size={16} />, label: "Marketing & Launch" },
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -829,10 +759,7 @@ export default function PublishingPrep(): JSX.Element {
                   gap: 8,
                   padding: "8px 14px",
                   borderRadius: 999,
-                  border:
-                    activeTab === tab.id
-                      ? "1px solid rgba(255,255,255,0.0)"
-                      : `1px solid ${theme.border}`,
+                  border: activeTab === tab.id ? "1px solid rgba(255,255,255,0.0)" : `1px solid ${theme.border}`,
                   background:
                     activeTab === tab.id
                       ? "linear-gradient(135deg, #9b7bc9, #b897d6)"
@@ -841,10 +768,7 @@ export default function PublishingPrep(): JSX.Element {
                   fontSize: 13,
                   fontWeight: 600,
                   cursor: "pointer",
-                  boxShadow:
-                    activeTab === tab.id
-                      ? "0 6px 18px rgba(155,123,201,0.35)"
-                      : "none",
+                  boxShadow: activeTab === tab.id ? "0 6px 18px rgba(155,123,201,0.35)" : "none",
                 }}
               >
                 {tab.icon}
@@ -852,7 +776,12 @@ export default function PublishingPrep(): JSX.Element {
               </button>
             ))}
 
-            <div style={{ marginLeft: "auto" }}>
+            <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 10 }}>
+              {showSaved && (
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: "#14532d" }}>
+                  <Check size={16} /> Saved
+                </span>
+              )}
               <button
                 onClick={handleSave}
                 disabled={isSaving || !projectId}
@@ -863,22 +792,16 @@ export default function PublishingPrep(): JSX.Element {
                   padding: "9px 16px",
                   borderRadius: 999,
                   border: "none",
-                  background:
-                    "linear-gradient(135deg, #D4AF37, #f5e6b3)",
+                  background: "linear-gradient(135deg, #D4AF37, #f5e6b3)",
                   color: "#1f2937",
                   fontSize: 13,
                   fontWeight: 600,
                   cursor: isSaving || !projectId ? "default" : "pointer",
                   opacity: isSaving || !projectId ? 0.6 : 1,
-                  boxShadow:
-                    "0 6px 18px rgba(180,142,38,0.35)",
+                  boxShadow: "0 6px 18px rgba(180,142,38,0.35)",
                 }}
               >
-                {isSaving ? (
-                  <Loader2 size={16} className="animate-spin" />
-                ) : (
-                  <Save size={16} />
-                )}
+                {isSaving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
                 {isSaving ? "Saving..." : "Save All"}
               </button>
             </div>
@@ -893,29 +816,16 @@ export default function PublishingPrep(): JSX.Element {
               alignItems: "flex-start",
             }}
           >
-            {/* Left column: text content */}
+            {/* Left column: content */}
             <div style={styles.glassCard}>
               {/* SYNOPSIS TAB */}
               {activeTab === "synopsis" && (
                 <>
-                  <h3
-                    style={{
-                      margin: "0 0 8px 0",
-                      fontSize: 18,
-                      color: theme.text,
-                    }}
-                  >
+                  <h3 style={{ margin: "0 0 8px 0", fontSize: 18, color: theme.text }}>
                     Synopsis
                   </h3>
-                  <p
-                    style={{
-                      margin: "0 0 12px 0",
-                      fontSize: 13,
-                      color: theme.subtext,
-                    }}
-                  >
-                    Draft a clear, compelling summary of your story. Aim for
-                    1–3 paragraphs that cover the main arc and stakes.
+                  <p style={{ margin: "0 0 12px 0", fontSize: 13, color: theme.subtext }}>
+                    Draft a clear, compelling summary of your story. Aim for 1–3 paragraphs that cover the main arc and stakes.
                   </p>
                   <textarea
                     value={synopsis}
@@ -942,9 +852,9 @@ export default function PublishingPrep(): JSX.Element {
                     }}
                   >
                     <span>{synopsisWords} words</span>
-                    {cameFromStoryMaterials && isSynopsisMaterial && (
+                    {cameFromStoryMaterials && incomingMaterialType.startsWith("synopsis") && incomingGenerated?.trim() ? (
                       <span>Imported from Story Materials</span>
-                    )}
+                    ) : null}
                   </div>
                 </>
               )}
@@ -952,34 +862,14 @@ export default function PublishingPrep(): JSX.Element {
               {/* QUERY TAB */}
               {activeTab === "query" && (
                 <>
-                  <h3
-                    style={{
-                      margin: "0 0 8px 0",
-                      fontSize: 18,
-                      color: theme.text,
-                    }}
-                  >
+                  <h3 style={{ margin: "0 0 8px 0", fontSize: 18, color: theme.text }}>
                     Query Letter
                   </h3>
-                  <p
-                    style={{
-                      margin: "0 0 12px 0",
-                      fontSize: 13,
-                      color: theme.subtext,
-                    }}
-                  >
-                    Draft your query letter here. Include a strong hook, brief
-                    synopsis, and your author bio.
+                  <p style={{ margin: "0 0 12px 0", fontSize: 13, color: theme.subtext }}>
+                    Draft your query letter here. Include a strong hook, brief synopsis, and your author bio.
                   </p>
 
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "flex-end",
-                      marginBottom: 8,
-                      gap: 8,
-                    }}
-                  >
+                  <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8, gap: 8 }}>
                     <button
                       type="button"
                       onClick={handleGenerateQueryLetter}
@@ -991,14 +881,11 @@ export default function PublishingPrep(): JSX.Element {
                         fontSize: 12,
                         fontWeight: 600,
                         cursor: isGeneratingQuery ? "default" : "pointer",
-                        background:
-                          "linear-gradient(135deg, #6366f1, #a855f7)",
+                        background: "linear-gradient(135deg, #6366f1, #a855f7)",
                         color: "#fff",
                       }}
                     >
-                      {isGeneratingQuery
-                        ? "AI drafting..."
-                        : "AI: Draft from synopsis + profile"}
+                      {isGeneratingQuery ? "AI drafting..." : "AI: Draft from synopsis + profile"}
                     </button>
                   </div>
 
@@ -1017,53 +904,25 @@ export default function PublishingPrep(): JSX.Element {
                       fontFamily: "inherit",
                     }}
                   />
-                  <div
-                    style={{
-                      marginTop: 6,
-                      fontSize: 12,
-                      color: theme.subtext,
-                      textAlign: "right",
-                    }}
-                  >
+
+                  <div style={{ marginTop: 6, fontSize: 12, color: theme.subtext, textAlign: "right" }}>
                     {queryWords} words
                   </div>
                 </>
               )}
 
-              {/* PITCH TAB: LOGLINE + BLURB */}
+              {/* PITCH TAB */}
               {activeTab === "pitch" && (
                 <>
-                  <h3
-                    style={{
-                      margin: "0 0 8px 0",
-                      fontSize: 18,
-                      color: theme.text,
-                    }}
-                  >
+                  <h3 style={{ margin: "0 0 8px 0", fontSize: 18, color: theme.text }}>
                     Logline & Back Cover Copy
                   </h3>
-                  <p
-                    style={{
-                      margin: "0 0 12px 0",
-                      fontSize: 13,
-                      color: theme.subtext,
-                    }}
-                  >
-                    Use a short logline to pitch the core hook in one sentence,
-                    and back cover copy to tease the story for readers or
-                    agents.
+                  <p style={{ margin: "0 0 12px 0", fontSize: 13, color: theme.subtext }}>
+                    Use a short logline to pitch the core hook in one sentence, and back cover copy to tease the story for readers.
                   </p>
 
                   {/* Logline */}
-                  <label
-                    style={{
-                      display: "block",
-                      fontSize: 13,
-                      fontWeight: 600,
-                      marginBottom: 6,
-                      color: theme.text,
-                    }}
-                  >
+                  <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 6, color: theme.text }}>
                     Logline
                   </label>
                   <div
@@ -1075,14 +934,8 @@ export default function PublishingPrep(): JSX.Element {
                       gap: 8,
                     }}
                   >
-                    <span
-                      style={{
-                        fontSize: 12,
-                        color: theme.subtext,
-                      }}
-                    >
-                      1–2 sentences that capture the main character, goal, and
-                      stakes.
+                    <span style={{ fontSize: 12, color: theme.subtext }}>
+                      1–2 sentences that capture the main character, goal, and stakes.
                     </span>
                     <button
                       type="button"
@@ -1095,8 +948,7 @@ export default function PublishingPrep(): JSX.Element {
                         fontSize: 11,
                         fontWeight: 600,
                         cursor: isGeneratingLogline ? "default" : "pointer",
-                        background:
-                          "linear-gradient(135deg, #0ea5e9, #22d3ee)",
+                        background: "linear-gradient(135deg, #0ea5e9, #22d3ee)",
                         color: "#0f172a",
                       }}
                     >
@@ -1119,14 +971,7 @@ export default function PublishingPrep(): JSX.Element {
                       marginBottom: 8,
                     }}
                   />
-                  <div
-                    style={{
-                      marginTop: 2,
-                      fontSize: 12,
-                      color: theme.subtext,
-                      textAlign: "right",
-                    }}
-                  >
+                  <div style={{ marginTop: 2, fontSize: 12, color: theme.subtext, textAlign: "right" }}>
                     {loglineWords} words
                   </div>
 
@@ -1140,15 +985,7 @@ export default function PublishingPrep(): JSX.Element {
                   />
 
                   {/* Back Cover */}
-                  <label
-                    style={{
-                      display: "block",
-                      fontSize: 13,
-                      fontWeight: 600,
-                      marginBottom: 6,
-                      color: theme.text,
-                    }}
-                  >
+                  <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 6, color: theme.text }}>
                     Back Cover / Book Blurb
                   </label>
                   <div
@@ -1160,14 +997,8 @@ export default function PublishingPrep(): JSX.Element {
                       gap: 8,
                     }}
                   >
-                    <span
-                      style={{
-                        fontSize: 12,
-                        color: theme.subtext,
-                      }}
-                    >
-                      The teaser readers will see on the back of the book or
-                      online listing.
+                    <span style={{ fontSize: 12, color: theme.subtext }}>
+                      The teaser readers will see on the back of the book or online listing.
                     </span>
                     <button
                       type="button"
@@ -1180,8 +1011,7 @@ export default function PublishingPrep(): JSX.Element {
                         fontSize: 11,
                         fontWeight: 600,
                         cursor: isGeneratingBackCover ? "default" : "pointer",
-                        background:
-                          "linear-gradient(135deg, #f97316, #fb923c)",
+                        background: "linear-gradient(135deg, #f97316, #fb923c)",
                         color: "#0f172a",
                       }}
                     >
@@ -1203,15 +1033,65 @@ export default function PublishingPrep(): JSX.Element {
                       fontFamily: "inherit",
                     }}
                   />
-                  <div
-                    style={{
-                      marginTop: 4,
-                      fontSize: 12,
-                      color: theme.subtext,
-                      textAlign: "right",
-                    }}
-                  >
+                  <div style={{ marginTop: 4, fontSize: 12, color: theme.subtext, textAlign: "right" }}>
                     {backCoverWords} words
+                  </div>
+                </>
+              )}
+
+              {/* CHECKLIST TAB */}
+              {activeTab === "checklist" && (
+                <>
+                  <h3 style={{ margin: "0 0 8px 0", fontSize: 18, color: theme.text }}>
+                    Publishing Checklist
+                  </h3>
+                  <p style={{ margin: "0 0 12px 0", fontSize: 13, color: theme.subtext }}>
+                    Track the basics so you know exactly what’s left before you upload or query.
+                  </p>
+
+                  <div style={{ display: "grid", gap: 10 }}>
+                    {DEFAULT_CHECKLIST.map((item) => {
+                      const checked = !!checklistState[item.id];
+                      return (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => handleToggleChecklist(item.id)}
+                          style={{
+                            textAlign: "left",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 10,
+                            padding: "10px 12px",
+                            borderRadius: 12,
+                            border: `1px solid ${theme.border}`,
+                            background: checked ? "rgba(155,123,201,0.12)" : theme.white,
+                            cursor: "pointer",
+                          }}
+                        >
+                          <span
+                            style={{
+                              width: 18,
+                              height: 18,
+                              borderRadius: 5,
+                              border: `1px solid ${theme.border}`,
+                              background: checked ? "linear-gradient(135deg,#9b7bc9,#b897d6)" : "#fff",
+                              display: "inline-flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              color: checked ? "#fff" : "transparent",
+                              fontSize: 12,
+                              fontWeight: 700,
+                            }}
+                          >
+                            ✓
+                          </span>
+                          <span style={{ fontSize: 13, fontWeight: 600, color: theme.text }}>
+                            {item.label}
+                          </span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </>
               )}
@@ -1219,71 +1099,43 @@ export default function PublishingPrep(): JSX.Element {
               {/* MARKETING TAB */}
               {activeTab === "marketing" && (
                 <>
-                  <h3
-                    style={{
-                      margin: "0 0 8px 0",
-                      fontSize: 18,
-                      color: theme.text,
-                    }}
-                  >
+                  <h3 style={{ margin: "0 0 8px 0", fontSize: 18, color: theme.text }}>
                     Marketing & Launch Plan
                   </h3>
-                  <p
-                    style={{
-                      margin: "0 0 12px 0",
-                      fontSize: 13,
-                      color: theme.subtext,
-                    }}
-                  >
-                    Sketch out your marketing notes and launch plan. Think about
-                    audience, channels, timing, and partnerships.
+                  <p style={{ margin: "0 0 12px 0", fontSize: 13, color: theme.subtext }}>
+                    Sketch your plan. Keep it simple: audience, channels, timeline, and assets you need.
                   </p>
-                  <label
-                    style={{
-                      display: "block",
-                      fontSize: 13,
-                      fontWeight: 600,
-                      marginBottom: 6,
-                      color: theme.text,
-                    }}
-                  >
+
+                  <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 6, color: theme.text }}>
                     Notes / Talking Points
                   </label>
                   <textarea
                     value={marketingNotes}
                     onChange={(e) => setMarketingNotes(e.target.value)}
-                    placeholder="Who is your reader? Where will you reach them?"
+                    placeholder="Who is your reader? Where will you reach them? What do you want to say?"
                     style={{
                       width: "100%",
-                      minHeight: 140,
+                      minHeight: 150,
                       borderRadius: 12,
                       border: `1px solid ${theme.border}`,
                       padding: "10px 12px",
                       fontSize: 14,
                       resize: "vertical",
                       fontFamily: "inherit",
-                      marginBottom: 16,
+                      marginBottom: 12,
                     }}
                   />
 
-                  <label
-                    style={{
-                      display: "block",
-                      fontSize: 13,
-                      fontWeight: 600,
-                      marginBottom: 6,
-                      color: theme.text,
-                    }}
-                  >
+                  <label style={{ display: "block", fontSize: 13, fontWeight: 600, marginBottom: 6, color: theme.text }}>
                     Launch Plan
                   </label>
                   <textarea
                     value={launchPlan}
                     onChange={(e) => setLaunchPlan(e.target.value)}
-                    placeholder="Outline your pre-launch, launch week, and post-launch steps..."
+                    placeholder="Dates, tasks, cover reveal, ARC/beta plan, upload checklist, announcements..."
                     style={{
                       width: "100%",
-                      minHeight: 160,
+                      minHeight: 180,
                       borderRadius: 12,
                       border: `1px solid ${theme.border}`,
                       padding: "10px 12px",
@@ -1294,236 +1146,62 @@ export default function PublishingPrep(): JSX.Element {
                   />
                 </>
               )}
-
-              {/* CHECKLIST TAB */}
-              {activeTab === "checklist" && (
-                <>
-                  <h3
-                    style={{
-                      margin: "0 0 8px 0",
-                      fontSize: 18,
-                      color: theme.text,
-                    }}
-                  >
-                    Pre-Publishing Checklist
-                  </h3>
-                  <p
-                    style={{
-                      margin: "0 0 12px 0",
-                      fontSize: 13,
-                      color: theme.subtext,
-                    }}
-                  >
-                    Track your pre-launch tasks. Mark items complete as you go.
-                  </p>
-                  <ul
-                    style={{
-                      listStyle: "none",
-                      margin: 0,
-                      padding: 0,
-                    }}
-                  >
-                    {DEFAULT_CHECKLIST.map((item) => {
-                      const checked = !!checklistState[item.id];
-                      return (
-                        <li
-                          key={item.id}
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 10,
-                            padding: "8px 0",
-                            borderBottom: `1px solid rgba(148,163,184,0.25)`,
-                          }}
-                        >
-                          <button
-                            type="button"
-                            onClick={() => handleToggleChecklist(item.id)}
-                            style={{
-                              width: 22,
-                              height: 22,
-                              borderRadius: "999px",
-                              border: checked
-                                ? "none"
-                                : `1px solid ${theme.border}`,
-                              display: "inline-flex",
-                              alignItems: "center",
-                              justifyContent: "center",
-                              background: checked
-                                ? "linear-gradient(135deg, #22c55e, #4ade80)"
-                                : theme.white,
-                              cursor: "pointer",
-                            }}
-                          >
-                            {checked && <Check size={14} color="#fff" />}
-                          </button>
-                          <span
-                            style={{
-                              fontSize: 14,
-                              color: theme.text,
-                            }}
-                          >
-                            {item.label}
-                          </span>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                </>
-              )}
             </div>
 
-            {/* Right column: summary / context */}
-            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-              {/* Project Summary Card */}
-              <div style={styles.glassCard}>
-                <h4
-                  style={{
-                    margin: "0 0 10px 0",
-                    fontSize: 15,
-                    color: theme.text,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                  }}
-                >
-                  <FileText size={16} />
-                  Project Summary
-                </h4>
-                {activeProject ? (
-                  <div
-                    style={{
-                      fontSize: 13,
-                      color: theme.subtext,
-                      lineHeight: 1.6,
-                    }}
-                  >
-                    <div>
-                      <strong>Title:</strong>{" "}
-                      {activeProject.title || "Untitled Project"}
-                    </div>
-                    <div>
-                      <strong>Author:</strong> {authorName}
-                    </div>
-                    <div>
-                      <strong>Status:</strong>{" "}
-                      {activeProject.status || "Draft"}
-                    </div>
-                    {typeof activeProject.wordCount === "number" && (
-                      <div>
-                        <strong>Words:</strong>{" "}
-                        {activeProject.wordCount.toLocaleString()}
-                      </div>
-                    )}
-                    {activeProject.chapterCount && (
-                      <div>
-                        <strong>Chapters:</strong> {activeProject.chapterCount}
-                      </div>
-                    )}
-                    {activeProject.targetWords && (
-                      <div>
-                        <strong>Target:</strong>{" "}
-                        {activeProject.targetWords.toLocaleString()}
-                      </div>
-                    )}
-                    {activeProject.lastModified && (
-                      <div>
-                        <strong>Last edit:</strong>{" "}
-                        {formatDate(activeProject.lastModified)}
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div
-                    style={{
-                      fontSize: 13,
-                      color: "#ef4444",
-                      padding: "12px",
-                      background: "#fef2f2",
-                      borderRadius: 8,
-                    }}
-                  >
-                    <strong>⚠️ No project selected</strong>
-                    <p style={{ margin: "8px 0 0" }}>
-                      Go back to the Dashboard or Projects page and select a
-                      manuscript to work on.
-                    </p>
-                  </div>
-                )}
-              </div>
+            {/* Right column: quick stats + tips */}
+            <div style={styles.rightCard}>
+              <h3 style={{ margin: "0 0 10px 0", fontSize: 15, color: theme.text, fontWeight: 700 }}>
+                Quick Summary
+              </h3>
 
-              {/* Pro Tips */}
-              <div style={{ ...styles.glassCard, background: theme.highlight }}>
-                <h4
-                  style={{
-                    margin: "0 0 10px 0",
-                    fontSize: 15,
-                    color: theme.text,
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                  }}
-                >
-                  <Feather size={16} />
-                  Pro Tips
-                </h4>
-                <ul
-                  style={{
-                    margin: 0,
-                    paddingLeft: 18,
-                    fontSize: 13,
-                    color: theme.text,
-                    lineHeight: 1.7,
-                  }}
-                >
-                  <li>
-                    Keep your synopsis clear and focused; avoid subplots
-                    unless essential.
-                  </li>
-                  <li>
-                    Tailor query letters to each agent or publisher whenever
-                    possible.
-                  </li>
-                  <li>
-                    Make sure your checklist is fully complete before
-                    hitting publish.
-                  </li>
-                  <li>
-                    Start building buzz for your book several weeks before
-                    launch.
-                  </li>
-                </ul>
+              <div style={{ display: "grid", gap: 10, fontSize: 13, color: theme.text }}>
+                <div>
+                  <div style={{ fontSize: 12, color: theme.subtext }}>Project</div>
+                  <div style={{ fontWeight: 700 }}>
+                    {activeProject?.title || projectMeta?.title || "—"}
+                  </div>
+                </div>
+
+                <div>
+                  <div style={{ fontSize: 12, color: theme.subtext }}>Author</div>
+                  <div style={{ fontWeight: 700 }}>{authorName}</div>
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                  <div>
+                    <div style={{ fontSize: 12, color: theme.subtext }}>Synopsis</div>
+                    <div style={{ fontWeight: 700 }}>{synopsisWords.toLocaleString()} words</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 12, color: theme.subtext }}>Query</div>
+                    <div style={{ fontWeight: 700 }}>{queryWords.toLocaleString()} words</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 12, color: theme.subtext }}>Logline</div>
+                    <div style={{ fontWeight: 700 }}>{loglineWords.toLocaleString()} words</div>
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 12, color: theme.subtext }}>Back cover</div>
+                    <div style={{ fontWeight: 700 }}>{backCoverWords.toLocaleString()} words</div>
+                  </div>
+                </div>
+
+                <div style={{ borderTop: `1px solid ${theme.border}`, paddingTop: 12, marginTop: 2 }}>
+                  <div style={{ fontSize: 12, color: theme.subtext, marginBottom: 6 }}>Tips</div>
+                  <ul style={{ margin: 0, paddingLeft: 18, color: theme.subtext, fontSize: 12, lineHeight: 1.5 }}>
+                    <li>Write the synopsis in plain language. No hype. Clear arc.</li>
+                    <li>Back cover copy should tease conflict and stakes, not summarize everything.</li>
+                    <li>Save often. This page stores per-project, so switching projects won’t overwrite another book.</li>
+                  </ul>
+                </div>
               </div>
             </div>
           </div>
+
+          {/* Footer spacing */}
+          <div style={{ height: 18 }} />
         </div>
       </div>
-
-      {/* Save toast */}
-      {showSaved && (
-        <div
-          style={{
-            position: "fixed",
-            bottom: 32,
-            right: 32,
-            display: "flex",
-            alignItems: "center",
-            gap: 10,
-            padding: "10px 16px",
-            borderRadius: 999,
-            background:
-              "linear-gradient(135deg, #22c55e, #4ade80)",
-            color: "#fff",
-            fontSize: 13,
-            fontWeight: 600,
-            boxShadow: "0 8px 24px rgba(22,163,74,0.4)",
-            zIndex: 1000,
-          }}
-        >
-          <Check size={16} />
-          Publishing prep saved for "{activeProject?.title || 'project'}"
-        </div>
-      )}
     </PageShell>
   );
 }
