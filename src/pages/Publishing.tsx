@@ -80,6 +80,19 @@ const GOOGLE_PALETTE = {
 
 /* ---------- Types ---------- */
 
+type ProjectCategory = "fiction" | "nonfiction" | "poetry";
+type NonfictionTrack = "memoir" | "commentary" | "howto" | "faith";
+type PoetryTrack = "collection" | "chapbook" | "narrative" | "devotional";
+
+type ProjectGenre = {
+  category: ProjectCategory;
+  track?: NonfictionTrack | PoetryTrack; // for nonfiction or poetry
+  label: string;           // display label, e.g. "Nonfiction — Memoir / Narrative"
+};
+
+const projectGenreKeyForProject = (projectId: string) =>
+  `dahtruth_project_genre_${projectId}`;
+
 type Chapter = {
   id: string;
   title: string;
@@ -653,6 +666,160 @@ function AIActionButton({
   );
 }
 
+/* ---------- Genre Picker Modal ---------- */
+
+function GenrePickerModal({
+  open,
+  onClose,
+  onSave,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onSave: (g: ProjectGenre) => void;
+}) {
+  const [category, setCategory] = React.useState<ProjectCategory>("fiction");
+  const [nonfictionTrack, setNonfictionTrack] = React.useState<NonfictionTrack>("memoir");
+  const [poetryTrack, setPoetryTrack] = React.useState<PoetryTrack>("collection");
+
+  if (!open) return null;
+
+  const label =
+    category === "fiction"
+      ? "Fiction"
+      : category === "poetry"
+      ? `Poetry — ${
+          poetryTrack === "collection"
+            ? "Collection"
+            : poetryTrack === "chapbook"
+            ? "Chapbook"
+            : poetryTrack === "narrative"
+            ? "Narrative / Epic"
+            : "Devotional / Faith"
+        }`
+      : `Nonfiction — ${
+          nonfictionTrack === "memoir"
+            ? "Memoir / Narrative"
+            : nonfictionTrack === "commentary"
+            ? "Commentary / Opinion"
+            : nonfictionTrack === "howto"
+            ? "How-to / Educational"
+            : "Faith-Based"
+        }`;
+
+  const currentTrack = 
+    category === "nonfiction" ? nonfictionTrack : 
+    category === "poetry" ? poetryTrack : 
+    undefined;
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.45)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 9999,
+        padding: 16,
+      }}
+      role="dialog"
+      aria-modal="true"
+    >
+      <div
+        style={{
+          width: "min(560px, 100%)",
+          background: theme.white,
+          borderRadius: 16,
+          border: `1px solid ${theme.border}`,
+          boxShadow: "0 20px 60px rgba(0,0,0,0.25)",
+          padding: 16,
+        }}
+      >
+        <h3 style={{ margin: "0 0 6px", color: theme.text }}>
+          Choose your manuscript type
+        </h3>
+        <div style={{ fontSize: 12, color: theme.subtext, marginBottom: 12 }}>
+          This sets your StoryLab modules and guidance across the app.
+          You can change it later.
+        </div>
+
+        <div style={{ display: "grid", gap: 10 }}>
+          <div>
+            <label style={{ ...styles.label, display: "block", marginBottom: 4 }}>
+              Category
+            </label>
+            <select
+              value={category}
+              onChange={(e) => setCategory(e.target.value as ProjectCategory)}
+              style={styles.input}
+            >
+              <option value="fiction">Fiction</option>
+              <option value="nonfiction">Nonfiction</option>
+              <option value="poetry">Poetry</option>
+            </select>
+          </div>
+
+          {category === "nonfiction" && (
+            <div>
+              <label style={{ ...styles.label, display: "block", marginBottom: 4 }}>
+                Nonfiction track
+              </label>
+              <select
+                value={nonfictionTrack}
+                onChange={(e) => setNonfictionTrack(e.target.value as NonfictionTrack)}
+                style={styles.input}
+              >
+                <option value="memoir">Memoir / Narrative</option>
+                <option value="commentary">Commentary / Opinion</option>
+                <option value="howto">How-to / Educational</option>
+                <option value="faith">Faith-Based</option>
+              </select>
+            </div>
+          )}
+
+          {category === "poetry" && (
+            <div>
+              <label style={{ ...styles.label, display: "block", marginBottom: 4 }}>
+                Poetry track
+              </label>
+              <select
+                value={poetryTrack}
+                onChange={(e) => setPoetryTrack(e.target.value as PoetryTrack)}
+                style={styles.input}
+              >
+                <option value="collection">Collection</option>
+                <option value="chapbook">Chapbook</option>
+                <option value="narrative">Narrative / Epic</option>
+                <option value="devotional">Devotional / Faith</option>
+              </select>
+            </div>
+          )}
+
+          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+            <button type="button" onClick={onClose} style={styles.btn}>
+              Not now
+            </button>
+            <button
+              type="button"
+              onClick={() =>
+                onSave({
+                  category,
+                  track: currentTrack,
+                  label,
+                })
+              }
+              style={styles.btnPrimary}
+            >
+              Save
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ======================== Component ======================== */
 
 export default function Publishing(): JSX.Element {
@@ -662,6 +829,10 @@ export default function Publishing(): JSX.Element {
 
   // ✅ NEW: Project ID state
   const [projectId, setProjectId] = useState<string>("");
+
+  // ✅ NEW: Project Genre (fiction/nonfiction + track)
+  const [projectGenre, setProjectGenre] = useState<ProjectGenre | null>(null);
+  const [showGenrePicker, setShowGenrePicker] = useState<boolean>(false);
 
  // ✅ Initialize selected project on mount
 useEffect(() => {
@@ -678,6 +849,39 @@ useEffect(() => {
     console.error("Failed to init selected project in Publishing:", e);
   }
 }, []);
+
+  // ✅ Load project genre (project-scoped). If missing, prompt user.
+  useEffect(() => {
+    if (!projectId) return;
+
+    try {
+      const raw = storage.getItem(projectGenreKeyForProject(projectId));
+      if (raw) {
+        const parsed = JSON.parse(raw) as ProjectGenre;
+        if (parsed?.category && parsed?.label) {
+          setProjectGenre(parsed);
+          setShowGenrePicker(false);
+          return;
+        }
+      }
+      setShowGenrePicker(true);
+    } catch {
+      setShowGenrePicker(true);
+    }
+  }, [projectId]);
+
+  // ✅ Persist project genre (project-scoped)
+  useEffect(() => {
+    if (!projectId || !projectGenre) return;
+    try {
+      storage.setItem(
+        projectGenreKeyForProject(projectId),
+        JSON.stringify(projectGenre)
+      );
+    } catch {
+      // ignore
+    }
+  }, [projectId, projectGenre]);
 
   // ---------- Meta (shared with Writing) ----------
   const [meta, setMeta] = useState<Meta>({
@@ -1419,6 +1623,15 @@ useEffect(() => {
           : {}),
       }}
     >
+      <GenrePickerModal
+        open={showGenrePicker}
+        onClose={() => setShowGenrePicker(false)}
+        onSave={(g) => {
+          setProjectGenre(g);
+          setShowGenrePicker(false);
+        }}
+      />
+
       <div style={styles.outer}>
         {/* HEADER STRIP */}
         <div
@@ -1508,6 +1721,29 @@ useEffect(() => {
                   {PLATFORM_PRESETS[platformPreset].label}
                 </span>
               </div>
+              <div style={{ fontSize: 11 }}>
+                Type:{" "}
+                <span style={{ fontWeight: 600 }}>
+                  {projectGenre?.label ?? "Not set"}
+                </span>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowGenrePicker(true)}
+                style={{
+                  padding: "4px 10px",
+                  borderRadius: 999,
+                  border: "1px solid rgba(255,255,255,0.6)",
+                  background: "rgba(255,255,255,0.12)",
+                  color: theme.white,
+                  fontSize: 10,
+                  cursor: "pointer",
+                }}
+              >
+                Change Type
+              </button>
+
               <button
                 type="button"
                 onClick={handleClearPublishingDraft}
