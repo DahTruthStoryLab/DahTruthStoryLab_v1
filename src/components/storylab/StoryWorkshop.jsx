@@ -10,8 +10,11 @@ import {
   Sparkles,
 } from "lucide-react";
 
-// If you already have these, you can remove the inline versions below
 import BackToLanding, { BackToLandingFab } from "./BackToLanding";
+
+// ✅ Add these imports
+import { ensureSelectedProject, getSelectedProjectId } from "../../lib/projectsSync";
+import { WORKSHOP_CARDS_BY_GENRE, normalizeGenre } from "../../lib/storyWorkshopCards";
 
 /* --------------------------------------------
    Simple Dark Toggle (use your app's if you have one)
@@ -30,7 +33,7 @@ function DarkModeToggle() {
       title="Toggle dark mode"
     >
       {dark ? "Light" : "Dark"}
-  </button>
+    </button>
   );
 }
 
@@ -43,25 +46,27 @@ const stripHtml = (g) =>
 /* --------------------------------------------
    New top “hero” banner + quote (centered)
 --------------------------------------------- */
-const HeroBanner = ({ quoteHtml }) => {
+const HeroBanner = ({ quoteHtml, genreLabel }) => {
   const cleaned = useMemo(() => stripHtml(quoteHtml), [quoteHtml]);
   const quote = cleaned && cleaned !== "”" && cleaned !== "“" ? cleaned : "";
 
   return (
     <div className="mx-auto mb-8">
       <div className="relative mx-auto max-w-3xl rounded-2xl border border-border bg-white/80 backdrop-blur-xl px-6 py-8 text-center shadow overflow-hidden">
-        {/* Subtle gradient */}
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-gold/10 pointer-events-none" />
         <div className="relative z-10">
           <h1 className="text-3xl md:text-4xl font-serif font-bold text-ink">
             Welcome to your Story Journey
           </h1>
           <p className="mt-3 text-muted max-w-2xl mx-auto">
-            Choose a path to begin. Each module is a step—prompts, roadmaps, priorities,
-            and character views—designed to move your story forward with clarity and flow.
+            Your workshop modules adapt to your manuscript’s genre so you always see the right tools at the right time.
           </p>
 
-          {/* Quote under the banner */}
+          <div className="mt-4 text-sm text-muted">
+            <span className="font-semibold text-ink">Current Track:</span>{" "}
+            {genreLabel}
+          </div>
+
           <div className="mt-6 glass-panel px-4 py-4 rounded-2xl">
             <div className="text-sm font-semibold text-muted mb-1">Featured Line</div>
             {quote ? (
@@ -125,7 +130,7 @@ function StoryLabHeader() {
           >
             Settings
           </button>
-            <DarkModeToggle />
+          <DarkModeToggle />
         </div>
       </div>
     </header>
@@ -136,16 +141,63 @@ function StoryLabHeader() {
    Workshop Hub (StoryLab launcher)
 --------------------------------------------- */
 export default function StoryWorkshop() {
-  // If your quote comes from editor state, wire it in here.
-  // For now, pass "" to avoid gibberish.
   const quoteHtml = "";
+
+  const [projectId, setProjectId] = useState("");
+  const [genre, setGenre] = useState("General");
+
+  // ✅ Read selected project + listen for changes
+  useEffect(() => {
+    const sync = () => {
+      try {
+        const p = ensureSelectedProject();
+        const id = p?.id || getSelectedProjectId() || "";
+        setProjectId(id);
+        setGenre(normalizeGenre(p?.genre));
+      } catch {
+        setProjectId("");
+        setGenre("General");
+      }
+    };
+
+    sync();
+    const onChange = () => sync();
+    window.addEventListener("project:change", onChange);
+    return () => window.removeEventListener("project:change", onChange);
+  }, []);
+
+  // ✅ Icon mapping (string -> component)
+  const iconMap = useMemo(
+    () => ({
+      BookOpen,
+      Layers,
+      Pin,
+      RouteIcon,
+      ListChecks,
+      Sparkles,
+    }),
+    []
+  );
+
+  const cards = useMemo(() => {
+    const common = WORKSHOP_CARDS_BY_GENRE.common || [];
+    const byGenre = WORKSHOP_CARDS_BY_GENRE[genre] || WORKSHOP_CARDS_BY_GENRE.General || [];
+    // Combine common + genre, remove dupes by key
+    const merged = [...common, ...byGenre];
+    const seen = new Set();
+    return merged.filter((c) => {
+      if (seen.has(c.key)) return false;
+      seen.add(c.key);
+      return true;
+    });
+  }, [genre]);
+
+  const genreLabel = projectId ? genre : "General (no project selected)";
 
   return (
     <div className="min-h-screen bg-base text-ink">
-      {/* StoryLab-only header (centered), not the dashboard header */}
       <StoryLabHeader />
 
-      {/* Optional global back to StoryLab landing (keep if you use it elsewhere) */}
       <BackToLanding
         title="Workshop Hub"
         rightSlot={
@@ -160,51 +212,38 @@ export default function StoryWorkshop() {
       />
 
       <div className="mx-auto max-w-7xl px-6 py-8">
-        {/* New hero banner + quote */}
-        <HeroBanner quoteHtml={quoteHtml} />
+        <HeroBanner quoteHtml={quoteHtml} genreLabel={genreLabel} />
 
-        {/* Modules */}
         <div className="mb-8">
           <div className="text-xs font-semibold uppercase tracking-wide text-muted mb-2">
             Workshop Modules
           </div>
+
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-            <ModuleCard
-              to="/story-lab/workshop/priorities"
-              title="Priority Cards"
-              description="Brainstorm and organize what matters most."
-              Icon={ListChecks}
-            />
-            <ModuleCard
-              to="/story-lab/workshop/roadmap"
-              title="Character Roadmap"
-              description="Map progression of your main characters."
-              Icon={RouteIcon}
-            />
-            <ModuleCard
-              to="/story-lab/workshop/clothesline"
-              title="Clothesline"
-              description="An org-style, visual cast-at-a-glance."
-              Icon={Pin}
-            />
-            <ModuleCard
-              to="/story-lab/workshop/hfl"
-              title="Hopes • Fears • Legacy"
-              description="Theme motivators by major characters."
-              Icon={Layers}
-            />
-            {/* NEW: Narrative Arc module */}
-            <ModuleCard
-              to="/story-lab/narrative-arc"
-              title="Narrative Arc"
-              description="Map emotional beats and structure."
-              Icon={Sparkles}
-            />
+            {cards.map((c) => {
+              const Icon = iconMap[c.iconName] || BookOpen;
+              return (
+                <ModuleCard
+                  key={c.key}
+                  to={c.to}
+                  title={c.title}
+                  description={c.description}
+                  Icon={Icon}
+                />
+              );
+            })}
+          </div>
+
+          <div className="mt-4 text-xs text-muted">
+            {projectId ? (
+              <>Active Project: <span className="text-ink font-semibold">{projectId}</span></>
+            ) : (
+              <>Tip: Select a project/genre to unlock the right track.</>
+            )}
           </div>
         </div>
       </div>
 
-      {/* Mobile floating “Back to Landing” button (optional) */}
       <BackToLandingFab />
     </div>
   );
