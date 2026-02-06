@@ -1,5 +1,5 @@
 // src/components/storylab/StoryWorkshop.jsx
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import {
   BookOpen,
@@ -11,15 +11,16 @@ import {
 } from "lucide-react";
 
 import BackToLanding, { BackToLandingFab } from "./BackToLanding";
+import { storage } from "../../lib/storage";
 
-// ✅ Selected-project helpers (same pattern you use elsewhere)
-import { ensureSelectedProject, getSelectedProjectId } from "../../lib/projectsSync";
-
-// ✅ Cards + genre normalization (updated to map primaryGenre -> track)
-import { WORKSHOP_CARDS_BY_GENRE, normalizeGenre } from "../../lib/storyWorkshopCards";
+// ✅ Cards + genre mapping live here
+import {
+  normalizeGenre,
+  WORKSHOP_CARDS_BY_GENRE,
+} from "../../lib/storyWorkshopCards";
 
 /* --------------------------------------------
-   Simple Dark Toggle (use your app's if you have one)
+   Simple Dark Toggle (keep yours if you want)
 --------------------------------------------- */
 function DarkModeToggle() {
   const [dark, setDark] = useState(() =>
@@ -48,7 +49,7 @@ const stripHtml = (g) =>
 /* --------------------------------------------
    New top “hero” banner + quote (centered)
 --------------------------------------------- */
-const HeroBanner = ({ quoteHtml, genreLabel }) => {
+const HeroBanner = ({ quoteHtml }) => {
   const cleaned = useMemo(() => stripHtml(quoteHtml), [quoteHtml]);
   const quote = cleaned && cleaned !== "”" && cleaned !== "“" ? cleaned : "";
 
@@ -58,25 +59,24 @@ const HeroBanner = ({ quoteHtml, genreLabel }) => {
         <div className="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-gold/10 pointer-events-none" />
         <div className="relative z-10">
           <h1 className="text-3xl md:text-4xl font-serif font-bold text-ink">
-            Welcome to your Story Journey
+            Workshop Hub
           </h1>
           <p className="mt-3 text-muted max-w-2xl mx-auto">
-            Your workshop modules adapt to your manuscript’s genre so you always see the right tools at the right time.
+            Your modules adjust based on your project genre.
           </p>
 
-          <div className="mt-4 text-sm text-muted">
-            <span className="font-semibold text-ink">Current Track:</span>{" "}
-            {genreLabel}
-          </div>
-
           <div className="mt-6 glass-panel px-4 py-4 rounded-2xl">
-            <div className="text-sm font-semibold text-muted mb-1">Featured Line</div>
+            <div className="text-sm font-semibold text-muted mb-1">
+              Featured Line
+            </div>
             {quote ? (
               <blockquote className="text-lg md:text-xl text-ink italic">
                 “{quote}”
               </blockquote>
             ) : (
-              <p className="text-muted">Add your first scene or quote to see it featured here.</p>
+              <p className="text-muted">
+                Add your first scene or quote to see it featured here.
+              </p>
             )}
           </div>
         </div>
@@ -106,17 +106,20 @@ const ModuleCard = ({ to, title, description, Icon }) => (
 );
 
 /* --------------------------------------------
-   StoryLab Header (centered title, right controls)
+   StoryLab Header
 --------------------------------------------- */
-function StoryLabHeader() {
+function StoryLabHeader({ trackLabel }) {
   const navigate = useNavigate();
   return (
     <header className="border-b bg-white/80 backdrop-blur-md">
       <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
         <div className="flex-1" />
-        <h1 className="text-xl font-semibold text-ink text-center flex-1">
-          StoryLab
-        </h1>
+        <div className="flex-1 text-center">
+          <h1 className="text-xl font-semibold text-ink">StoryLab</h1>
+          <div className="text-xs text-muted mt-0.5">
+            Track: <span className="font-semibold">{trackLabel}</span>
+          </div>
+        </div>
         <div className="flex-1 flex items-center justify-end gap-2">
           <button
             onClick={() => navigate("/")}
@@ -124,13 +127,6 @@ function StoryLabHeader() {
             title="Back to Dashboard"
           >
             ← Dashboard
-          </button>
-          <button
-            onClick={() => alert("Open StoryLab settings…")}
-            className="px-3 py-2 rounded-lg bg-white/60 border border-border hover:bg-white"
-            title="Settings"
-          >
-            Settings
           </button>
           <DarkModeToggle />
         </div>
@@ -143,36 +139,12 @@ function StoryLabHeader() {
    Workshop Hub (StoryLab launcher)
 --------------------------------------------- */
 export default function StoryWorkshop() {
+  const [track, setTrack] = useState("General");
+
   // If your quote comes from editor state, wire it in here.
-  // For now, pass "" to avoid gibberish.
   const quoteHtml = "";
 
-  const [projectId, setProjectId] = useState("");
-  const [track, setTrack] = useState("General"); // Fiction | Non-Fiction | Poetry | General
-
-  // ✅ Read selected project + listen for changes
-  useEffect(() => {
-    const sync = () => {
-      try {
-        const p = ensureSelectedProject();
-        const id = p?.id || getSelectedProjectId() || "";
-        setProjectId(id);
-
-        // ✅ Your app stores genre as primaryGenre (ProjectPage)
-       setTrack(normalizeGenre(p?.primaryGenre || p?.genre));
-      } catch {
-        setProjectId("");
-        setTrack("General");
-      }
-    };
-
-    sync();
-    const onChange = () => sync();
-    window.addEventListener("project:change", onChange);
-    return () => window.removeEventListener("project:change", onChange);
-  }, []);
-
-  // ✅ Icon mapping (string -> component)
+  // ✅ ICON MAP — must include every iconName used in storyWorkshopCards.js
   const iconMap = useMemo(
     () => ({
       BookOpen,
@@ -185,24 +157,62 @@ export default function StoryWorkshop() {
     []
   );
 
-  const cards = useMemo(() => {
-    const common = WORKSHOP_CARDS_BY_GENRE.common || [];
-    const byTrack = WORKSHOP_CARDS_BY_GENRE[track] || WORKSHOP_CARDS_BY_GENRE.General || [];
-    // Combine common + track, remove dupes by key
-    const merged = [...common, ...byTrack];
-    const seen = new Set();
-    return merged.filter((c) => {
-      if (seen.has(c.key)) return false;
-      seen.add(c.key);
-      return true;
-    });
-  }, [track]);
+  // ✅ Sync track from storage/current project
+  useEffect(() => {
+    const sync = () => {
+      try {
+        // 1) Prefer currentStory.primaryGenre (fastest + most reliable)
+        const csRaw = storage.getItem("currentStory");
+        if (csRaw) {
+          const cs = JSON.parse(csRaw);
+          const g = cs?.primaryGenre || cs?.genre || "";
+          setTrack(normalizeGenre(g));
+          return;
+        }
 
-  const genreLabel = projectId ? track : "General (no project selected)";
+        // 2) Fallback: read current project id and its stored project data
+        const projectId = storage.getItem("dahtruth-current-project-id");
+        if (projectId) {
+          const raw = storage.getItem(`dahtruth-project-${projectId}`);
+          if (raw) {
+            const data = JSON.parse(raw);
+            const g = data?.primaryGenre || data?.genre || "";
+            setTrack(normalizeGenre(g));
+            return;
+          }
+        }
+
+        // 3) Default
+        setTrack("General");
+      } catch (e) {
+        console.error("[StoryWorkshop] Failed to sync track:", e);
+        setTrack("General");
+      }
+    };
+
+    sync();
+
+    // ✅ This is the part most people miss: re-sync when project/genre changes
+    window.addEventListener("project:change", sync);
+    window.addEventListener("storage", sync);
+
+    return () => {
+      window.removeEventListener("project:change", sync);
+      window.removeEventListener("storage", sync);
+    };
+  }, []);
+
+  // ✅ Step 4 goes right here: common + track-specific
+  const cards = useMemo(() => {
+    return [
+      ...(WORKSHOP_CARDS_BY_GENRE.common || []),
+      ...(WORKSHOP_CARDS_BY_GENRE[track] || []),
+    ];
+  }, [track]);
 
   return (
     <div className="min-h-screen bg-base text-ink">
-      <StoryLabHeader />
+      <StoryLabHeader trackLabel={track} />
 
       <BackToLanding
         title="Workshop Hub"
@@ -218,7 +228,7 @@ export default function StoryWorkshop() {
       />
 
       <div className="mx-auto max-w-7xl px-6 py-8">
-        <HeroBanner quoteHtml={quoteHtml} genreLabel={genreLabel} />
+        <HeroBanner quoteHtml={quoteHtml} />
 
         <div className="mb-8">
           <div className="text-xs font-semibold uppercase tracking-wide text-muted mb-2">
@@ -227,7 +237,7 @@ export default function StoryWorkshop() {
 
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {cards.map((c) => {
-              const Icon = iconMap[c.iconName] || BookOpen;
+              const Icon = iconMap[c.iconName] || BookOpen; // safe fallback
               return (
                 <ModuleCard
                   key={c.key}
@@ -238,14 +248,6 @@ export default function StoryWorkshop() {
                 />
               );
             })}
-          </div>
-
-          <div className="mt-4 text-xs text-muted">
-            {projectId ? (
-              <>Active Project: <span className="text-ink font-semibold">{projectId}</span></>
-            ) : (
-              <>Tip: Select a project/genre to unlock the right track.</>
-            )}
           </div>
         </div>
       </div>
