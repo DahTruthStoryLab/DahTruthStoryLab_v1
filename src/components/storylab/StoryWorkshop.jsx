@@ -159,7 +159,7 @@ export default function StoryWorkshop() {
         setProjectId(id);
 
         // ✅ Your app stores genre as primaryGenre (ProjectPage)
-        setTrack(normalizeGenre(p?.primaryGenre || p?.genre));
+       setTrack(normalizeGenre(p?.primaryGenre || p?.genre));
       } catch {
         setProjectId("");
         setTrack("General");
