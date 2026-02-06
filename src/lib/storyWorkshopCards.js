@@ -1,16 +1,20 @@
 // src/lib/storyWorkshopCards.js
 
+/**
+ * Maps a project's primaryGenre (e.g., "Literary Fiction", "Memoir", "Poetry")
+ * to a workshop track: "Fiction" | "Non-Fiction" | "Poetry" | "General"
+ */
 export function normalizeGenre(raw) {
-  const g = (raw || "").trim().toLowerCase();
+  const g = String(raw || "").trim().toLowerCase();
 
   // Catch empty or default
-  if (!g || g.includes("general")) return "General";
+  if (!g || g.includes("general") || g.includes("undeclared")) return "General";
 
   // Poetry track
   if (g.includes("poetry")) return "Poetry";
 
   // Non-Fiction track
-  const nonfiction = [
+  const nonfictionHits = [
     "memoir",
     "biography",
     "essay",
@@ -24,14 +28,19 @@ export function normalizeGenre(raw) {
     "non-fiction",
     "non fiction",
   ];
-  if (nonfiction.some((k) => g.includes(k))) return "Non-Fiction";
+  if (nonfictionHits.some((k) => g.includes(k))) return "Non-Fiction";
 
   // Everything else defaults to Fiction
   return "Fiction";
 }
 
-// IMPORTANT: We store iconName (string) here because icons are imported in the component.
-// The component will map iconName -> actual Lucide icon.
+/**
+ * IMPORTANT: We store iconName (string) here because icons are imported in the component.
+ * The component will map iconName -> actual Lucide icon.
+ *
+ * Keep iconName values in sync with the iconMap in StoryWorkshop.jsx
+ * (e.g. "RouteIcon" must exist in iconMap).
+ */
 export const WORKSHOP_CARDS_BY_GENRE = {
   // Shared building blocks that can apply to most tracks
   common: [
@@ -74,7 +83,7 @@ export const WORKSHOP_CARDS_BY_GENRE = {
       iconName: "Sparkles",
     },
 
-    // These can be added when you build routes/tools:
+    // Add these only once the routes exist:
     // { key:"dialogueLab", to:"/story-lab/workshop/dialogue", title:"Dialogue Lab", description:"Subtext, tension, voice.", iconName:"BookOpen" },
     // { key:"sceneBuilder", to:"/story-lab/workshop/scenes", title:"Scene Builder", description:"Goal, conflict, shift, outcome.", iconName:"BookOpen" },
     // { key:"plotBuilder", to:"/story-lab/workshop/plot", title:"Plot Builder", description:"Stakes, turns, momentum.", iconName:"BookOpen" },
