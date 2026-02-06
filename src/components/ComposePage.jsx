@@ -129,17 +129,25 @@ function generatePreview(html = "", maxWords = 20) {
   return words.length > maxWords ? preview + "..." : preview;
 }
 
-// Save a simple "current story" snapshot for ProjectPage to read
-function saveCurrentStorySnapshot({ id, title }) {
+// Save a simple "current story" snapshot for StoryLab + ProjectPage to read
+function saveCurrentStorySnapshot({ id, title, primaryGenre }) {
   if (!title) return;
   try {
     const snapshot = {
       id: id || getSelectedProjectId() || "unknown",
       title: title.trim(),
+      primaryGenre: primaryGenre || "General / Undeclared", // ✅ ADD THIS
       status: "Draft",
       updatedAt: new Date().toISOString(),
     };
+
     storage.setItem(CURRENT_STORY_KEY, JSON.stringify(snapshot));
+
+    // ✅ Also keep selected project id in sync for any page that reads it
+    storage.setItem("dahtruth-current-project-id", snapshot.id);
+
+    // ✅ Notify StoryLab to refresh its genre/cards
+    window.dispatchEvent(new Event("project:change"));
   } catch (err) {
     console.error("Failed to save currentStory:", err);
   }
