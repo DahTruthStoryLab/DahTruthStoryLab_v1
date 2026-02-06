@@ -12,8 +12,10 @@ import {
 
 import BackToLanding, { BackToLandingFab } from "./BackToLanding";
 
-// ✅ Add these imports
+// ✅ Selected-project helpers (same pattern you use elsewhere)
 import { ensureSelectedProject, getSelectedProjectId } from "../../lib/projectsSync";
+
+// ✅ Cards + genre normalization (updated to map primaryGenre -> track)
 import { WORKSHOP_CARDS_BY_GENRE, normalizeGenre } from "../../lib/storyWorkshopCards";
 
 /* --------------------------------------------
@@ -141,10 +143,12 @@ function StoryLabHeader() {
    Workshop Hub (StoryLab launcher)
 --------------------------------------------- */
 export default function StoryWorkshop() {
+  // If your quote comes from editor state, wire it in here.
+  // For now, pass "" to avoid gibberish.
   const quoteHtml = "";
 
   const [projectId, setProjectId] = useState("");
-  const [genre, setGenre] = useState("General");
+  const [track, setTrack] = useState("General"); // Fiction | Non-Fiction | Poetry | General
 
   // ✅ Read selected project + listen for changes
   useEffect(() => {
@@ -153,10 +157,12 @@ export default function StoryWorkshop() {
         const p = ensureSelectedProject();
         const id = p?.id || getSelectedProjectId() || "";
         setProjectId(id);
-        setGenre(normalizeGenre(p?.genre));
+
+        // ✅ Your app stores genre as primaryGenre (ProjectPage)
+        setTrack(normalizeGenre(p?.primaryGenre || p?.genre));
       } catch {
         setProjectId("");
-        setGenre("General");
+        setTrack("General");
       }
     };
 
@@ -181,18 +187,18 @@ export default function StoryWorkshop() {
 
   const cards = useMemo(() => {
     const common = WORKSHOP_CARDS_BY_GENRE.common || [];
-    const byGenre = WORKSHOP_CARDS_BY_GENRE[genre] || WORKSHOP_CARDS_BY_GENRE.General || [];
-    // Combine common + genre, remove dupes by key
-    const merged = [...common, ...byGenre];
+    const byTrack = WORKSHOP_CARDS_BY_GENRE[track] || WORKSHOP_CARDS_BY_GENRE.General || [];
+    // Combine common + track, remove dupes by key
+    const merged = [...common, ...byTrack];
     const seen = new Set();
     return merged.filter((c) => {
       if (seen.has(c.key)) return false;
       seen.add(c.key);
       return true;
     });
-  }, [genre]);
+  }, [track]);
 
-  const genreLabel = projectId ? genre : "General (no project selected)";
+  const genreLabel = projectId ? track : "General (no project selected)";
 
   return (
     <div className="min-h-screen bg-base text-ink">
