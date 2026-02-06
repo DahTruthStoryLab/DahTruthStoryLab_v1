@@ -2,10 +2,32 @@
 
 export function normalizeGenre(raw) {
   const g = (raw || "").trim().toLowerCase();
-  if (g === "fiction") return "Fiction";
-  if (g === "nonfiction" || g === "non-fiction" || g === "non fiction") return "Non-Fiction";
-  if (g === "poetry") return "Poetry";
-  return "General";
+
+  // Catch empty or default
+  if (!g || g.includes("general")) return "General";
+
+  // Poetry track
+  if (g.includes("poetry")) return "Poetry";
+
+  // Non-Fiction track
+  const nonfiction = [
+    "memoir",
+    "biography",
+    "essay",
+    "essays",
+    "cultural",
+    "commentary",
+    "self-help",
+    "faith",
+    "christian",
+    "nonfiction",
+    "non-fiction",
+    "non fiction",
+  ];
+  if (nonfiction.some((k) => g.includes(k))) return "Non-Fiction";
+
+  // Everything else defaults to Fiction
+  return "Fiction";
 }
 
 // IMPORTANT: We store iconName (string) here because icons are imported in the component.
