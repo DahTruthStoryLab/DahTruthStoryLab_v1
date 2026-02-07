@@ -16,7 +16,6 @@ import {
   Flame,
   Map,
   Star,
-  Zap,
   TrendingUp,
   MessageSquare,
 } from "lucide-react";
@@ -38,13 +37,55 @@ const BRAND = {
 };
 
 /* ============================================
+   STORY CONTEXT (Step 2: read currentStory)
+   ============================================ */
+const CURRENT_STORY_KEY = "currentStory";
+
+function safeJsonParse(value, fallback = null) {
+  try {
+    return value ? JSON.parse(value) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+// Normalize story genres into broad tracks StoryLab understands
+function normalizeGenre(genreRaw) {
+  const g = String(genreRaw || "").toLowerCase();
+
+  // Poetry
+  if (g.includes("poem") || g.includes("poetry")) return "Poetry";
+
+  // Nonfiction
+  if (
+    (g.includes("non") && g.includes("fiction")) ||
+    g.includes("memoir") ||
+    g.includes("essay") ||
+    g.includes("biograph") ||
+    g.includes("self help") ||
+    g.includes("self-help") ||
+    g.includes("history") ||
+    g.includes("devotional") ||
+    g.includes("christian living") ||
+    g.includes("how to") ||
+    g.includes("how-to")
+  ) {
+    return "Nonfiction";
+  }
+
+  // Default
+  return "Fiction";
+}
+
+/* ============================================
    MODULE DEFINITIONS
    ============================================ */
 const MODULES = [
   {
     id: "hfl",
     title: "Hopes • Fears • Legacy",
-    description: "Define what drives your characters - their dreams, obstacles, and what they leave behind.",
+    description:
+      "Define what drives your characters - their dreams, obstacles, and what they leave behind.",
     icon: Heart,
     path: "/story-lab/workshop/hfl",
     color: BRAND.rose,
@@ -54,7 +95,8 @@ const MODULES = [
   {
     id: "priorities",
     title: "Priority Cards",
-    description: "Track character wants, fears, needs, and secrets with AI-powered suggestions.",
+    description:
+      "Track character wants, fears, needs, and secrets with AI-powered suggestions.",
     icon: Target,
     path: "/story-lab/workshop/priorities",
     color: BRAND.gold,
@@ -74,7 +116,8 @@ const MODULES = [
   {
     id: "plot-builder",
     title: "Plot Builder",
-    description: "Build your story's architecture - raise stakes, create obstacles, design turning points.",
+    description:
+      "Build your story's architecture - raise stakes, create obstacles, design turning points.",
     icon: Layers,
     path: "/story-lab/plot-builder",
     color: "#dc2626",
@@ -85,7 +128,8 @@ const MODULES = [
   {
     id: "narrative-arc",
     title: "Narrative Arc",
-    description: "Map your story's structure using classic frameworks like Save the Cat or Hero's Journey.",
+    description:
+      "Map your story's structure using classic frameworks like Save the Cat or Hero's Journey.",
     icon: TrendingUp,
     path: "/story-lab/narrative-arc",
     color: BRAND.navy,
@@ -140,49 +184,46 @@ const MODULES = [
    ============================================ */
 function ModuleCard({ module }) {
   const Icon = module.icon;
-  
+
   return (
     <Link
       to={module.path}
       className="group relative rounded-2xl overflow-hidden transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl"
-      style={{ 
+      style={{
         background: "white",
         border: `1px solid ${module.color}20`,
       }}
     >
       {/* New Badge */}
       {module.isNew && (
-        <div 
+        <div
           className="absolute top-3 right-3 text-xs font-bold px-2 py-1 rounded-full text-white z-10"
           style={{ background: BRAND.gold }}
         >
           NEW
         </div>
       )}
-      
+
       {/* Header with gradient */}
-      <div 
-        className="px-6 py-5"
-        style={{ background: module.gradient }}
-      >
+      <div className="px-6 py-5" style={{ background: module.gradient }}>
         <div className="flex items-center gap-4">
           <div className="w-14 h-14 rounded-2xl bg-white/20 flex items-center justify-center shadow-lg">
             <Icon size={28} className="text-white" />
           </div>
           <div>
             <h3 className="font-bold text-lg text-white">{module.title}</h3>
-            <span className="text-xs text-white/70 uppercase tracking-wide">{module.category}</span>
+            <span className="text-xs text-white/70 uppercase tracking-wide">
+              {module.category}
+            </span>
           </div>
         </div>
       </div>
-      
+
       {/* Content */}
       <div className="px-6 py-5">
-        <p className="text-sm text-slate-600 mb-4 leading-relaxed">
-          {module.description}
-        </p>
+        <p className="text-sm text-slate-600 mb-4 leading-relaxed">{module.description}</p>
         <div className="flex items-center justify-between">
-          <span 
+          <span
             className="text-sm font-semibold flex items-center gap-1 transition-all group-hover:gap-2"
             style={{ color: module.color }}
           >
@@ -211,7 +252,7 @@ function QuickAccess() {
           key={link.to}
           to={link.to}
           className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all hover:scale-105"
-          style={{ 
+          style={{
             background: `${link.color}15`,
             color: link.color,
             border: `1px solid ${link.color}30`,
@@ -229,15 +270,56 @@ function QuickAccess() {
    MAIN COMPONENT
    ============================================ */
 export default function WorkshopHub() {
+  const [track, setTrack] = useState("Fiction");
+  const [storyTitle, setStoryTitle] = useState("");
+
+  useEffect(() => {
+    const load = () => {
+      const story = safeJsonParse(localStorage.getItem(CURRENT_STORY_KEY), {});
+      const nextTrack = normalizeGenre(story?.primaryGenre || story?.genre);
+      setTrack(nextTrack);
+      setStoryTitle(story?.title || "");
+    };
+
+    load(); // initial
+
+    // 🔁 react to changes coming from Compose/Project switching
+    const onProjectChange = () => load();
+    window.addEventListener("project:change", onProjectChange);
+
+    // Optional: sync across tabs
+    const onStorage = (e) => {
+      if (e.key === CURRENT_STORY_KEY) load();
+    };
+    window.addEventListener("storage", onStorage);
+
+    return () => {
+      window.removeEventListener("project:change", onProjectChange);
+      window.removeEventListener("storage", onStorage);
+    };
+  }, []);
+
   // Group modules by category
   const categories = [
-    { name: "Character Development", modules: MODULES.filter(m => m.category === "Character") },
-    { name: "Plot & Structure", modules: MODULES.filter(m => m.category === "Plot" || m.category === "Structure") },
-    { name: "Writing & Community", modules: MODULES.filter(m => m.category === "Writing" || m.category === "Community") },
+    {
+      name: "Character Development",
+      modules: MODULES.filter((m) => m.category === "Character"),
+    },
+    {
+      name: "Plot & Structure",
+      modules: MODULES.filter((m) => m.category === "Plot" || m.category === "Structure"),
+    },
+    {
+      name: "Writing & Community",
+      modules: MODULES.filter((m) => m.category === "Writing" || m.category === "Community"),
+    },
   ];
 
   return (
-    <div className="min-h-screen" style={{ background: `linear-gradient(180deg, ${BRAND.cream} 0%, #f1f5f9 100%)` }}>
+    <div
+      className="min-h-screen"
+      style={{ background: `linear-gradient(180deg, ${BRAND.cream} 0%, #f1f5f9 100%)` }}
+    >
       {/* Navigation */}
       <div className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-slate-200 shadow-sm">
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
@@ -259,44 +341,80 @@ export default function WorkshopHub() {
 
       <div className="max-w-6xl mx-auto px-4 py-8">
         {/* Hero Banner */}
-        <div 
+        <div
           className="rounded-3xl p-10 mb-10 text-white text-center relative overflow-hidden"
           style={{
             background: `linear-gradient(135deg, ${BRAND.navy} 0%, ${BRAND.navyLight} 30%, ${BRAND.mauve} 70%, ${BRAND.rose} 100%)`,
           }}
         >
           {/* Decorative elements */}
-          <div className="absolute top-0 left-0 w-64 h-64 rounded-full opacity-10" style={{ background: BRAND.gold, filter: 'blur(80px)' }} />
-          <div className="absolute bottom-0 right-0 w-96 h-96 rounded-full opacity-10" style={{ background: BRAND.rose, filter: 'blur(100px)' }} />
-          
+          <div
+            className="absolute top-0 left-0 w-64 h-64 rounded-full opacity-10"
+            style={{ background: BRAND.gold, filter: "blur(80px)" }}
+          />
+          <div
+            className="absolute bottom-0 right-0 w-96 h-96 rounded-full opacity-10"
+            style={{ background: BRAND.rose, filter: "blur(100px)" }}
+          />
+
           <div className="relative z-10">
             {/* Icon cluster */}
             <div className="flex items-center justify-center gap-3 mb-6">
-              <div className="w-11 h-11 rounded-2xl flex items-center justify-center" style={{ background: `${BRAND.rose}50` }}>
+              <div
+                className="w-11 h-11 rounded-2xl flex items-center justify-center"
+                style={{ background: `${BRAND.rose}50` }}
+              >
                 <Heart size={22} className="text-white" />
               </div>
-              <div className="w-11 h-11 rounded-2xl flex items-center justify-center" style={{ background: '#dc262650' }}>
+              <div
+                className="w-11 h-11 rounded-2xl flex items-center justify-center"
+                style={{ background: "#dc262650" }}
+              >
                 <Flame size={22} className="text-white" />
               </div>
-              <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg" style={{ background: `linear-gradient(135deg, ${BRAND.gold}, ${BRAND.goldDark})` }}>
+              <div
+                className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg"
+                style={{ background: `linear-gradient(135deg, ${BRAND.gold}, ${BRAND.goldDark})` }}
+              >
                 <Star size={28} className="text-white" />
               </div>
-              <div className="w-11 h-11 rounded-2xl flex items-center justify-center" style={{ background: `${BRAND.gold}50` }}>
+              <div
+                className="w-11 h-11 rounded-2xl flex items-center justify-center"
+                style={{ background: `${BRAND.gold}50` }}
+              >
                 <Target size={22} className="text-white" />
               </div>
-              <div className="w-11 h-11 rounded-2xl flex items-center justify-center" style={{ background: `${BRAND.navy}70` }}>
+              <div
+                className="w-11 h-11 rounded-2xl flex items-center justify-center"
+                style={{ background: `${BRAND.navy}70` }}
+              >
                 <Layers size={22} className="text-white" />
               </div>
             </div>
 
-            <h1 className="text-4xl font-bold mb-3">
-              Workshop Hub
-            </h1>
-            
+            <h1 className="text-4xl font-bold mb-3">Workshop Hub</h1>
+
             <p className="text-white/80 max-w-2xl mx-auto text-lg">
-              Your creative toolkit for building unforgettable stories. From character development to plot architecture - everything you need in one place.
+              Your creative toolkit for building unforgettable stories. From character development to
+              plot architecture - everything you need in one place.
             </p>
-            
+
+            {/* ✅ Track pill */}
+            <div className="mt-4 flex items-center justify-center">
+              <span
+                className="px-3 py-1 rounded-full text-xs font-semibold"
+                style={{
+                  background: "rgba(255,255,255,0.18)",
+                  border: "1px solid rgba(255,255,255,0.22)",
+                }}
+              >
+                Track: <span className="font-bold">{track}</span>
+                {storyTitle ? (
+                  <span className="font-normal text-white/80"> • {storyTitle}</span>
+                ) : null}
+              </span>
+            </div>
+
             <div className="mt-6 flex items-center justify-center gap-6 text-sm text-white/60 flex-wrap">
               <div className="flex items-center gap-2">
                 <Heart size={14} style={{ color: BRAND.rose }} />
@@ -331,7 +449,9 @@ export default function WorkshopHub() {
           <div key={category.name} className="mb-10">
             <h2 className="text-xl font-bold mb-5 flex items-center gap-3" style={{ color: BRAND.navy }}>
               <span>{category.name}</span>
-              <span className="text-sm font-normal text-slate-400">({category.modules.length} tools)</span>
+              <span className="text-sm font-normal text-slate-400">
+                ({category.modules.length} tools)
+              </span>
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
               {category.modules.map((module) => (
@@ -349,32 +469,62 @@ export default function WorkshopHub() {
           </h3>
           <div className="flex items-center justify-between flex-wrap gap-4 text-sm">
             <div className="flex items-center gap-2">
-              <span className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold" style={{ background: BRAND.rose }}>1</span>
+              <span
+                className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold"
+                style={{ background: BRAND.rose }}
+              >
+                1
+              </span>
               <span className="text-slate-600">Hopes • Fears • Legacy</span>
             </div>
             <span className="text-slate-300">→</span>
             <div className="flex items-center gap-2">
-              <span className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold" style={{ background: BRAND.gold }}>2</span>
+              <span
+                className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold"
+                style={{ background: BRAND.gold }}
+              >
+                2
+              </span>
               <span className="text-slate-600">Priority Cards</span>
             </div>
             <span className="text-slate-300">→</span>
             <div className="flex items-center gap-2">
-              <span className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold" style={{ background: "#dc2626" }}>3</span>
+              <span
+                className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold"
+                style={{ background: "#dc2626" }}
+              >
+                3
+              </span>
               <span className="text-slate-600">Plot Builder</span>
             </div>
             <span className="text-slate-300">→</span>
             <div className="flex items-center gap-2">
-              <span className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold" style={{ background: BRAND.navy }}>4</span>
+              <span
+                className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold"
+                style={{ background: BRAND.navy }}
+              >
+                4
+              </span>
               <span className="text-slate-600">Narrative Arc</span>
             </div>
             <span className="text-slate-300">→</span>
             <div className="flex items-center gap-2">
-              <span className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold" style={{ background: "#0891b2" }}>5</span>
+              <span
+                className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold"
+                style={{ background: "#0891b2" }}
+              >
+                5
+              </span>
               <span className="text-slate-600">Dialogue Lab</span>
             </div>
             <span className="text-slate-300">→</span>
             <div className="flex items-center gap-2">
-              <span className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold" style={{ background: "#6366f1" }}>6</span>
+              <span
+                className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold"
+                style={{ background: "#6366f1" }}
+              >
+                6
+              </span>
               <span className="text-slate-600">Clothesline</span>
             </div>
           </div>
@@ -383,4 +533,3 @@ export default function WorkshopHub() {
     </div>
   );
 }
-
