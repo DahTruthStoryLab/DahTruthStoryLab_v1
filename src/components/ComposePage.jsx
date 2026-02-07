@@ -159,6 +159,29 @@ function htmlToPlainText(html = "") {
   return text.replace(/\r\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim();
 }
 
+const SELECTED_CHAPTER_KEY_PREFIX = "dt_selected_chapter_";
+
+function selectedChapterKeyForProject(projectId) {
+  const pid = projectId || getSelectedProjectId() || "unknown";
+  return `${SELECTED_CHAPTER_KEY_PREFIX}${pid}`;
+}
+
+// Clean/normalize html for publishing stability
+function normalizeHtmlForPublishing(html = "") {
+  let out = String(html || "");
+
+  // Remove spacer paragraphs
+  out = stripSpacerParagraphs(out);
+
+  // Normalize multiple <br> runs inside paragraphs
+  out = out.replace(/(<br\s*\/?>\s*){4,}/gi, "<br/><br/><br/>");
+
+  // Remove trailing empty paragraphs again after normalization
+  out = stripSpacerParagraphs(out);
+
+  return out;
+}
+
 /* =============================================================================
    Regex Character Scan (shared by modal + refresh button)
 ============================================================================= */
@@ -430,7 +453,7 @@ function regexScanForCharacters(chapterList = []) {
       }
     });
 
-    // Pattern 2: Names with titles (Mr. Smith, Mrs. Johnson, Dr. Carter)
+    // Pattern 2: Names with titles
     const titlePattern =
       /(?:Mr\.|Mrs\.|Ms\.|Miss|Dr\.|Pastor|Father|Mother|Sister|Brother|Uncle|Aunt|Grandma|Grandpa|Coach|Officer|Detective|Agent|Captain|Professor|Prof\.)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/gi;
     let match;
@@ -454,7 +477,7 @@ function regexScanForCharacters(chapterList = []) {
       }
     }
 
-    // Pattern 3: Proper nouns (capitalized words not at sentence start)
+    // Pattern 3: Proper nouns
     const properNounPattern = /[a-z,;:]\s+([A-Z][a-z]{2,}(?:\s+[A-Z][a-z]+)?)/g;
     while ((match = properNounPattern.exec(content)) !== null) {
       const name = match[1]?.trim();
@@ -482,7 +505,7 @@ function regexScanForCharacters(chapterList = []) {
       }
     }
 
-    // Pattern 4: Action patterns (Name + verb)
+    // Pattern 4: Action patterns
     const actionPattern =
       /([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s+(?:walked|ran|looked|turned|smiled|frowned|nodded|shook|stood|sat|leaned|reached|grabbed|pulled|pushed|opened|closed|picked|put|took|gave|held|felt|watched|stared|glanced|gazed|noticed|saw|heard|listened|moved|stepped|entered|left|arrived|returned|approached|followed|led|stopped|started|continued|began|tried|wanted|needed|decided|thought|knew|remembered|forgot|realized|understood|believed|hoped|wished|feared|loved|hated|liked)/gi;
 
@@ -511,10 +534,8 @@ function regexScanForCharacters(chapterList = []) {
   // Convert to array and calculate confidence
   const results = [];
   nameStats.forEach((stats, name) => {
-    // Skip single-word names that appear only once (unless dialogue)
     if (stats.count < 2 && !name.includes(" ") && stats.inDialogue === 0) return;
 
-    // Confidence
     let confidence = "low";
     if (stats.inDialogue >= 2 || (stats.count >= 5 && stats.chapters.size >= 2)) {
       confidence = "high";
@@ -560,7 +581,6 @@ function CharacterSuggestionModal({
   const [isVerifying, setIsVerifying] = useState(false);
   const [verifyError, setVerifyError] = useState(null);
 
-  // Reset state when modal opens and run initial scan
   useEffect(() => {
     if (isOpen && chapters && chapters.length > 0) {
       setSuggestions([]);
@@ -573,7 +593,6 @@ function CharacterSuggestionModal({
       setSuggestions(results);
       setHasScanned(true);
 
-      // Auto-select high/medium confidence
       const autoSelected = new Set();
       results.forEach((c) => {
         if (c.confidence === "high" || c.confidence === "medium") {
@@ -584,7 +603,6 @@ function CharacterSuggestionModal({
     }
   }, [isOpen, chapters]);
 
-  // AI verification (optional)
   const verifyWithAI = async () => {
     if (suggestions.length === 0) return;
 
@@ -722,7 +740,6 @@ Return ONLY the JSON array, no other text.`;
   return createPortal(
     <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4 bg-black/50">
       <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[80vh] flex flex-col overflow-hidden">
-        {/* Header */}
         <div
           className="px-6 py-4 flex items-center justify-between flex-shrink-0"
           style={{
@@ -758,7 +775,6 @@ Return ONLY the JSON array, no other text.`;
           </button>
         </div>
 
-        {/* Content */}
         <div className="flex-1 overflow-y-auto p-6">
           {!hasScanned && (
             <div className="text-center py-12">
@@ -897,7 +913,6 @@ Return ONLY the JSON array, no other text.`;
                 })}
               </div>
 
-              {/* AI Verify Button */}
               {!suggestions.some((s) => s.verified) && (
                 <div className="mt-4 pt-4 border-t border-slate-100">
                   <button
@@ -931,7 +946,6 @@ Return ONLY the JSON array, no other text.`;
           )}
         </div>
 
-        {/* Footer */}
         <div
           className="px-6 py-4 flex items-center justify-between flex-shrink-0"
           style={{ borderTop: `1px solid ${BRAND.navy}10` }}
@@ -1017,7 +1031,6 @@ function ProjectDropdown({
 
       {isOpen && (
         <div className="absolute top-full left-0 mt-2 z-50 bg-white rounded-xl shadow-xl border min-w-[280px] py-2">
-          {/* Current Project Actions */}
           {currentProject && (
             <>
               <div className="px-3 py-1.5 text-xs font-semibold text-slate-400 uppercase tracking-wide">
@@ -1135,7 +1148,6 @@ function ImportOptionsModal({
         </p>
 
         <div className="space-y-3">
-          {/* Import as NEW Project */}
           <button
             onClick={onImportNew}
             className="w-full p-4 rounded-xl text-left transition-all hover:scale-[1.02] hover:shadow-md"
@@ -1168,7 +1180,6 @@ function ImportOptionsModal({
             </div>
           </button>
 
-          {/* Import into CURRENT Project */}
           <button
             onClick={onImportCurrent}
             className="w-full p-4 rounded-xl text-left transition-all hover:shadow-md"
@@ -1391,12 +1402,17 @@ export default function ComposePage() {
   const primaryGenre =
     currentProject?.primaryGenre || currentProject?.genre || "General / Undeclared";
 
+  // ✅ Selected chapter key (project-scoped)
+  const selectedChapterStorageKey = useMemo(
+    () => selectedChapterKeyForProject(currentProjectId),
+    [currentProjectId]
+  );
+
   // Update bookTitle when project changes
   useEffect(() => {
     if (currentProject?.title) setBookTitle(currentProject.title);
     else if (book?.title) setBookTitle(book.title);
 
-    // keep StoryLab + other modules synced on project switch
     const pid = currentProject?.id || currentProjectId || getSelectedProjectId();
     const safeTitle = (currentProject?.title || book?.title || bookTitle || "Untitled Book").trim();
     if (pid) {
@@ -1488,6 +1504,24 @@ export default function ComposePage() {
       if (activeAiTab) storage.setItem("dt_activeAiTab", activeAiTab);
     } catch {}
   }, [activeAiTab]);
+
+  // ✅ Auto-select a chapter when entering editor view
+  useEffect(() => {
+    if (view !== "editor") return;
+    if (selectedId) return;
+    if (!chapters?.length) return;
+
+    try {
+      const saved = storage.getItem(selectedChapterStorageKey);
+      const exists = saved && chapters.some((c) => c.id === saved);
+      if (exists) {
+        setSelectedId(saved);
+        return;
+      }
+    } catch {}
+
+    setSelectedId(chapters[0].id);
+  }, [view, selectedId, chapters, selectedChapterStorageKey, setSelectedId]);
 
   // Check for pending character scan after reload
   useEffect(() => {
@@ -1591,14 +1625,12 @@ export default function ComposePage() {
     try {
       const preview = generatePreview(html, 20);
 
-      // Update local chapter first
       updateChapter(selectedId, {
         title: title || selectedChapter?.title || "",
         content: html,
         preview,
       });
 
-      // Compute stats using a "next" snapshot to avoid off-by-one
       const nextChapters = (chapters || []).map((c) =>
         c.id === selectedId
           ? {
@@ -1629,12 +1661,10 @@ export default function ComposePage() {
       const safeTitle = bookTitle?.trim() || book?.title?.trim() || "Untitled Book";
       const projectId = currentProjectId || getSelectedProjectId() || "unknown";
 
-      // Keep project list title synced
       if (currentProjectId && safeTitle) {
         renameProject(currentProjectId, safeTitle);
       }
 
-      // Snapshot + meta MUST include genre
       saveCurrentStorySnapshot({ id: projectId, title: safeTitle, primaryGenre });
 
       upsertProjectMeta({
@@ -1838,7 +1868,6 @@ export default function ComposePage() {
     }
   };
 
-  // Parse a file and return the parsed document
   const parseFile = async (file) => {
     const name = file.name.toLowerCase();
     let parsed;
@@ -1854,7 +1883,6 @@ export default function ComposePage() {
     return parsed;
   };
 
-  // Add @char: tags to chapters for selected characters
   const handleAddCharacterTags = (characterNames) => {
     if (!characterNames || characterNames.length === 0) return;
 
@@ -1894,7 +1922,6 @@ export default function ComposePage() {
     alert(`✅ Added @char: tags for ${taggedNames.size} character(s).`);
   };
 
-  // Import into CURRENT project (append chapters)
   const handleImportIntoCurrent = async (file) => {
     if (!file) return;
 
@@ -1960,7 +1987,6 @@ export default function ComposePage() {
     }
   };
 
-  // Import as NEW project
   const handleImportAsNewProject = async (file) => {
     if (!file) return;
 
@@ -2003,7 +2029,6 @@ export default function ComposePage() {
     }
   };
 
-  // File input handler - shows modal to choose import type
   const handleFileSelect = (e) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -2013,7 +2038,6 @@ export default function ComposePage() {
     e.target.value = "";
   };
 
-  // Direct import as new project (from project dropdown)
   const handleNewProjectFileSelect = async (e) => {
     const file = e.target.files?.[0];
     if (file) await handleImportAsNewProject(file);
@@ -2037,7 +2061,6 @@ export default function ComposePage() {
   const handleSwitchProject = (projectId) => {
     switchProject(projectId);
 
-    // immediate cross-page sync
     try {
       storage.setItem("dahtruth-current-project-id", projectId);
       window.dispatchEvent(new Event("project:change"));
@@ -2055,14 +2078,25 @@ export default function ComposePage() {
     URL.revokeObjectURL(url);
   };
 
+  // ✅ Updated delete: stay in editor, clear selection + stored key
   const handleDeleteCurrent = () => {
     if (!hasChapter) {
       alert("Please select a chapter first.");
       return;
     }
-    if (window.confirm(`Delete "${title || selectedChapter.title}"?\n\nThis cannot be undone.`)) {
+
+    const label = title || selectedChapter?.title || "Untitled Chapter";
+
+    if (window.confirm(`Delete "${label}"?\n\nThis cannot be undone.`)) {
       deleteChapter(selectedId);
-      setTimeout(() => setView("grid"), 100);
+
+      setSelectedId("");
+      try {
+        storage.removeItem(selectedChapterStorageKey);
+      } catch {}
+
+      setView("editor");
+      setEditorViewMode("editor");
     }
   };
 
@@ -2072,10 +2106,17 @@ export default function ComposePage() {
 
     ids.forEach((id) => deleteChapter(id));
     clearSelection();
-    if (ids.includes(selectedId)) setTimeout(() => setView("grid"), 100);
+
+    if (ids.includes(selectedId)) {
+      setSelectedId("");
+      try {
+        storage.removeItem(selectedChapterStorageKey);
+      } catch {}
+      setView("editor");
+      setEditorViewMode("editor");
+    }
   };
 
-  // Manual character scan (modal)
   const handleScanForCharacters = () => {
     if (!hasAnyChapters) {
       alert("Import a manuscript first to scan for characters.");
@@ -2086,9 +2127,26 @@ export default function ComposePage() {
 
   const goBack = () => navigate("/dashboard");
 
+  // ✅ Writer navigation: always persist selection per-project
   const goToWriter = (chapterId) => {
-    const idToUse = chapterId || selectedId || chapters?.[0]?.id;
-    if (idToUse) setSelectedId(idToUse);
+    const idToUse =
+      chapterId ||
+      selectedId ||
+      (() => {
+        try {
+          const saved = storage.getItem(selectedChapterStorageKey);
+          if (saved && chapters.some((c) => c.id === saved)) return saved;
+        } catch {}
+        return chapters?.[0]?.id;
+      })();
+
+    if (idToUse) {
+      setSelectedId(idToUse);
+      try {
+        storage.setItem(selectedChapterStorageKey, idToUse);
+      } catch {}
+    }
+
     setView("editor");
     setEditorViewMode("editor");
   };
@@ -2110,7 +2168,6 @@ export default function ComposePage() {
     setEditorViewMode("pages");
   };
 
-  // refresh detected candidates (regex scan)
   const refreshDetectedCharacters = useCallback(() => {
     const results = regexScanForCharacters(chapters || []);
     setDetectedCharacters(results || []);
@@ -2151,13 +2208,8 @@ export default function ComposePage() {
           title: ch.title || `Chapter ${index + 1}`,
           included: typeof ch.included === "boolean" ? ch.included : true,
 
-          // ✅ Primary source for formatting & export
           html: htmlForPublishing,
-
-          // ✅ Backward compatibility (do not remove yet)
           textHTML: htmlForPublishing,
-
-          // ✅ Helper only (search / AI / fallback)
           text: plainForPublishing,
         };
       });
@@ -2196,7 +2248,6 @@ export default function ComposePage() {
       storage.setItem(metaKey, JSON.stringify(meta));
       storage.setItem(draftKey, JSON.stringify(payload));
 
-      // Ensure cross-page snapshot updated right before navigation
       saveCurrentStorySnapshot({ id: projectId, title: safeBookTitle, primaryGenre });
 
       navigate("/publishing");
@@ -2262,7 +2313,6 @@ export default function ComposePage() {
       >
         <div className="max-w-[1800px] mx-auto px-4 py-3">
           <div className="flex items-center justify-between flex-wrap gap-3">
-            {/* Left: Title + Project Dropdown */}
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-3">
                 <PenLine size={24} className="text-amber-300" />
@@ -2278,14 +2328,11 @@ export default function ComposePage() {
                 onRename={(id, newTitle) => {
                   renameProject(id, newTitle);
                   setBookTitle(newTitle);
-
-                  // keep snapshot synced after rename
                   saveCurrentStorySnapshot({ id, title: newTitle, primaryGenre });
                 }}
               />
             </div>
 
-            {/* Center: Story Info */}
             <div className="flex items-center gap-4 md:gap-6 text-sm flex-wrap">
               <div className="flex items-center gap-2">
                 <span className="text-white/70">Chapter:</span>
@@ -2298,7 +2345,9 @@ export default function ComposePage() {
 
               <div className="flex items-center gap-2">
                 <span className="text-white/70">Words:</span>
-                <span className="font-medium text-white">{totalWordCount.toLocaleString()}</span>
+                <span className="font-medium text-white">
+                  {totalWordCount.toLocaleString()}
+                </span>
               </div>
 
               <div className="flex items-center gap-2">
@@ -2307,7 +2356,6 @@ export default function ComposePage() {
               </div>
             </div>
 
-            {/* Right: Provider selector */}
             <div className="flex items-center gap-2">
               <label className="text-xs text-white/70">AI:</label>
               <select
@@ -2365,7 +2413,11 @@ export default function ComposePage() {
           )}
 
           <DropdownMenu label="File" icon={FolderOpen}>
-            <DropdownItem icon={FolderPlus} label="Import as New Project" onClick={triggerNewProjectImport} />
+            <DropdownItem
+              icon={FolderPlus}
+              label="Import as New Project"
+              onClick={triggerNewProjectImport}
+            />
             <DropdownItem icon={Upload} label="Import into Current Project" onClick={triggerImport} />
             <DropdownDivider />
             <DropdownItem
@@ -2379,7 +2431,13 @@ export default function ComposePage() {
             <DropdownDivider />
             <DropdownItem
               icon={Save}
-              label={saveStatus === "saving" ? "Saving..." : saveStatus === "saved" ? "Saved ✓" : "Save"}
+              label={
+                saveStatus === "saving"
+                  ? "Saving..."
+                  : saveStatus === "saved"
+                  ? "Saved ✓"
+                  : "Save"
+              }
               onClick={handleSave}
               disabled={!hasChapter || saveStatus === "saving"}
               shortcut="Ctrl+S"
@@ -2525,28 +2583,27 @@ export default function ComposePage() {
                 alignItems: "stretch",
               }}
             >
-              {/* Left Sidebar */}
-              <aside className="space-y-3 overflow-y-auto min-w-[280px] relative z-20">
-                {showSearch && (
-                  <SearchPanel
-                    chapters={chapters}
-                    onSelectChapter={(id) => {
-                      setSelectedId(id);
-                      setShowSearch(false);
-                    }}
-                    onClose={() => setShowSearch(false)}
-                  />
-                )}
-
-                {/* Genre-Aware StoryLab Sidebar */}
+              {/* LEFT SIDEBAR */}
+              <aside className="min-h-0 flex flex-col gap-4 overflow-y-auto pr-1">
+                {/* ✅ ONLY ONE SidebarRouter (duplicate removed) */}
                 <SidebarRouter
                   genre={primaryGenre}
                   chapters={chapters}
+                  selectedChapterId={selectedId}
                   projectId={currentProjectId}
                   projectTitle={bookTitle}
                   wordCount={totalWordCount}
                   targetWords={50000}
                   hasAnyChapters={hasAnyChapters}
+                  onSelectChapter={(id) => {
+                    if (!id) return;
+                    setSelectedId(id);
+                    setView("editor");
+                    setEditorViewMode("editor");
+                    try {
+                      storage.setItem(selectedChapterStorageKey, id);
+                    } catch {}
+                  }}
                   onRefresh={() => window.dispatchEvent(new Event("project:change"))}
                 />
 
