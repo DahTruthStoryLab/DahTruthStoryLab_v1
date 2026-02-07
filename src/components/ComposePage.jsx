@@ -1,23 +1,23 @@
 // src/components/ComposePage.jsx
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import { createPortal } from "react-dom";
 
 import EditorPane from "./Editor/EditorPane";
 import ChapterGrid from "./Writing/ChapterGrid";
-import ChapterSidebar from "./Writing/ChapterSidebar";
-import EditorToolbar from "./Editor/EditorToolbar";
 import TrashDock from "./Writing/TrashDock";
 import SearchPanel from "./Writing/SearchPanel";
 import PaginatedView from "./Writing/PaginatedView";
+import SidebarRouter from "./Writing/SidebarRouter";
+import EditorToolbar from "./Editor/EditorToolbar";
 
 import { useChapterManager } from "../hooks/useChapterManager";
 import { useProjectStore } from "../hooks/useProjectStore";
 import { documentParser } from "../utils/documentParser";
 import { rateLimiter } from "../utils/rateLimiter";
-import { createPortal } from "react-dom";
 import { storage } from "../lib/storage";
-
 import { runAssistant } from "../lib/api";
+
 import {
   Sparkles,
   Search,
@@ -59,20 +59,10 @@ import {
   getSelectedProjectId,
 } from "../lib/projectsSync";
 
-// Add with your other imports
-import { 
-  getGenreCategory, 
-  getConfigForGenre,
-  GENRE_CATEGORIES 
-} from '../lib/genreConfig';
-
-import SidebarRouter from './Writing/SidebarRouter';
 /* =============================================================================
    Constants
 ============================================================================= */
 const CURRENT_STORY_KEY = "currentStory";
-const PUBLISHING_DRAFT_KEY = "publishingDraft";
-
 const DEBUG_IMPORT = false;
 
 // Brand colors
@@ -136,17 +126,17 @@ function saveCurrentStorySnapshot({ id, title, primaryGenre }) {
     const snapshot = {
       id: id || getSelectedProjectId() || "unknown",
       title: title.trim(),
-      primaryGenre: primaryGenre || "General / Undeclared", // ✅ ADD THIS
+      primaryGenre: primaryGenre || "General / Undeclared",
       status: "Draft",
       updatedAt: new Date().toISOString(),
     };
 
     storage.setItem(CURRENT_STORY_KEY, JSON.stringify(snapshot));
 
-    // ✅ Also keep selected project id in sync for any page that reads it
+    // keep selected project id in sync for any page that reads it
     storage.setItem("dahtruth-current-project-id", snapshot.id);
 
-    // ✅ Notify StoryLab to refresh its genre/cards
+    // notify StoryLab/other pages
     window.dispatchEvent(new Event("project:change"));
   } catch (err) {
     console.error("Failed to save currentStory:", err);
@@ -297,7 +287,7 @@ const EXCLUDED_WORDS = new Set([
   "october",
   "november",
   "december",
-  // Common titles (handled separately)
+  // Common titles
   "mr",
   "mrs",
   "ms",
@@ -324,7 +314,6 @@ const EXCLUDED_WORDS = new Set([
   "bible",
   "chapter",
   // Story-related words
-  "chapter",
   "part",
   "book",
   "story",
@@ -977,7 +966,14 @@ Return ONLY the JSON array, no other text.`;
 /* =============================================================================
    PROJECT DROPDOWN COMPONENT
 ============================================================================= */
-function ProjectDropdown({ currentProject, projects, onSwitch, onCreate, onImportNew, onRename }) {
+function ProjectDropdown({
+  currentProject,
+  projects,
+  onSwitch,
+  onCreate,
+  onImportNew,
+  onRename,
+}) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
 
@@ -993,7 +989,10 @@ function ProjectDropdown({ currentProject, projects, onSwitch, onCreate, onImpor
 
   const handleEditTitle = () => {
     if (!currentProject) return;
-    const newTitle = window.prompt("Enter new title for your manuscript:", currentProject.title || "Untitled");
+    const newTitle = window.prompt(
+      "Enter new title for your manuscript:",
+      currentProject.title || "Untitled"
+    );
     if (newTitle && newTitle.trim() && newTitle !== currentProject.title) {
       onRename(currentProject.id, newTitle.trim());
     }
@@ -1007,8 +1006,13 @@ function ProjectDropdown({ currentProject, projects, onSwitch, onCreate, onImpor
         className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium bg-white/20 hover:bg-white/30 text-white transition-colors"
       >
         <BookOpen size={16} />
-        <span className="max-w-[180px] truncate">{currentProject?.title || "No Project"}</span>
-        <ChevronDown size={14} className={`transition-transform ${isOpen ? "rotate-180" : ""}`} />
+        <span className="max-w-[180px] truncate">
+          {currentProject?.title || "No Project"}
+        </span>
+        <ChevronDown
+          size={14}
+          className={`transition-transform ${isOpen ? "rotate-180" : ""}`}
+        />
       </button>
 
       {isOpen && (
@@ -1040,7 +1044,9 @@ function ProjectDropdown({ currentProject, projects, onSwitch, onCreate, onImpor
 
           <div className="max-h-64 overflow-y-auto">
             {projects.length === 0 ? (
-              <div className="px-3 py-4 text-sm text-slate-500 text-center">No projects yet</div>
+              <div className="px-3 py-4 text-sm text-slate-500 text-center">
+                No projects yet
+              </div>
             ) : (
               projects.map((project) => (
                 <button
@@ -1109,7 +1115,13 @@ function ProjectDropdown({ currentProject, projects, onSwitch, onCreate, onImpor
 /* =============================================================================
    IMPORT OPTIONS MODAL
 ============================================================================= */
-function ImportOptionsModal({ isOpen, onClose, onImportCurrent, onImportNew, fileName }) {
+function ImportOptionsModal({
+  isOpen,
+  onClose,
+  onImportCurrent,
+  onImportNew,
+  fileName,
+}) {
   if (!isOpen) return null;
 
   return createPortal(
@@ -1336,8 +1348,15 @@ export default function ComposePage() {
   const navigate = useNavigate();
 
   // Project management
-  const { projects, currentProjectId, currentProject, createProject, createProjectFromImport, switchProject, renameProject } =
-    useProjectStore();
+  const {
+    projects,
+    currentProjectId,
+    currentProject,
+    createProject,
+    createProjectFromImport,
+    switchProject,
+    renameProject,
+  } = useProjectStore();
 
   const {
     book,
@@ -1368,11 +1387,23 @@ export default function ComposePage() {
   const [bookTitle, setBookTitle] = useState(book?.title || "Untitled Story");
   const [author, setAuthor] = useState("Jacqueline Session Ausby");
 
+  // Genre from project (always safe)
+  const primaryGenre =
+    currentProject?.primaryGenre || currentProject?.genre || "General / Undeclared";
+
   // Update bookTitle when project changes
   useEffect(() => {
     if (currentProject?.title) setBookTitle(currentProject.title);
     else if (book?.title) setBookTitle(book.title);
-  }, [currentProject, book]);
+
+    // keep StoryLab + other modules synced on project switch
+    const pid = currentProject?.id || currentProjectId || getSelectedProjectId();
+    const safeTitle = (currentProject?.title || book?.title || bookTitle || "Untitled Book").trim();
+    if (pid) {
+      saveCurrentStorySnapshot({ id: pid, title: safeTitle, primaryGenre });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentProjectId, currentProject?.id, currentProject?.title, primaryGenre]);
 
   const { characters, characterCount } = useMemo(
     () => computeCharactersFromChapters(chapters || []),
@@ -1422,14 +1453,12 @@ export default function ComposePage() {
   // Character suggestion modal state
   const [showCharacterSuggestion, setShowCharacterSuggestion] = useState(false);
 
-  // ✅ detected characters state (safe + inside component)
+  // detected characters state
   const [detectedCharacters, setDetectedCharacters] = useState([]);
 
   const hasChapter = !!selectedId && !!selectedChapter;
   const hasAnyChapters = Array.isArray(chapters) && chapters.length > 0;
-   // Get genre from current project (defaults to General if not set)
-  const primaryGenre = currentProject?.primaryGenre || currentProject?.genre || 'General / Undeclared';
-  console.log('DEBUG Genre:', primaryGenre, 'Category:', getGenreCategory(primaryGenre));
+
   const fileInputRef = useRef(null);
   const newProjectFileInputRef = useRef(null);
 
@@ -1561,17 +1590,30 @@ export default function ComposePage() {
 
     try {
       const preview = generatePreview(html, 20);
+
+      // Update local chapter first
       updateChapter(selectedId, {
         title: title || selectedChapter?.title || "",
         content: html,
         preview,
       });
 
-      const totalWords = computeWordsFromChapters(chapters || []);
-      const chapterCount = Array.isArray(chapters) ? chapters.length : 0;
-      const { characterCount: computedCharacterCount } = computeCharactersFromChapters(
-        chapters || []
+      // Compute stats using a "next" snapshot to avoid off-by-one
+      const nextChapters = (chapters || []).map((c) =>
+        c.id === selectedId
+          ? {
+              ...c,
+              title: title || c.title || "",
+              content: html,
+              preview,
+            }
+          : c
       );
+
+      const totalWords = computeWordsFromChapters(nextChapters);
+      const chapterCount = Array.isArray(nextChapters) ? nextChapters.length : 0;
+      const { characterCount: computedCharacterCount } =
+        computeCharactersFromChapters(nextChapters);
 
       await Promise.resolve(
         saveProject({
@@ -1587,16 +1629,18 @@ export default function ComposePage() {
       const safeTitle = bookTitle?.trim() || book?.title?.trim() || "Untitled Book";
       const projectId = currentProjectId || getSelectedProjectId() || "unknown";
 
-      // Update project title in projects list
+      // Keep project list title synced
       if (currentProjectId && safeTitle) {
         renameProject(currentProjectId, safeTitle);
       }
 
-      saveCurrentStorySnapshot({ id: projectId, title: safeTitle });
+      // Snapshot + meta MUST include genre
+      saveCurrentStorySnapshot({ id: projectId, title: safeTitle, primaryGenre });
 
       upsertProjectMeta({
         id: projectId,
         title: safeTitle,
+        primaryGenre,
         wordCount: totalWords,
         targetWords: 50000,
         characterCount: computedCharacterCount,
@@ -1614,11 +1658,6 @@ export default function ComposePage() {
       console.error("Save failed:", error);
       setSaveStatus("idle");
     }
-  };
-
-  const handleRenameChapter = (chapterId, newTitle) => {
-    if (!chapterId || !newTitle) return;
-    updateChapter(chapterId, { title: newTitle });
   };
 
   const resolveAIMode = (mode) => {
@@ -1989,11 +2028,20 @@ export default function ComposePage() {
     if (t) {
       createProject(t);
       setBookTitle(t);
+
+      const pid = getSelectedProjectId() || currentProjectId || "unknown";
+      saveCurrentStorySnapshot({ id: pid, title: t, primaryGenre });
     }
   };
 
   const handleSwitchProject = (projectId) => {
     switchProject(projectId);
+
+    // immediate cross-page sync
+    try {
+      storage.setItem("dahtruth-current-project-id", projectId);
+      window.dispatchEvent(new Event("project:change"));
+    } catch {}
   };
 
   const handleExport = () => {
@@ -2062,13 +2110,12 @@ export default function ComposePage() {
     setEditorViewMode("pages");
   };
 
-  // ✅ refresh detected candidates (regex scan)
+  // refresh detected candidates (regex scan)
   const refreshDetectedCharacters = useCallback(() => {
     const results = regexScanForCharacters(chapters || []);
     setDetectedCharacters(results || []);
   }, [chapters]);
 
-  // Optional: keep it continuously updated
   useEffect(() => {
     refreshDetectedCharacters();
   }, [refreshDetectedCharacters]);
@@ -2086,37 +2133,34 @@ export default function ComposePage() {
         const raw = ch.content || ch.body || ch.text || "";
         const noChars = stripCharacterTags(raw);
         const noSpacers = stripSpacerParagraphs(noChars);
-        const safeHtml = noSpacers;
-        const plain = htmlToPlainText(safeHtml);
 
         return {
           ...ch,
-          content: safeHtml,
-          _plainForPublishing: plain,
-          textHTML: safeHtml,
+          content: noSpacers,
+          _plainForPublishing: htmlToPlainText(noSpacers),
           _index: idx,
         };
       });
 
-     const normalizedForPublishing = cleanedChapters.map((ch, index) => {
-      const htmlForPublishing = ch.content || "";
-      const plainForPublishing = htmlToPlainText(htmlForPublishing);
-    
-      return {
-        id: ch.id || `c_${index + 1}`,
-        title: ch.title || `Chapter ${index + 1}`,
-        included: typeof ch.included === "boolean" ? ch.included : true,
-    
-        // ✅ Primary source for formatting & export
-        html: htmlForPublishing,
-    
-        // ✅ Backward compatibility (do not remove yet)
-        textHTML: htmlForPublishing,
-    
-        // ✅ Helper only (search / AI / fallback)
-        text: plainForPublishing,
-      };
-    });
+      const normalizedForPublishing = cleanedChapters.map((ch, index) => {
+        const htmlForPublishing = ch.content || "";
+        const plainForPublishing = htmlToPlainText(htmlForPublishing);
+
+        return {
+          id: ch.id || `c_${index + 1}`,
+          title: ch.title || `Chapter ${index + 1}`,
+          included: typeof ch.included === "boolean" ? ch.included : true,
+
+          // ✅ Primary source for formatting & export
+          html: htmlForPublishing,
+
+          // ✅ Backward compatibility (do not remove yet)
+          textHTML: htmlForPublishing,
+
+          // ✅ Helper only (search / AI / fallback)
+          text: plainForPublishing,
+        };
+      });
 
       const safeBookTitle = bookTitle?.trim() || book?.title?.trim() || "Untitled Book";
 
@@ -2125,12 +2169,14 @@ export default function ComposePage() {
         author: author || "Unknown Author",
         year: new Date().getFullYear().toString(),
         authorLast: (author || "").split(" ").slice(-1)[0] || "Author",
+        primaryGenre,
       };
 
       const payload = {
         book: {
           ...book,
           title: safeBookTitle,
+          primaryGenre,
           status: "ReadyForPublishing",
           updatedAt: new Date().toISOString(),
         },
@@ -2142,15 +2188,18 @@ export default function ComposePage() {
       };
 
       const projectId = currentProjectId || getSelectedProjectId() || "unknown";
-      const chaptersKey = chaptersKeyForProject(projectId);
+      const keyChapters = chaptersKeyForProject(projectId);
       const metaKey = `dahtruth_project_meta_${projectId}`;
       const draftKey = `publishingDraft_${projectId}`;
 
-      storage.setItem(chaptersKey, JSON.stringify(normalizedForPublishing));
+      storage.setItem(keyChapters, JSON.stringify(normalizedForPublishing));
       storage.setItem(metaKey, JSON.stringify(meta));
       storage.setItem(draftKey, JSON.stringify(payload));
-      
-    navigate("/publishing");
+
+      // Ensure cross-page snapshot updated right before navigation
+      saveCurrentStorySnapshot({ id: projectId, title: safeBookTitle, primaryGenre });
+
+      navigate("/publishing");
     } catch (err) {
       console.error("Failed to send manuscript to publishing:", err);
       alert("Something went wrong sending this to Publishing. Please try again.");
@@ -2229,6 +2278,9 @@ export default function ComposePage() {
                 onRename={(id, newTitle) => {
                   renameProject(id, newTitle);
                   setBookTitle(newTitle);
+
+                  // keep snapshot synced after rename
+                  saveCurrentStorySnapshot({ id, title: newTitle, primaryGenre });
                 }}
               />
             </div>
@@ -2267,7 +2319,7 @@ export default function ComposePage() {
                   Claude
                 </option>
                 <option value="openai" className="text-slate-800">
-                  GPT-4
+                  GPT
                 </option>
               </select>
             </div>
@@ -2327,9 +2379,7 @@ export default function ComposePage() {
             <DropdownDivider />
             <DropdownItem
               icon={Save}
-              label={
-                saveStatus === "saving" ? "Saving..." : saveStatus === "saved" ? "Saved ✓" : "Save"
-              }
+              label={saveStatus === "saving" ? "Saving..." : saveStatus === "saved" ? "Saved ✓" : "Save"}
               onClick={handleSave}
               disabled={!hasChapter || saveStatus === "saving"}
               shortcut="Ctrl+S"
@@ -2472,7 +2522,7 @@ export default function ComposePage() {
                 gridTemplateColumns: showAssistant
                   ? "300px minmax(0, 1fr) 320px"
                   : "300px minmax(0, 1fr)",
-                alignItems: 'stretch',
+                alignItems: "stretch",
               }}
             >
               {/* Left Sidebar */}
@@ -2488,18 +2538,18 @@ export default function ComposePage() {
                   />
                 )}
 
-  {/* Genre-Aware StoryLab Sidebar (always shows; it chooses the right modules) */}
-              <SidebarRouter
-                genre={primaryGenre}
-                chapters={chapters}
-                projectId={currentProjectId}
-                projectTitle={bookTitle}
-                wordCount={totalWordCount}
-                targetWords={50000}
-                hasAnyChapters={hasAnyChapters}
-                onRefresh={() => console.log("Refresh story elements")}
-              />
-                
+                {/* Genre-Aware StoryLab Sidebar */}
+                <SidebarRouter
+                  genre={primaryGenre}
+                  chapters={chapters}
+                  projectId={currentProjectId}
+                  projectTitle={bookTitle}
+                  wordCount={totalWordCount}
+                  targetWords={50000}
+                  hasAnyChapters={hasAnyChapters}
+                  onRefresh={() => window.dispatchEvent(new Event("project:change"))}
+                />
+
                 {headings.length > 0 && (
                   <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
                     <div className="text-xs font-semibold text-slate-700 mb-2">
@@ -2644,7 +2694,10 @@ export default function ComposePage() {
 
               {/* Right-hand AI Assistant */}
               {showAssistant && (
-                <section className="flex flex-col bg-white border border-slate-200 rounded-xl shadow-sm h-full overflow-hidden relative z-20" style={{ minHeight: '400px', maxHeight: 'calc(100vh - 180px)' }}>
+                <section
+                  className="flex flex-col bg-white border border-slate-200 rounded-xl shadow-sm h-full overflow-hidden relative z-20"
+                  style={{ minHeight: "400px", maxHeight: "calc(100vh - 180px)" }}
+                >
                   <div className="px-3 py-2 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
                     <div>
                       <div className="text-xs font-semibold text-slate-800">AI Assistant</div>
