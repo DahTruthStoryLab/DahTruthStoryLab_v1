@@ -21,7 +21,7 @@ import {
   MouseTransition,
 } from "dnd-multi-backend";
 import { HTML5Backend } from "react-dnd-html5-backend";
-import { TouchBackend } from "react-dnd-touch-backend"; 
+import { TouchBackend } from "react-dnd-touch-backend";
 import PlotBuilder from "./components/storylab/PlotBuilder";
 
 // Global user context
@@ -65,13 +65,13 @@ const ProjectPage = lazy(() => import("./components/ProjectPage"));
 const WhoAmI = lazy(() => import("./components/WhoAmI"));
 const ComposePage = lazy(() => import("./components/ComposePage"));
 const Calendar = lazy(() => import("./components/Calendar"));
+
+// StoryLab (existing nested system)
 const StoryLabLanding = lazy(() => import("./lib/storylab/StoryLabLanding"));
 const StoryPromptsWorkshop = lazy(() =>
   import("./lib/storylab/StoryPromptsWorkshop")
 );
-const PriorityCards = lazy(() =>
-  import("./components/storylab/PriorityCards")
-);
+const PriorityCards = lazy(() => import("./components/storylab/PriorityCards"));
 const CharacterRoadmap = lazy(() =>
   import("./components/storylab/CharacterRoadmap")
 );
@@ -82,26 +82,30 @@ const HopesFearsLegacy = lazy(() =>
 const WorkshopCohort = lazy(() =>
   import("./components/storylab/WorkshopCohort.jsx")
 );
+const StoryLabLayout = lazy(() =>
+  import("./components/storylab/StoryLabLayout.jsx")
+);
+const NarrativeArc = lazy(() => import("./components/storylab/NarrativeArc.jsx"));
+const WorkshopHub = lazy(() => import("./components/storylab/WorkshopHub.jsx"));
+
+// ✅ NEW: top-level StoryLab page (genre-aware jump target)
+const StoryLab = lazy(() => import("./pages/StoryLab.jsx"));
+
+// Publishing
 const Publishing = lazy(() => import("./pages/Publishing.tsx"));
 const Proof = lazy(() => import("./pages/Proof.tsx"));
 const Format = lazy(() => import("./pages/Format.tsx"));
 const Export = lazy(() => import("./pages/Export.tsx"));
 const PublishingPrep = lazy(() => import("./pages/PublishingPrep.tsx"));
+const Cover = lazy(() => import("./pages/Cover.tsx"));
+
+// Other
 const Profile = lazy(() => import("./components/Profile"));
 const PlansPage = lazy(() => import("./components/PlansPage"));
 const BillingSuccess = lazy(() => import("./pages/BillingSuccess.jsx"));
 const AiTools = lazy(() => import("./pages/AiTools"));
-const StoryLabLayout = lazy(() =>
-  import("./components/storylab/StoryLabLayout.jsx")
-);
-const NarrativeArc = lazy(() =>
-  import("./components/storylab/NarrativeArc.jsx")
-);
-const Cover = lazy(() => import("./pages/Cover.tsx"));
-const WorkshopHub = lazy(() =>
-  import("./components/storylab/WorkshopHub.jsx")
-);
 const AboutPage = lazy(() => import("./components/AboutPage.jsx"));
+
 // =========================
 // Global UI helpers
 // =========================
@@ -188,6 +192,16 @@ export default function App() {
                 }
               />
 
+              {/* ✅ NEW: top-level StoryLab jump target */}
+              <Route
+                path="/storylab"
+                element={
+                  <ProtectedRoute>
+                    <StoryLab />
+                  </ProtectedRoute>
+                }
+              />
+
               {/* STORY-LAB (layout + nested routes) */}
               <Route
                 path="/story-lab/*"
@@ -252,7 +266,6 @@ export default function App() {
                   </ProtectedRoute>
                 }
               />
-              {/* NEW: top-level Cover route */}
               <Route
                 path="/cover"
                 element={
@@ -263,35 +276,21 @@ export default function App() {
               />
 
               {/* Aliases that all point to the top-level publishing routes */}
-              <Route
-                path="/publish"
-                element={<Navigate to="/publishing" replace />}
-              />
+              <Route path="/publish" element={<Navigate to="/publishing" replace />} />
               <Route
                 path="/publishing-suite"
                 element={<Navigate to="/publishing" replace />}
               />
-              <Route
-                path="/publishing/cover"
-                element={<Navigate to="/cover" replace />}
-              />
+              <Route path="/publishing/cover" element={<Navigate to="/cover" replace />} />
+
               {/* Legacy Story-Lab URLs → new top-level pages */}
               <Route
                 path="/story-lab/publishing"
                 element={<Navigate to="/publishing" replace />}
               />
-              <Route
-                path="/story-lab/proof"
-                element={<Navigate to="/proof" replace />}
-              />
-              <Route
-                path="/story-lab/format"
-                element={<Navigate to="/format" replace />}
-              />
-              <Route
-                path="/story-lab/export"
-                element={<Navigate to="/export" replace />}
-              />
+              <Route path="/story-lab/proof" element={<Navigate to="/proof" replace />} />
+              <Route path="/story-lab/format" element={<Navigate to="/format" replace />} />
+              <Route path="/story-lab/export" element={<Navigate to="/export" replace />} />
               <Route
                 path="/story-lab/publishing-prep"
                 element={<Navigate to="/publishing-prep" replace />}
@@ -302,14 +301,8 @@ export default function App() {
                 path="/storylab/publishing"
                 element={<Navigate to="/publishing" replace />}
               />
-              <Route
-                path="/storylab/format"
-                element={<Navigate to="/format" replace />}
-              />
-              <Route
-                path="/storylab/export"
-                element={<Navigate to="/export" replace />}
-              />
+              <Route path="/storylab/format" element={<Navigate to="/format" replace />} />
+              <Route path="/storylab/export" element={<Navigate to="/export" replace />} />
               <Route
                 path="/storylab/publishing-prep"
                 element={<Navigate to="/publishing-prep" replace />}
@@ -379,7 +372,7 @@ export default function App() {
                   </ProtectedRoute>
                 }
               />
-              
+
               {/* Fallback */}
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
