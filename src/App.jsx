@@ -85,11 +85,15 @@ const WorkshopCohort = lazy(() =>
 const StoryLabLayout = lazy(() =>
   import("./components/storylab/StoryLabLayout.jsx")
 );
-const NarrativeArc = lazy(() => import("./components/storylab/NarrativeArc.jsx"));
-const WorkshopHub = lazy(() => import("./components/storylab/WorkshopHub.jsx"));
+const NarrativeArc = lazy(() =>
+  import("./components/storylab/NarrativeArc.jsx")
+);
+const WorkshopHub = lazy(() =>
+  import("./components/storylab/WorkshopHub.jsx")
+);
 
-// ✅ NEW: top-level StoryLab page (genre-aware jump target)
-const StoryLab = lazy(() => import("./pages/StoryLab.jsx"));
+// ❌ REMOVE: top-level StoryLab page (we now jump into the designed hub)
+// const StoryLab = lazy(() => import("./pages/StoryLab.jsx"));
 
 // Publishing
 const Publishing = lazy(() => import("./pages/Publishing.tsx"));
@@ -192,12 +196,12 @@ export default function App() {
                 }
               />
 
-              {/* ✅ NEW: top-level StoryLab jump target */}
+              {/* ✅ FIXED: /storylab now jumps into the designed StoryLab hub */}
               <Route
                 path="/storylab"
                 element={
                   <ProtectedRoute>
-                    <StoryLab />
+                    <Navigate to="/story-lab/hub" replace />
                   </ProtectedRoute>
                 }
               />
@@ -276,21 +280,36 @@ export default function App() {
               />
 
               {/* Aliases that all point to the top-level publishing routes */}
-              <Route path="/publish" element={<Navigate to="/publishing" replace />} />
+              <Route
+                path="/publish"
+                element={<Navigate to="/publishing" replace />}
+              />
               <Route
                 path="/publishing-suite"
                 element={<Navigate to="/publishing" replace />}
               />
-              <Route path="/publishing/cover" element={<Navigate to="/cover" replace />} />
+              <Route
+                path="/publishing/cover"
+                element={<Navigate to="/cover" replace />}
+              />
 
               {/* Legacy Story-Lab URLs → new top-level pages */}
               <Route
                 path="/story-lab/publishing"
                 element={<Navigate to="/publishing" replace />}
               />
-              <Route path="/story-lab/proof" element={<Navigate to="/proof" replace />} />
-              <Route path="/story-lab/format" element={<Navigate to="/format" replace />} />
-              <Route path="/story-lab/export" element={<Navigate to="/export" replace />} />
+              <Route
+                path="/story-lab/proof"
+                element={<Navigate to="/proof" replace />}
+              />
+              <Route
+                path="/story-lab/format"
+                element={<Navigate to="/format" replace />}
+              />
+              <Route
+                path="/story-lab/export"
+                element={<Navigate to="/export" replace />}
+              />
               <Route
                 path="/story-lab/publishing-prep"
                 element={<Navigate to="/publishing-prep" replace />}
@@ -301,8 +320,14 @@ export default function App() {
                 path="/storylab/publishing"
                 element={<Navigate to="/publishing" replace />}
               />
-              <Route path="/storylab/format" element={<Navigate to="/format" replace />} />
-              <Route path="/storylab/export" element={<Navigate to="/export" replace />} />
+              <Route
+                path="/storylab/format"
+                element={<Navigate to="/format" replace />}
+              />
+              <Route
+                path="/storylab/export"
+                element={<Navigate to="/export" replace />}
+              />
               <Route
                 path="/storylab/publishing-prep"
                 element={<Navigate to="/publishing-prep" replace />}
