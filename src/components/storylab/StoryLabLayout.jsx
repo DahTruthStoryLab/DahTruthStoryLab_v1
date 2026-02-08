@@ -78,7 +78,8 @@ export default function StoryLabLayout() {
     };
   }, []);
 
-  const inHub = pathname === "/story-lab/hub" || pathname === "/story-lab/workshop";
+  const inHub =
+    pathname === "/story-lab/hub" || pathname === "/story-lab/workshop";
 
   return (
     <div className="min-h-screen bg-[color:var(--brand-bg,#f8fafc)]">
@@ -161,7 +162,7 @@ export default function StoryLabLayout() {
       </div>
 
       {/* Page content */}
-      <main className="max-w-6xl mx-auto">
+      <main className="max-w-6xl mx-auto px-4 py-8">
         <Outlet />
       </main>
     </div>
