@@ -2125,6 +2125,17 @@ export default function ComposePage() {
     setShowCharacterSuggestion(true);
   };
 
+  // ✅ Jump to StoryLab — syncs project ID and navigates
+  const jumpToStoryLab = () => {
+    try {
+      storage.setItem("dahtruth-current-project-id", currentProjectId);
+    } catch {}
+    try {
+      window.dispatchEvent(new Event("project:change"));
+    } catch {}
+    navigate("/storylab");
+  };
+
   const goBack = () => navigate("/dashboard");
 
   // ✅ Writer navigation: always persist selection per-project
@@ -2370,6 +2381,16 @@ export default function ComposePage() {
                   GPT
                 </option>
               </select>
+
+              <button
+                type="button"
+                onClick={jumpToStoryLab}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium border border-white/20 hover:border-white/40 hover:bg-white/10 text-white transition-colors"
+                title="Open StoryLab for this project"
+              >
+                <Sparkles size={14} />
+                StoryLab
+              </button>
             </div>
           </div>
         </div>
@@ -2838,3 +2859,4 @@ export default function ComposePage() {
     </div>
   );
 }
+
