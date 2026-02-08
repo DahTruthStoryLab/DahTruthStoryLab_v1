@@ -1,7 +1,8 @@
 // src/components/storylab/WorkshopHub.jsx
 // Workshop Hub - Central dashboard for all StoryLab modules
+// UPDATED: Track-aware modules for Fiction / Poetry / Nonfiction (with Coming Soon cards)
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import {
   Heart,
@@ -18,6 +19,10 @@ import {
   Star,
   TrendingUp,
   MessageSquare,
+  Feather,
+  NotebookPen,
+  Quote,
+  ScrollText,
 } from "lucide-react";
 
 /* ============================================
@@ -79,13 +84,50 @@ function normalizeGenre(genreRaw) {
 
 /* ============================================
    MODULE DEFINITIONS
+   - We split modules into: COMMON + track-specific
+   - For track-specific modules you haven't built yet:
+     mark comingSoon: true so we can show a nice disabled card
    ============================================ */
-const MODULES = [
+const COMMON_MODULES = [
+  {
+    id: "dialogue-lab",
+    title: "Dialogue Lab",
+    description: "Write, analyze, and enhance dialogue with AI-powered feedback.",
+    icon: MessageSquare,
+    path: "/story-lab/dialogue-lab",
+    color: "#0891b2",
+    gradient: "linear-gradient(135deg, #0e7490 0%, #0891b2 50%, #06b6d4 100%)",
+    category: "Writing",
+    isNew: true,
+  },
+  {
+    id: "prompts",
+    title: "Writing Prompts",
+    description: "AI-powered prompts to spark creativity and overcome blocks.",
+    icon: Sparkles,
+    path: "/story-lab/prompts",
+    color: BRAND.mauve,
+    gradient: `linear-gradient(135deg, ${BRAND.mauve} 0%, #a78bfa 100%)`,
+    category: "Writing",
+  },
+  {
+    id: "community",
+    title: "Workshop Community",
+    description: "Connect with other writers—share work, give feedback, grow together.",
+    icon: Users,
+    path: "/story-lab/community",
+    color: "#059669",
+    gradient: "linear-gradient(135deg, #047857 0%, #059669 100%)",
+    category: "Community",
+  },
+];
+
+const FICTION_MODULES = [
   {
     id: "hfl",
     title: "Hopes • Fears • Legacy",
     description:
-      "Define what drives your characters - their dreams, obstacles, and what they leave behind.",
+      "Define what drives your characters—their dreams, obstacles, and what they leave behind.",
     icon: Heart,
     path: "/story-lab/workshop/hfl",
     color: BRAND.rose,
@@ -95,8 +137,7 @@ const MODULES = [
   {
     id: "priorities",
     title: "Priority Cards",
-    description:
-      "Track character wants, fears, needs, and secrets with AI-powered suggestions.",
+    description: "Track wants, fears, needs, and secrets with AI-powered suggestions.",
     icon: Target,
     path: "/story-lab/workshop/priorities",
     color: BRAND.gold,
@@ -106,7 +147,7 @@ const MODULES = [
   {
     id: "roadmap",
     title: "Character Roadmap",
-    description: "Plan character milestones and track their journey through your story.",
+    description: "Plan milestones and track the character journey through your story.",
     icon: Map,
     path: "/story-lab/workshop/roadmap",
     color: "#7c3aed",
@@ -116,8 +157,7 @@ const MODULES = [
   {
     id: "plot-builder",
     title: "Plot Builder",
-    description:
-      "Build your story's architecture - raise stakes, create obstacles, design turning points.",
+    description: "Build story architecture—stakes, obstacles, turning points.",
     icon: Layers,
     path: "/story-lab/plot-builder",
     color: "#dc2626",
@@ -128,8 +168,7 @@ const MODULES = [
   {
     id: "narrative-arc",
     title: "Narrative Arc",
-    description:
-      "Map your story's structure using classic frameworks like Save the Cat or Hero's Journey.",
+    description: "Map structure using classic frameworks (Save the Cat, Hero’s Journey, etc.).",
     icon: TrendingUp,
     path: "/story-lab/narrative-arc",
     color: BRAND.navy,
@@ -137,45 +176,108 @@ const MODULES = [
     category: "Structure",
   },
   {
-    id: "dialogue-lab",
-    title: "Dialogue Lab",
-    description: "Write, analyze, and enhance character dialogue with AI-powered feedback.",
-    icon: MessageSquare,
-    path: "/story-lab/dialogue-lab",
-    color: "#0891b2",
-    gradient: "linear-gradient(135deg, #0e7490 0%, #0891b2 50%, #06b6d4 100%)",
-    category: "Writing",
-    isNew: true,
-  },
-  {
     id: "clothesline",
     title: "Clothesline",
-    description: "Visualize your complete story - scenes, chapters, and character threads.",
+    description: "Visualize your story—scenes, chapters, and character threads.",
     icon: LayoutGrid,
     path: "/story-lab/workshop/clothesline",
     color: "#6366f1",
     gradient: "linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)",
     category: "Structure",
   },
+];
+
+const POETRY_MODULES = [
+  // usable now (re-use existing tools that already exist)
   {
-    id: "prompts",
-    title: "Story Prompts",
-    description: "AI-powered writing prompts to spark creativity and overcome blocks.",
-    icon: Sparkles,
-    path: "/story-lab/prompts",
-    color: BRAND.mauve,
-    gradient: `linear-gradient(135deg, ${BRAND.mauve} 0%, #a78bfa 100%)`,
-    category: "Writing",
+    id: "poetry-collection",
+    title: "Collection Builder",
+    description: "Organize poems into sections, order flow, and themes for a full collection.",
+    icon: BookOpen,
+    path: "/story-lab/hub", // safe path until you build the real page
+    color: BRAND.gold,
+    gradient: `linear-gradient(135deg, ${BRAND.goldDark} 0%, ${BRAND.gold} 100%)`,
+    category: "Poetry",
+    comingSoon: true,
   },
   {
-    id: "community",
-    title: "Workshop Community",
-    description: "Connect with other writers - share work, give feedback, grow together.",
-    icon: Users,
-    path: "/story-lab/community",
-    color: "#059669",
-    gradient: "linear-gradient(135deg, #047857 0%, #059669 100%)",
-    category: "Community",
+    id: "poetry-forms",
+    title: "Forms & Craft Lab",
+    description: "Work through forms (free verse, sonnet, villanelle) and craft checkpoints.",
+    icon: Feather,
+    path: "/story-lab/hub",
+    color: BRAND.rose,
+    gradient: `linear-gradient(135deg, ${BRAND.roseDark} 0%, ${BRAND.rose} 100%)`,
+    category: "Poetry",
+    comingSoon: true,
+  },
+  {
+    id: "poetry-linebreak",
+    title: "Line Break Clinic",
+    description: "Refine line breaks, rhythm, repetition, and emotional pacing.",
+    icon: Quote,
+    path: "/story-lab/hub",
+    color: "#6366f1",
+    gradient: "linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)",
+    category: "Poetry",
+    comingSoon: true,
+  },
+  {
+    id: "poetry-theme-map",
+    title: "Theme Map",
+    description: "Tag poems by theme/imagery and track recurring motifs across the collection.",
+    icon: NotebookPen,
+    path: "/story-lab/hub",
+    color: BRAND.mauve,
+    gradient: `linear-gradient(135deg, ${BRAND.mauve} 0%, #a78bfa 100%)`,
+    category: "Poetry",
+    comingSoon: true,
+  },
+];
+
+const NONFICTION_MODULES = [
+  {
+    id: "nf-outline",
+    title: "Nonfiction Blueprint",
+    description: "Build a chapter plan: promise, structure, beats, and reader takeaways.",
+    icon: ScrollText,
+    path: "/story-lab/hub",
+    color: BRAND.navy,
+    gradient: `linear-gradient(135deg, ${BRAND.ink} 0%, ${BRAND.navy} 100%)`,
+    category: "Nonfiction",
+    comingSoon: true,
+  },
+  {
+    id: "nf-argument",
+    title: "Argument & Evidence Map",
+    description: "Track claims, support, citations you need, and what to cut or clarify.",
+    icon: Target,
+    path: "/story-lab/hub",
+    color: BRAND.gold,
+    gradient: `linear-gradient(135deg, ${BRAND.goldDark} 0%, ${BRAND.gold} 100%)`,
+    category: "Nonfiction",
+    comingSoon: true,
+  },
+  {
+    id: "nf-voice",
+    title: "Voice & Tone Guardrails",
+    description: "Keep your voice consistent while tightening clarity and persuasion.",
+    icon: Flame,
+    path: "/story-lab/hub",
+    color: BRAND.rose,
+    gradient: `linear-gradient(135deg, ${BRAND.roseDark} 0%, ${BRAND.rose} 100%)`,
+    category: "Nonfiction",
+    comingSoon: true,
+  },
+  {
+    id: "nf-structure",
+    title: "Narrative Arc (Nonfiction)",
+    description: "Use structure frameworks to organize memoir/essay chapters and beats.",
+    icon: TrendingUp,
+    path: "/story-lab/narrative-arc",
+    color: BRAND.navy,
+    gradient: `linear-gradient(135deg, ${BRAND.ink} 0%, ${BRAND.navy} 100%)`,
+    category: "Structure",
   },
 ];
 
@@ -185,22 +287,15 @@ const MODULES = [
 function ModuleCard({ module }) {
   const Icon = module.icon;
 
-  return (
-    <Link
-      to={module.path}
-      className="group relative rounded-2xl overflow-hidden transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl"
-      style={{
-        background: "white",
-        border: `1px solid ${module.color}20`,
-      }}
-    >
-      {/* New Badge */}
-      {module.isNew && (
+  const CardInner = (
+    <>
+      {/* Badge */}
+      {(module.isNew || module.comingSoon) && (
         <div
           className="absolute top-3 right-3 text-xs font-bold px-2 py-1 rounded-full text-white z-10"
-          style={{ background: BRAND.gold }}
+          style={{ background: module.comingSoon ? BRAND.navy : BRAND.gold }}
         >
-          NEW
+          {module.comingSoon ? "COMING SOON" : "NEW"}
         </div>
       )}
 
@@ -221,17 +316,60 @@ function ModuleCard({ module }) {
 
       {/* Content */}
       <div className="px-6 py-5">
-        <p className="text-sm text-slate-600 mb-4 leading-relaxed">{module.description}</p>
+        <p className="text-sm text-slate-600 mb-4 leading-relaxed">
+          {module.description}
+        </p>
+
         <div className="flex items-center justify-between">
           <span
             className="text-sm font-semibold flex items-center gap-1 transition-all group-hover:gap-2"
             style={{ color: module.color }}
           >
-            Open Module
+            {module.comingSoon ? "Preview (not live yet)" : "Open Module"}
             <ArrowRight size={16} />
           </span>
         </div>
       </div>
+
+      {/* Disabled overlay */}
+      {module.comingSoon && (
+        <div
+          className="absolute inset-0"
+          style={{
+            background: "rgba(255,255,255,0.45)",
+            backdropFilter: "blur(1px)",
+          }}
+        />
+      )}
+    </>
+  );
+
+  const baseStyle = {
+    background: "white",
+    border: `1px solid ${module.color}20`,
+    opacity: module.comingSoon ? 0.92 : 1,
+  };
+
+  // If comingSoon, render a non-clickable card but keep the hover style subtle
+  if (module.comingSoon) {
+    return (
+      <div
+        className="group relative rounded-2xl overflow-hidden transition-all duration-300"
+        style={baseStyle}
+        aria-disabled="true"
+      >
+        {CardInner}
+      </div>
+    );
+  }
+
+  return (
+    <Link
+      to={module.path}
+      className="group relative rounded-2xl overflow-hidden transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl"
+      style={baseStyle}
+    >
+      {CardInner}
     </Link>
   );
 }
@@ -283,11 +421,9 @@ export default function WorkshopHub() {
 
     load(); // initial
 
-    // 🔁 react to changes coming from Compose/Project switching
     const onProjectChange = () => load();
     window.addEventListener("project:change", onProjectChange);
 
-    // Optional: sync across tabs
     const onStorage = (e) => {
       if (e.key === CURRENT_STORY_KEY) load();
     };
@@ -299,26 +435,60 @@ export default function WorkshopHub() {
     };
   }, []);
 
-  // Group modules by category
-  const categories = [
-    {
-      name: "Character Development",
-      modules: MODULES.filter((m) => m.category === "Character"),
-    },
-    {
-      name: "Plot & Structure",
-      modules: MODULES.filter((m) => m.category === "Plot" || m.category === "Structure"),
-    },
-    {
-      name: "Writing & Community",
-      modules: MODULES.filter((m) => m.category === "Writing" || m.category === "Community"),
-    },
-  ];
+  // Track-aware modules
+  const modulesForTrack = useMemo(() => {
+    if (track === "Poetry") return [...POETRY_MODULES, ...COMMON_MODULES];
+    if (track === "Nonfiction") return [...NONFICTION_MODULES, ...COMMON_MODULES];
+    return [...FICTION_MODULES, ...COMMON_MODULES];
+  }, [track]);
+
+  // Group modules by category (dynamic)
+  const categories = useMemo(() => {
+    const byCat = new Map();
+    modulesForTrack.forEach((m) => {
+      const cat = m.category || "Other";
+      if (!byCat.has(cat)) byCat.set(cat, []);
+      byCat.get(cat).push(m);
+    });
+
+    // Desired ordering depending on track
+    const order =
+      track === "Fiction"
+        ? ["Character", "Plot", "Structure", "Writing", "Community", "Other"]
+        : track === "Poetry"
+        ? ["Poetry", "Writing", "Community", "Structure", "Other"]
+        : ["Nonfiction", "Structure", "Writing", "Community", "Other"];
+
+    const out = [];
+    order.forEach((name) => {
+      const list = byCat.get(name);
+      if (list && list.length) {
+        out.push({ name, modules: list });
+        byCat.delete(name);
+      }
+    });
+
+    // Any remaining categories
+    for (const [name, list] of byCat.entries()) {
+      out.push({ name, modules: list });
+    }
+
+    return out;
+  }, [modulesForTrack, track]);
+
+  const trackSubtitle =
+    track === "Poetry"
+      ? "Build a collection with craft, motif, and emotional arc."
+      : track === "Nonfiction"
+      ? "Structure your argument, strengthen clarity, and protect your voice."
+      : "Build unforgettable characters and a powerful narrative arc.";
 
   return (
     <div
       className="min-h-screen"
-      style={{ background: `linear-gradient(180deg, ${BRAND.cream} 0%, #f1f5f9 100%)` }}
+      style={{
+        background: `linear-gradient(180deg, ${BRAND.cream} 0%, #f1f5f9 100%)`,
+      }}
     >
       {/* Navigation */}
       <div className="sticky top-0 z-40 bg-white/95 backdrop-blur border-b border-slate-200 shadow-sm">
@@ -395,11 +565,10 @@ export default function WorkshopHub() {
             <h1 className="text-4xl font-bold mb-3">Workshop Hub</h1>
 
             <p className="text-white/80 max-w-2xl mx-auto text-lg">
-              Your creative toolkit for building unforgettable stories. From character development to
-              plot architecture - everything you need in one place.
+              {trackSubtitle}
             </p>
 
-            {/* ✅ Track pill */}
+            {/* Track pill */}
             <div className="mt-4 flex items-center justify-center">
               <span
                 className="px-3 py-1 rounded-full text-xs font-semibold"
@@ -418,15 +587,15 @@ export default function WorkshopHub() {
             <div className="mt-6 flex items-center justify-center gap-6 text-sm text-white/60 flex-wrap">
               <div className="flex items-center gap-2">
                 <Heart size={14} style={{ color: BRAND.rose }} />
-                <span>Characters</span>
+                <span>{track === "Fiction" ? "Characters" : "Craft"}</span>
               </div>
               <div className="flex items-center gap-2">
                 <Layers size={14} className="text-orange-400" />
-                <span>Plot</span>
+                <span>{track === "Poetry" ? "Motif" : "Structure"}</span>
               </div>
               <div className="flex items-center gap-2">
                 <TrendingUp size={14} style={{ color: BRAND.gold }} />
-                <span>Structure</span>
+                <span>{track === "Nonfiction" ? "Argument" : "Arc"}</span>
               </div>
               <div className="flex items-center gap-2">
                 <MessageSquare size={14} className="text-cyan-400" />
@@ -444,15 +613,27 @@ export default function WorkshopHub() {
           </div>
         </div>
 
-        {/* Module Categories */}
+        {/* Module Categories (dynamic by track) */}
         {categories.map((category) => (
           <div key={category.name} className="mb-10">
-            <h2 className="text-xl font-bold mb-5 flex items-center gap-3" style={{ color: BRAND.navy }}>
-              <span>{category.name}</span>
+            <h2
+              className="text-xl font-bold mb-5 flex items-center gap-3"
+              style={{ color: BRAND.navy }}
+            >
+              <span>
+                {category.name === "Character"
+                  ? "Character Development"
+                  : category.name === "Plot"
+                  ? "Plot"
+                  : category.name === "Structure"
+                  ? "Structure"
+                  : category.name}
+              </span>
               <span className="text-sm font-normal text-slate-400">
                 ({category.modules.length} tools)
               </span>
             </h2>
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
               {category.modules.map((module) => (
                 <ModuleCard key={module.id} module={module} />
@@ -461,75 +642,75 @@ export default function WorkshopHub() {
           </div>
         ))}
 
-        {/* Journey Flow */}
+        {/* Journey Flow (changes by track) */}
         <div className="mt-10 p-6 rounded-2xl border border-slate-200 bg-white/80">
           <h3 className="font-semibold text-slate-700 mb-4 flex items-center gap-2">
             <Map size={18} style={{ color: BRAND.gold }} />
-            Suggested Journey
+            Suggested Journey ({track})
           </h3>
-          <div className="flex items-center justify-between flex-wrap gap-4 text-sm">
-            <div className="flex items-center gap-2">
-              <span
-                className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold"
-                style={{ background: BRAND.rose }}
-              >
-                1
-              </span>
-              <span className="text-slate-600">Hopes • Fears • Legacy</span>
+
+          {track === "Fiction" ? (
+            <div className="flex items-center justify-between flex-wrap gap-4 text-sm">
+              <Step n={1} color={BRAND.rose} label="Hopes • Fears • Legacy" />
+              <Arrow />
+              <Step n={2} color={BRAND.gold} label="Priority Cards" />
+              <Arrow />
+              <Step n={3} color="#dc2626" label="Plot Builder" />
+              <Arrow />
+              <Step n={4} color={BRAND.navy} label="Narrative Arc" />
+              <Arrow />
+              <Step n={5} color="#0891b2" label="Dialogue Lab" />
+              <Arrow />
+              <Step n={6} color="#6366f1" label="Clothesline" />
             </div>
-            <span className="text-slate-300">→</span>
-            <div className="flex items-center gap-2">
-              <span
-                className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold"
-                style={{ background: BRAND.gold }}
-              >
-                2
-              </span>
-              <span className="text-slate-600">Priority Cards</span>
+          ) : track === "Poetry" ? (
+            <div className="flex items-center justify-between flex-wrap gap-4 text-sm">
+              <Step n={1} color={BRAND.mauve} label="Writing Prompts" />
+              <Arrow />
+              <Step n={2} color={BRAND.rose} label="Forms & Craft Lab (Soon)" />
+              <Arrow />
+              <Step n={3} color="#6366f1" label="Line Break Clinic (Soon)" />
+              <Arrow />
+              <Step n={4} color={BRAND.gold} label="Collection Builder (Soon)" />
+              <Arrow />
+              <Step n={5} color="#0891b2" label="Dialogue Lab" />
             </div>
-            <span className="text-slate-300">→</span>
-            <div className="flex items-center gap-2">
-              <span
-                className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold"
-                style={{ background: "#dc2626" }}
-              >
-                3
-              </span>
-              <span className="text-slate-600">Plot Builder</span>
+          ) : (
+            <div className="flex items-center justify-between flex-wrap gap-4 text-sm">
+              <Step n={1} color={BRAND.gold} label="Argument & Evidence Map (Soon)" />
+              <Arrow />
+              <Step n={2} color={BRAND.navy} label="Nonfiction Blueprint (Soon)" />
+              <Arrow />
+              <Step n={3} color={BRAND.rose} label="Voice Guardrails (Soon)" />
+              <Arrow />
+              <Step n={4} color={BRAND.mauve} label="Writing Prompts" />
+              <Arrow />
+              <Step n={5} color="#0891b2" label="Dialogue Lab" />
             </div>
-            <span className="text-slate-300">→</span>
-            <div className="flex items-center gap-2">
-              <span
-                className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold"
-                style={{ background: BRAND.navy }}
-              >
-                4
-              </span>
-              <span className="text-slate-600">Narrative Arc</span>
-            </div>
-            <span className="text-slate-300">→</span>
-            <div className="flex items-center gap-2">
-              <span
-                className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold"
-                style={{ background: "#0891b2" }}
-              >
-                5
-              </span>
-              <span className="text-slate-600">Dialogue Lab</span>
-            </div>
-            <span className="text-slate-300">→</span>
-            <div className="flex items-center gap-2">
-              <span
-                className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold"
-                style={{ background: "#6366f1" }}
-              >
-                6
-              </span>
-              <span className="text-slate-600">Clothesline</span>
-            </div>
-          </div>
+          )}
         </div>
       </div>
     </div>
   );
+}
+
+/* ============================================
+   Journey helpers
+   ============================================ */
+function Step({ n, color, label }) {
+  return (
+    <div className="flex items-center gap-2">
+      <span
+        className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold"
+        style={{ background: color }}
+      >
+        {n}
+      </span>
+      <span className="text-slate-600">{label}</span>
+    </div>
+  );
+}
+
+function Arrow() {
+  return <span className="text-slate-300">→</span>;
 }
