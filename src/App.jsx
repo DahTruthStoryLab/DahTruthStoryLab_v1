@@ -92,6 +92,12 @@ const WorkshopHub = lazy(() =>
   import("./components/storylab/WorkshopHub.jsx")
 );
 
+// ✅ ADD: Genre modules
+const PoetryModule = lazy(() => import("./components/storylab/PoetryModule"));
+const NonFictionModule = lazy(() =>
+  import("./components/storylab/NonFictionModule")
+);
+
 // ❌ REMOVE: top-level StoryLab page (we now jump into the designed hub)
 // const StoryLab = lazy(() => import("./pages/StoryLab.jsx"));
 
@@ -196,7 +202,7 @@ export default function App() {
                 }
               />
 
-              {/* ✅ FIXED: /storylab now jumps into the designed StoryLab hub */}
+              {/* ✅ /storylab → hub */}
               <Route
                 path="/storylab"
                 element={
@@ -227,6 +233,10 @@ export default function App() {
                 <Route path="workshop/clothesline" element={<Clothesline />} />
                 <Route path="workshop/hfl" element={<HopesFearsLegacy />} />
                 <Route path="prompts" element={<StoryPromptsWorkshop />} />
+
+                {/* ✅ ADD: Poetry + Nonfiction routes */}
+                <Route path="poetry" element={<PoetryModule />} />
+                <Route path="nonfiction" element={<NonFictionModule />} />
               </Route>
 
               {/* TOP-LEVEL PUBLISHING PAGES (src/pages/*.tsx) */}
