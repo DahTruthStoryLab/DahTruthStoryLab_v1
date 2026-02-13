@@ -123,7 +123,16 @@ const menuItems = [
   { icon: Layers,     label: "Projects",          path: "/project" },
   { icon: BookOpen,   label: "Table of Contents", path: "/toc" },
   { icon: PencilLine, label: "Writer",            path: "/writer" },
-  { icon: Layers,     label: "Story Lab",         path: "/story-lab" },
+
+  // StoryLab (main)
+  { icon: Layers,     label: "StoryLab",          path: "/story-lab/hub" },
+
+  // Genre section (shown under "Genre" header)
+  { icon: BookOpen,   label: "Fiction",           path: "/story-lab/hub",        section: "Genre" },
+  { icon: FileText,   label: "Nonfiction",        path: "/story-lab/nonfiction", section: "Genre" },
+  { icon: BookOpen,   label: "Poetry",            path: "/story-lab/poetry",     section: "Genre" },
+
+  // Publishing / Scheduling
   { icon: UploadCloud,label: "Publishing Suite",  path: "/publishing" },
   { icon: Calendar,   label: "Calendar",          path: "/calendar" },
 
@@ -205,38 +214,84 @@ const Sidebar = ({ isOpen, onClose, authorName, authorAvatar, navigate, userNove
 
         {/* Menu */}
         <nav className="p-3 space-y-1 flex-1 overflow-y-auto">
-          {menuItems.map((item) => {
-            const isActive = pathname === item.path;
-            return (
-              <button
-                key={item.path}
-                type="button"
-                role="menuitem"
-                aria-current={isActive ? "page" : undefined}
-                onClick={() => navigate(item.path)}
-                className={`
-                  group relative w-full h-10 rounded-xl
-                  flex items-center gap-2.5 px-3
-                  transition-all duration-150
-                  ${isActive ? "bg-white/90 shadow-sm" : "hover:bg-white/70"}
-                `}
-              >
-                <item.icon
-                  size={17}
-                  className={isActive ? "text-violet-500" : "text-slate-500"}
-                />
-                <span
-                  className="font-medium text-xs"
-                  style={{
-                    fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
-                    color: isActive ? "#111827" : "#374151",
-                  }}
+          {/* Main items (no section) */}
+          {menuItems
+            .filter((m) => !m.section)
+            .map((item) => {
+              const isActive = pathname === item.path;
+              return (
+                <button
+                  key={item.path + item.label}
+                  type="button"
+                  role="menuitem"
+                  aria-current={isActive ? "page" : undefined}
+                  onClick={() => navigate(item.path)}
+                  className={`
+                    group relative w-full h-10 rounded-xl
+                    flex items-center gap-2.5 px-3
+                    transition-all duration-150
+                    ${isActive ? "bg-white/90 shadow-sm" : "hover:bg-white/70"}
+                  `}
                 >
-                  {item.label}
-                </span>
-              </button>
-            );
-          })}
+                  <item.icon
+                    size={17}
+                    className={isActive ? "text-violet-500" : "text-slate-500"}
+                  />
+                  <span
+                    className="font-medium text-xs"
+                    style={{
+                      fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+                      color: isActive ? "#111827" : "#374151",
+                    }}
+                  >
+                    {item.label}
+                  </span>
+                </button>
+              );
+            })}
+
+          {/* Genre header */}
+          <div className="pt-3 pb-1">
+            <div className="px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+              Genre
+            </div>
+          </div>
+
+          {/* Genre items */}
+          {menuItems
+            .filter((m) => m.section === "Genre")
+            .map((item) => {
+              const isActive = pathname === item.path;
+              return (
+                <button
+                  key={item.path + item.label}
+                  type="button"
+                  role="menuitem"
+                  aria-current={isActive ? "page" : undefined}
+                  onClick={() => navigate(item.path)}
+                  className={`
+                    group relative w-full h-10 rounded-xl
+                    flex items-center gap-2.5 px-6
+                    transition-all duration-150
+                    ${isActive ? "bg-white/90 shadow-sm" : "hover:bg-white/70"}
+                  `}
+                >
+                  <item.icon
+                    size={16}
+                    className={isActive ? "text-violet-500" : "text-slate-500"}
+                  />
+                  <span
+                    className="font-medium text-xs"
+                    style={{
+                      fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+                      color: isActive ? "#111827" : "#374151",
+                    }}
+                  >
+                    {item.label}
+                  </span>
+                </button>
+              );
+            })}
         </nav>
 
         {/* Your Projects */}
@@ -405,14 +460,14 @@ export default function Dashboard() {
   useEffect(() => {
     if (user) {
       // Get name from user context
-      const name = user.displayName || 
-                   user.author || 
-                   (user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : null) ||
-                   user.firstName ||
-                   user.username ||
-                   user.email?.split("@")[0] ||
-                   "New Author";
-      
+      const name = user.displayName ||
+        user.author ||
+        (user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : null) ||
+        user.firstName ||
+        user.username ||
+        user.email?.split("@")[0] ||
+        "New Author";
+
       setAuthorName(name);
       setAuthorAvatar(user.avatarUrl || "");
     } else {
@@ -448,10 +503,13 @@ export default function Dashboard() {
         const userId = storage.getItem("dt_user_id") || "default";
         const userProjectsKey = `userProjects_${userId}`;
         const userNovelsKey = `userNovels_${userId}`;
-        
+
         // Check user-specific keys first, then fall back to generic keys
         // Also check dahtruth-projects-list which is the main project store
-        const projectData = storage.getItem(userProjectsKey) || storage.getItem("userProjects") || storage.getItem("dahtruth-projects-list");
+        const projectData =
+          storage.getItem(userProjectsKey) ||
+          storage.getItem("userProjects") ||
+          storage.getItem("dahtruth-projects-list");
         const novelsData = storage.getItem(userNovelsKey) || storage.getItem("userNovels");
 
         if (projectData) {
@@ -572,11 +630,11 @@ export default function Dashboard() {
                       onClick={() => navigate("/writer")}
                       className="inline-flex items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-medium shadow-md shadow-violet-900/40 hover:shadow-lg transition-all"
                       style={{
-                          // solid DahTruth gold
-                          background: "#D4AF37",
-                          color: "#111827",
-                        }}
-                      >
+                        // solid DahTruth gold
+                        background: "#D4AF37",
+                        color: "#111827",
+                      }}
+                    >
                       <Plus size={18} />
                       Start Writing
                     </button>
@@ -603,7 +661,7 @@ export default function Dashboard() {
               </CardBody>
             </Card>
 
-               {/* Stats */}
+            {/* Stats */}
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
               <Card>
                 <CardBody>
@@ -687,10 +745,7 @@ export default function Dashboard() {
                 onClick={() => navigate("/toc")}
               >
                 <CardBody className="text-center">
-                  <BookOpen
-                    size={22}
-                    className="mx-auto mb-2 text-emerald-500"
-                  />
+                  <BookOpen size={22} className="mx-auto mb-2 text-emerald-500" />
                   <p className="font-semibold text-sm text-slate-900">
                     Table of Contents
                   </p>
@@ -705,13 +760,8 @@ export default function Dashboard() {
                 onClick={() => navigate("/writer")}
               >
                 <CardBody className="text-center">
-                  <PencilLine
-                    size={22}
-                    className="mx-auto mb-2 text-violet-500"
-                  />
-                  <p className="font-semibold text-sm text-slate-900">
-                    Writer
-                  </p>
+                  <PencilLine size={22} className="mx-auto mb-2 text-violet-500" />
+                  <p className="font-semibold text-sm text-slate-900">Writer</p>
                   <p className="text-[11px] text-slate-500 mt-1">
                     Draft your pages
                   </p>
@@ -723,13 +773,8 @@ export default function Dashboard() {
                 onClick={() => navigate("/project")}
               >
                 <CardBody className="text-center">
-                  <Layers
-                    size={22}
-                    className="mx-auto mb-2 text-indigo-500"
-                  />
-                  <p className="font-semibold text-sm text-slate-900">
-                    Projects
-                  </p>
+                  <Layers size={22} className="mx-auto mb-2 text-indigo-500" />
+                  <p className="font-semibold text-sm text-slate-900">Projects</p>
                   <p className="text-[11px] text-slate-500 mt-1">
                     Manage every manuscript
                   </p>
@@ -741,13 +786,8 @@ export default function Dashboard() {
                 onClick={() => navigate("/calendar")}
               >
                 <CardBody className="text-center">
-                  <Calendar
-                    size={22}
-                    className="mx-auto mb-2 text-rose-500"
-                  />
-                  <p className="font-semibold text-sm text-slate-900">
-                    Calendar
-                  </p>
+                  <Calendar size={22} className="mx-auto mb-2 text-rose-500" />
+                  <p className="font-semibold text-sm text-slate-900">Calendar</p>
                   <p className="text-[11px] text-slate-500 mt-1">
                     Map your writing time
                   </p>
@@ -811,11 +851,7 @@ export default function Dashboard() {
                             <stop offset="100%" stopColor="#A855F7" />
                           </linearGradient>
                         </defs>
-                        <Bar
-                          dataKey="words"
-                          fill="url(#brandGradient)"
-                          radius={[4, 4, 0, 0]}
-                        />
+                        <Bar dataKey="words" fill="url(#brandGradient)" radius={[4, 4, 0, 0]} />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>
