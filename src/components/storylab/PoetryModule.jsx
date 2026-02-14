@@ -1,4 +1,3 @@
-cat > src/components/storylab/PoetryModule.jsx << 'EOF'
 import React from "react";
 import { Link } from "react-router-dom";
 export default function PoetryModule() {
@@ -38,4 +37,3 @@ export default function PoetryModule() {
     </div>
   );
 }
-EOF
