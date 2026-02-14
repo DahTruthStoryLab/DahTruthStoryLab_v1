@@ -15,7 +15,7 @@ import {
   PenLine,
   ArrowRight,
   Flame,
-  Map,
+  Map as MapIcon,
   Star,
   TrendingUp,
   MessageSquare,
@@ -148,7 +148,7 @@ const FICTION_MODULES = [
     id: "roadmap",
     title: "Character Roadmap",
     description: "Plan milestones and track the character journey through your story.",
-    icon: Map,
+    icon: MapIcon,
     path: "/story-lab/workshop/roadmap",
     color: "#7c3aed",
     gradient: "linear-gradient(135deg, #6d28d9 0%, #7c3aed 100%)",
@@ -645,7 +645,7 @@ export default function WorkshopHub() {
         {/* Journey Flow (changes by track) */}
         <div className="mt-10 p-6 rounded-2xl border border-slate-200 bg-white/80">
           <h3 className="font-semibold text-slate-700 mb-4 flex items-center gap-2">
-            <Map size={18} style={{ color: BRAND.gold }} />
+          <MapIcon size={18} style={{ color: BRAND.gold }} />
             Suggested Journey ({track})
           </h3>
 
