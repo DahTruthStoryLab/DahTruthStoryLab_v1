@@ -1,4 +1,3 @@
-cat > src/components/storylab/NonFictionModule.jsx << 'EOF'
 import React from "react";
 import { Link } from "react-router-dom";
 export default function NonFictionModule() {
@@ -38,4 +37,3 @@ export default function NonFictionModule() {
     </div>
   );
 }
-EOF
