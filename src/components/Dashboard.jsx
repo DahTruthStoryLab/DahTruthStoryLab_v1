@@ -124,13 +124,13 @@ const menuItems = [
   { icon: BookOpen,   label: "Table of Contents", path: "/toc" },
   { icon: PencilLine, label: "Writer",            path: "/writer" },
 
-  // StoryLab (main)
+  // StoryLab (parent)
   { icon: Layers,     label: "StoryLab",          path: "/story-lab/hub" },
 
-  // Genre section (shown under "Genre" header)
-  { icon: BookOpen,   label: "Fiction",           path: "/story-lab/hub",        section: "Genre" },
-  { icon: FileText,   label: "Nonfiction",        path: "/story-lab/nonfiction", section: "Genre" },
-  { icon: BookOpen,   label: "Poetry",            path: "/story-lab/poetry",     section: "Genre" },
+  // Genre sub-items nested under StoryLab
+  { icon: BookOpen,   label: "Fiction",           path: "/story-lab/hub",        section: "StoryLab" },
+  { icon: FileText,   label: "Nonfiction",        path: "/story-lab/nonfiction", section: "StoryLab" },
+  { icon: BookOpen,   label: "Poetry",            path: "/story-lab/poetry",     section: "StoryLab" },
 
   // Publishing / Scheduling
   { icon: UploadCloud,label: "Publishing Suite",  path: "/publishing" },
@@ -218,78 +218,79 @@ const Sidebar = ({ isOpen, onClose, authorName, authorAvatar, navigate, userNove
           {menuItems
             .filter((m) => !m.section)
             .map((item) => {
-              const isActive = pathname === item.path;
+              const isActive =
+                item.label === "StoryLab"
+                  ? pathname.startsWith("/story-lab")
+                  : pathname === item.path;
               return (
-                <button
-                  key={item.path + item.label}
-                  type="button"
-                  role="menuitem"
-                  aria-current={isActive ? "page" : undefined}
-                  onClick={() => navigate(item.path)}
-                  className={`
-                    group relative w-full h-10 rounded-xl
-                    flex items-center gap-2.5 px-3
-                    transition-all duration-150
-                    ${isActive ? "bg-white/90 shadow-sm" : "hover:bg-white/70"}
-                  `}
-                >
-                  <item.icon
-                    size={17}
-                    className={isActive ? "text-violet-500" : "text-slate-500"}
-                  />
-                  <span
-                    className="font-medium text-xs"
-                    style={{
-                      fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
-                      color: isActive ? "#111827" : "#374151",
-                    }}
+                <React.Fragment key={item.path + item.label}>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    aria-current={isActive ? "page" : undefined}
+                    onClick={() => navigate(item.path)}
+                    className={`
+                      group relative w-full h-10 rounded-xl
+                      flex items-center gap-2.5 px-3
+                      transition-all duration-150
+                      ${isActive ? "bg-white/90 shadow-sm" : "hover:bg-white/70"}
+                    `}
                   >
-                    {item.label}
-                  </span>
-                </button>
-              );
-            })}
+                    <item.icon
+                      size={17}
+                      className={isActive ? "text-violet-500" : "text-slate-500"}
+                    />
+                    <span
+                      className="font-medium text-xs"
+                      style={{
+                        fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+                        color: isActive ? "#111827" : "#374151",
+                      }}
+                    >
+                      {item.label}
+                    </span>
+                  </button>
 
-          {/* Genre header */}
-          <div className="pt-3 pb-1">
-            <div className="px-3 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-              Genre
-            </div>
-          </div>
-
-          {/* Genre items */}
-          {menuItems
-            .filter((m) => m.section === "Genre")
-            .map((item) => {
-              const isActive = pathname === item.path;
-              return (
-                <button
-                  key={item.path + item.label}
-                  type="button"
-                  role="menuitem"
-                  aria-current={isActive ? "page" : undefined}
-                  onClick={() => navigate(item.path)}
-                  className={`
-                    group relative w-full h-10 rounded-xl
-                    flex items-center gap-2.5 px-6
-                    transition-all duration-150
-                    ${isActive ? "bg-white/90 shadow-sm" : "hover:bg-white/70"}
-                  `}
-                >
-                  <item.icon
-                    size={16}
-                    className={isActive ? "text-violet-500" : "text-slate-500"}
-                  />
-                  <span
-                    className="font-medium text-xs"
-                    style={{
-                      fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
-                      color: isActive ? "#111827" : "#374151",
-                    }}
-                  >
-                    {item.label}
-                  </span>
-                </button>
+                  {/* Render StoryLab sub-items directly after the StoryLab button */}
+                  {item.label === "StoryLab" &&
+                    menuItems
+                      .filter((m) => m.section === "StoryLab")
+                      .map((subItem) => {
+                        const subIsActive =
+                          subItem.label === "Fiction"
+                            ? pathname === "/story-lab/hub"
+                            : pathname === subItem.path;
+                        return (
+                          <button
+                            key={subItem.path + subItem.label}
+                            type="button"
+                            role="menuitem"
+                            aria-current={subIsActive ? "page" : undefined}
+                            onClick={() => navigate(subItem.path)}
+                            className={`
+                              group relative w-full h-9 rounded-xl
+                              flex items-center gap-2.5 px-8
+                              transition-all duration-150
+                              ${subIsActive ? "bg-white/90 shadow-sm" : "hover:bg-white/70"}
+                            `}
+                          >
+                            <subItem.icon
+                              size={14}
+                              className={subIsActive ? "text-violet-500" : "text-slate-400"}
+                            />
+                            <span
+                              className="font-medium text-xs"
+                              style={{
+                                fontFamily: "'Inter', system-ui, -apple-system, sans-serif",
+                                color: subIsActive ? "#111827" : "#6B7280",
+                              }}
+                            >
+                              {subItem.label}
+                            </span>
+                          </button>
+                        );
+                      })}
+                </React.Fragment>
               );
             })}
         </nav>
@@ -932,3 +933,4 @@ export default function Dashboard() {
     </div>
   );
 }
+
