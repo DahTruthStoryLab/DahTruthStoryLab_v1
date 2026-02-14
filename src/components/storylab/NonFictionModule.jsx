@@ -1,7 +1,6 @@
 src/components/storylab/NonFictionModule.jsx
 import React from "react";
 import { Link } from "react-router-dom";
-
 export default function NonFictionModule() {
   return (
     <div className="rounded-2xl bg-white border border-slate-200 p-6">
@@ -12,7 +11,6 @@ export default function NonFictionModule() {
             Tools for essays, memoir, devotionals, history, and commentary.
           </p>
         </div>
-
         <Link
           to="/story-lab/hub"
           className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium hover:bg-slate-100 text-slate-700"
@@ -20,7 +18,6 @@ export default function NonFictionModule() {
           Back to Hub
         </Link>
       </div>
-
       <div className="mt-6 grid gap-3">
         <div className="rounded-xl border border-slate-200 p-4">
           <div className="font-semibold text-slate-800">Essay Builder</div>
@@ -29,7 +26,6 @@ export default function NonFictionModule() {
           </div>
           <div className="text-xs text-slate-500 mt-2">Coming next</div>
         </div>
-
         <div className="rounded-xl border border-slate-200 p-4">
           <div className="font-semibold text-slate-800">Memoir Scene Map</div>
           <div className="text-sm text-slate-600">
@@ -37,7 +33,6 @@ export default function NonFictionModule() {
           </div>
           <div className="text-xs text-slate-500 mt-2">Coming next</div>
         </div>
-
         <div className="rounded-xl border border-slate-200 p-4">
           <div className="font-semibold text-slate-800">Research Notes</div>
           <div className="text-sm text-slate-600">
