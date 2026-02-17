@@ -9,7 +9,7 @@ function stripHtml(html = "") {
 }
 
 function countWords(text = "") {
-  const cleaned = text.replace(/\s+/g, " ").trim();
+  const cleaned = String(text || "").replace(/\s+/g, " ").trim();
   if (!cleaned) return 0;
   return cleaned.split(" ").length;
 }
@@ -22,7 +22,7 @@ export default function EditorPane({
   onSave,
   onAI, // kept for compatibility (not used here)
   aiBusy,
-  pageWidth = 850,
+  pageWidth = 1000, // match ComposePage default
   onHeadingsChange,
 }) {
   const quillRef = useRef(null);
@@ -112,6 +112,45 @@ export default function EditorPane({
     if (editor?.history) editor.history.redo();
   };
 
+  // ✅ Keyboard shortcuts (Ctrl/Cmd+Z, Ctrl/Cmd+Y, Ctrl/Cmd+Shift+Z)
+  useEffect(() => {
+    const onKey = (e) => {
+      const isMac = /Mac|iPhone|iPad|iPod/i.test(navigator.platform);
+      const mod = isMac ? e.metaKey : e.ctrlKey;
+      if (!mod) return;
+
+      const key = (e.key || "").toLowerCase();
+
+      if (key === "s") {
+        // let ComposePage global handler handle save,
+        // but avoid browser save-dialog if focus is inside editor
+        e.preventDefault();
+        return;
+      }
+
+      if (key === "z" && e.shiftKey) {
+        e.preventDefault();
+        handleRedo();
+        return;
+      }
+
+      if (key === "z") {
+        e.preventDefault();
+        handleUndo();
+        return;
+      }
+
+      if (key === "y") {
+        e.preventDefault();
+        handleRedo();
+        return;
+      }
+    };
+
+    window.addEventListener("keydown", onKey, { capture: true });
+    return () => window.removeEventListener("keydown", onKey, { capture: true });
+  }, []);
+
   // Build a class for line spacing
   const spacingClass = `storylab-lh-${lineSpacing.replace(".", "_")}`;
 
@@ -160,7 +199,7 @@ export default function EditorPane({
             type="button"
             onClick={handleUndo}
             className="px-3 py-1.5 rounded border border-slate-200 bg-white hover:bg-slate-50 font-medium"
-            title="Undo (Ctrl+Z)"
+            title="Undo (Ctrl/Cmd+Z)"
           >
             ↩ Undo
           </button>
@@ -168,7 +207,7 @@ export default function EditorPane({
             type="button"
             onClick={handleRedo}
             className="px-3 py-1.5 rounded border border-slate-200 bg-white hover:bg-slate-50 font-medium"
-            title="Redo (Ctrl+Y)"
+            title="Redo (Ctrl/Cmd+Y)"
           >
             ↪ Redo
           </button>
@@ -217,6 +256,7 @@ export default function EditorPane({
           outline: none;
         }
 
+        /* ✅ Most important: prevent any absolute/transform weirdness that causes overlap */
         .word-style-editor .ql-container,
         .word-style-editor .ql-editor,
         .word-style-editor .ql-toolbar {
