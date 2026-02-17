@@ -1,5 +1,5 @@
 // src/components/Editor/EditorPane.jsx
-import React, { useMemo, useEffect, useState, useRef } from "react";
+import React, { useMemo, useEffect, useState, useRef, useCallback } from "react";
 import ReactQuill from "react-quill";
 
 function stripHtml(html = "") {
@@ -20,15 +20,26 @@ export default function EditorPane({
   html,
   setHtml,
   onSave,
-  onAI, // kept for compatibility (not used here)
+  onAI, // compatibility
   aiBusy,
-  pageWidth = 1000, // match ComposePage default
+  pageWidth, // ignored for true 8.5x11 (kept for compatibility)
   onHeadingsChange,
 }) {
   const quillRef = useRef(null);
 
   // Line spacing state ("1", "1.5", "2")
-  const [lineSpacing, setLineSpacing] = useState("1.5");
+  const [lineSpacing, setLineSpacing] = useState("2");
+
+  // ==========================
+  // 8.5 x 11 PAGE CONSTANTS
+  // ==========================
+  // At 96dpi, 8.5in = 816px, 11in = 1056px
+  const PAGE_W = 816;
+  const PAGE_H = 1056;
+  const PAGE_GAP = 28; // space between pages on the gray "desk"
+  const MARGIN = 96; // ~1 inch at 96dpi
+
+  const [measuredPages, setMeasuredPages] = useState(1);
 
   // Standard Quill toolbar
   const modules = useMemo(
@@ -74,13 +85,10 @@ export default function EditorPane({
     []
   );
 
-  // Word + page count
+  // Word + page count (info only)
   const plainText = useMemo(() => stripHtml(html), [html]);
   const wordCount = useMemo(() => countWords(plainText), [plainText]);
-  const pageCount = useMemo(
-    () => Math.max(1, Math.ceil(wordCount / 300)),
-    [wordCount]
-  );
+  const approxPages = useMemo(() => Math.max(1, Math.ceil(wordCount / 300)), [wordCount]);
 
   // Headings → TOC in sidebar
   useEffect(() => {
@@ -112,7 +120,7 @@ export default function EditorPane({
     if (editor?.history) editor.history.redo();
   };
 
-  // ✅ Keyboard shortcuts (Ctrl/Cmd+Z, Ctrl/Cmd+Y, Ctrl/Cmd+Shift+Z)
+  // Keyboard shortcuts (Ctrl/Cmd+Z/Y)
   useEffect(() => {
     const onKey = (e) => {
       const isMac = /Mac|iPhone|iPad|iPod/i.test(navigator.platform);
@@ -122,24 +130,19 @@ export default function EditorPane({
       const key = (e.key || "").toLowerCase();
 
       if (key === "s") {
-        // let ComposePage global handler handle save,
-        // but avoid browser save-dialog if focus is inside editor
         e.preventDefault();
         return;
       }
-
       if (key === "z" && e.shiftKey) {
         e.preventDefault();
         handleRedo();
         return;
       }
-
       if (key === "z") {
         e.preventDefault();
         handleUndo();
         return;
       }
-
       if (key === "y") {
         e.preventDefault();
         handleRedo();
@@ -151,12 +154,29 @@ export default function EditorPane({
     return () => window.removeEventListener("keydown", onKey, { capture: true });
   }, []);
 
-  // Build a class for line spacing
-  const spacingClass = `storylab-lh-${lineSpacing.replace(".", "_")}`;
-
   // Line height value for inline styles
   const lineHeightValue =
     lineSpacing === "1" ? "1.4" : lineSpacing === "1.5" ? "1.8" : "2.4";
+
+  // Measure actual rendered height -> number of pages
+  const measurePages = useCallback(() => {
+    const editor = quillRef.current?.getEditor?.();
+    const root = editor?.root;
+    if (!root) return;
+
+    // root.scrollHeight is the true content height
+    const contentH = Math.max(PAGE_H, root.scrollHeight + MARGIN * 2);
+    const needed = Math.max(1, Math.ceil(contentH / PAGE_H));
+    setMeasuredPages((prev) => (prev === needed ? prev : needed));
+  }, [PAGE_H, MARGIN]);
+
+  useEffect(() => {
+    // measure after render
+    const t = requestAnimationFrame(() => measurePages());
+    return () => cancelAnimationFrame(t);
+  }, [html, lineSpacing, measurePages]);
+
+  const totalCanvasHeight = measuredPages * PAGE_H + (measuredPages - 1) * PAGE_GAP;
 
   return (
     <div className="relative flex flex-col h-full min-h-0 min-w-0 overflow-hidden">
@@ -171,15 +191,16 @@ export default function EditorPane({
           className="flex-1 min-w-[200px] rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
         />
 
-        {/* Word + page info */}
         <div className="flex items-center gap-3 text-xs text-slate-600">
           <span>{wordCount.toLocaleString()} words</span>
           <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1">
-            ~{pageCount} page{pageCount !== 1 ? "s" : ""}
+            ~{approxPages} page{approxPages !== 1 ? "s" : ""}
+          </span>
+          <span className="text-[11px] text-slate-400">
+            (layout pages: {measuredPages})
           </span>
         </div>
 
-        {/* Line spacing selector */}
         <div className="flex items-center gap-2 text-xs text-slate-600">
           <span>Spacing:</span>
           <select
@@ -193,7 +214,6 @@ export default function EditorPane({
           </select>
         </div>
 
-        {/* Undo / Redo buttons */}
         <div className="flex items-center gap-1 text-xs">
           <button
             type="button"
@@ -214,52 +234,77 @@ export default function EditorPane({
         </div>
       </div>
 
-      {/* Quill styling + HARD CLAMPS to prevent overlap */}
       <style>{`
-        .word-style-editor,
-        .word-style-editor * {
+        /* ===== Desk background ===== */
+        .dt-desk {
+          background: #f1f5f9; /* cool gray */
+        }
+
+        /* ===== Page stack ===== */
+        .dt-page {
+          width: ${PAGE_W}px;
+          height: ${PAGE_H}px;
+          background: white;
+          border: 1px solid #e2e8f0;
+          border-radius: 10px;
+          box-shadow:
+            0 10px 20px rgba(15, 23, 42, 0.08),
+            0 2px 6px rgba(15, 23, 42, 0.06);
+        }
+
+        /* Page separator space */
+        .dt-page + .dt-page {
+          margin-top: ${PAGE_GAP}px;
+        }
+
+        /* ===== Quill hard clamps ===== */
+        .dt-quill,
+        .dt-quill * {
           box-sizing: border-box;
           max-width: 100%;
         }
 
-        .word-style-editor {
-          width: 100%;
-          min-width: 0;
-        }
-
-        .word-style-editor .ql-toolbar {
+        .dt-quill .ql-toolbar {
           border: none !important;
           border-bottom: 1px solid #e2e8f0 !important;
-          background: #f8fafc;
-          border-radius: 8px 8px 0 0;
+          background: rgba(248, 250, 252, 0.95);
+          border-radius: 10px 10px 0 0;
         }
 
-        .word-style-editor .ql-container {
+        .dt-quill .ql-container {
           border: none !important;
           width: 100% !important;
           min-width: 0 !important;
           max-width: 100% !important;
           font-family: 'Times New Roman', Georgia, serif;
           font-size: 12pt;
+          background: transparent !important;
         }
 
-        .word-style-editor .ql-editor {
-          padding: 60px 72px;
-          min-height: 600px;
+        .dt-quill .ql-editor {
+          /* Make the editor transparent so the page backdrops show */
+          background: transparent !important;
+
+          /* Standard manuscript margins */
+          padding: ${MARGIN}px;
+
+          /* IMPORTANT: let content flow across pages by height expansion */
+          min-height: ${PAGE_H}px;
           line-height: ${lineHeightValue};
+
           overflow-wrap: anywhere;
           word-break: break-word;
+
           margin: 0 !important;
         }
 
-        .word-style-editor .ql-editor:focus {
+        .dt-quill .ql-editor:focus {
           outline: none;
         }
 
-        /* ✅ Most important: prevent any absolute/transform weirdness that causes overlap */
-        .word-style-editor .ql-container,
-        .word-style-editor .ql-editor,
-        .word-style-editor .ql-toolbar {
+        .dt-quill .ql-container,
+        .dt-quill .ql-editor,
+        .dt-quill .ql-toolbar {
           position: static !important;
           left: auto !important;
           right: auto !important;
@@ -272,21 +317,43 @@ export default function EditorPane({
         }
       `}</style>
 
-      {/* Page wrapper */}
-      <div className="flex-1 min-h-0 min-w-0 overflow-auto">
-        <div
-          className="bg-white rounded-lg border border-slate-200 shadow-sm overflow-hidden mx-auto"
-          style={{ width: "100%", maxWidth: pageWidth }}
-        >
-          <ReactQuill
-            ref={quillRef}
-            theme="snow"
-            value={html}
-            onChange={handleChange}
-            modules={modules}
-            formats={formats}
-            className={`word-style-editor ${spacingClass}`}
-          />
+      {/* ===== Paged editor surface ===== */}
+      <div className="flex-1 min-h-0 min-w-0 overflow-auto dt-desk rounded-lg border border-slate-200">
+        <div className="py-10">
+          {/* Center column */}
+          <div className="mx-auto" style={{ width: PAGE_W }}>
+            {/* Relative canvas to stack page backdrops + editor */}
+            <div className="relative" style={{ width: PAGE_W, minHeight: totalCanvasHeight }}>
+              {/* Page backdrops */}
+              <div aria-hidden="true">
+                {Array.from({ length: measuredPages }).map((_, i) => (
+                  <div key={i} className="dt-page" />
+                ))}
+              </div>
+
+              {/* Editor overlay */}
+              <div
+                className="absolute inset-0"
+                style={{
+                  width: PAGE_W,
+                  height: totalCanvasHeight,
+                  paddingTop: 0,
+                }}
+              >
+                <div className="dt-page overflow-hidden" style={{ height: totalCanvasHeight, border: "none", boxShadow: "none", background: "transparent" }}>
+                  <ReactQuill
+                    ref={quillRef}
+                    theme="snow"
+                    value={html}
+                    onChange={handleChange}
+                    modules={modules}
+                    formats={formats}
+                    className="dt-quill"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
