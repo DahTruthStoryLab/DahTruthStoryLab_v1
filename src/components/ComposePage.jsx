@@ -643,7 +643,9 @@ Return ONLY the JSON array, no other text.`;
         if (jsonMatch) parsed = JSON.parse(jsonMatch[0]);
       } catch (e) {
         console.error("Failed to parse AI verification:", e);
-        setVerifyError("Couldn't parse AI response. Your selections are still valid.");
+        setVerifyError(
+          "Couldn't parse AI response. Your selections are still valid."
+        );
         return;
       }
 
@@ -674,7 +676,9 @@ Return ONLY the JSON array, no other text.`;
           return { ...s, verified: true };
         });
 
-        const filtered = updatedSuggestions.filter((s) => s.isCharacter !== false);
+        const filtered = updatedSuggestions.filter(
+          (s) => s.isCharacter !== false
+        );
         filtered.sort((a, b) => {
           const confOrder = { high: 0, medium: 1, low: 2, rejected: 3 };
           if (confOrder[a.confidence] !== confOrder[b.confidence]) {
@@ -687,7 +691,11 @@ Return ONLY the JSON array, no other text.`;
 
         const newSelected = new Set();
         filtered.forEach((s) => {
-          if (s.role === "major" || s.role === "minor" || s.confidence === "high") {
+          if (
+            s.role === "major" ||
+            s.role === "minor" ||
+            s.confidence === "high"
+          ) {
             newSelected.add(s.name);
           }
         });
@@ -727,7 +735,11 @@ Return ONLY the JSON array, no other text.`;
       case "high":
         return { bg: `${BRAND.gold}20`, color: BRAND.gold, label: "High confidence" };
       case "medium":
-        return { bg: `${BRAND.mauve}20`, color: BRAND.mauve, label: "Medium" };
+        return {
+          bg: `${BRAND.mauve}20`,
+          color: BRAND.mauve,
+          label: "Medium",
+        };
       case "rejected":
         return { bg: "#fee2e2", color: "#b91c1c", label: "Rejected" };
       default:
@@ -806,8 +818,8 @@ Return ONLY the JSON array, no other text.`;
                 No New Characters Found
               </h3>
               <p className="text-sm text-slate-500 max-w-sm mx-auto">
-                Either all characters are already tagged with @char:, or no character
-                names were detected.
+                Either all characters are already tagged with @char:, or no
+                character names were detected.
               </p>
             </div>
           )}
@@ -821,8 +833,8 @@ Return ONLY the JSON array, no other text.`;
                     {suggestions.length !== 1 ? "s" : ""}
                   </h3>
                   <p className="text-xs text-slate-500">
-                    {selectedChars.size} selected • Confidence based on dialogue tags &
-                    frequency
+                    {selectedChars.size} selected • Confidence based on dialogue
+                    tags & frequency
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -903,7 +915,7 @@ Return ONLY the JSON array, no other text.`;
                         className="text-[10px] px-2 py-1 rounded-full flex-shrink-0"
                         style={{ background: conf.bg, color: conf.color }}
                       >
-                        {char.verified ? (char.role || conf.label) : conf.label}
+                        {char.verified ? char.role || conf.label : conf.label}
                       </div>
                       {selectedChars.has(char.name) && (
                         <Check size={16} style={{ color: BRAND.gold }} />
@@ -938,7 +950,8 @@ Return ONLY the JSON array, no other text.`;
                     )}
                   </button>
                   <p className="text-[11px] text-slate-400 text-center mt-2">
-                    AI will confirm which names are characters and classify their roles
+                    AI will confirm which names are characters and classify their
+                    roles
                   </p>
                 </div>
               )}
@@ -998,7 +1011,8 @@ function ProjectDropdown({
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    return () =>
+      document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   const handleEditTitle = () => {
@@ -1037,7 +1051,10 @@ function ProjectDropdown({
                 Current Project
               </div>
               <div className="px-3 py-2 mb-2 border-b border-slate-100">
-                <div className="font-medium text-sm truncate" style={{ color: BRAND.navy }}>
+                <div
+                  className="font-medium text-sm truncate"
+                  style={{ color: BRAND.navy }}
+                >
                   {currentProject.title || "Untitled"}
                 </div>
                 <button
@@ -1075,11 +1092,17 @@ function ProjectDropdown({
                   <BookOpen
                     size={16}
                     style={{
-                      color: project.id === currentProject?.id ? BRAND.gold : BRAND.navy,
+                      color:
+                        project.id === currentProject?.id
+                          ? BRAND.gold
+                          : BRAND.navy,
                     }}
                   />
                   <div className="flex-1 min-w-0">
-                    <div className="font-medium truncate" style={{ color: BRAND.navy }}>
+                    <div
+                      className="font-medium truncate"
+                      style={{ color: BRAND.navy }}
+                    >
                       {project.title}
                     </div>
                     <div className="text-xs text-slate-500">
@@ -1340,7 +1363,9 @@ function DropdownItem({
         ${active ? "bg-amber-50 text-amber-800" : "text-slate-700"}
       `}
     >
-      {Icon && <Icon size={16} className={active ? "text-amber-600" : "text-slate-500"} />}
+      {Icon && (
+        <Icon size={16} className={active ? "text-amber-600" : "text-slate-500"} />
+      )}
       <span className="flex-1">{label}</span>
       {shortcut && <span className="text-xs text-slate-400">{shortcut}</span>}
       {active && <span className="text-amber-500">✓</span>}
@@ -1400,7 +1425,9 @@ export default function ComposePage() {
 
   // Genre from project (always safe)
   const primaryGenre =
-    currentProject?.primaryGenre || currentProject?.genre || "General / Undeclared";
+    currentProject?.primaryGenre ||
+    currentProject?.genre ||
+    "General / Undeclared";
 
   // ✅ Selected chapter key (project-scoped)
   const selectedChapterStorageKey = useMemo(
@@ -1414,7 +1441,12 @@ export default function ComposePage() {
     else if (book?.title) setBookTitle(book.title);
 
     const pid = currentProject?.id || currentProjectId || getSelectedProjectId();
-    const safeTitle = (currentProject?.title || book?.title || bookTitle || "Untitled Book").trim();
+    const safeTitle = (
+      currentProject?.title ||
+      book?.title ||
+      bookTitle ||
+      "Untitled Book"
+    ).trim();
     if (pid) {
       saveCurrentStorySnapshot({ id: pid, title: safeTitle, primaryGenre });
     }
@@ -1426,7 +1458,10 @@ export default function ComposePage() {
     [chapters]
   );
 
-  const totalWordCount = useMemo(() => computeWordsFromChapters(chapters || []), [chapters]);
+  const totalWordCount = useMemo(
+    () => computeWordsFromChapters(chapters || []),
+    [chapters]
+  );
 
   const currentChapterIndex = useMemo(() => {
     if (!selectedId) return 0;
@@ -1658,7 +1693,8 @@ export default function ComposePage() {
         })
       );
 
-      const safeTitle = bookTitle?.trim() || book?.title?.trim() || "Untitled Book";
+      const safeTitle =
+        bookTitle?.trim() || book?.title?.trim() || "Untitled Book";
       const projectId = currentProjectId || getSelectedProjectId() || "unknown";
 
       if (currentProjectId && safeTitle) {
@@ -1722,7 +1758,9 @@ export default function ComposePage() {
       selection.isCollapsed ||
       !editorEl.contains(selection.getRangeAt(0).commonAncestorContainer)
     ) {
-      alert("Please highlight the text you want the AI to revise, then click the AI button again.");
+      alert(
+        "Please highlight the text you want the AI to revise, then click the AI button again."
+      );
       return;
     }
 
@@ -1738,7 +1776,10 @@ export default function ComposePage() {
       return;
     }
 
-    const selectedPlain = selectedHtml.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+    const selectedPlain = selectedHtml
+      .replace(/<[^>]*>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
     if (!selectedPlain) {
       alert(
         "The selected content seems to be empty or only formatting. Please select normal text and try again."
@@ -1771,10 +1812,15 @@ export default function ComposePage() {
       );
 
       const resultTextRaw =
-        (result && (result.result || result.text || result.output || result.data)) || result || "";
+        (result &&
+          (result.result || result.text || result.output || result.data)) ||
+        result ||
+        "";
 
       if (!resultTextRaw) {
-        alert("The AI did not return any text. Please try again with a smaller selection or a different mode.");
+        alert(
+          "The AI did not return any text. Please try again with a smaller selection or a different mode."
+        );
         return;
       }
 
@@ -1783,7 +1829,9 @@ export default function ComposePage() {
       const fullHtml = (html || "").toString();
 
       if (!fullHtml.includes(selectedHtml)) {
-        alert("I couldn't safely locate that selection in the chapter. No changes were made.");
+        alert(
+          "I couldn't safely locate that selection in the chapter. No changes were made."
+        );
         return;
       }
 
@@ -1852,7 +1900,8 @@ export default function ComposePage() {
         ...prev,
         {
           role: "assistant",
-          content: "Sorry, there was an error reaching the assistant. Please try again in a moment.",
+          content:
+            "Sorry, there was an error reaching the assistant. Please try again in a moment.",
           id: Date.now() + 2,
         },
       ]);
@@ -1873,7 +1922,9 @@ export default function ComposePage() {
     let parsed;
 
     if (name.endsWith(".doc") || name.endsWith(".docx")) {
-      parsed = await rateLimiter.addToQueue(() => documentParser.parseWordDocument(file));
+      parsed = await rateLimiter.addToQueue(() =>
+        documentParser.parseWordDocument(file)
+      );
     } else if (name.endsWith(".txt") || name.endsWith(".md")) {
       parsed = await documentParser.parseTextDocument(file);
     } else {
@@ -1971,7 +2022,11 @@ export default function ComposePage() {
 
         alert(`✅ Imported ${parsed.chapters.length} chapter(s) into current project.`);
 
-        if (window.confirm("Would you like AI to scan for character names in the imported chapters?")) {
+        if (
+          window.confirm(
+            "Would you like AI to scan for character names in the imported chapters?"
+          )
+        ) {
           setShowCharacterSuggestion(true);
         }
       }
@@ -2319,7 +2374,8 @@ export default function ComposePage() {
       <div
         className="text-white flex-shrink-0"
         style={{
-          background: "linear-gradient(135deg, #1e3a5f 0%, #2d4a6f 40%, #9b7bc9 100%)",
+          background:
+            "linear-gradient(135deg, #1e3a5f 0%, #2d4a6f 40%, #9b7bc9 100%)",
         }}
       >
         <div className="max-w-[1800px] mx-auto px-4 py-3">
@@ -2339,7 +2395,11 @@ export default function ComposePage() {
                 onRename={(id, newTitle) => {
                   renameProject(id, newTitle);
                   setBookTitle(newTitle);
-                  saveCurrentStorySnapshot({ id, title: newTitle, primaryGenre });
+                  saveCurrentStorySnapshot({
+                    id,
+                    title: newTitle,
+                    primaryGenre,
+                  });
                 }}
               />
             </div>
@@ -2439,7 +2499,11 @@ export default function ComposePage() {
               label="Import as New Project"
               onClick={triggerNewProjectImport}
             />
-            <DropdownItem icon={Upload} label="Import into Current Project" onClick={triggerImport} />
+            <DropdownItem
+              icon={Upload}
+              label="Import into Current Project"
+              onClick={triggerImport}
+            />
             <DropdownDivider />
             <DropdownItem
               icon={Users}
@@ -2448,7 +2512,12 @@ export default function ComposePage() {
               disabled={!hasAnyChapters}
             />
             <DropdownDivider />
-            <DropdownItem icon={Download} label="Export Chapter" onClick={handleExport} disabled={!hasChapter} />
+            <DropdownItem
+              icon={Download}
+              label="Export Chapter"
+              onClick={handleExport}
+              disabled={!hasChapter}
+            />
             <DropdownDivider />
             <DropdownItem
               icon={Save}
@@ -2464,22 +2533,79 @@ export default function ComposePage() {
               shortcut="Ctrl+S"
             />
             <DropdownDivider />
-            <DropdownItem icon={Trash2} label="Delete Chapter" onClick={handleDeleteCurrent} disabled={!hasChapter} />
+            <DropdownItem
+              icon={Trash2}
+              label="Delete Chapter"
+              onClick={handleDeleteCurrent}
+              disabled={!hasChapter}
+            />
           </DropdownMenu>
 
           <DropdownMenu label="View" icon={Eye}>
-            <DropdownItem icon={Grid3X3} label="Chapter Grid" onClick={() => setView("grid")} active={view === "grid"} />
-            <DropdownItem icon={Edit3} label="Editor" onClick={switchToEditor} active={view === "editor" && editorViewMode === "editor"} />
-            <DropdownItem icon={FileText} label="Page View (8.5 × 11)" onClick={switchToPageView} active={view === "editor" && editorViewMode === "pages"} />
+            <DropdownItem
+              icon={Grid3X3}
+              label="Chapter Grid"
+              onClick={() => setView("grid")}
+              active={view === "grid"}
+            />
+            <DropdownItem
+              icon={Edit3}
+              label="Editor"
+              onClick={switchToEditor}
+              active={view === "editor" && editorViewMode === "editor"}
+            />
+            <DropdownItem
+              icon={FileText}
+              label="Page View (8.5 × 11)"
+              onClick={switchToPageView}
+              active={view === "editor" && editorViewMode === "pages"}
+            />
             <DropdownDivider />
-            <DropdownItem icon={CheckSquare} label="Select Mode" onClick={toggleSelectMode} active={selectMode} />
+            <DropdownItem
+              icon={CheckSquare}
+              label="Select Mode"
+              onClick={toggleSelectMode}
+              active={selectMode}
+            />
           </DropdownMenu>
 
           <DropdownMenu label="AI Tools" icon={Sparkles} disabled={!hasChapter || aiBusy}>
-            <DropdownItem icon={BookCheck} label="Proofread" onClick={() => { setActiveAiTab("proofread"); handleAI("proofread"); }} active={activeAiTab === "proofread"} />
-            <DropdownItem icon={Wand2} label="Clarify" onClick={() => { setActiveAiTab("clarify"); handleAI("clarify"); }} active={activeAiTab === "clarify"} />
-            <DropdownItem icon={RefreshCw} label="Rewrite" onClick={() => { setActiveAiTab("rewrite"); handleAI("rewrite"); }} active={activeAiTab === "rewrite"} />
-            <DropdownItem icon={Eye} label="Readability" onClick={() => { setActiveAiTab("readability"); handleAI("readability"); }} active={activeAiTab === "readability"} />
+            <DropdownItem
+              icon={BookCheck}
+              label="Proofread"
+              onClick={() => {
+                setActiveAiTab("proofread");
+                handleAI("proofread");
+              }}
+              active={activeAiTab === "proofread"}
+            />
+            <DropdownItem
+              icon={Wand2}
+              label="Clarify"
+              onClick={() => {
+                setActiveAiTab("clarify");
+                handleAI("clarify");
+              }}
+              active={activeAiTab === "clarify"}
+            />
+            <DropdownItem
+              icon={RefreshCw}
+              label="Rewrite"
+              onClick={() => {
+                setActiveAiTab("rewrite");
+                handleAI("rewrite");
+              }}
+              active={activeAiTab === "rewrite"}
+            />
+            <DropdownItem
+              icon={Eye}
+              label="Readability"
+              onClick={() => {
+                setActiveAiTab("readability");
+                handleAI("readability");
+              }}
+              active={activeAiTab === "readability"}
+            />
             <DropdownDivider />
             <DropdownItem
               icon={MessageSquare}
@@ -2635,7 +2761,10 @@ export default function ComposePage() {
                     </div>
                     <ul className="space-y-1 max-h-64 overflow-auto text-xs">
                       {headings.map((h, idx) => (
-                        <li key={`${h.level}-${idx}-${h.text}`} className="text-slate-700">
+                        <li
+                          key={`${h.level}-${idx}-${h.text}`}
+                          className="text-slate-700"
+                        >
                           <span
                             className={
                               h.level === "h1"
@@ -2658,7 +2787,9 @@ export default function ComposePage() {
                   <div className="text-xs font-semibold text-slate-700 mb-2 flex items-center justify-between gap-2">
                     <span>Characters</span>
                     <div className="flex items-center gap-2">
-                      <span className="text-[11px] text-slate-500">{characterCount} tagged</span>
+                      <span className="text-[11px] text-slate-500">
+                        {characterCount} tagged
+                      </span>
                       <button
                         type="button"
                         onClick={refreshDetectedCharacters}
@@ -2859,4 +2990,3 @@ export default function ComposePage() {
     </div>
   );
 }
-
