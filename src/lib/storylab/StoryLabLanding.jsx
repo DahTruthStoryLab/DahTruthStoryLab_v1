@@ -1,32 +1,21 @@
 // src/lib/storylab/StoryLabLanding.jsx
+// StoryLab Modules — Gateway page for Fiction, Nonfiction, and Poetry workshops
 
-import React, { useState, useEffect, useMemo } from "react";
-import { useNavigate, Link, useLocation } from "react-router-dom";
-import { motion, AnimatePresence } from "framer-motion";
+import React, { useState, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import {
-  Map as MapIcon,
-  Compass,
-  Sparkles,
   BookOpen,
-  PenLine,
-  Target,
-  Heart,
-  LayoutGrid,
-  Settings,
-  Moon,
-  Sun,
-  Users,
-  MessageSquare,
-  Menu,
-  X,
-  ChevronRight,
-  BookOpenCheck,
-  Home,
+  FileText,
   Feather,
   ArrowRight,
-  Play,
-  Calendar,
+  PenLine,
   Layers,
+  Heart,
+  Target,
+  Sparkles,
+  MessageSquare,
+  LayoutGrid,
+  TrendingUp,
 } from "lucide-react";
 
 /* ---------------------------
@@ -34,138 +23,56 @@ import {
 ---------------------------- */
 const BRAND = {
   navy: "#1e3a5f",
-  gold: "#d4af37",
-  mauve: "#b8a9c9",
   navyLight: "#2d4a6f",
-  goldLight: "#e6c860",
+  gold: "#d4af37",
+  goldDark: "#b8960c",
+  goldLight: "#f5e6b3",
+  mauve: "#b8a9c9",
+  rose: "#e8b4b8",
+  roseDark: "#c97b7b",
+  ink: "#0F172A",
+  cream: "#fefdfb",
+  sage: "#7C9A82",
+  sageDark: "#5C7A62",
+  sageLight: "#A8C5AE",
 };
 
-const BASE = "/story-lab";
+/* ---------------------------
+   Leaf icon for Poetry
+---------------------------- */
+function LeafIcon({ size = 20, color = BRAND.sage }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke={color}
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M17 8C8 10 5.9 16.17 3.82 21.34L5.71 22l1-2.3A4.49 4.49 0 0 0 8 20c4 0 8.68-3.31 12-12H17z" />
+      <path d="M6 15l4-4" />
+    </svg>
+  );
+}
 
 /* ---------------------------
-   Story Journey Modules (The 4-Step Path)
+   Story context
 ---------------------------- */
-const JOURNEY_STEPS = [
-  {
-    step: 1,
-    id: "hopes",
-    title: "Hopes • Fears • Legacy",
-    blurb: "Who is your character at their core? What drives them?",
-    icon: Heart,
-    color: BRAND.mauve,
-    route: `${BASE}/workshop/hfl`,
-    weeks: "Weeks 1-2",
-  },
-  {
-    step: 2,
-    id: "priorities",
-    title: "Priority Cards",
-    blurb: "What 4-5 things MUST happen in their arc?",
-    icon: Target,
-    color: BRAND.gold,
-    route: `${BASE}/workshop/priorities`,
-    weeks: "Weeks 3-4",
-  },
-  {
-    step: 3,
-    id: "roadmap",
-    title: "Character Roadmap",
-    blurb: "Map milestones to chapters. Plan every scene.",
-    icon: MapIcon,
-    color: BRAND.navy,
-    route: `${BASE}/workshop/roadmap`,
-    weeks: "Weeks 5-6",
-  },
-  {
-    step: 4,
-    id: "clothesline",
-    title: "Clothesline",
-    blurb: "Visualize the full journey. See it all at a glance.",
-    icon: LayoutGrid,
-    color: "#6366f1",
-    route: `${BASE}/workshop/clothesline`,
-    weeks: "Weeks 7-8",
-  },
-];
-
-/* ---------------------------
-   Story Tools (Secondary)
----------------------------- */
-const STORY_TOOLS = [
-  {
-    id: "plot-builder",
-    title: "Plot Builder",
-    blurb: "Build story blocks: stakes, obstacles, turning points.",
-    icon: Layers,
-    route: `${BASE}/plot-builder`,
-    color: "#dc2626",
-    isNew: true,
-  },
-  {
-    id: "narrative-arc",
-    title: "Narrative Arc",
-    blurb: "Map emotional beats and story structure.",
-    icon: Sparkles,
-    route: `${BASE}/narrative-arc`,
-  },
-  {
-    id: "dialogue-lab",
-    title: "Dialogue Lab",
-    blurb: "Write, analyze, and enhance character dialogue.",
-    icon: MessageSquare,
-    route: `${BASE}/dialogue-lab`,
-    color: "#0891b2",
-    isNew: true,
-  },
-  {
-    id: "prompts",
-    title: "Story Prompts",
-    blurb: "Context-aware sparks for stuck scenes.",
-    icon: Feather,
-    route: `${BASE}/prompts`,
-  },
-];
-
-/* ---------------------------
-   Compact Sidebar Nav Items
----------------------------- */
-const NAV_ITEMS = [
-  { to: `${BASE}`, icon: Home, label: "Landing" },
-  { to: `${BASE}/workshop/hfl`, icon: Heart, label: "Hopes & Fears" },
-  { to: `${BASE}/workshop/priorities`, icon: Target, label: "Priorities" },
-  { to: `${BASE}/workshop/roadmap`, icon: MapIcon, label: "Roadmap" },
-  { to: `${BASE}/workshop/clothesline`, icon: LayoutGrid, label: "Clothesline" },
-  { divider: true },
-  { to: `${BASE}/plot-builder`, icon: Layers, label: "Plot Builder", isNew: true },
-  { to: `${BASE}/narrative-arc`, icon: Sparkles, label: "Narrative Arc" },
-  { to: `${BASE}/dialogue-lab`, icon: MessageSquare, label: "Dialogue Lab", isNew: true },
-  { to: `${BASE}/prompts`, icon: Feather, label: "Prompts" },
-  { to: `${BASE}/community`, icon: Users, label: "Community" },
-];
-
-/* ============ Load Current Story Data ============ */
 function useCurrentStory() {
-  const [story, setStory] = useState({
-    title: "Untitled Story",
-    wordCount: 0,
-    chapterCount: 0,
-    currentChapter: null,
-    lastLine: "",
-  });
+  const [story, setStory] = useState({ title: "", wordCount: 0, chapterCount: 0 });
 
   useEffect(() => {
     const load = () => {
       try {
-        // Get story metadata
         const currentRaw = localStorage.getItem("currentStory");
         const current = currentRaw ? JSON.parse(currentRaw) : null;
-
-        // Get chapters
         const chaptersRaw = localStorage.getItem("dahtruth-story-lab-toc-v3");
         const parsed = chaptersRaw ? JSON.parse(chaptersRaw) : null;
         const chapters = parsed?.chapters || [];
 
-        // Calculate word count
         let totalWords = 0;
         chapters.forEach((ch) => {
           const text = ch?.content || ch?.text || ch?.body || "";
@@ -173,26 +80,10 @@ function useCurrentStory() {
           totalWords += plainText.split(/\s+/).filter(Boolean).length;
         });
 
-        // Get a random sentence from chapters
-        const allText = chapters
-          .map((c) => c?.content || c?.text || c?.body || "")
-          .join(" ")
-          .replace(/<[^>]*>/g, " ")
-          .replace(/\s+/g, " ");
-        const sentences = allText.match(/[^.!?]+[.!?]/g) || [];
-        const randomLine = sentences.length
-          ? sentences[Math.floor(Math.random() * sentences.length)].trim()
-          : "";
-
-        // Get current/last chapter
-        const lastChapter = chapters.length > 0 ? chapters[chapters.length - 1] : null;
-
         setStory({
-          title: current?.title || parsed?.book?.title || "Untitled Story",
+          title: current?.title || parsed?.book?.title || "",
           wordCount: totalWords,
           chapterCount: chapters.length,
-          currentChapter: lastChapter,
-          lastLine: randomLine,
         });
       } catch (err) {
         console.error("Failed to load story data:", err);
@@ -208,599 +99,276 @@ function useCurrentStory() {
     };
   }, []);
 
-  const refreshQuote = () => {
-    try {
-      const chaptersRaw = localStorage.getItem("dahtruth-story-lab-toc-v3");
-      const parsed = chaptersRaw ? JSON.parse(chaptersRaw) : null;
-      const chapters = parsed?.chapters || [];
-      const allText = chapters
-        .map((c) => c?.content || c?.text || c?.body || "")
-        .join(" ")
-        .replace(/<[^>]*>/g, " ")
-        .replace(/\s+/g, " ");
-      const sentences = allText.match(/[^.!?]+[.!?]/g) || [];
-      const randomLine = sentences.length
-        ? sentences[Math.floor(Math.random() * sentences.length)].trim()
-        : "";
-      setStory((prev) => ({ ...prev, lastLine: randomLine }));
-    } catch {}
-  };
-
-  return { story, refreshQuote };
+  return story;
 }
 
-/* ============ Pinned Sidebar (Always Expanded) ============ */
-function PinnedSidebar() {
-  const { pathname } = useLocation();
+/* ---------------------------
+   Genre Card
+---------------------------- */
+const GENRES = [
+  {
+    id: "fiction",
+    title: "Fiction",
+    subtitle: "Characters, plot, scenes, conflict, pacing, dialogue",
+    description:
+      "Build unforgettable characters and powerful narrative arcs with tools designed for novelists and short story writers.",
+    icon: BookOpen,
+    path: "/story-lab/fiction",
+    gradient: `linear-gradient(135deg, ${BRAND.ink} 0%, ${BRAND.navy} 40%, ${BRAND.navyLight} 100%)`,
+    accentColor: BRAND.navy,
+    tools: [
+      { icon: Heart, label: "Hopes • Fears • Legacy" },
+      { icon: Target, label: "Priority Cards" },
+      { icon: Layers, label: "Plot Builder" },
+      { icon: TrendingUp, label: "Narrative Arc" },
+      { icon: MessageSquare, label: "Dialogue Lab" },
+      { icon: LayoutGrid, label: "Clothesline" },
+    ],
+  },
+  {
+    id: "nonfiction",
+    title: "Nonfiction",
+    subtitle: "Thesis, structure, argument, evidence, clarity, transitions",
+    description:
+      "Structure your argument, strengthen clarity, and protect your voice with tools for essays, memoir, devotionals, and commentary.",
+    icon: FileText,
+    path: "/story-lab/nonfiction",
+    gradient: `linear-gradient(135deg, ${BRAND.goldDark} 0%, ${BRAND.gold} 50%, #e6c860 100%)`,
+    accentColor: BRAND.gold,
+    tools: [
+      { icon: FileText, label: "Essay Builder" },
+      { icon: BookOpen, label: "Memoir Scene Map" },
+      { icon: Sparkles, label: "Research Notes" },
+    ],
+  },
+  {
+    id: "poetry",
+    title: "Poetry",
+    subtitle: "Imagery, sound, line breaks, form, rhythm, compression",
+    description:
+      "Craft, revise, and build your collection with tools designed for the way poets actually work.",
+    iconCustom: true,
+    path: "/story-lab/poetry",
+    gradient: `linear-gradient(135deg, ${BRAND.sageDark} 0%, ${BRAND.sage} 50%, ${BRAND.sageLight} 100%)`,
+    accentColor: BRAND.sage,
+    tools: [
+      { icon: Feather, label: "Craft Lab" },
+      { icon: PenLine, label: "Revision Lab" },
+      { icon: BookOpen, label: "Sequence Builder" },
+    ],
+  },
+];
 
+function GenreCard({ genre }) {
   return (
-    <aside className="hidden md:flex fixed left-0 top-0 z-40 h-screen w-56 flex-col border-r border-slate-200 bg-white/95 backdrop-blur-md">
-      {/* Logo */}
-      <div className="flex items-center gap-3 px-4 py-4 border-b border-slate-100">
-        <img
-          src="/DahTruthLogo.png"
-          alt="DahTruth"
-          className="h-10 rounded-lg"
-          onError={(e) => (e.currentTarget.style.display = "none")}
+    <Link
+      to={genre.path}
+      className="group relative rounded-2xl overflow-hidden transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl"
+      style={{
+        background: "white",
+        border: `1px solid ${genre.accentColor}20`,
+      }}
+    >
+      {/* Header */}
+      <div
+        className="px-7 py-8 relative overflow-hidden"
+        style={{ background: genre.gradient }}
+      >
+        {/* Decorative circle */}
+        <div
+          className="absolute -top-8 -right-8 w-32 h-32 rounded-full opacity-10"
+          style={{ background: "white" }}
         />
-        <div>
-          <div className="font-serif text-lg font-bold" style={{ color: BRAND.navy }}>
-            DahTruth
+
+        <div className="relative z-10 flex items-center gap-4">
+          <div className="w-16 h-16 rounded-2xl bg-white/20 flex items-center justify-center shadow-lg backdrop-blur-sm">
+            {genre.iconCustom ? (
+              <LeafIcon size={32} color="white" />
+            ) : (
+              <genre.icon size={32} className="text-white" />
+            )}
           </div>
-          <div className="text-xs text-slate-500">Story Lab</div>
+          <div>
+            <h3
+              className="text-2xl font-bold text-white"
+              style={{ fontFamily: "'EB Garamond', Georgia, serif" }}
+            >
+              {genre.title}
+            </h3>
+            <p className="text-white/70 text-sm mt-1">{genre.subtitle}</p>
+          </div>
         </div>
       </div>
 
-      {/* Nav Items */}
-      <nav className="flex-1 py-4 space-y-1 px-3 overflow-y-auto">
-        {NAV_ITEMS.map((item, idx) =>
-          item.divider ? (
-            <div key={idx} className="my-3 border-t border-slate-100" />
-          ) : (
-            <Link
-              key={item.to}
-              to={item.to}
-              className={`flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all relative ${
-                pathname === item.to
-                  ? "bg-gradient-to-r from-slate-100 to-slate-50 shadow-sm"
-                  : "hover:bg-slate-50"
-              }`}
+      {/* Body */}
+      <div className="px-7 py-6">
+        <p className="text-slate-600 text-sm leading-relaxed mb-5">
+          {genre.description}
+        </p>
+
+        {/* Tool pills */}
+        <div className="flex flex-wrap gap-2 mb-5">
+          {genre.tools.map((tool) => (
+            <span
+              key={tool.label}
+              className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-full"
               style={{
-                color: pathname === item.to ? BRAND.navy : "#64748b",
+                background: `${genre.accentColor}10`,
+                color: genre.accentColor,
+                border: `1px solid ${genre.accentColor}20`,
               }}
             >
-              <item.icon
-                size={20}
-                style={{
-                  color: pathname === item.to ? BRAND.gold : "#94a3b8",
-                }}
-              />
-              <span className="text-sm font-medium truncate">{item.label}</span>
-              {item.isNew && (
-                <span 
-                  className="absolute right-2 text-[10px] font-bold px-1.5 py-0.5 rounded text-white"
-                  style={{ background: "#dc2626" }}
-                >
-                  NEW
-                </span>
-              )}
-            </Link>
-          )
-        )}
-      </nav>
+              <tool.icon size={12} />
+              {tool.label}
+            </span>
+          ))}
+        </div>
 
-      {/* Footer - Dashboard Button */}
-      <div className="p-3 border-t border-slate-100">
-        <Link
-          to="/dashboard"
-          className="flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-white transition-all hover:scale-105"
-          style={{ background: `linear-gradient(135deg, ${BRAND.gold}, #B8960C)` }}
-        >
-          <Home size={18} />
-          Dashboard
-        </Link>
-      </div>
-    </aside>
-  );
-}
-
-/* ============ Mobile Header & Sidebar ============ */
-function MobileHeader({ onMenuClick }) {
-  return (
-    <div className="md:hidden sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200 px-4 py-3">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <img
-            src="/DahTruthLogo.png"
-            alt="DahTruth"
-            className="h-8 rounded"
-            onError={(e) => (e.currentTarget.style.display = "none")}
-          />
-          <span className="font-serif font-bold" style={{ color: BRAND.navy }}>
-            Story Lab
+        {/* CTA */}
+        <div className="flex items-center justify-between">
+          <span
+            className="text-sm font-semibold flex items-center gap-1.5 transition-all group-hover:gap-3"
+            style={{ color: genre.accentColor }}
+          >
+            Open {genre.title} Workshop
+            <ArrowRight size={16} />
           </span>
         </div>
-        <button
-          onClick={onMenuClick}
-          className="p-2 rounded-xl hover:bg-slate-100"
-          aria-label="Open menu"
-        >
-          <Menu size={24} />
-        </button>
       </div>
-    </div>
+    </Link>
   );
 }
 
-function MobileSidebar({ open, setOpen }) {
-  const { pathname } = useLocation();
-
-  useEffect(() => {
-    document.body.style.overflow = open ? "hidden" : "";
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, [open]);
-
-  return (
-    <AnimatePresence>
-      {open && (
-        <>
-          <motion.div
-            className="fixed inset-0 z-50 bg-black/30"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setOpen(false)}
-          />
-          <motion.aside
-            className="fixed left-0 top-0 bottom-0 z-50 w-72 bg-white p-4"
-            initial={{ x: -300 }}
-            animate={{ x: 0 }}
-            exit={{ x: -300 }}
-            transition={{ type: "spring", stiffness: 300, damping: 30 }}
-          >
-            <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-2">
-                <img
-                  src="/DahTruthLogo.png"
-                  alt="DahTruth"
-                  className="h-10 rounded"
-                  onError={(e) => (e.currentTarget.style.display = "none")}
-                />
-                <div>
-                  <div className="font-serif font-bold" style={{ color: BRAND.navy }}>
-                    DahTruth
-                  </div>
-                  <div className="text-xs text-slate-500">Story Lab</div>
-                </div>
-              </div>
-              <button
-                onClick={() => setOpen(false)}
-                className="p-2 rounded-xl hover:bg-slate-100"
-              >
-                <X size={20} />
-              </button>
-            </div>
-
-            <nav className="space-y-1">
-              {NAV_ITEMS.map((item, idx) =>
-                item.divider ? (
-                  <div key={idx} className="my-3 border-t border-slate-100" />
-                ) : (
-                  <Link
-                    key={item.to}
-                    to={item.to}
-                    onClick={() => setOpen(false)}
-                    className={`flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all relative ${
-                      pathname === item.to ? "bg-slate-100" : "hover:bg-slate-50"
-                    }`}
-                  >
-                    <item.icon
-                      size={20}
-                      style={{ color: pathname === item.to ? BRAND.gold : "#94a3b8" }}
-                    />
-                    <span
-                      className="font-medium"
-                      style={{ color: pathname === item.to ? BRAND.navy : "#64748b" }}
-                    >
-                      {item.label}
-                    </span>
-                    {item.isNew && (
-                      <span 
-                        className="text-[10px] font-bold px-1.5 py-0.5 rounded text-white"
-                        style={{ background: "#dc2626" }}
-                      >
-                        NEW
-                      </span>
-                    )}
-                  </Link>
-                )
-              )}
-            </nav>
-
-            <div className="absolute bottom-4 left-4 right-4">
-              <Link
-                to="/dashboard"
-                onClick={() => setOpen(false)}
-                className="flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-white font-semibold"
-                style={{ background: `linear-gradient(135deg, ${BRAND.gold}, #B8960C)` }}
-              >
-                <Home size={18} />
-                Back to Dashboard
-              </Link>
-            </div>
-          </motion.aside>
-        </>
-      )}
-    </AnimatePresence>
-  );
-}
-
-/* ============ Story Banner ============ */
-function StoryBanner({ story, onContinue }) {
-  return (
-    <div
-      className="rounded-2xl p-6 mb-6"
-      style={{
-        background: `linear-gradient(135deg, ${BRAND.navy} 0%, ${BRAND.navyLight} 40%, ${BRAND.mauve} 100%)`,
-      }}
-    >
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <p className="text-white/70 text-sm mb-1">Currently Working On</p>
-          <h2 className="text-2xl md:text-3xl font-bold text-white mb-2">
-            {story.title}
-          </h2>
-          <div className="flex flex-wrap items-center gap-4 text-sm">
-            <span className="text-white/80">
-              <span className="text-amber-300 font-semibold">{story.chapterCount}</span> Chapters
-            </span>
-            <span className="text-white/80">
-              <span className="text-amber-300 font-semibold">{story.wordCount.toLocaleString()}</span> Words
-            </span>
-            {story.currentChapter && (
-              <span className="text-white/80">
-                Last: <span className="text-white">{story.currentChapter.title || "Untitled"}</span>
-              </span>
-            )}
-          </div>
-        </div>
-        <button
-          onClick={onContinue}
-          className="inline-flex items-center gap-2 rounded-xl px-5 py-3 text-sm font-semibold transition-all hover:scale-105"
-          style={{
-            background: `linear-gradient(135deg, ${BRAND.gold}, #B8960C)`,
-            color: "#fff",
-            boxShadow: `0 4px 15px ${BRAND.gold}50`,
-          }}
-        >
-          <Play size={18} />
-          Continue Writing
-        </button>
-      </div>
-    </div>
-  );
-}
-
-/* ============ Quote from Story ============ */
-function StoryQuote({ line, onRefresh }) {
-  if (!line) return null;
-
-  return (
-    <div
-      className="rounded-xl p-4 mb-6 flex items-center justify-between"
-      style={{
-        background: "rgba(255, 255, 255, 0.8)",
-        border: `1px solid ${BRAND.mauve}30`,
-      }}
-    >
-      <p className="italic text-slate-600 flex-1">"{line}"</p>
-      <button
-        onClick={onRefresh}
-        className="ml-4 px-3 py-1.5 rounded-lg text-sm text-slate-500 hover:bg-slate-100 transition-colors"
-      >
-        Refresh
-      </button>
-    </div>
-  );
-}
-
-/* ============ Story Journey Section ============ */
-function StoryJourneySection({ navigate }) {
-  return (
-    <section className="mb-10">
-      <div className="mb-6">
-        <h2 className="text-xl md:text-2xl font-bold" style={{ color: BRAND.navy }}>
-          Your Character Development Path
-        </h2>
-        <p className="text-slate-500 mt-1">
-          Follow the journey — each step builds on the last
-        </p>
-      </div>
-
-      <div className="grid gap-4">
-        {JOURNEY_STEPS.map((step, idx) => (
-          <motion.button
-            key={step.id}
-            onClick={() => navigate(step.route)}
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: idx * 0.1 }}
-            className="group relative overflow-hidden rounded-2xl p-5 text-left transition-all hover:shadow-lg"
-            style={{
-              background: "rgba(255, 255, 255, 0.9)",
-              border: `1px solid ${step.color}25`,
-            }}
-          >
-            {/* Step number */}
-            <div
-              className="absolute top-4 right-4 w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold"
-              style={{
-                background: `${step.color}15`,
-                color: step.color,
-              }}
-            >
-              {step.step}
-            </div>
-
-            {/* Decorative gradient blob */}
-            <div
-              className="absolute -top-10 -left-10 w-32 h-32 rounded-full blur-3xl opacity-30"
-              style={{ background: step.color }}
-            />
-
-            <div className="relative flex items-start gap-4">
-              <div
-                className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
-                style={{ background: `${step.color}15` }}
-              >
-                <step.icon size={24} style={{ color: step.color }} />
-              </div>
-
-              <div className="flex-1 pr-12">
-                <div className="flex items-center gap-2 mb-1">
-                  <h3 className="text-lg font-semibold" style={{ color: BRAND.navy }}>
-                    {step.title}
-                  </h3>
-                  <span
-                    className="text-xs px-2 py-0.5 rounded-full"
-                    style={{ background: `${step.color}15`, color: step.color }}
-                  >
-                    {step.weeks}
-                  </span>
-                </div>
-                <p className="text-slate-500 text-sm">{step.blurb}</p>
-              </div>
-
-              <ChevronRight
-                size={20}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-300 group-hover:text-slate-500 group-hover:translate-x-1 transition-all"
-              />
-            </div>
-
-            {/* Connection line to next step */}
-            {idx < JOURNEY_STEPS.length - 1 && (
-              <div
-                className="absolute left-10 -bottom-4 w-0.5 h-8 z-10"
-                style={{ background: `${BRAND.navy}20` }}
-              />
-            )}
-          </motion.button>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-/* ============ Story Tools Section ============ */
-function StoryToolsSection({ navigate }) {
-  return (
-    <section className="mb-10">
-      <div className="mb-4">
-        <h2 className="text-lg font-bold" style={{ color: BRAND.navy }}>
-          Story Tools
-        </h2>
-        <p className="text-slate-500 text-sm">Additional resources for your craft</p>
-      </div>
-
-      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        {STORY_TOOLS.map((tool) => (
-          <button
-            key={tool.id}
-            onClick={() => navigate(tool.route)}
-            className="group rounded-xl p-4 text-left transition-all hover:shadow-md relative"
-            style={{
-              background: "rgba(255, 255, 255, 0.8)",
-              border: `1px solid ${tool.color ? `${tool.color}25` : "rgba(30, 58, 95, 0.1)"}`,
-            }}
-          >
-            {/* NEW badge */}
-            {tool.isNew && (
-              <span 
-                className="absolute top-2 right-2 text-[10px] font-bold px-1.5 py-0.5 rounded text-white"
-                style={{ background: "#dc2626" }}
-              >
-                NEW
-              </span>
-            )}
-            <div className="flex items-start gap-3">
-              <div
-                className="w-10 h-10 rounded-lg flex items-center justify-center"
-                style={{ background: tool.color ? `${tool.color}15` : `${BRAND.navy}08` }}
-              >
-                <tool.icon size={20} style={{ color: tool.color || BRAND.navy }} />
-              </div>
-              <div>
-                <h3 className="font-semibold text-sm" style={{ color: BRAND.navy }}>
-                  {tool.title}
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">{tool.blurb}</p>
-              </div>
-            </div>
-          </button>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-/* ============ Workshop Community Button ============ */
-function WorkshopCommunitySection({ navigate }) {
-  return (
-    <section className="mb-10">
-      <button
-        onClick={() => navigate(`${BASE}/workshop`)}
-        className="w-full group rounded-2xl p-6 text-left transition-all hover:shadow-lg hover:scale-[1.01]"
-        style={{
-          background: `linear-gradient(135deg, ${BRAND.mauve}15 0%, ${BRAND.navy}10 100%)`,
-          border: `1px solid ${BRAND.mauve}30`,
-        }}
-      >
-        <div className="flex items-center gap-4">
-          <div
-            className="w-14 h-14 rounded-xl flex items-center justify-center flex-shrink-0"
-            style={{ background: `linear-gradient(135deg, ${BRAND.mauve} 0%, ${BRAND.navy} 100%)` }}
-          >
-            <Users size={28} className="text-white" />
-          </div>
-          <div className="flex-1">
-            <h3 className="text-lg font-bold mb-1" style={{ color: BRAND.navy }}>
-              Workshop Hub
-            </h3>
-            <p className="text-sm text-slate-600">
-              Access all your story development tools, connect with your cohort, and track your writing journey.
-            </p>
-          </div>
-          <ChevronRight
-            size={24}
-            className="text-slate-300 group-hover:text-slate-500 group-hover:translate-x-1 transition-all"
-          />
-        </div>
-      </button>
-    </section>
-  );
-}
-
-/* ============ Workshop Info Card ============ */
-function WorkshopInfoCard({ navigate }) {
-  return (
-    <div
-      className="rounded-2xl p-5 mb-6"
-      style={{
-        background: `linear-gradient(135deg, ${BRAND.gold}10 0%, ${BRAND.mauve}15 100%)`,
-        border: `1px solid ${BRAND.gold}30`,
-      }}
-    >
-      <div className="flex items-start gap-4">
-        <div
-          className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
-          style={{ background: `${BRAND.gold}20` }}
-        >
-          <Calendar size={24} style={{ color: BRAND.gold }} />
-        </div>
-        <div className="flex-1">
-          <h3 className="font-bold" style={{ color: BRAND.navy }}>
-            8-Week Character Workshop
-          </h3>
-          <p className="text-sm text-slate-600 mt-1">
-            Follow the Story Journey over 8 weeks — 2 weeks per module. 
-            Deep work, feedback sessions, and a complete character arc by the end.
-          </p>
-          <button
-            onClick={() => navigate(`${BASE}/workshop`)}
-            className="mt-3 inline-flex items-center gap-2 text-sm font-medium hover:gap-3 transition-all"
-            style={{ color: BRAND.gold }}
-          >
-            Learn more <ArrowRight size={16} />
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ============ Dark Mode Toggle ============ */
-function DarkModeToggle() {
-  const [dark, setDark] = useState(() =>
-    typeof window !== "undefined" &&
-    document.documentElement.classList.contains("theme-dark")
-  );
-  
-  useEffect(() => {
-    document.documentElement.classList.toggle("theme-dark", dark);
-  }, [dark]);
-  
-  return (
-    <button
-      onClick={() => setDark((d) => !d)}
-      className="p-2 rounded-xl hover:bg-slate-100 transition-colors"
-      aria-label="Toggle dark mode"
-    >
-      {dark ? <Sun size={20} /> : <Moon size={20} />}
-    </button>
-  );
-}
-
-/* ============ Main Page ============ */
+/* ---------------------------
+   Main Component
+---------------------------- */
 export default function StoryLabLanding() {
   const navigate = useNavigate();
-  const [mobileOpen, setMobileOpen] = useState(false);
-  const { story, refreshQuote } = useCurrentStory();
+  const story = useCurrentStory();
 
   return (
-    <div className="min-h-screen" style={{ background: "#f8fafc" }}>
-      {/* Sidebar */}
-      <PinnedSidebar />
-      <MobileSidebar open={mobileOpen} setOpen={setMobileOpen} />
-      <MobileHeader onMenuClick={() => setMobileOpen(true)} />
+    <div
+      className="min-h-screen"
+      style={{
+        background: `linear-gradient(180deg, ${BRAND.cream} 0%, #f1f5f9 100%)`,
+      }}
+    >
+      <div className="max-w-5xl mx-auto px-4 py-8">
+        {/* Hero */}
+        <div
+          className="rounded-3xl p-10 mb-10 text-center relative overflow-hidden"
+          style={{
+            background: `linear-gradient(135deg, ${BRAND.navy} 0%, ${BRAND.navyLight} 30%, ${BRAND.mauve} 70%, ${BRAND.rose} 100%)`,
+          }}
+        >
+          {/* Decorative elements */}
+          <div
+            className="absolute top-0 left-0 w-64 h-64 rounded-full opacity-10"
+            style={{ background: BRAND.gold, filter: "blur(80px)" }}
+          />
+          <div
+            className="absolute bottom-0 right-0 w-80 h-80 rounded-full opacity-10"
+            style={{ background: BRAND.rose, filter: "blur(100px)" }}
+          />
 
-      {/* Main Content */}
-      <main className="md:ml-56">
-        <div className="max-w-4xl mx-auto px-4 md:px-6 py-6">
-          {/* Top Actions */}
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h1 className="text-2xl md:text-3xl font-bold" style={{ color: BRAND.navy }}>
-                Story Journey
-              </h1>
-              <p className="text-slate-500 text-sm">Where Every Story Finds Its Audience</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => navigate("/settings")}
-                className="p-2 rounded-xl hover:bg-slate-100 transition-colors"
+          <div className="relative z-10">
+            {/* Icon cluster */}
+            <div className="flex items-center justify-center gap-3 mb-6">
+              <div
+                className="w-11 h-11 rounded-2xl flex items-center justify-center"
+                style={{ background: `${BRAND.navy}60` }}
               >
-                <Settings size={20} className="text-slate-500" />
-              </button>
-              <DarkModeToggle />
+                <BookOpen size={22} className="text-white" />
+              </div>
+              <div
+                className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg"
+                style={{
+                  background: `linear-gradient(135deg, ${BRAND.gold}, ${BRAND.goldDark})`,
+                }}
+              >
+                <Sparkles size={28} className="text-white" />
+              </div>
+              <div
+                className="w-11 h-11 rounded-2xl flex items-center justify-center"
+                style={{ background: `${BRAND.sage}60` }}
+              >
+                <LeafIcon size={22} color="white" />
+              </div>
             </div>
+
+            <h1
+              className="text-4xl font-bold text-white mb-3"
+              style={{ fontFamily: "'EB Garamond', Georgia, serif" }}
+            >
+              StoryLab Modules
+            </h1>
+            <p className="text-white/80 max-w-xl mx-auto text-lg mb-4">
+              Choose your craft. Every genre has its own set of tools, exercises,
+              and pathways built for the way you write.
+            </p>
+
+            {/* Current project pill */}
+            {story.title && (
+              <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/15 border border-white/20">
+                <span className="text-white/70 text-sm">Working on:</span>
+                <span className="text-white text-sm font-semibold">
+                  {story.title}
+                </span>
+                {story.wordCount > 0 && (
+                  <span className="text-amber-300 text-sm">
+                    • {story.wordCount.toLocaleString()} words
+                  </span>
+                )}
+              </div>
+            )}
           </div>
-
-          {/* Story Banner */}
-          <StoryBanner story={story} onContinue={() => navigate("/compose")} />
-
-          {/* Quote from story */}
-          <StoryQuote line={story.lastLine} onRefresh={refreshQuote} />
-
-          {/* 8-Week Workshop Info */}
-          <WorkshopInfoCard navigate={navigate} />
-
-          {/* Story Journey - The Main Path */}
-          <StoryJourneySection navigate={navigate} />
-
-          {/* Story Tools */}
-          <StoryToolsSection navigate={navigate} />
-
-          {/* Workshop Hub */}
-          <WorkshopCommunitySection navigate={navigate} />
-
-          {/* Footer */}
-          <footer className="text-center text-xs text-slate-400 py-8">
-            © {new Date().getFullYear()} DahTruth • Where Truth is Written
-          </footer>
         </div>
-      </main>
+
+        {/* Genre Cards */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-10">
+          {GENRES.map((genre) => (
+            <GenreCard key={genre.id} genre={genre} />
+          ))}
+        </div>
+
+        {/* Quick Links */}
+        <div className="flex items-center justify-center gap-4 mb-8">
+          <button
+            onClick={() => navigate("/compose")}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium transition-all hover:scale-105"
+            style={{
+              background: `${BRAND.navy}10`,
+              border: `1px solid ${BRAND.navy}20`,
+              color: BRAND.navy,
+            }}
+          >
+            <PenLine size={16} />
+            Writer
+          </button>
+          <button
+            onClick={() => navigate("/dashboard")}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium transition-all hover:scale-105"
+            style={{
+              background: `${BRAND.gold}15`,
+              border: `1px solid ${BRAND.gold}25`,
+              color: BRAND.goldDark,
+            }}
+          >
+            <BookOpen size={16} />
+            Dashboard
+          </button>
+        </div>
+
+        {/* Footer tagline */}
+        <div className="text-center pb-8">
+          <p
+            className="text-slate-400 text-sm italic"
+            style={{ fontFamily: "'EB Garamond', Georgia, serif" }}
+          >
+            Where Every Story Finds Its Audience
+          </p>
+        </div>
+      </div>
     </div>
   );
 }
