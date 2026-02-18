@@ -100,6 +100,15 @@ const NonFictionModule = lazy(() =>
   import("./components/storylab/NonFictionModule")
 );
 
+// ✅ ADD: Poetry subroute modules
+const RevisionLab = lazy(() => import("./components/storylab/poetry/RevisionLab"));
+const SequenceBuilder = lazy(() => import("./components/storylab/poetry/SequenceBuilder"));
+const CraftLab = lazy(() => import("./components/storylab/poetry/CraftLab"));
+const RemixLab = lazy(() => import("./components/storylab/poetry/RemixLab"));
+const VoiceIdentityLab = lazy(() => import("./components/storylab/poetry/VoiceIdentityLab"));
+
+// ❌ REMOVE: top-level StoryLab page (we now jump into the designed hub)
+
 // ❌ REMOVE: top-level StoryLab page (we now jump into the designed hub)
 // const StoryLab = lazy(() => import("./pages/StoryLab.jsx"));
 
@@ -238,23 +247,21 @@ export default function App() {
 
               <Route path="story-lab" element={<StoryLabLayout />}>
   
-                {/* Hub */}
-                <Route path="hub" element={<StoryLabHub />} />
-              
-                {/* Genre modules */}
+               <Route path="prompts" element={<StoryPromptsWorkshop />} />
+
+                {/* Genre module routes */}
                 <Route path="fiction" element={<FictionModule />} />
                 <Route path="poetry" element={<PoetryModule />} />
                 <Route path="nonfiction" element={<NonFictionModule />} />
-              
+
                 {/* Poetry subroutes */}
                 <Route path="poetry/revision" element={<RevisionLab />} />
                 <Route path="poetry/sequence" element={<SequenceBuilder />} />
                 <Route path="poetry/craft" element={<CraftLab />} />
                 <Route path="poetry/remix" element={<RemixLab />} />
                 <Route path="poetry/voice" element={<VoiceIdentityLab />} />
-              
               </Route>
-                                          
+
              {/* TOP-LEVEL PUBLISHING PAGES (src/pages/*.tsx) */}
               <Route
                 path="/publishing"
