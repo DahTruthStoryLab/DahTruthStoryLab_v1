@@ -237,11 +237,12 @@ export default function App() {
                 <Route path="prompts" element={<StoryPromptsWorkshop />} />
 
                {/* ✅ ADD: Genre module routes */}
-                <Route path="fiction" element={<FictionModule />} />
+               <Route path="fiction" element={<FictionModule />} />
                 <Route path="poetry" element={<PoetryModule />} />
                 <Route path="nonfiction" element={<NonFictionModule />} />
+              </Route>
 
-              {/* TOP-LEVEL PUBLISHING PAGES (src/pages/*.tsx) */}
+             {/* TOP-LEVEL PUBLISHING PAGES (src/pages/*.tsx) */}
               <Route
                 path="/publishing"
                 element={
