@@ -236,12 +236,25 @@ export default function App() {
                 <Route path="workshop/hfl" element={<HopesFearsLegacy />} />
                 <Route path="prompts" element={<StoryPromptsWorkshop />} />
 
-               {/* ✅ ADD: Genre module routes */}
-               <Route path="fiction" element={<FictionModule />} />
+              <Route path="story-lab" element={<StoryLabLayout />}>
+  
+                {/* Hub */}
+                <Route path="hub" element={<StoryLabHub />} />
+              
+                {/* Genre modules */}
+                <Route path="fiction" element={<FictionModule />} />
                 <Route path="poetry" element={<PoetryModule />} />
                 <Route path="nonfiction" element={<NonFictionModule />} />
+              
+                {/* Poetry subroutes */}
+                <Route path="poetry/revision" element={<RevisionLab />} />
+                <Route path="poetry/sequence" element={<SequenceBuilder />} />
+                <Route path="poetry/craft" element={<CraftLab />} />
+                <Route path="poetry/remix" element={<RemixLab />} />
+                <Route path="poetry/voice" element={<VoiceIdentityLab />} />
+              
               </Route>
-
+                                          
              {/* TOP-LEVEL PUBLISHING PAGES (src/pages/*.tsx) */}
               <Route
                 path="/publishing"
