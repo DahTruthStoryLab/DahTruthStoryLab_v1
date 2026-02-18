@@ -93,6 +93,8 @@ const WorkshopHub = lazy(() =>
 );
 
 // ✅ ADD: Genre modules
+// ✅ ADD: Genre modules
+const FictionModule = lazy(() => import("./components/storylab/FictionModule"));
 const PoetryModule = lazy(() => import("./components/storylab/PoetryModule"));
 const NonFictionModule = lazy(() =>
   import("./components/storylab/NonFictionModule")
@@ -234,10 +236,10 @@ export default function App() {
                 <Route path="workshop/hfl" element={<HopesFearsLegacy />} />
                 <Route path="prompts" element={<StoryPromptsWorkshop />} />
 
-                {/* ✅ ADD: Poetry + Nonfiction routes */}
+               {/* ✅ ADD: Genre module routes */}
+                <Route path="fiction" element={<FictionModule />} />
                 <Route path="poetry" element={<PoetryModule />} />
                 <Route path="nonfiction" element={<NonFictionModule />} />
-              </Route>
 
               {/* TOP-LEVEL PUBLISHING PAGES (src/pages/*.tsx) */}
               <Route
