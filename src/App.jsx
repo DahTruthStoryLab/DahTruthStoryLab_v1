@@ -92,25 +92,19 @@ const WorkshopHub = lazy(() =>
   import("./components/storylab/WorkshopHub.jsx")
 );
 
-// ✅ ADD: Genre modules
-// ✅ ADD: Genre modules
+// Genre modules
 const FictionModule = lazy(() => import("./components/storylab/FictionModule"));
 const PoetryModule = lazy(() => import("./components/storylab/PoetryModule"));
 const NonFictionModule = lazy(() =>
   import("./components/storylab/NonFictionModule")
 );
 
-// ✅ ADD: Poetry subroute modules
+// Poetry subroute modules
 const RevisionLab = lazy(() => import("./components/storylab/poetry/RevisionLab"));
 const SequenceBuilder = lazy(() => import("./components/storylab/poetry/SequenceBuilder"));
 const CraftLab = lazy(() => import("./components/storylab/poetry/CraftLab"));
 const RemixLab = lazy(() => import("./components/storylab/poetry/RemixLab"));
 const VoiceIdentityLab = lazy(() => import("./components/storylab/poetry/VoiceIdentityLab"));
-
-// ❌ REMOVE: top-level StoryLab page (we now jump into the designed hub)
-
-// ❌ REMOVE: top-level StoryLab page (we now jump into the designed hub)
-// const StoryLab = lazy(() => import("./pages/StoryLab.jsx"));
 
 // Publishing
 const Publishing = lazy(() => import("./pages/Publishing.tsx"));
@@ -213,7 +207,7 @@ export default function App() {
                 }
               />
 
-              {/* ✅ /storylab → hub */}
+              {/* /storylab → redirect to story-lab */}
               <Route
                 path="/storylab"
                 element={
@@ -245,10 +239,6 @@ export default function App() {
                 <Route path="workshop/hfl" element={<HopesFearsLegacy />} />
                 <Route path="prompts" element={<StoryPromptsWorkshop />} />
 
-              <Route path="story-lab" element={<StoryLabLayout />}>
-  
-               <Route path="prompts" element={<StoryPromptsWorkshop />} />
-
                 {/* Genre module routes */}
                 <Route path="fiction" element={<FictionModule />} />
                 <Route path="poetry" element={<PoetryModule />} />
@@ -262,7 +252,7 @@ export default function App() {
                 <Route path="poetry/voice" element={<VoiceIdentityLab />} />
               </Route>
 
-             {/* TOP-LEVEL PUBLISHING PAGES (src/pages/*.tsx) */}
+              {/* TOP-LEVEL PUBLISHING PAGES (src/pages/*.tsx) */}
               <Route
                 path="/publishing"
                 element={
@@ -440,3 +430,4 @@ export default function App() {
     </UserProvider>
   );
 }
+
