@@ -186,41 +186,33 @@ function normalizeHtmlForPublishing(html = "") {
    Regex Character Scan (shared by modal + refresh button)
 ============================================================================= */
 
-// Replace your existing EXCLUDED_WORDS set with this one.
-// New additions are marked with // ✅ NEW
-
+// ✅ EXPANDED: Common words to exclude (not character names)
 const EXCLUDED_WORDS = new Set([
-  // ── Original pronouns, articles, conjunctions ──
+  // ── Pronouns, articles, conjunctions ──
   "the", "a", "an", "and", "but", "or", "for", "nor", "on", "at", "to",
   "from", "by", "in", "of", "with", "as", "is", "was", "were", "been",
   "be", "have", "has", "had", "do", "does", "did", "will", "would",
   "could", "should", "may", "might", "must", "shall", "can", "need",
   "dare", "ought", "used",
-
   // ── Pronouns ──
   "i", "you", "he", "she", "it", "we", "they", "me", "him", "her",
   "us", "them", "my", "your", "his", "its", "our", "their", "mine",
   "yours", "hers", "ours", "theirs", "this", "that", "these", "those",
   "who", "whom", "which", "what", "whose", "where", "when", "why", "how",
-
   // ── Determiners & quantifiers ──
   "all", "each", "every", "both", "few", "more", "most", "other",
   "some", "such", "no", "not", "only", "own", "same", "so", "than",
   "too", "very", "just", "also", "now", "here", "there", "then",
-
   // ── Days & months ──
   "monday", "tuesday", "wednesday", "thursday", "friday", "saturday",
   "sunday", "january", "february", "march", "april", "may", "june",
   "july", "august", "september", "october", "november", "december",
-
-  // ── Common titles (kept from original) ──
+  // ── Common titles ──
   "mr", "mrs", "ms", "miss", "dr", "prof", "sir", "lord", "lady",
-
   // ── Places/things often capitalized ──
   "church", "hospital", "school", "university", "street", "avenue",
   "road", "building", "house", "room", "office", "god", "lord", "bible",
   "chapter",
-
   // ── Story-related words / dialogue tags ──
   "part", "book", "story", "page", "said", "asked", "replied",
   "answered", "whispered", "shouted", "cried", "called", "thought",
@@ -228,13 +220,11 @@ const EXCLUDED_WORDS = new Set([
   "came", "went", "got", "made", "took", "gave", "found", "told",
   "let", "put", "seemed", "left", "kept", "began", "started", "tried",
   "wanted", "needed", "liked",
-
-  // ── ✅ NEW: Indefinite pronouns (commonly capitalized at sentence start) ──
+  // ── Indefinite pronouns (commonly capitalized at sentence start) ──
   "nothing", "something", "everything", "anything", "everyone",
   "someone", "nobody", "somebody", "anyone", "nowhere", "somewhere",
   "everybody", "wherever", "whatever", "whoever", "however",
-
-  // ── ✅ NEW: Common adverbs / transitions that start sentences ──
+  // ── Common adverbs / transitions that start sentences ──
   "sometimes", "always", "never", "maybe", "perhaps", "already",
   "still", "even", "though", "because", "before", "after", "again",
   "around", "away", "back", "down", "enough", "long", "much",
@@ -242,17 +232,15 @@ const EXCLUDED_WORDS = new Set([
   "barely", "nearly", "almost", "probably", "certainly", "clearly",
   "simply", "really", "actually", "apparently", "eventually",
   "obviously", "especially", "usually", "often", "once", "twice",
-  "meanwhile", "otherwise", "instead", "besides", "however",
+  "meanwhile", "otherwise", "instead", "besides",
   "therefore", "furthermore", "moreover", "nevertheless",
   "unfortunately", "fortunately",
-
-  // ── ✅ NEW: Time references ──
+  // ── Time references ──
   "home", "tonight", "today", "tomorrow", "morning", "night", "time",
   "year", "years", "week", "weeks", "month", "months", "hour", "hours",
   "minute", "minutes", "moment", "day", "days", "afternoon", "evening",
   "midnight", "noon", "dawn", "dusk", "yesterday",
-
-  // ── ✅ NEW: Common nouns that get capitalized at sentence start ──
+  // ── Common nouns that get capitalized at sentence start ──
   "world", "life", "people", "man", "woman", "girl", "boy",
   "mother", "father", "baby", "child", "children", "family",
   "head", "hand", "hands", "eyes", "face", "voice", "door",
@@ -260,22 +248,20 @@ const EXCLUDED_WORDS = new Set([
   "between", "through", "things", "thing", "way", "place",
   "truth", "love", "death", "fear", "pain", "hope", "faith",
   "power", "money", "blood", "body", "mind", "soul", "spirit",
-  "side", "end", "part", "kind", "sort", "type",
+  "side", "end", "kind", "sort", "type",
   "name", "word", "words", "question", "answer", "reason",
-  "fact", "point", "sense", "feeling", "idea", "thought",
+  "fact", "point", "sense", "feeling", "idea",
   "sound", "silence", "air", "light", "dark", "darkness",
   "ground", "floor", "wall", "walls", "table", "chair", "bed",
   "car", "truck", "phone", "food", "rest", "sleep",
-
-  // ── ✅ NEW: Adjectives that start sentences ──
+  // ── Adjectives that start sentences ──
   "black", "white", "little", "old", "new", "young", "good", "right",
   "wrong", "small", "big", "large", "great", "real", "whole",
-  "long", "short", "hard", "soft", "cold", "hot", "warm",
-  "certain", "sure", "true", "false", "own", "different", "same",
-  "last", "first", "next", "other", "another", "many", "several",
-  "enough", "whole", "entire", "single", "alone", "together",
-
-  // ── ✅ NEW: Verbs commonly starting sentences ──
+  "short", "hard", "soft", "cold", "hot", "warm",
+  "certain", "sure", "true", "false", "different",
+  "last", "first", "next", "another", "many", "several",
+  "entire", "single", "alone", "together",
+  // ── Verbs commonly starting sentences ──
   "being", "having", "going", "coming", "getting", "making",
   "taking", "seeing", "looking", "knowing", "thinking", "feeling",
   "trying", "leaving", "turning", "opening", "standing", "sitting",
@@ -284,24 +270,16 @@ const EXCLUDED_WORDS = new Set([
   "speaking", "telling", "saying", "asking", "following", "leading",
   "bringing", "carrying", "reading", "writing", "playing",
   "wearing", "smiling", "crying", "shaking", "reaching",
-
-  // ── ✅ NEW: Common abstract / emotional words ──
-  "everything", "nothing", "anything", "somewhere", "nowhere",
-  "trouble", "problem", "answer", "choice", "chance", "change",
-
-  // ── ✅ NEW: Interjections / sentence starters ──
+  // ── Interjections / sentence starters ──
   "well", "yes", "yeah", "okay", "alright", "please", "sorry",
-  "sure", "fine", "thank", "thanks", "hell", "damn", "shit",
-  "fuck", "god", "jesus", "christ", "gosh", "geez", "wow",
-  "hey", "look", "listen", "wait", "stop", "come", "let",
-  "whoa", "oh", "hmm", "huh",
-
-  // ── ✅ NEW: Directional / positional words ──
+  "fine", "thank", "thanks", "hell", "damn",
+  "hey", "look", "listen", "wait", "stop", "come",
+  "oh", "hmm", "huh",
+  // ── Directional / positional words ──
   "north", "south", "east", "west", "above", "below", "behind",
-  "front", "left", "right", "middle", "center", "top", "bottom",
+  "front", "middle", "center", "top", "bottom",
   "across", "along", "past", "beyond",
-
-  // ── ✅ NEW: Common place words (supplement PLACE_INDICATORS) ──
+  // ── Common place words ──
   "city", "town", "village", "neighborhood", "block", "corner",
   "market", "store", "shop", "bar", "restaurant", "hotel",
   "station", "airport", "bridge", "river", "lake", "ocean",
@@ -312,60 +290,44 @@ const EXCLUDED_WORDS = new Set([
   "cemetery", "park", "playground", "field", "island",
 ]);
 
+// Common place indicators
+const PLACE_INDICATORS = [
+  "street",
+  "avenue",
+  "road",
+  "drive",
+  "lane",
+  "way",
+  "boulevard",
+  "court",
+  "place",
+  "park",
+  "city",
+  "town",
+  "county",
+  "state",
+  "building",
+  "tower",
+  "center",
+  "mall",
+  "hospital",
+  "church",
+  "school",
+];
 
-CHANGE 2: TIGHTEN THE CONFIDENCE FILTER
-// ─────────────────────────────────────────────────────────────────────────────
-// In the regexScanForCharacters function, near the bottom where results are
-// built from nameStats, replace the existing filter logic.
-//
-// Find this block (around line ~310):
-//
-//   nameStats.forEach((stats, name) => {
-//     if (stats.count < 2 && !name.includes(" ") && stats.inDialogue === 0) return;
-//
-// Replace it with the block below:
+function regexScanForCharacters(chapterList = []) {
+  const nameStats = new Map(); // name -> { count, inDialogue, chapters, contexts }
 
-/*
-  // Convert to array and calculate confidence
-  const results = [];
-  nameStats.forEach((stats, name) => {
-    // ✅ FIX: Much stricter filtering to avoid false positives
-    
-    // Single-word names MUST appear in dialogue at least once,
-    // OR appear 4+ times total to be considered
-    if (!name.includes(" ")) {
-      if (stats.inDialogue === 0 && stats.count < 4) return;
-      if (stats.count < 2) return;
+  // Get already tagged characters
+  const existingTags = new Set();
+  const tagPattern = /@char:\s*([A-Za-z][A-Za-z\s.'-]*)/gi;
+  chapterList.forEach((ch) => {
+    let match;
+    const content = ch?.content || "";
+    while ((match = tagPattern.exec(content)) !== null) {
+      existingTags.add((match[1] || "").trim().toLowerCase());
     }
-    
-    // Multi-word names (e.g. "Grace Thompson") still need at least 2 mentions
-    if (name.includes(" ") && stats.count < 2) return;
-    
-    // Extra filter: skip very short names (2 chars) unless high dialogue count
-    if (name.length <= 2 && stats.inDialogue < 3) return;
-    
-    // Skip names that are ONLY from Pattern 3 (proper nouns) with no dialogue
-    // These are the most unreliable detections
-    if (stats.inDialogue === 0 && stats.chapters.size < 2 && stats.count < 5) return;
-
-    let confidence = "low";
-    if (stats.inDialogue >= 2 || (stats.count >= 5 && stats.chapters.size >= 2)) {
-      confidence = "high";
-    } else if (stats.inDialogue >= 1 || stats.count >= 3 || name.includes(" ")) {
-      confidence = "medium";
-    }
-
-    results.push({
-      name,
-      count: stats.count,
-      inDialogue: stats.inDialogue,
-      chapters: Array.from(stats.chapters),
-      confidence,
-      verified: false,
-      role: null,
-    });
   });
-*/
 
   chapterList.forEach((chapter, chIdx) => {
     const content = stripHtml(chapter?.content || "");
@@ -480,10 +442,25 @@ CHANGE 2: TIGHTEN THE CONFIDENCE FILTER
     }
   });
 
-  // Convert to array and calculate confidence
+  // ✅ TIGHTENED: Convert to array and calculate confidence
   const results = [];
   nameStats.forEach((stats, name) => {
-    if (stats.count < 2 && !name.includes(" ") && stats.inDialogue === 0) return;
+    // Single-word names MUST appear in dialogue at least once,
+    // OR appear 4+ times total to be considered
+    if (!name.includes(" ")) {
+      if (stats.inDialogue === 0 && stats.count < 4) return;
+      if (stats.count < 2) return;
+    }
+
+    // Multi-word names still need at least 2 mentions
+    if (name.includes(" ") && stats.count < 2) return;
+
+    // Skip very short names (2 chars) unless high dialogue count
+    if (name.length <= 2 && stats.inDialogue < 3) return;
+
+    // Skip names that are ONLY from proper nouns pattern with no dialogue
+    // and only appear in one chapter with few mentions
+    if (stats.inDialogue === 0 && stats.chapters.size < 2 && stats.count < 5) return;
 
     let confidence = "low";
     if (stats.inDialogue >= 2 || (stats.count >= 5 && stats.chapters.size >= 2)) {
