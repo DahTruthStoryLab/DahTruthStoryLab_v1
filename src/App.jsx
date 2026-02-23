@@ -30,6 +30,7 @@ import { UserProvider } from "./lib/userStore.jsx";
 // force-load API bootstrap (adds window.__API_BASE__)
 import "./lib/api";
 import DialogueLab from "./components/storylab/DialogueLab";
+import PoetryLab from "./pages/storylab/PoetryLab";
 
 // =========================
 // DnD Backend Configuration
