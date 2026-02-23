@@ -4,6 +4,7 @@
 const CURRENT_STORY_KEY = "currentStory";
 const PROJECTS_KEY = "userProjects";
 const SELECTED_PROJECT_ID_KEY = "dahtruth_selected_project_id";
+const SELECTED_CHAPTER_KEY_PREFIX = "dt_selected_chapter_";
 
 // ---------- Helpers ----------
 function safeParseJSON(value) {
