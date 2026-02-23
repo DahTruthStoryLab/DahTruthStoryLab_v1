@@ -1,6 +1,9 @@
 // src/components/Writing/SidebarRouter.jsx
 // Routes to the correct sidebar component based on project genre
 // Main integration point for genre-aware sidebars
+//
+// ✅ FIX: Now accepts selectedChapterId prop and passes it (along with
+//    onSelectChapter) to GeneralSidebar so chapters are clickable.
 
 import React from "react";
 import {
@@ -23,6 +26,7 @@ import GeneralSidebar from "./GeneralSidebar";
 export default function SidebarRouter({
   genre,
   chapters = [],
+  selectedChapterId,       // ✅ NEW: active chapter in the editor
   projectId,
   projectTitle = "",
   wordCount = 0,
@@ -49,6 +53,17 @@ export default function SidebarRouter({
     hasAnyChapters,
   };
 
+  // ✅ Props that GeneralSidebar needs for clickable chapter navigation
+  const generalSidebarProps = {
+    ...commonProps,
+    projectId,
+    projectTitle,
+    wordCount,
+    targetWords,
+    selectedChapterId,    // ✅ FIX: pass through so chapters highlight
+    onSelectChapter,      // ✅ FIX: pass through so chapters are clickable
+  };
+
   // ✅ Helper: fiction-style sidebar behavior (your existing CHARACTER case)
   const renderFiction = () => {
     // If you have a CharacterSidebar implementation, render it
@@ -65,15 +80,7 @@ export default function SidebarRouter({
     }
 
     // Safe fallback so StoryLab doesn't disappear for fiction projects
-    return (
-      <GeneralSidebar
-        {...commonProps}
-        projectId={projectId}
-        projectTitle={projectTitle}
-        wordCount={wordCount}
-        targetWords={targetWords}
-      />
-    );
+    return <GeneralSidebar {...generalSidebarProps} />;
   };
 
   switch (category) {
@@ -143,15 +150,7 @@ export default function SidebarRouter({
 
     case GENRE_CATEGORIES.GENERAL:
     default:
-      return (
-        <GeneralSidebar
-          {...commonProps}
-          projectId={projectId}
-          projectTitle={projectTitle}
-          wordCount={wordCount}
-          targetWords={targetWords}
-        />
-      );
+      return <GeneralSidebar {...generalSidebarProps} />;
   }
 }
 
