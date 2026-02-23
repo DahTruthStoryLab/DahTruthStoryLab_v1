@@ -2,6 +2,10 @@
 // General sidebar with minimal universal tools for any project type
 // Used when genre is undeclared or "General / Undeclared"
 // Provides: Outline, Notes, Todo, Logline, Word Targets
+//
+// ✅ FIX: Chapters in the Outline tab are now clickable.
+//    Added onSelectChapter + selectedChapterId props so clicking
+//    a chapter navigates to it in the editor without going to the grid.
 
 import React, { useState, useEffect } from 'react';
 import {
@@ -40,6 +44,8 @@ export default function GeneralSidebar({
   targetWords = 50000,
   onUpdateTarget,
   hasAnyChapters = false,
+  selectedChapterId,     // ✅ NEW: which chapter is active in the editor
+  onSelectChapter,       // ✅ NEW: callback to navigate to a chapter
 }) {
   const [isExpanded, setIsExpanded] = useState(true);
   const [activeTab, setActiveTab] = useState('outline'); // 'outline' | 'notes' | 'todo'
@@ -217,22 +223,44 @@ export default function GeneralSidebar({
                 </div>
               ) : (
                 <div className="space-y-1 max-h-48 overflow-y-auto">
-                  {chapters.map((chapter, idx) => (
-                    <div
-                      key={chapter.id}
-                      className="flex items-center gap-2 p-2 rounded-lg bg-slate-50 hover:bg-slate-100 transition-colors"
-                    >
-                      <span
-                        className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0"
-                        style={{ background: BRAND.navy }}
+                  {chapters.map((chapter, idx) => {
+                    const isActive = chapter.id === selectedChapterId;
+                    return (
+                      <div
+                        key={chapter.id}
+                        /* ✅ FIX: clicking a chapter now navigates to it */
+                        onClick={() => onSelectChapter?.(chapter.id)}
+                        className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer transition-colors ${
+                          isActive
+                            ? 'bg-amber-50 border border-amber-200 shadow-sm'
+                            : 'bg-slate-50 hover:bg-slate-100'
+                        }`}
+                        title={`Click to open "${chapter.title || 'Untitled'}"`}
                       >
-                        {idx + 1}
-                      </span>
-                      <span className="text-xs text-slate-700 truncate flex-1">
-                        {chapter.title || 'Untitled'}
-                      </span>
-                    </div>
-                  ))}
+                        <span
+                          className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white flex-shrink-0"
+                          style={{ background: isActive ? BRAND.gold : BRAND.navy }}
+                        >
+                          {idx + 1}
+                        </span>
+                        <span
+                          className={`text-xs truncate flex-1 ${
+                            isActive ? 'font-semibold' : ''
+                          }`}
+                          style={{ color: isActive ? BRAND.navy : '#334155' }}
+                        >
+                          {chapter.title || 'Untitled'}
+                        </span>
+                        {/* ✅ Show active indicator */}
+                        {isActive && (
+                          <span
+                            className="w-2 h-2 rounded-full flex-shrink-0"
+                            style={{ background: BRAND.gold }}
+                          />
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </>
@@ -460,4 +488,3 @@ export function ProgressCard({ wordCount = 0, targetWords = 50000 }) {
     </div>
   );
 }
-
