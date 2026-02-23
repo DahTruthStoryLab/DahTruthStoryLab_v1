@@ -76,7 +76,9 @@ export function chaptersKeyForProject(projectId) {
 export function coverKeyForProject(projectId) {
   return `dahtruth_cover_${projectId}`;
 }
-
+export function poemsKeyForProject(projectId) {
+  return `dahtruth_poems_${projectId}`;
+}
 // ---------- Project CRUD ----------
 export function createProject({ title, targetWords = 0 } = {}) {
   if (typeof window === "undefined") return null;
