@@ -62,6 +62,10 @@ export function getSelectedProjectId() {
   return window.localStorage.getItem(SELECTED_PROJECT_ID_KEY) || "";
 }
 
+export function selectedChapterKeyForProject(projectId) {
+  const pid = projectId || getSelectedProjectId() || "unknown";
+  return `${SELECTED_CHAPTER_KEY_PREFIX}${pid}`;
+}
 export function setSelectedProjectId(projectId) {
   if (typeof window === "undefined") return;
   if (!projectId) return;
