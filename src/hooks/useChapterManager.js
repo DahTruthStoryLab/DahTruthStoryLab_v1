@@ -1,6 +1,10 @@
 // src/hooks/useChapterManager.js
 // Manages chapter state, CRUD operations, and localStorage persistence
 // NOW: Uses project-specific storage via useProjectStore
+//
+// ✅ FIX: Removed automatic blank "Chapter 1" creation on import/switch.
+//    ensureFirstChapter is now ONLY used when the user explicitly adds a chapter
+//    via the "New Empty Manuscript" flow or the addChapter button.
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import {
@@ -61,23 +65,17 @@ const saveState = (state) => {
   }
 };
 
-// Ensure at least one chapter exists
-const ensureFirstChapter = (chapters) => {
-  if (Array.isArray(chapters) && chapters.length > 0) {
-    return chapters;
-  }
-  return [
-    {
-      id: `chapter-${Date.now()}`,
-      title: "Chapter 1: Untitled",
-      content: "",
-      wordCount: 0,
-      lastEdited: "Just now",
-      status: "draft",
-      order: 0,
-    },
-  ];
-};
+// ✅ KEPT but only used explicitly (e.g. addChapter when list is empty)
+// No longer called automatically on import or project switch.
+const createBlankChapter = () => ({
+  id: `chapter-${Date.now()}`,
+  title: "Chapter 1: Untitled",
+  content: "",
+  wordCount: 0,
+  lastEdited: "Just now",
+  status: "draft",
+  order: 0,
+});
 
 // Count words in HTML
 const countWords = (html = "") => {
@@ -96,8 +94,9 @@ export function useChapterManager() {
     initial?.book || { title: "Untitled Book" }
   );
 
+  // ✅ FIX: Allow empty chapter array — no forced blank chapter on load
   const [chapters, setChapters] = useState(
-    ensureFirstChapter(initial?.chapters || [])
+    initial?.chapters?.length > 0 ? initial.chapters : []
   );
 
   const [selectedId, setSelectedId] = useState(chapters[0]?.id || null);
@@ -118,12 +117,14 @@ export function useChapterManager() {
         const data = getCurrentProjectData();
         if (data) {
           setBook(data.book || { title: "Untitled Book" });
-          setChapters(ensureFirstChapter(data.chapters || []));
+          // ✅ FIX: Don't force a blank chapter on project switch
+          setChapters(data.chapters?.length > 0 ? data.chapters : []);
           setSelectedId(data.chapters?.[0]?.id || null);
         } else {
-          // New project with no data yet
+          // New project with no data yet — start empty
           setBook({ title: "Untitled Book" });
-          setChapters(ensureFirstChapter([]));
+          // ✅ FIX: Empty array, not a forced blank chapter
+          setChapters([]);
           setSelectedId(null);
         }
       }
@@ -205,16 +206,15 @@ export function useChapterManager() {
     setChapters((prev) => {
       const filtered = prev.filter((c) => c.id !== id);
 
-      // Ensure at least one chapter remains
-      const result = ensureFirstChapter(filtered);
-
+      // ✅ FIX: Allow empty chapter list after deletion.
+      // The grid/UI already handles the "no chapters" empty state gracefully.
       // If we just deleted the selected one, move selection
       if (selectedId === id) {
-        const newSelected = result[0]?.id || null;
+        const newSelected = filtered[0]?.id || null;
         setSelectedId(newSelected);
       }
 
-      return result;
+      return filtered;
     });
   }, [selectedId]);
 
@@ -270,7 +270,8 @@ export function useChapterManager() {
     }));
 
     setBook({ title: parsedDoc.title });
-    setChapters(ensureFirstChapter(newChapters));
+    // ✅ FIX: Set chapters directly — no ensureFirstChapter wrapper
+    setChapters(newChapters.length > 0 ? newChapters : []);
     setSelectedId(newChapters[0]?.id || null);
 
     // Save immediately
