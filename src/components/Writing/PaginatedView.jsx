@@ -1,4 +1,11 @@
 // src/components/Writing/PaginatedView.jsx
+//
+// ✅ FIX: Text no longer runs off the page boundary.
+//    - Added explicit width/maxWidth to the content container
+//    - Added word-wrap, overflow-wrap, word-break to both the
+//      content container and the innerHTML div
+//    - Content now stays within the 8.5" × 11" page margins
+
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import { ChevronLeft, ChevronRight, Maximize2, Minimize2 } from "lucide-react";
 
@@ -8,8 +15,8 @@ import { ChevronLeft, ChevronRight, Maximize2, Minimize2 } from "lucide-react";
  *   html: string - HTML content to paginate
  *   title: string - Chapter title
  *   author: string - Author name
- *   pageWidth: number - Width in pixels (default 612 = 8.5" at 72dpi)
- *   pageHeight: number - Height in pixels (default 792 = 11" at 72dpi)
+ *   pageWidth: number - Width in pixels (default 816 = 8.5" at 96dpi)
+ *   pageHeight: number - Height in pixels (default 1056 = 11" at 96dpi)
  */
 export default function PaginatedView({
   html = "",
@@ -46,10 +53,15 @@ export default function PaginatedView({
       position: absolute;
       visibility: hidden;
       width: ${CONTENT_WIDTH}px;
+      max-width: ${CONTENT_WIDTH}px;
       font-family: 'Times New Roman', Georgia, serif;
       font-size: 12pt;
       line-height: 2;
       padding: 0;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+      word-break: break-word;
+      box-sizing: border-box;
     `;
     document.body.appendChild(measureDiv);
 
@@ -90,6 +102,9 @@ export default function PaginatedView({
 
     setPages(pageContent.length > 0 ? pageContent : [""]);
     setTotalPages(pageContent.length || 1);
+
+    // Reset to page 1 when content changes
+    setCurrentPage(1);
   }, [html]);
 
   const goToPage = (page) => {
@@ -217,6 +232,7 @@ export default function PaginatedView({
           transform: `scale(${scale})`,
           transformOrigin: "top center",
           marginBottom: isFullscreen ? 0 : -(PAGE_HEIGHT * (1 - scale)),
+          overflow: "hidden", // ✅ FIX: prevent anything from escaping the page
         }}
       >
         {/* Page content */}
@@ -228,10 +244,15 @@ export default function PaginatedView({
             left: MARGIN,
             right: MARGIN,
             bottom: MARGIN,
+            width: CONTENT_WIDTH,       // ✅ FIX: explicit width
+            maxWidth: CONTENT_WIDTH,    // ✅ FIX: hard max-width constraint
             fontFamily: "'Times New Roman', Georgia, serif",
             fontSize: "12pt",
             lineHeight: 2,
             overflow: "hidden",
+            wordWrap: "break-word",     // ✅ FIX: wrap long words
+            overflowWrap: "break-word", // ✅ FIX: modern word-wrap
+            boxSizing: "border-box",    // ✅ FIX: include padding in width calc
           }}
         >
           {/* Header (chapter title on first page) */}
@@ -242,7 +263,11 @@ export default function PaginatedView({
               </div>
               <h1
                 className="text-2xl font-bold"
-                style={{ fontFamily: "'Times New Roman', Georgia, serif" }}
+                style={{
+                  fontFamily: "'Times New Roman', Georgia, serif",
+                  wordWrap: "break-word",
+                  overflowWrap: "break-word",
+                }}
               >
                 {title}
               </h1>
@@ -255,6 +280,12 @@ export default function PaginatedView({
             style={{
               textAlign: "justify",
               textIndent: "0.5in",
+              maxWidth: "100%",            // ✅ FIX: never exceed container
+              wordWrap: "break-word",      // ✅ FIX: wrap long words
+              overflowWrap: "break-word",  // ✅ FIX: modern equivalent
+              wordBreak: "break-word",     // ✅ FIX: break anywhere if needed
+              overflow: "hidden",          // ✅ FIX: clip any overflow
+              boxSizing: "border-box",
             }}
           />
         </div>
@@ -288,4 +319,3 @@ export default function PaginatedView({
     </div>
   );
 }
-
