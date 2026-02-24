@@ -2654,8 +2654,9 @@ export default function ComposePage() {
                   ? "300px minmax(0, 1fr) 320px"
                   : "300px minmax(0, 1fr)",
                 alignItems: "stretch",
-                height: "calc(100vh - 180px)",
+              height: "calc(100vh - 180px)",
               }}
+            >
               {/* LEFT SIDEBAR */}
               <aside className="min-h-0 flex flex-col gap-4 overflow-y-auto pr-1">
                 {/* ✅ ONLY ONE SidebarRouter (duplicate removed) */}
