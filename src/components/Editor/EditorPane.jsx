@@ -282,8 +282,8 @@ export default function EditorPane({
         }
 
         .dt-quill .ql-editor {
-          /* Make the editor transparent so the page backdrops show */
-          background: transparent !important;
+        /* Ensure text always has white background */
+        background: white !important;
 
           /* Standard manuscript margins */
           padding: ${MARGIN}px;
