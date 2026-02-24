@@ -7,8 +7,12 @@ import {
   getSelectedProjectId,
   chaptersKeyForProject,
 } from "../../lib/projectsSync";
+
 import { storage } from "../../lib/storage";
 import { isPoem } from "../../lib/chapterTypes";
+
+// ✅ bring back the workshop modules UI
+import PoetryModule from "../../components/storylab/PoetryModule";
 
 function uid() {
   return `poem_${Date.now()}_${Math.random().toString(16).slice(2)}`;
@@ -81,9 +85,6 @@ export default function PoetryLab() {
       title: "Untitled Poem",
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      // optional fields you can use later:
-      // section: "Section 1",
-      // order: poems.length + 1,
     };
 
     setChapters((prev) => {
@@ -111,7 +112,8 @@ export default function PoetryLab() {
   );
 
   return (
-    <div className="p-6">
+    <div className="p-6 space-y-6">
+      {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold text-slate-900">Poetry Studio</h1>
@@ -142,7 +144,11 @@ export default function PoetryLab() {
         </div>
       </div>
 
-      <div className="mt-6 grid gap-3">
+      {/* ✅ Workshops / Modules are back */}
+      <PoetryModule />
+
+      {/* Poems list */}
+      <div className="grid gap-3">
         {poems.length === 0 ? (
           <div className="rounded-2xl bg-white border border-slate-200 p-6">
             <div className="font-semibold text-slate-900">No poems yet</div>
@@ -163,7 +169,9 @@ export default function PoetryLab() {
                     {p.title || "Untitled Poem"}
                   </div>
                   <div className="text-xs text-slate-500 mt-1">
-                    {p.updatedAt ? `Updated ${new Date(p.updatedAt).toLocaleString()}` : ""}
+                    {p.updatedAt
+                      ? `Updated ${new Date(p.updatedAt).toLocaleString()}`
+                      : ""}
                   </div>
                 </div>
                 <div className="text-xs font-semibold text-violet-600">
