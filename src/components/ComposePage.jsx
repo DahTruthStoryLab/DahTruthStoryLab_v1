@@ -2258,7 +2258,7 @@ export default function ComposePage() {
   }
 
   return (
-    <div className="min-h-screen bg-[rgb(244,247,250)] text-slate-900 flex flex-col">
+   <div className="h-screen bg-[rgb(244,247,250)] text-slate-900 flex flex-col overflow-hidden">
       {/* Hidden file inputs */}
       <input
         ref={fileInputRef}
@@ -2648,14 +2648,14 @@ export default function ComposePage() {
             </div>
 
             <div
-              className="grid gap-6 flex-1 min-h-0 overflow-hidden items-stretch"
-             style={{
+              className="grid gap-6 flex-1 min-h-0 items-stretch"
+              style={{
                 gridTemplateColumns: showAssistant
                   ? "300px minmax(0, 1fr) 320px"
                   : "300px minmax(0, 1fr)",
                 alignItems: "stretch",
-              height: "calc(100vh - 180px)",
               }}
+            >
             >
               {/* LEFT SIDEBAR */}
               <aside className="min-h-0 flex flex-col gap-4 overflow-y-auto pr-1">
