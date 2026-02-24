@@ -2277,8 +2277,8 @@ export default function ComposePage() {
   }
 
   return (
-    <div className="min-h-screen bg-[rgb(244,247,250)] text-slate-900 flex flex-col">
-      {/* Hidden file inputs */}
+    <div className="h-screen overflow-hidden bg-[rgb(244,247,250)] text-slate-900 flex flex-col">
+     {/* Hidden file inputs */}
       <input
         ref={fileInputRef}
         type="file"
