@@ -2649,13 +2649,13 @@ export default function ComposePage() {
 
             <div
               className="grid gap-6 flex-1 min-h-0 overflow-hidden items-stretch"
-              style={{
+             style={{
                 gridTemplateColumns: showAssistant
                   ? "300px minmax(0, 1fr) 320px"
                   : "300px minmax(0, 1fr)",
                 alignItems: "stretch",
+                height: "calc(100vh - 180px)",
               }}
-            >
               {/* LEFT SIDEBAR */}
               <aside className="min-h-0 flex flex-col gap-4 overflow-y-auto pr-1">
                 {/* ✅ ONLY ONE SidebarRouter (duplicate removed) */}
@@ -2801,8 +2801,8 @@ export default function ComposePage() {
               </aside>
 
               {/* Main Editor/Paginated View */}
-              <main className="min-h-0 min-w-0 overflow-hidden relative z-10">
-                <div className="min-h-0 min-w-0 w-full h-full overflow-x-auto">
+             <main className="min-h-0 min-w-0 overflow-auto relative z-10">
+                <div className="min-h-0 min-w-0 w-full h-full overflow-auto">
                   {editorViewMode === "pages" ? (
                     <PaginatedView
                       html={html}
