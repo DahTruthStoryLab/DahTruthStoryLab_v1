@@ -11,7 +11,7 @@ import {
 import { storage } from "../../lib/storage";
 import { isPoem } from "../../lib/chapterTypes";
 
-// ✅ bring back the workshop modules UI
+// ✅ workshops/modules UI (shown inside the Studio page)
 import PoetryModule from "../../components/storylab/PoetryModule";
 
 function uid() {
@@ -45,7 +45,7 @@ export default function PoetryLab() {
     }
   }, []);
 
-  // ✅ load all chapters from the ONE source of truth
+  // ✅ load chapters (single source of truth)
   useEffect(() => {
     if (!projectId) return;
     try {
@@ -122,13 +122,22 @@ export default function PoetryLab() {
           </p>
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button
             onClick={() => navigate("/story-lab/hub")}
             className="px-3 py-2 rounded-xl text-sm font-medium hover:bg-slate-100 text-slate-700"
           >
             Back to Hub
           </button>
+
+          {/* ✅ Quick link to global AI tools page */}
+          <button
+            onClick={() => navigate("/ai-tools")}
+            className="px-3 py-2 rounded-xl text-sm font-medium hover:bg-slate-100 text-slate-700"
+          >
+            AI Tools
+          </button>
+
           <button
             onClick={onRefresh}
             className="px-3 py-2 rounded-xl text-sm font-medium hover:bg-slate-100 text-slate-700"
@@ -144,8 +153,21 @@ export default function PoetryLab() {
         </div>
       </div>
 
-      {/* ✅ Workshops / Modules are back */}
-      <PoetryModule />
+      {/* ✅ Workshops / Modules */}
+      <div className="rounded-2xl bg-white border border-slate-200 p-4">
+        <div className="flex items-center justify-between gap-3 mb-3">
+          <div>
+            <div className="text-sm font-semibold text-slate-900">
+              Poetry Workshops
+            </div>
+            <div className="text-xs text-slate-500">
+              Craft labs and guided modules for revision, sequencing, voice, and more.
+            </div>
+          </div>
+        </div>
+
+        <PoetryModule />
+      </div>
 
       {/* Poems list */}
       <div className="grid gap-3">
