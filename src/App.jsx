@@ -240,9 +240,15 @@ export default function App() {
                 <Route path="workshop/hfl" element={<HopesFearsLegacy />} />
                 <Route path="prompts" element={<StoryPromptsWorkshop />} />
 
-                {/* Genre module routes */}
+                {/* Genre routes */}
                 <Route path="fiction" element={<FictionModule />} />
-                <Route path="poetry" element={<PoetryModule />} />
+                
+                {/* ✅ Poetry Studio */}
+                <Route path="poetry" element={<PoetryLab />} />
+                
+                {/* ✅ Poetry Workshops / Modules */}
+                <Route path="poetry/workshops" element={<PoetryModule />} />
+                
                 <Route path="nonfiction" element={<NonFictionModule />} />
 
                 {/* Poetry subroutes */}
