@@ -242,12 +242,8 @@ export default function App() {
 
                 {/* Genre routes */}
                 <Route path="fiction" element={<FictionModule />} />
-                
-                {/* ✅ Poetry Studio */}
                 <Route path="poetry" element={<PoetryLab />} />
-                
-                {/* ✅ Poetry Workshops / Modules */}
-                <Route path="poetry/workshops" element={<PoetryModule />} />
+                <Route path="nonfiction" element={<NonFictionModule />} />
                 
                 <Route path="nonfiction" element={<NonFictionModule />} />
 
