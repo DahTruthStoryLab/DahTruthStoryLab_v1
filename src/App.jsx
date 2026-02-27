@@ -246,6 +246,7 @@ export default function App() {
                 <Route path="workshop/clothesline" element={<Clothesline />} />
                 <Route path="workshop/hfl" element={<HopesFearsLegacy />} />
                 <Route path="prompts" element={<StoryPromptsWorkshop />} />
+                <Route path="/storylab/*" element={<Navigate to="/story-lab" replace />} />
 
                 {/* Genre routes */}
                 <Route path="fiction" element={<FictionModule />} />
