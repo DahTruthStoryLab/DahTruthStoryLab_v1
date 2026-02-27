@@ -1,6 +1,6 @@
 // src/pages/storylab/PoetryLab.jsx
 import React, { useEffect, useMemo, useState, useCallback } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Outlet, useLocation } from "react-router-dom";
 
 import {
   ensureSelectedProject,
@@ -20,6 +20,7 @@ function uid() {
 
 export default function PoetryLab() {
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [projectId, setProjectId] = useState("");
   const [projectTitle, setProjectTitle] = useState("Untitled Project");
@@ -111,6 +112,11 @@ export default function PoetryLab() {
     [navigate]
   );
 
+  // If we are on a subroute like /story-lab/poetry/revision, show the workshop panel.
+  const isWorkshopRoute = useMemo(() => {
+    return location.pathname.startsWith("/story-lab/poetry/");
+  }, [location.pathname]);
+
   return (
     <div className="p-6 space-y-6">
       {/* Header */}
@@ -144,6 +150,7 @@ export default function PoetryLab() {
           >
             Refresh
           </button>
+
           <button
             onClick={onCreatePoem}
             className="px-3 py-2 rounded-xl text-sm font-semibold bg-violet-600 text-white hover:bg-violet-700"
@@ -153,7 +160,7 @@ export default function PoetryLab() {
         </div>
       </div>
 
-      {/* ✅ Workshops / Modules */}
+      {/* ✅ Workshops / Modules (these are the links/cards) */}
       <div className="rounded-2xl bg-white border border-slate-200 p-4">
         <div className="flex items-center justify-between gap-3 mb-3">
           <div>
@@ -164,9 +171,25 @@ export default function PoetryLab() {
               Craft labs and guided modules for revision, sequencing, voice, and more.
             </div>
           </div>
+
+          {/* Optional quick “close workshop” button if you’re currently inside one */}
+          {isWorkshopRoute ? (
+            <button
+              onClick={() => navigate("/story-lab/poetry")}
+              className="px-3 py-2 rounded-xl text-xs font-semibold border border-slate-200 hover:bg-slate-50 text-slate-700"
+            >
+              Close Workshop
+            </button>
+          ) : null}
         </div>
 
         <PoetryModule />
+
+        {/* ✅ THIS is what you were missing:
+            where the workshop route component actually renders */}
+        <div className="mt-4">
+          <Outlet />
+        </div>
       </div>
 
       {/* Poems list */}
