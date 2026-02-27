@@ -1,3 +1,4 @@
+src/components/storylab/PoetryStudioLegacy.jsx
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { storage } from "../../lib/storage";
