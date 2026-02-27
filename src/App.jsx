@@ -22,15 +22,18 @@ import {
 } from "dnd-multi-backend";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { TouchBackend } from "react-dnd-touch-backend";
+
 import PlotBuilder from "./components/storylab/PlotBuilder";
+import DialogueLab from "./components/storylab/DialogueLab";
+
+// ✅ Poetry Studio page (this becomes the POETRY layout route)
+import PoetryLab from "./pages/storylab/PoetryLab";
 
 // Global user context
 import { UserProvider } from "./lib/userStore.jsx";
 
 // force-load API bootstrap (adds window.__API_BASE__)
 import "./lib/api";
-import DialogueLab from "./components/storylab/DialogueLab";
-import PoetryLab from "./pages/storylab/PoetryLab";
 
 // =========================
 // DnD Backend Configuration
@@ -63,7 +66,6 @@ const RegistrationPage = lazy(() => import("./components/RegistrationPage"));
 const SignInPage = lazy(() => import("./components/SignInPage"));
 const Dashboard = lazy(() => import("./components/Dashboard"));
 const ProjectPage = lazy(() => import("./components/ProjectPage"));
-const WhoAmI = lazy(() => import("./components/WhoAmI"));
 const ComposePage = lazy(() => import("./components/ComposePage"));
 const Calendar = lazy(() => import("./components/Calendar"));
 
@@ -95,17 +97,22 @@ const WorkshopHub = lazy(() =>
 
 // Genre modules
 const FictionModule = lazy(() => import("./components/storylab/FictionModule"));
-const PoetryModule = lazy(() => import("./components/storylab/PoetryModule"));
 const NonFictionModule = lazy(() =>
   import("./components/storylab/NonFictionModule")
 );
 
-// Poetry subroute modules
-const RevisionLab = lazy(() => import("./components/storylab/poetry/RevisionLab"));
-const SequenceBuilder = lazy(() => import("./components/storylab/poetry/SequenceBuilder"));
+// Poetry workshop subroutes
+const RevisionLab = lazy(() =>
+  import("./components/storylab/poetry/RevisionLab")
+);
+const SequenceBuilder = lazy(() =>
+  import("./components/storylab/poetry/SequenceBuilder")
+);
 const CraftLab = lazy(() => import("./components/storylab/poetry/CraftLab"));
 const RemixLab = lazy(() => import("./components/storylab/poetry/RemixLab"));
-const VoiceIdentityLab = lazy(() => import("./components/storylab/poetry/VoiceIdentityLab"));
+const VoiceIdentityLab = lazy(() =>
+  import("./components/storylab/poetry/VoiceIdentityLab")
+);
 
 // Publishing
 const Publishing = lazy(() => import("./pages/Publishing.tsx"));
@@ -220,7 +227,7 @@ export default function App() {
 
               {/* STORY-LAB (layout + nested routes) */}
               <Route
-                path="/story-lab/*"
+                path="/story-lab"
                 element={
                   <ProtectedRoute>
                     <StoryLabLayout />
@@ -242,17 +249,18 @@ export default function App() {
 
                 {/* Genre routes */}
                 <Route path="fiction" element={<FictionModule />} />
-                <Route path="poetry" element={<PoetryLab />} />
-                <Route path="nonfiction" element={<NonFictionModule />} />
-                
-                <Route path="nonfiction" element={<NonFictionModule />} />
 
-                {/* Poetry subroutes */}
-                <Route path="poetry/revision" element={<RevisionLab />} />
-                <Route path="poetry/sequence" element={<SequenceBuilder />} />
-                <Route path="poetry/craft" element={<CraftLab />} />
-                <Route path="poetry/remix" element={<RemixLab />} />
-                <Route path="poetry/voice" element={<VoiceIdentityLab />} />
+                {/* ✅ Poetry = Poetry Studio + nested workshop routes */}
+                <Route path="poetry" element={<PoetryLab />}>
+                  <Route index element={null} />
+                  <Route path="revision" element={<RevisionLab />} />
+                  <Route path="sequence" element={<SequenceBuilder />} />
+                  <Route path="craft" element={<CraftLab />} />
+                  <Route path="remix" element={<RemixLab />} />
+                  <Route path="voice" element={<VoiceIdentityLab />} />
+                </Route>
+
+                <Route path="nonfiction" element={<NonFictionModule />} />
               </Route>
 
               {/* TOP-LEVEL PUBLISHING PAGES (src/pages/*.tsx) */}
@@ -306,10 +314,7 @@ export default function App() {
               />
 
               {/* Aliases that all point to the top-level publishing routes */}
-              <Route
-                path="/publish"
-                element={<Navigate to="/publishing" replace />}
-              />
+              <Route path="/publish" element={<Navigate to="/publishing" replace />} />
               <Route
                 path="/publishing-suite"
                 element={<Navigate to="/publishing" replace />}
@@ -324,10 +329,7 @@ export default function App() {
                 path="/story-lab/publishing"
                 element={<Navigate to="/publishing" replace />}
               />
-              <Route
-                path="/story-lab/proof"
-                element={<Navigate to="/proof" replace />}
-              />
+              <Route path="/story-lab/proof" element={<Navigate to="/proof" replace />} />
               <Route
                 path="/story-lab/format"
                 element={<Navigate to="/format" replace />}
@@ -346,14 +348,8 @@ export default function App() {
                 path="/storylab/publishing"
                 element={<Navigate to="/publishing" replace />}
               />
-              <Route
-                path="/storylab/format"
-                element={<Navigate to="/format" replace />}
-              />
-              <Route
-                path="/storylab/export"
-                element={<Navigate to="/export" replace />}
-              />
+              <Route path="/storylab/format" element={<Navigate to="/format" replace />} />
+              <Route path="/storylab/export" element={<Navigate to="/export" replace />} />
               <Route
                 path="/storylab/publishing-prep"
                 element={<Navigate to="/publishing-prep" replace />}
@@ -414,7 +410,6 @@ export default function App() {
                   </ProtectedRoute>
                 }
               />
-
               <Route
                 path="/about"
                 element={
