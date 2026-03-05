@@ -47,25 +47,15 @@ const items = [
     tag: "Voice",
     Icon: Mic2,
   },
-  // Optional: keep Leaf reserved for your Image/Scene Bank module once you add route
-  // {
-  //   to: "/story-lab/poetry/scene-bank",
-  //   title: "Image / Scene Bank",
-  //   desc: "Build place-cards, sensory notes, metaphor bank.",
-  //   tag: "Inspire",
-  //   Icon: Leaf,
-  // },
 ];
 
 export default function PoetryModule() {
   const location = useLocation();
-
   return (
     <nav className="flex flex-col gap-2">
       {items.map((it) => {
         const active = location.pathname === it.to;
         const Icon = it.Icon || Leaf;
-
         return (
           <Link
             key={it.to}
@@ -86,22 +76,18 @@ export default function PoetryModule() {
             >
               <Icon className="h-4 w-4 text-slate-700" />
             </div>
-
             <div className="min-w-0 flex-1">
               <div className="flex items-center justify-between gap-2">
                 <div className="text-sm font-semibold text-slate-900 truncate">
                   {it.title}
                 </div>
-
                 <span className="shrink-0 text-[11px] font-semibold px-2 py-1 rounded-full border border-slate-200 text-slate-700 bg-white">
                   {it.tag}
                 </span>
               </div>
-
               <div className="text-xs text-slate-600 mt-1 line-clamp-2">
                 {it.desc}
               </div>
-
               <div className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-[color:var(--brand-navy,#1e3a5f)]">
                 Open <ChevronRight className="h-3.5 w-3.5" />
               </div>
@@ -112,3 +98,4 @@ export default function PoetryModule() {
     </nav>
   );
 }
+
