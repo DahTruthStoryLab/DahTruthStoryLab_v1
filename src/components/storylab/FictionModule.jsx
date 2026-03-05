@@ -17,9 +17,6 @@ import {
   Feather,
 } from "lucide-react";
 
-/* ---------------------------
-   Brand Colors
----------------------------- */
 const BRAND = {
   navy: "#1e3a5f",
   navyLight: "#2d4a6f",
@@ -32,9 +29,6 @@ const BRAND = {
   cream: "#fefdfb",
 };
 
-/* ---------------------------
-   Fiction Modules
----------------------------- */
 const CHARACTER_MODULES = [
   {
     id: "hfl",
@@ -72,8 +66,7 @@ const STRUCTURE_MODULES = [
   {
     id: "plot-builder",
     title: "Plot Builder",
-    description:
-      "Build story architecture — stakes, obstacles, turning points.",
+    description: "Build story architecture — stakes, obstacles, turning points.",
     icon: Layers,
     path: "/story-lab/plot-builder",
     color: "#dc2626",
@@ -93,8 +86,7 @@ const STRUCTURE_MODULES = [
   {
     id: "clothesline",
     title: "Clothesline",
-    description:
-      "Visualize your story — scenes, chapters, and character threads.",
+    description: "Visualize your story — scenes, chapters, and character threads.",
     icon: LayoutGrid,
     path: "/story-lab/workshop/clothesline",
     color: "#6366f1",
@@ -117,8 +109,7 @@ const WRITING_MODULES = [
   {
     id: "prompts",
     title: "Writing Prompts",
-    description:
-      "AI-powered prompts to spark creativity and overcome blocks.",
+    description: "AI-powered prompts to spark creativity and overcome blocks.",
     icon: Sparkles,
     path: "/story-lab/prompts",
     color: BRAND.mauve,
@@ -136,21 +127,14 @@ const WRITING_MODULES = [
   },
 ];
 
-/* ---------------------------
-   Module Card
----------------------------- */
 function ModuleCard({ mod }) {
   const Icon = mod.icon;
   return (
     <Link
       to={mod.path}
       className="group relative rounded-2xl overflow-hidden transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl"
-      style={{
-        background: "white",
-        border: `1px solid ${mod.color}20`,
-      }}
+      style={{ background: "white", border: `1px solid ${mod.color}20` }}
     >
-      {/* NEW badge */}
       {mod.isNew && (
         <div
           className="absolute top-3 right-3 text-xs font-bold px-2 py-1 rounded-full text-white z-10"
@@ -159,20 +143,14 @@ function ModuleCard({ mod }) {
           NEW
         </div>
       )}
-
-      {/* Header */}
       <div className="px-6 py-5" style={{ background: mod.gradient }}>
         <div className="flex items-center gap-4">
           <div className="w-14 h-14 rounded-2xl bg-white/20 flex items-center justify-center shadow-lg">
             <Icon size={28} className="text-white" />
           </div>
-          <div>
-            <h3 className="font-bold text-lg text-white">{mod.title}</h3>
-          </div>
+          <h3 className="font-bold text-lg text-white">{mod.title}</h3>
         </div>
       </div>
-
-      {/* Body */}
       <div className="px-6 py-5">
         <p className="text-sm text-slate-600 mb-4 leading-relaxed">
           {mod.description}
@@ -189,81 +167,39 @@ function ModuleCard({ mod }) {
   );
 }
 
-/* ---------------------------
-   Section Header
----------------------------- */
 function SectionHeader({ title, count, color = BRAND.navy }) {
   return (
-    <h2
-      className="text-xl font-bold mb-5 flex items-center gap-3"
-      style={{ color }}
-    >
+    <h2 className="text-xl font-bold mb-5 flex items-center gap-3" style={{ color }}>
       <span>{title}</span>
-      <span className="text-sm font-normal text-slate-400">
-        ({count} tools)
-      </span>
+      <span className="text-sm font-normal text-slate-400">({count} tools)</span>
     </h2>
   );
 }
 
-/* ---------------------------
-   Main Component
----------------------------- */
 export default function FictionModule() {
   return (
-    <div
-      className="min-h-screen"
-      style={{
-        background: `linear-gradient(180deg, ${BRAND.cream} 0%, #f1f5f9 100%)`,
-      }}
-    >
+    <div className="min-h-screen" style={{ background: `linear-gradient(180deg, ${BRAND.cream} 0%, #f1f5f9 100%)` }}>
       <div className="max-w-5xl mx-auto px-4 py-8">
         {/* Hero Banner */}
         <div
           className="rounded-3xl p-10 mb-10 text-center relative overflow-hidden"
-          style={{
-            background: `linear-gradient(135deg, ${BRAND.ink} 0%, ${BRAND.navy} 30%, ${BRAND.navyLight} 60%, ${BRAND.mauve} 100%)`,
-          }}
+          style={{ background: `linear-gradient(135deg, ${BRAND.ink} 0%, ${BRAND.navy} 30%, ${BRAND.navyLight} 60%, ${BRAND.mauve} 100%)` }}
         >
-          {/* Decorative elements */}
-          <div
-            className="absolute top-0 left-0 w-64 h-64 rounded-full opacity-10"
-            style={{ background: BRAND.gold, filter: "blur(80px)" }}
-          />
-          <div
-            className="absolute bottom-0 right-0 w-80 h-80 rounded-full opacity-10"
-            style={{ background: BRAND.rose, filter: "blur(100px)" }}
-          />
-
+          <div className="absolute top-0 left-0 w-64 h-64 rounded-full opacity-10" style={{ background: BRAND.gold, filter: "blur(80px)" }} />
+          <div className="absolute bottom-0 right-0 w-80 h-80 rounded-full opacity-10" style={{ background: BRAND.rose, filter: "blur(100px)" }} />
           <div className="relative z-10">
-            {/* Icon cluster */}
             <div className="flex items-center justify-center gap-3 mb-6">
-              <div
-                className="w-11 h-11 rounded-2xl flex items-center justify-center"
-                style={{ background: `${BRAND.rose}50` }}
-              >
+              <div className="w-11 h-11 rounded-2xl flex items-center justify-center" style={{ background: `${BRAND.rose}50` }}>
                 <Heart size={22} className="text-white" />
               </div>
-              <div
-                className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg"
-                style={{
-                  background: `linear-gradient(135deg, ${BRAND.gold}, ${BRAND.goldDark})`,
-                }}
-              >
+              <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg" style={{ background: `linear-gradient(135deg, ${BRAND.gold}, ${BRAND.goldDark})` }}>
                 <Layers size={28} className="text-white" />
               </div>
-              <div
-                className="w-11 h-11 rounded-2xl flex items-center justify-center"
-                style={{ background: `${BRAND.navy}70` }}
-              >
+              <div className="w-11 h-11 rounded-2xl flex items-center justify-center" style={{ background: `${BRAND.navy}70` }}>
                 <LayoutGrid size={22} className="text-white" />
               </div>
             </div>
-
-            <h1
-              className="text-4xl font-bold text-white mb-3"
-              style={{ fontFamily: "'EB Garamond', Georgia, serif" }}
-            >
+            <h1 className="text-4xl font-bold text-white mb-3" style={{ fontFamily: "'EB Garamond', Georgia, serif" }}>
               Fiction Workshop
             </h1>
             <p className="text-white/80 max-w-xl mx-auto text-lg">
@@ -272,37 +208,27 @@ export default function FictionModule() {
           </div>
         </div>
 
-        {/* Character Development */}
         <div className="mb-10">
           <SectionHeader title="Character Development" count={CHARACTER_MODULES.length} />
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {CHARACTER_MODULES.map((mod) => (
-              <ModuleCard key={mod.id} mod={mod} />
-            ))}
+            {CHARACTER_MODULES.map((mod) => <ModuleCard key={mod.id} mod={mod} />)}
           </div>
         </div>
 
-        {/* Structure & Plot */}
         <div className="mb-10">
           <SectionHeader title="Structure & Plot" count={STRUCTURE_MODULES.length} />
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {STRUCTURE_MODULES.map((mod) => (
-              <ModuleCard key={mod.id} mod={mod} />
-            ))}
+            {STRUCTURE_MODULES.map((mod) => <ModuleCard key={mod.id} mod={mod} />)}
           </div>
         </div>
 
-        {/* Writing & Community */}
         <div className="mb-10">
           <SectionHeader title="Writing & Community" count={WRITING_MODULES.length} />
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {WRITING_MODULES.map((mod) => (
-              <ModuleCard key={mod.id} mod={mod} />
-            ))}
+            {WRITING_MODULES.map((mod) => <ModuleCard key={mod.id} mod={mod} />)}
           </div>
         </div>
 
-        {/* Suggested Journey */}
         <div className="p-6 rounded-2xl border border-slate-200 bg-white/80 mb-8">
           <h3 className="font-semibold text-slate-700 mb-4 flex items-center gap-2">
             <Feather size={18} style={{ color: BRAND.gold }} />
@@ -319,10 +245,7 @@ export default function FictionModule() {
             ].map((step, i) => (
               <div key={step.n} className="flex items-center gap-2">
                 {i > 0 && <span className="text-slate-300">→</span>}
-                <span
-                  className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold"
-                  style={{ background: step.color }}
-                >
+                <span className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold" style={{ background: step.color }}>
                   {step.n}
                 </span>
                 <span className="text-slate-600">{step.label}</span>
@@ -331,13 +254,8 @@ export default function FictionModule() {
           </div>
         </div>
 
-        {/* Back to modules link */}
         <div className="text-center">
-          <Link
-            to="/story-lab"
-            className="inline-flex items-center gap-2 text-sm font-medium hover:gap-3 transition-all"
-            style={{ color: BRAND.navy }}
-          >
+          <Link to="/story-lab" className="inline-flex items-center gap-2 text-sm font-medium hover:gap-3 transition-all" style={{ color: BRAND.navy }}>
             ← Back to StoryLab Modules
           </Link>
         </div>
