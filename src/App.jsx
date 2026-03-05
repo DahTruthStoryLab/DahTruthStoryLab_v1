@@ -22,18 +22,20 @@ import {
 } from "dnd-multi-backend";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { TouchBackend } from "react-dnd-touch-backend";
-
 import PlotBuilder from "./components/storylab/PlotBuilder";
-import DialogueLab from "./components/storylab/DialogueLab";
-
-// ✅ Poetry Studio page (this becomes the POETRY layout route)
-import PoetryLab from "./pages/storylab/PoetryLab";
 
 // Global user context
 import { UserProvider } from "./lib/userStore.jsx";
 
 // force-load API bootstrap (adds window.__API_BASE__)
 import "./lib/api";
+
+import DialogueLab from "./components/storylab/DialogueLab";
+
+// ✅ NEW: StoryLab nested route trees
+import FictionRoutes from "./routes/storylab/FictionRoutes.jsx";
+import NonfictionRoutes from "./routes/storylab/NonfictionRoutes.jsx";
+import PoetryRoutes from "./routes/storylab/PoetryRoutes.jsx";
 
 // =========================
 // DnD Backend Configuration
@@ -66,10 +68,11 @@ const RegistrationPage = lazy(() => import("./components/RegistrationPage"));
 const SignInPage = lazy(() => import("./components/SignInPage"));
 const Dashboard = lazy(() => import("./components/Dashboard"));
 const ProjectPage = lazy(() => import("./components/ProjectPage"));
+const WhoAmI = lazy(() => import("./components/WhoAmI"));
 const ComposePage = lazy(() => import("./components/ComposePage"));
 const Calendar = lazy(() => import("./components/Calendar"));
 
-// StoryLab (existing nested system)
+// StoryLab (layout + shared pages)
 const StoryLabLanding = lazy(() => import("./lib/storylab/StoryLabLanding"));
 const StoryPromptsWorkshop = lazy(() =>
   import("./lib/storylab/StoryPromptsWorkshop")
@@ -93,25 +96,6 @@ const NarrativeArc = lazy(() =>
 );
 const WorkshopHub = lazy(() =>
   import("./components/storylab/WorkshopHub.jsx")
-);
-
-// Genre modules
-const FictionModule = lazy(() => import("./components/storylab/FictionModule"));
-const NonFictionModule = lazy(() =>
-  import("./components/storylab/NonFictionModule")
-);
-
-// Poetry workshop subroutes
-const RevisionLab = lazy(() =>
-  import("./components/storylab/poetry/RevisionLab")
-);
-const SequenceBuilder = lazy(() =>
-  import("./components/storylab/poetry/SequenceBuilder")
-);
-const CraftLab = lazy(() => import("./components/storylab/poetry/CraftLab"));
-const RemixLab = lazy(() => import("./components/storylab/poetry/RemixLab"));
-const VoiceIdentityLab = lazy(() =>
-  import("./components/storylab/poetry/VoiceIdentityLab")
 );
 
 // Publishing
@@ -147,12 +131,6 @@ function ScrollToTop() {
     if (!hash) window.scrollTo({ top: 0, behavior: "smooth" });
   }, [pathname, search, hash]);
   return null;
-}
-
-function LegacyStorylabRedirect() {
-  const location = useLocation();
-  const rest = location.pathname.replace("/storylab", "");
-  return <Navigate to={`/story-lab${rest}${location.search || ""}${location.hash || ""}`} replace />;
 }
 
 // =========================
@@ -221,64 +199,48 @@ export default function App() {
                 }
               />
 
-             {/* Legacy /storylab → StoryLab landing (NOT fiction hub) */}
-<Route
-  path="/storylab"
-  element={
-    <ProtectedRoute>
-      <Navigate to="/story-lab" replace />
-    </ProtectedRoute>
-  }
-/>
+              {/* ✅ Legacy /storylab → go to StoryLab LANDING (not Fiction, not Hub) */}
+              <Route
+                path="/storylab"
+                element={
+                  <ProtectedRoute>
+                    <Navigate to="/story-lab" replace />
+                  </ProtectedRoute>
+                }
+              />
 
-{/* Legacy deep links: /storylab/... → /story-lab/... */}
-<Route
-  path="/storylab/*"
-  element={
-    <ProtectedRoute>
-      <LegacyStorylabRedirect />
-    </ProtectedRoute>
-  }
-/>
-
-{/* STORY-LAB (layout + nested routes) */}
-<Route
-  path="/story-lab/*"
-  element={
-    <ProtectedRoute>
-      <StoryLabLayout />
-    </ProtectedRoute>
-  }
->
-  {/* whatever nested routes you already have */}
-</Route>
+              {/* ✅ STORY-LAB (layout + nested routes) */}
+              <Route
+                path="/story-lab/*"
+                element={
+                  <ProtectedRoute>
+                    <StoryLabLayout />
+                  </ProtectedRoute>
+                }
+              >
+                {/* Default = landing page */}
                 <Route index element={<StoryLabLanding />} />
-                <Route path="narrative-arc" element={<NarrativeArc />} />
+
+                {/* Hub */}
                 <Route path="hub" element={<WorkshopHub />} />
                 <Route path="workshop" element={<WorkshopHub />} />
+
+                {/* Shared StoryLab pages */}
+                <Route path="narrative-arc" element={<NarrativeArc />} />
                 <Route path="community" element={<WorkshopCohort />} />
                 <Route path="plot-builder" element={<PlotBuilder />} />
                 <Route path="dialogue-lab" element={<DialogueLab />} />
+
                 <Route path="workshop/priorities" element={<PriorityCards />} />
                 <Route path="workshop/roadmap" element={<CharacterRoadmap />} />
                 <Route path="workshop/clothesline" element={<Clothesline />} />
                 <Route path="workshop/hfl" element={<HopesFearsLegacy />} />
                 <Route path="prompts" element={<StoryPromptsWorkshop />} />
-              
-                {/* Genre routes */}
-                <Route path="fiction" element={<FictionModule />} />
 
-                {/* ✅ Poetry = Poetry Studio + nested workshop routes */}
-                <Route path="poetry" element={<PoetryLab />}>
-                  <Route index element={null} />
-                  <Route path="revision" element={<RevisionLab />} />
-                  <Route path="sequence" element={<SequenceBuilder />} />
-                  <Route path="craft" element={<CraftLab />} />
-                  <Route path="remix" element={<RemixLab />} />
-                  <Route path="voice" element={<VoiceIdentityLab />} />
-                </Route>
-
-                <Route path="nonfiction" element={<NonFictionModule />} />
+                {/* ✅ Genre route trees */}
+                <Route path="fiction/*" element={<FictionRoutes />} />
+                <Route path="nonfiction/*" element={<NonfictionRoutes />} />
+                <Route path="poetry/*" element={<PoetryRoutes />} />
               </Route>
 
               {/* TOP-LEVEL PUBLISHING PAGES (src/pages/*.tsx) */}
@@ -337,10 +299,7 @@ export default function App() {
                 path="/publishing-suite"
                 element={<Navigate to="/publishing" replace />}
               />
-              <Route
-                path="/publishing/cover"
-                element={<Navigate to="/cover" replace />}
-              />
+              <Route path="/publishing/cover" element={<Navigate to="/cover" replace />} />
 
               {/* Legacy Story-Lab URLs → new top-level pages */}
               <Route
@@ -348,14 +307,8 @@ export default function App() {
                 element={<Navigate to="/publishing" replace />}
               />
               <Route path="/story-lab/proof" element={<Navigate to="/proof" replace />} />
-              <Route
-                path="/story-lab/format"
-                element={<Navigate to="/format" replace />}
-              />
-              <Route
-                path="/story-lab/export"
-                element={<Navigate to="/export" replace />}
-              />
+              <Route path="/story-lab/format" element={<Navigate to="/format" replace />} />
+              <Route path="/story-lab/export" element={<Navigate to="/export" replace />} />
               <Route
                 path="/story-lab/publishing-prep"
                 element={<Navigate to="/publishing-prep" replace />}
