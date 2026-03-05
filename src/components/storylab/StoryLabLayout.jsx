@@ -1,7 +1,13 @@
 // src/components/storylab/StoryLabLayout.jsx
 import React, { useEffect, useState } from "react";
 import { Outlet, Link, useLocation } from "react-router-dom";
-import { BookOpen, PenLine, LayoutGrid } from "lucide-react";
+import {
+  BookOpen,
+  PenLine,
+  LayoutGrid,
+  Home,
+  Compass,
+} from "lucide-react";
 
 /* ============================================
    BRAND COLORS (keep aligned with WorkshopHub)
@@ -78,8 +84,13 @@ export default function StoryLabLayout() {
     };
   }, []);
 
-  const inHub =
-    pathname === "/story-lab/hub" || pathname === "/story-lab/workshop";
+  const isStoryLabLanding = pathname === "/story-lab";
+  const isHub =
+    pathname === "/story-lab/hub" ||
+    pathname === "/story-lab/workshop" ||
+    pathname.startsWith("/story-lab/workshop/");
+
+  const isStoryLabSection = pathname.startsWith("/story-lab");
 
   return (
     <div className="min-h-screen bg-[color:var(--brand-bg,#f8fafc)]">
@@ -88,15 +99,17 @@ export default function StoryLabLayout() {
         <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
           {/* Left: Brand + context */}
           <div className="flex items-center gap-3 min-w-0">
-            <div
-              className="w-10 h-10 rounded-2xl flex items-center justify-center text-white shadow-sm"
+            <Link
+              to="/story-lab"
+              className="w-10 h-10 rounded-2xl flex items-center justify-center text-white shadow-sm hover:opacity-95 transition"
               style={{
                 background: `linear-gradient(135deg, ${BRAND.navy} 0%, ${BRAND.navyLight} 55%, ${BRAND.rose} 100%)`,
               }}
               title="StoryLab"
+              aria-label="StoryLab"
             >
               <LayoutGrid size={18} />
-            </div>
+            </Link>
 
             <div className="min-w-0">
               <div className="flex items-center gap-2 min-w-0">
@@ -112,6 +125,12 @@ export default function StoryLabLayout() {
                 >
                   {track}
                 </span>
+
+                {isStoryLabSection && (
+                  <span className="hidden sm:inline text-xs text-slate-400 truncate">
+                    {isStoryLabLanding ? "Landing" : isHub ? "Hub" : ""}
+                  </span>
+                )}
               </div>
 
               <div className="text-xs text-slate-500 truncate">
@@ -121,17 +140,33 @@ export default function StoryLabLayout() {
           </div>
 
           {/* Right: quick nav */}
-          <div className="flex items-center gap-2 shrink-0">
-            {!inHub && (
-              <Link
-                to="/story-lab/hub"
-                className="hidden sm:inline-flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-colors hover:bg-slate-100 text-slate-700"
-              >
-                <BookOpen size={16} />
-                Hub
-              </Link>
-            )}
+          <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
+            {/* ✅ StoryLab should ALWAYS go to the StoryLab landing page */}
+            <Link
+              to="/story-lab"
+              className="hidden sm:inline-flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-colors"
+              style={{
+                background: "rgba(30,58,95,0.08)",
+                border: "1px solid rgba(30,58,95,0.16)",
+                color: BRAND.navy,
+              }}
+              title="StoryLab Landing"
+            >
+              <Home size={16} />
+              StoryLab
+            </Link>
 
+            {/* ✅ Hub stays Hub (workshop hub) */}
+            <Link
+              to="/story-lab/hub"
+              className="hidden sm:inline-flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-colors hover:bg-slate-100 text-slate-700"
+              title="Workshop Hub"
+            >
+              <Compass size={16} />
+              Hub
+            </Link>
+
+            {/* Writer */}
             <Link
               to="/compose"
               className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium"
@@ -140,11 +175,13 @@ export default function StoryLabLayout() {
                 border: "1px solid rgba(30,58,95,0.18)",
                 color: BRAND.navy,
               }}
+              title="Writer"
             >
               <PenLine size={16} />
               Writer
             </Link>
 
+            {/* Dashboard (global) */}
             <Link
               to="/dashboard"
               className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium"
@@ -153,6 +190,7 @@ export default function StoryLabLayout() {
                 border: "1px solid rgba(212,175,55,0.20)",
                 color: BRAND.goldDark,
               }}
+              title="Dashboard"
             >
               <BookOpen size={16} />
               Dashboard
