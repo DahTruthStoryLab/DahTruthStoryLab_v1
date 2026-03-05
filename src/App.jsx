@@ -114,6 +114,88 @@ const AiTools = lazy(() => import("./pages/AiTools"));
 const AboutPage = lazy(() => import("./components/AboutPage.jsx"));
 
 // =========================
+// Error Boundary — shows the real crash instead of blank screen
+// =========================
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { error };
+  }
+
+  componentDidCatch(error, info) {
+    console.error("🔴 App crashed:", error, info);
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <div
+          style={{
+            padding: 32,
+            fontFamily: "monospace",
+            background: "#fff0f0",
+            minHeight: "100vh",
+          }}
+        >
+          <h2 style={{ color: "#c00", marginBottom: 16 }}>
+            ⚠️ App crashed — real error below:
+          </h2>
+          <pre
+            style={{
+              background: "#fff",
+              border: "1px solid #f99",
+              borderRadius: 8,
+              padding: 16,
+              color: "#900",
+              whiteSpace: "pre-wrap",
+              wordBreak: "break-word",
+            }}
+          >
+            {this.state.error?.message}
+          </pre>
+          <pre
+            style={{
+              marginTop: 16,
+              background: "#fff",
+              border: "1px solid #ddd",
+              borderRadius: 8,
+              padding: 16,
+              color: "#333",
+              fontSize: 12,
+              whiteSpace: "pre-wrap",
+              wordBreak: "break-word",
+            }}
+          >
+            {this.state.error?.stack}
+          </pre>
+          <button
+            onClick={() => this.setState({ error: null })}
+            style={{
+              marginTop: 16,
+              padding: "8px 20px",
+              background: "#1e3a5f",
+              color: "#fff",
+              border: "none",
+              borderRadius: 8,
+              cursor: "pointer",
+              fontSize: 14,
+            }}
+          >
+            Try Again
+          </button>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
+// =========================
 // Global UI helpers
 // =========================
 const Fallback = () => (
@@ -155,247 +237,252 @@ export default function App() {
   }, []);
 
   return (
-    <UserProvider>
-      <DndProvider backend={MultiBackend} options={BACKENDS}>
-        <Router>
-          <ScrollToTop />
-          <Suspense fallback={<Fallback />}>
-            <Routes>
-              {/* Public */}
-              <Route path="/" element={<LandingPage />} />
-              <Route path="/signin" element={<SignInPage />} />
-              <Route path="/auth/register" element={<RegistrationPage />} />
+    <ErrorBoundary>
+      <UserProvider>
+        <DndProvider backend={MultiBackend} options={BACKENDS}>
+          <Router>
+            <ScrollToTop />
+            <Suspense fallback={<Fallback />}>
+              <ErrorBoundary>
+                <Routes>
+                  {/* Public */}
+                  <Route path="/" element={<LandingPage />} />
+                  <Route path="/signin" element={<SignInPage />} />
+                  <Route path="/auth/register" element={<RegistrationPage />} />
 
-              {/* Protected Dashboard */}
-              <Route
-                path="/dashboard"
-                element={
-                  <ProtectedRoute>
-                    <Dashboard />
-                  </ProtectedRoute>
-                }
-              />
+                  {/* Protected Dashboard */}
+                  <Route
+                    path="/dashboard"
+                    element={
+                      <ProtectedRoute>
+                        <Dashboard />
+                      </ProtectedRoute>
+                    }
+                  />
 
-              {/* Writer routes */}
-              {["/writer", "/write", "/writing", "/compose"].map((p) => (
-                <Route
-                  key={p}
-                  path={p}
-                  element={
-                    <ProtectedRoute>
-                      <ComposePage />
-                    </ProtectedRoute>
-                  }
-                />
-              ))}
+                  {/* Writer routes */}
+                  {["/writer", "/write", "/writing", "/compose"].map((p) => (
+                    <Route
+                      key={p}
+                      path={p}
+                      element={
+                        <ProtectedRoute>
+                          <ComposePage />
+                        </ProtectedRoute>
+                      }
+                    />
+                  ))}
 
-              {/* TOC → use ComposePage (chapter grid as TOC) */}
-              <Route
-                path="/toc"
-                element={
-                  <ProtectedRoute>
-                    <ComposePage />
-                  </ProtectedRoute>
-                }
-              />
+                  {/* TOC → use ComposePage (chapter grid as TOC) */}
+                  <Route
+                    path="/toc"
+                    element={
+                      <ProtectedRoute>
+                        <ComposePage />
+                      </ProtectedRoute>
+                    }
+                  />
 
-              {/* ✅ Legacy /storylab → go to StoryLab LANDING (not Fiction, not Hub) */}
-              <Route
-                path="/storylab"
-                element={
-                  <ProtectedRoute>
-                    <Navigate to="/story-lab" replace />
-                  </ProtectedRoute>
-                }
-              />
+                  {/* ✅ Legacy /storylab → go to StoryLab LANDING (not Fiction, not Hub) */}
+                  <Route
+                    path="/storylab"
+                    element={
+                      <ProtectedRoute>
+                        <Navigate to="/story-lab" replace />
+                      </ProtectedRoute>
+                    }
+                  />
 
-              {/* ✅ STORY-LAB (layout + nested routes) */}
-              <Route
-                path="/story-lab/*"
-                element={
-                  <ProtectedRoute>
-                    <StoryLabLayout />
-                  </ProtectedRoute>
-                }
-              >
-                {/* Default = landing page */}
-                <Route index element={<StoryLabLanding />} />
+                  {/* ✅ STORY-LAB (layout + nested routes) */}
+                  <Route
+                    path="/story-lab/*"
+                    element={
+                      <ProtectedRoute>
+                        <StoryLabLayout />
+                      </ProtectedRoute>
+                    }
+                  >
+                    {/* Default = landing page */}
+                    <Route index element={<StoryLabLanding />} />
 
-                {/* Hub */}
-                <Route path="hub" element={<WorkshopHub />} />
-                <Route path="workshop" element={<WorkshopHub />} />
+                    {/* Hub */}
+                    <Route path="hub" element={<WorkshopHub />} />
+                    <Route path="workshop" element={<WorkshopHub />} />
 
-                {/* Shared StoryLab pages */}
-                <Route path="narrative-arc" element={<NarrativeArc />} />
-                <Route path="community" element={<WorkshopCohort />} />
-                <Route path="plot-builder" element={<PlotBuilder />} />
-                <Route path="dialogue-lab" element={<DialogueLab />} />
+                    {/* Shared StoryLab pages */}
+                    <Route path="narrative-arc" element={<NarrativeArc />} />
+                    <Route path="community" element={<WorkshopCohort />} />
+                    <Route path="plot-builder" element={<PlotBuilder />} />
+                    <Route path="dialogue-lab" element={<DialogueLab />} />
 
-                <Route path="workshop/priorities" element={<PriorityCards />} />
-                <Route path="workshop/roadmap" element={<CharacterRoadmap />} />
-                <Route path="workshop/clothesline" element={<Clothesline />} />
-                <Route path="workshop/hfl" element={<HopesFearsLegacy />} />
-                <Route path="prompts" element={<StoryPromptsWorkshop />} />
+                    <Route path="workshop/priorities" element={<PriorityCards />} />
+                    <Route path="workshop/roadmap" element={<CharacterRoadmap />} />
+                    <Route path="workshop/clothesline" element={<Clothesline />} />
+                    <Route path="workshop/hfl" element={<HopesFearsLegacy />} />
+                    <Route path="prompts" element={<StoryPromptsWorkshop />} />
 
-                {/* ✅ Genre route trees */}
-                <Route path="fiction/*" element={<FictionRoutes />} />
-                <Route path="nonfiction/*" element={<NonfictionRoutes />} />
-                <Route path="poetry/*" element={<PoetryRoutes />} />
-              </Route>
+                    {/* ✅ Genre route trees */}
+                    <Route path="fiction/*" element={<FictionRoutes />} />
+                    <Route path="nonfiction/*" element={<NonfictionRoutes />} />
+                    <Route path="poetry/*" element={<PoetryRoutes />} />
+                  </Route>
 
-              {/* TOP-LEVEL PUBLISHING PAGES (src/pages/*.tsx) */}
-              <Route
-                path="/publishing"
-                element={
-                  <ProtectedRoute>
-                    <Publishing />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/proof"
-                element={
-                  <ProtectedRoute>
-                    <Proof />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/format"
-                element={
-                  <ProtectedRoute>
-                    <Format />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/export"
-                element={
-                  <ProtectedRoute>
-                    <Export />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/publishing-prep"
-                element={
-                  <ProtectedRoute>
-                    <PublishingPrep />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/cover"
-                element={
-                  <ProtectedRoute>
-                    <Cover />
-                  </ProtectedRoute>
-                }
-              />
+                  {/* TOP-LEVEL PUBLISHING PAGES (src/pages/*.tsx) */}
+                  <Route
+                    path="/publishing"
+                    element={
+                      <ProtectedRoute>
+                        <Publishing />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/proof"
+                    element={
+                      <ProtectedRoute>
+                        <Proof />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/format"
+                    element={
+                      <ProtectedRoute>
+                        <Format />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/export"
+                    element={
+                      <ProtectedRoute>
+                        <Export />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/publishing-prep"
+                    element={
+                      <ProtectedRoute>
+                        <PublishingPrep />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/cover"
+                    element={
+                      <ProtectedRoute>
+                        <Cover />
+                      </ProtectedRoute>
+                    }
+                  />
 
-              {/* Aliases that all point to the top-level publishing routes */}
-              <Route path="/publish" element={<Navigate to="/publishing" replace />} />
-              <Route
-                path="/publishing-suite"
-                element={<Navigate to="/publishing" replace />}
-              />
-              <Route path="/publishing/cover" element={<Navigate to="/cover" replace />} />
+                  {/* Aliases that all point to the top-level publishing routes */}
+                  <Route path="/publish" element={<Navigate to="/publishing" replace />} />
+                  <Route
+                    path="/publishing-suite"
+                    element={<Navigate to="/publishing" replace />}
+                  />
+                  <Route path="/publishing/cover" element={<Navigate to="/cover" replace />} />
 
-              {/* Legacy Story-Lab URLs → new top-level pages */}
-              <Route
-                path="/story-lab/publishing"
-                element={<Navigate to="/publishing" replace />}
-              />
-              <Route path="/story-lab/proof" element={<Navigate to="/proof" replace />} />
-              <Route path="/story-lab/format" element={<Navigate to="/format" replace />} />
-              <Route path="/story-lab/export" element={<Navigate to="/export" replace />} />
-              <Route
-                path="/story-lab/publishing-prep"
-                element={<Navigate to="/publishing-prep" replace />}
-              />
+                  {/* Legacy Story-Lab URLs → new top-level pages */}
+                  <Route
+                    path="/story-lab/publishing"
+                    element={<Navigate to="/publishing" replace />}
+                  />
+                  <Route path="/story-lab/proof" element={<Navigate to="/proof" replace />} />
+                  <Route path="/story-lab/format" element={<Navigate to="/format" replace />} />
+                  <Route path="/story-lab/export" element={<Navigate to="/export" replace />} />
+                  <Route
+                    path="/story-lab/publishing-prep"
+                    element={<Navigate to="/publishing-prep" replace />}
+                  />
 
-              {/* Legacy without hyphen */}
-              <Route
-                path="/storylab/publishing"
-                element={<Navigate to="/publishing" replace />}
-              />
-              <Route path="/storylab/format" element={<Navigate to="/format" replace />} />
-              <Route path="/storylab/export" element={<Navigate to="/export" replace />} />
-              <Route
-                path="/storylab/publishing-prep"
-                element={<Navigate to="/publishing-prep" replace />}
-              />
+                  {/* Legacy without hyphen */}
+                  <Route
+                    path="/storylab/publishing"
+                    element={<Navigate to="/publishing" replace />}
+                  />
+                  <Route path="/storylab/format" element={<Navigate to="/format" replace />} />
+                  <Route path="/storylab/export" element={<Navigate to="/export" replace />} />
+                  <Route
+                    path="/storylab/publishing-prep"
+                    element={<Navigate to="/publishing-prep" replace />}
+                  />
 
-              {/* Project */}
-              <Route
-                path="/project"
-                element={
-                  <ProtectedRoute>
-                    <ProjectPage />
-                  </ProtectedRoute>
-                }
-              />
+                  {/* Project */}
+                  <Route
+                    path="/project"
+                    element={
+                      <ProtectedRoute>
+                        <ProjectPage />
+                      </ProtectedRoute>
+                    }
+                  />
 
-              {/* Calendar */}
-              <Route
-                path="/calendar"
-                element={
-                  <ProtectedRoute>
-                    <Calendar />
-                  </ProtectedRoute>
-                }
-              />
+                  {/* Calendar */}
+                  <Route
+                    path="/calendar"
+                    element={
+                      <ProtectedRoute>
+                        <Calendar />
+                      </ProtectedRoute>
+                    }
+                  />
 
-              {/* Profile */}
-              <Route
-                path="/profile"
-                element={
-                  <ProtectedRoute>
-                    <Profile />
-                  </ProtectedRoute>
-                }
-              />
+                  {/* Profile */}
+                  <Route
+                    path="/profile"
+                    element={
+                      <ProtectedRoute>
+                        <Profile />
+                      </ProtectedRoute>
+                    }
+                  />
 
-              {/* Plans / Billing / Tools */}
-              <Route
-                path="/plans"
-                element={
-                  <ProtectedRoute>
-                    <PlansPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/billing/success"
-                element={
-                  <ProtectedRoute>
-                    <BillingSuccess />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/ai-tools"
-                element={
-                  <ProtectedRoute>
-                    <AiTools />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/about"
-                element={
-                  <ProtectedRoute>
-                    <AboutPage />
-                  </ProtectedRoute>
-                }
-              />
+                  {/* Plans / Billing / Tools */}
+                  <Route
+                    path="/plans"
+                    element={
+                      <ProtectedRoute>
+                        <PlansPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/billing/success"
+                    element={
+                      <ProtectedRoute>
+                        <BillingSuccess />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/ai-tools"
+                    element={
+                      <ProtectedRoute>
+                        <AiTools />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/about"
+                    element={
+                      <ProtectedRoute>
+                        <AboutPage />
+                      </ProtectedRoute>
+                    }
+                  />
 
-              {/* Fallback */}
-              <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
-          </Suspense>
-        </Router>
-      </DndProvider>
-    </UserProvider>
+                  {/* Fallback */}
+                  <Route path="*" element={<Navigate to="/" replace />} />
+                </Routes>
+              </ErrorBoundary>
+            </Suspense>
+          </Router>
+        </DndProvider>
+      </UserProvider>
+    </ErrorBoundary>
   );
 }
+
