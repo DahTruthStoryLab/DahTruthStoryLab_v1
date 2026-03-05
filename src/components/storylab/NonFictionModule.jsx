@@ -1,5 +1,7 @@
+// src/components/storylab/NonFictionModule.jsx
 import React from "react";
 import { Link } from "react-router-dom";
+
 export default function NonFictionModule() {
   return (
     <div className="rounded-2xl bg-white border border-slate-200 p-6">
@@ -20,20 +22,27 @@ export default function NonFictionModule() {
       <div className="mt-6 grid gap-3">
         <div className="rounded-xl border border-slate-200 p-4">
           <div className="font-semibold text-slate-800">Essay Builder</div>
-          <div className="text-sm text-slate-600">Thesis, claims, evidence, counterargument, conclusion.</div>
+          <div className="text-sm text-slate-600">
+            Thesis, claims, evidence, counterargument, conclusion.
+          </div>
           <div className="text-xs text-slate-500 mt-2">Coming next</div>
         </div>
         <div className="rounded-xl border border-slate-200 p-4">
           <div className="font-semibold text-slate-800">Memoir Scene Map</div>
-          <div className="text-sm text-slate-600">Scene goal, emotional turn, sensory detail, reflection.</div>
+          <div className="text-sm text-slate-600">
+            Scene goal, emotional turn, sensory detail, reflection.
+          </div>
           <div className="text-xs text-slate-500 mt-2">Coming next</div>
         </div>
         <div className="rounded-xl border border-slate-200 p-4">
           <div className="font-semibold text-slate-800">Research Notes</div>
-          <div className="text-sm text-slate-600">Source, quote, paraphrase, your commentary.</div>
+          <div className="text-sm text-slate-600">
+            Source, quote, paraphrase, your commentary.
+          </div>
           <div className="text-xs text-slate-500 mt-2">Coming next</div>
         </div>
       </div>
     </div>
   );
 }
+
