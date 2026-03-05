@@ -7,6 +7,7 @@ import {
   PenTool,
   Shuffle,
   Mic2,
+  Leaf,
   ChevronRight,
 } from "lucide-react";
 
@@ -14,7 +15,7 @@ const items = [
   {
     to: "/story-lab/poetry/revision",
     title: "Revision Lab",
-    desc: "Tighten diction, sharpen images, and strengthen the turn.",
+    desc: "Tighten diction, sharpen images, strengthen the turn.",
     tag: "Revise",
     Icon: Wand2,
   },
@@ -41,11 +42,19 @@ const items = [
   },
   {
     to: "/story-lab/poetry/voice",
-    title: "Voice & Identity Lab",
-    desc: "Tone, stance, persona, faith lens, and signature language.",
+    title: "Voice & Identity",
+    desc: "Tone, stance, persona, signature language.",
     tag: "Voice",
     Icon: Mic2,
   },
+  // Optional: keep Leaf reserved for your Image/Scene Bank module once you add route
+  // {
+  //   to: "/story-lab/poetry/scene-bank",
+  //   title: "Image / Scene Bank",
+  //   desc: "Build place-cards, sensory notes, metaphor bank.",
+  //   tag: "Inspire",
+  //   Icon: Leaf,
+  // },
 ];
 
 export default function PoetryModule() {
@@ -55,7 +64,7 @@ export default function PoetryModule() {
     <nav className="flex flex-col gap-2">
       {items.map((it) => {
         const active = location.pathname === it.to;
-        const Icon = it.Icon;
+        const Icon = it.Icon || Leaf;
 
         return (
           <Link
@@ -72,9 +81,7 @@ export default function PoetryModule() {
             <div
               className={[
                 "mt-0.5 shrink-0 rounded-xl border p-2",
-                active
-                  ? "border-slate-300 bg-white"
-                  : "border-slate-200 bg-white",
+                active ? "border-slate-300 bg-white" : "border-slate-200 bg-white",
               ].join(" ")}
             >
               <Icon className="h-4 w-4 text-slate-700" />
