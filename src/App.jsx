@@ -149,6 +149,12 @@ function ScrollToTop() {
   return null;
 }
 
+function LegacyStorylabRedirect() {
+  const location = useLocation();
+  const rest = location.pathname.replace("/storylab", "");
+  return <Navigate to={`/story-lab${rest}${location.search || ""}${location.hash || ""}`} replace />;
+}
+
 // =========================
 // Auth gate (toggleable)
 // =========================
@@ -215,25 +221,37 @@ export default function App() {
                 }
               />
 
-              {/* /storylab → redirect to story-lab */}
-              <Route
-                path="/storylab"
-                element={
-                  <ProtectedRoute>
-                    <Navigate to="/story-lab/hub" replace />
-                  </ProtectedRoute>
-                }
-              />
+             {/* Legacy /storylab → StoryLab landing (NOT fiction hub) */}
+<Route
+  path="/storylab"
+  element={
+    <ProtectedRoute>
+      <Navigate to="/story-lab" replace />
+    </ProtectedRoute>
+  }
+/>
 
-              {/* STORY-LAB (layout + nested routes) */}
-              <Route
-                path="/story-lab"
-                element={
-                  <ProtectedRoute>
-                    <StoryLabLayout />
-                  </ProtectedRoute>
-                }
-              >
+{/* Legacy deep links: /storylab/... → /story-lab/... */}
+<Route
+  path="/storylab/*"
+  element={
+    <ProtectedRoute>
+      <LegacyStorylabRedirect />
+    </ProtectedRoute>
+  }
+/>
+
+{/* STORY-LAB (layout + nested routes) */}
+<Route
+  path="/story-lab/*"
+  element={
+    <ProtectedRoute>
+      <StoryLabLayout />
+    </ProtectedRoute>
+  }
+>
+  {/* whatever nested routes you already have */}
+</Route>
                 <Route index element={<StoryLabLanding />} />
                 <Route path="narrative-arc" element={<NarrativeArc />} />
                 <Route path="hub" element={<WorkshopHub />} />
