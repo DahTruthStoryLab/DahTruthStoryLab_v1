@@ -29,12 +29,6 @@ import { UserProvider } from "./lib/userStore.jsx";
 // force-load API bootstrap (adds window.__API_BASE__)
 import "./lib/api";
 
-
-// ✅ NEW: StoryLab nested route trees
-import FictionRoutes from "./routes/storylab/FictionRoutes.jsx";
-import NonfictionRoutes from "./routes/storylab/NonfictionRoutes.jsx";
-import PoetryRoutes from "./routes/storylab/PoetryRoutes.jsx";
-
 // =========================
 // DnD Backend Configuration
 // =========================
@@ -69,6 +63,9 @@ const ProjectPage = lazy(() => import("./components/ProjectPage"));
 const WhoAmI = lazy(() => import("./components/WhoAmI"));
 const ComposePage = lazy(() => import("./components/ComposePage"));
 const Calendar = lazy(() => import("./components/Calendar"));
+const FictionRoutes = lazy(() => import("./routes/storylab/FictionRoutes.jsx"));
+const NonfictionRoutes = lazy(() => import("./routes/storylab/NonfictionRoutes.jsx"));
+const PoetryRoutes = lazy(() => import("./routes/storylab/PoetryRoutes.jsx"));
 
 // StoryLab (layout + shared pages)
 const StoryLabLanding = lazy(() => import("./lib/storylab/StoryLabLanding"));
