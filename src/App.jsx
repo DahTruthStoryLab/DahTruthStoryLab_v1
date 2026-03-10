@@ -22,7 +22,6 @@ import {
 } from "dnd-multi-backend";
 import { HTML5Backend } from "react-dnd-html5-backend";
 import { TouchBackend } from "react-dnd-touch-backend";
-import PlotBuilder from "./components/storylab/PlotBuilder";
 
 // Global user context
 import { UserProvider } from "./lib/userStore.jsx";
@@ -30,7 +29,6 @@ import { UserProvider } from "./lib/userStore.jsx";
 // force-load API bootstrap (adds window.__API_BASE__)
 import "./lib/api";
 
-import DialogueLab from "./components/storylab/DialogueLab";
 
 // ✅ NEW: StoryLab nested route trees
 import FictionRoutes from "./routes/storylab/FictionRoutes.jsx";
@@ -112,6 +110,8 @@ const PlansPage = lazy(() => import("./components/PlansPage"));
 const BillingSuccess = lazy(() => import("./pages/BillingSuccess.jsx"));
 const AiTools = lazy(() => import("./pages/AiTools"));
 const AboutPage = lazy(() => import("./components/AboutPage.jsx"));
+const PlotBuilder = lazy(() => import("./components/storylab/PlotBuilder"));
+const DialogueLab = lazy(() => import("./components/storylab/DialogueLab"));
 
 // =========================
 // Error Boundary — shows the real crash instead of blank screen
