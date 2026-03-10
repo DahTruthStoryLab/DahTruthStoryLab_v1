@@ -34,7 +34,17 @@ export default defineConfig({
     })
   ],
   build: {
-    minify: false
+    minify: false,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            return 'vendor';
+          }
+        },
+        chunkFileNames: 'assets/chunk-[hash].js',
+      }
+    }
   },
   server: {
     host: true,
