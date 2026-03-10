@@ -1,4 +1,3 @@
-// vite.config.js
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
@@ -6,15 +5,11 @@ import { VitePWA } from "vite-plugin-pwa";
 export default defineConfig({
   plugins: [
     react(),
-
     VitePWA({
       registerType: "autoUpdate",
-
-      // IMPORTANT: this gives you app-like behavior without offline caching yet
       workbox: {
         navigateFallback: null
       },
-
       manifest: {
         name: "DahTruth StoryLab",
         short_name: "StoryLab",
@@ -38,7 +33,9 @@ export default defineConfig({
       }
     })
   ],
-
+  build: {
+    minify: false
+  },
   server: {
     host: true,
     port: 5174,
