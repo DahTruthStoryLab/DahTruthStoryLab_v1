@@ -1,447 +1,251 @@
 // src/pages/storylab/PoetryLab.jsx
-import React, { useEffect, useMemo, useState, useCallback } from "react";
-import { Link, useNavigate, useLocation } from "react-router-dom";
+import React from "react";
+import { Link } from "react-router-dom";
 import {
-  Plus,
+  Wand2,
+  Layers,
+  PenTool,
+  Shuffle,
+  Mic2,
+  Feather,
   Sparkles,
   BookOpen,
-  RefreshCw,
-  Trash2,
-  Feather,
+  ArrowRight,
+  Download,
 } from "lucide-react";
 
-import {
-  ensureSelectedProject,
-  getSelectedProjectId,
-  chaptersKeyForProject,
-} from "../../lib/projectsSync";
-import { storage } from "../../lib/storage";
-import { isPoem } from "../../lib/chapterTypes";
+const BRAND = {
+  navy: "#1e3a5f",
+  navyLight: "#2d4a6f",
+  gold: "#d4af37",
+  goldDark: "#b8960c",
+  mauve: "#b8a9c9",
+  rose: "#e8b4b8",
+  roseDark: "#c97b7b",
+  ink: "#0F172A",
+  cream: "#fefdfb",
+};
 
-// ✅ Vertical workshops menu (Revision/Sequence/Craft/Remix/Voice)
-import PoetryModule from "../../components/storylab/PoetryModule";
+const CRAFT_MODULES = [
+  {
+    id: "craft",
+    title: "Craft Lab",
+    description: "Line breaks, sound, metaphor, syntax, tension, clarity — the building blocks of the poem.",
+    icon: PenTool,
+    path: "/story-lab/poetry/craft",
+    color: "#7c3aed",
+    gradient: "linear-gradient(135deg, #6d28d9 0%, #7c3aed 100%)",
+  },
+  {
+    id: "revision",
+    title: "Revision Lab",
+    description: "Tighten diction, sharpen images, strengthen the turn. Make every word earn its place.",
+    icon: Wand2,
+    path: "/story-lab/poetry/revision",
+    color: BRAND.roseDark,
+    gradient: `linear-gradient(135deg, ${BRAND.roseDark} 0%, ${BRAND.rose} 100%)`,
+  },
+  {
+    id: "voice",
+    title: "Voice & Identity",
+    description: "Tone, stance, persona, signature language. Develop a voice that is unmistakably yours.",
+    icon: Mic2,
+    path: "/story-lab/poetry/voice",
+    color: "#0891b2",
+    gradient: "linear-gradient(135deg, #0e7490 0%, #0891b2 50%, #06b6d4 100%)",
+  },
+];
 
-// ---------- helpers ----------
-function uid() {
-  return `poem_${Date.now()}_${Math.random().toString(16).slice(2)}`;
+const STRUCTURE_MODULES = [
+  {
+    id: "sequence",
+    title: "Sequence Builder",
+    description: "Arrange poems into an arc: openings, hinges, closers. Shape the collection as a whole.",
+    icon: Layers,
+    path: "/story-lab/poetry/sequence",
+    color: BRAND.gold,
+    gradient: `linear-gradient(135deg, ${BRAND.goldDark} 0%, ${BRAND.gold} 100%)`,
+  },
+  {
+    id: "remix",
+    title: "Remix Lab",
+    description: "Rewrite with constraints: erase, mirror, compress, expand. Break the poem open.",
+    icon: Shuffle,
+    path: "/story-lab/poetry/remix",
+    color: "#059669",
+    gradient: "linear-gradient(135deg, #047857 0%, #059669 100%)",
+    isNew: true,
+  },
+];
+
+const AI_MODULES = [
+  {
+    id: "prompts",
+    title: "AI Poetry Prompts",
+    description: "AI-powered prompts to spark creativity, break blocks, and push into new territory.",
+    icon: Sparkles,
+    path: "/story-lab/prompts",
+    color: BRAND.mauve,
+    gradient: `linear-gradient(135deg, ${BRAND.mauve} 0%, #a78bfa 100%)`,
+  },
+  {
+    id: "publish",
+    title: "Export & Publish",
+    description: "Format your collection for print or digital — KDP-ready, beautifully typeset.",
+    icon: Download,
+    path: "/publishing",
+    color: BRAND.navy,
+    gradient: `linear-gradient(135deg, ${BRAND.ink} 0%, ${BRAND.navy} 100%)`,
+  },
+];
+
+function ModuleCard({ mod }) {
+  const Icon = mod.icon;
+  return (
+    <Link
+      to={mod.path}
+      className="group relative rounded-2xl overflow-hidden transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl"
+      style={{ background: "white", border: `1px solid ${mod.color}20` }}
+    >
+      {mod.isNew && (
+        <div
+          className="absolute top-3 right-3 text-xs font-bold px-2 py-1 rounded-full text-white z-10"
+          style={{ background: BRAND.gold }}
+        >
+          NEW
+        </div>
+      )}
+      <div className="px-6 py-5" style={{ background: mod.gradient }}>
+        <div className="flex items-center gap-4">
+          <div className="w-14 h-14 rounded-2xl bg-white/20 flex items-center justify-center shadow-lg">
+            <Icon size={28} className="text-white" />
+          </div>
+          <h3 className="font-bold text-lg text-white">{mod.title}</h3>
+        </div>
+      </div>
+      <div className="px-6 py-5">
+        <p className="text-sm text-slate-600 mb-4 leading-relaxed">
+          {mod.description}
+        </p>
+        <span
+          className="text-sm font-semibold flex items-center gap-1 transition-all group-hover:gap-2"
+          style={{ color: mod.color }}
+        >
+          Open Module
+          <ArrowRight size={16} />
+        </span>
+      </div>
+    </Link>
+  );
 }
 
-function countWords(text = "") {
-  const cleaned = String(text || "").trim();
-  if (!cleaned) return 0;
-  return cleaned.split(/\s+/).filter(Boolean).length;
-}
-
-function countLines(text = "") {
-  if (!text) return 0;
-  return String(text).split("\n").length;
-}
-
-// Per-project active poem key
-const ACTIVE_POEM_KEY_PREFIX = "dt_active_poem_";
-function activePoemKey(projectId) {
-  const pid = projectId || "unknown";
-  return `${ACTIVE_POEM_KEY_PREFIX}${pid}`;
+function SectionHeader({ title, count, color = BRAND.navy }) {
+  return (
+    <h2 className="text-xl font-bold mb-5 flex items-center gap-3" style={{ color }}>
+      <span>{title}</span>
+      <span className="text-sm font-normal text-slate-400">({count} tools)</span>
+    </h2>
+  );
 }
 
 export default function PoetryLab() {
-  const navigate = useNavigate();
-  const location = useLocation();
-
-  const [projectId, setProjectId] = useState("");
-  const [projectTitle, setProjectTitle] = useState("Untitled Project");
-
-  const [chapters, setChapters] = useState([]);
-  const poems = useMemo(() => chapters.filter(isPoem), [chapters]);
-
-  const [activeId, setActiveId] = useState("");
-
-  const activePoem = useMemo(() => {
-    return poems.find((p) => String(p.id) === String(activeId)) || null;
-  }, [poems, activeId]);
-
-  // ---------- init selected project ----------
-  useEffect(() => {
-    try {
-      const p = ensureSelectedProject();
-      const id = p?.id || getSelectedProjectId() || "";
-      if (!id) return;
-
-      setProjectId(id);
-      setProjectTitle(p?.title || p?.name || "Untitled Project");
-
-      // keep global current project (optional)
-      try {
-        storage.setItem("dahtruth-current-project-id", id);
-        window.dispatchEvent(new Event("project:change"));
-      } catch {}
-    } catch (e) {
-      console.error("PoetryLab: failed to init selected project:", e);
-    }
-  }, []);
-
-  // ---------- load chapters ----------
-  const loadChapters = useCallback(() => {
-    if (!projectId) return;
-
-    try {
-      const key = chaptersKeyForProject(projectId);
-      const raw = storage.getItem(key);
-      const list = raw ? JSON.parse(raw) : [];
-      const safe = Array.isArray(list) ? list : [];
-      setChapters(safe);
-
-      // restore active poem for this project
-      const savedActive = storage.getItem(activePoemKey(projectId)) || "";
-      const poemIds = safe.filter(isPoem).map((x) => String(x.id));
-      const nextActive =
-        savedActive && poemIds.includes(String(savedActive))
-          ? savedActive
-          : poemIds[0] || "";
-
-      setActiveId(nextActive);
-    } catch (e) {
-      console.error("PoetryLab: failed to load chapters:", e);
-      setChapters([]);
-      setActiveId("");
-    }
-  }, [projectId]);
-
-  useEffect(() => {
-    loadChapters();
-  }, [loadChapters]);
-
-  // ---------- persist chapters ----------
-  const persistChapters = useCallback(
-    (next) => {
-      if (!projectId) return;
-      try {
-        storage.setItem(chaptersKeyForProject(projectId), JSON.stringify(next));
-      } catch (e) {
-        console.warn("PoetryLab: persist failed:", e);
-      }
-    },
-    [projectId]
-  );
-
-  // ---------- set active poem ----------
-  const setActivePoemId = useCallback(
-    (id) => {
-      const val = id ? String(id) : "";
-      setActiveId(val);
-      try {
-        storage.setItem(activePoemKey(projectId), val);
-      } catch {}
-    },
-    [projectId]
-  );
-
-  // ---------- create poem (STAYS HERE) ----------
-  const onCreatePoem = useCallback(() => {
-    if (!projectId) return;
-
-    const newPoem = {
-      id: uid(),
-      type: "poem",
-      title: "Untitled Poem",
-      content: "",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-
-    setChapters((prev) => {
-      const next = Array.isArray(prev) ? [newPoem, ...prev] : [newPoem];
-      persistChapters(next);
-      return next;
-    });
-
-    setActivePoemId(newPoem.id);
-  }, [projectId, persistChapters, setActivePoemId]);
-
-  // ---------- update active poem ----------
-  const updateActivePoem = useCallback(
-    (patch) => {
-      if (!activeId) return;
-
-      setChapters((prev) => {
-        const next = (Array.isArray(prev) ? prev : []).map((c) => {
-          if (String(c.id) !== String(activeId)) return c;
-          return { ...c, ...patch, updatedAt: new Date().toISOString() };
-        });
-
-        persistChapters(next);
-        return next;
-      });
-    },
-    [activeId, persistChapters]
-  );
-
-  // ---------- delete poem ----------
-  const deletePoem = useCallback(
-    (id) => {
-      if (!id) return;
-
-      setChapters((prev) => {
-        const list = Array.isArray(prev) ? prev : [];
-        const next = list.filter((c) => String(c.id) !== String(id));
-        persistChapters(next);
-
-        if (String(activeId) === String(id)) {
-          const nextPoem = next.filter(isPoem)[0];
-          setActivePoemId(nextPoem?.id || "");
-        }
-
-        return next;
-      });
-    },
-    [activeId, persistChapters, setActivePoemId]
-  );
-
-  // ---------- stats ----------
-  const stats = useMemo(() => {
-    const text = activePoem?.content || "";
-    return { words: countWords(text), lines: countLines(text) };
-  }, [activePoem]);
-
-  // ---------- AI actions (for now route to AI Tools; later wire to runGrammar/runStyle/etc.) ----------
-  const goAiTools = useCallback(() => navigate("/ai-tools"), [navigate]);
-
-  const openInWriter = useCallback(() => {
-    if (!activeId) return;
-    try {
-      storage.setItem("dahtruth-selected-chapter-id", String(activeId));
-    } catch {}
-    navigate("/writer");
-  }, [activeId, navigate]);
-
   return (
-    <div className="min-h-[calc(100vh-64px)] bg-[color:var(--brand-bg,#f6f7fb)]">
-      {/* Top bar */}
-      <div className="sticky top-0 z-10 border-b border-slate-200 bg-white">
-        <div className="px-6 py-4 flex items-center justify-between gap-4">
-          <div className="min-w-0">
-            <h1 className="text-lg font-semibold text-slate-900 truncate">
-              Poetry
+    <div className="min-h-screen" style={{ background: `linear-gradient(180deg, ${BRAND.cream} 0%, #f1f5f9 100%)` }}>
+      <div className="max-w-5xl mx-auto px-4 py-8">
+
+        {/* Hero Banner */}
+        <div
+          className="rounded-3xl p-10 mb-10 text-center relative overflow-hidden"
+          style={{ background: `linear-gradient(135deg, ${BRAND.ink} 0%, #3b1f5e 40%, #7c3aed 80%, ${BRAND.mauve} 100%)` }}
+        >
+          <div className="absolute top-0 left-0 w-64 h-64 rounded-full opacity-10" style={{ background: BRAND.gold, filter: "blur(80px)" }} />
+          <div className="absolute bottom-0 right-0 w-80 h-80 rounded-full opacity-10" style={{ background: BRAND.rose, filter: "blur(100px)" }} />
+          <div className="relative z-10">
+            <div className="flex items-center justify-center gap-3 mb-6">
+              <div className="w-11 h-11 rounded-2xl flex items-center justify-center" style={{ background: `${BRAND.mauve}50` }}>
+                <Mic2 size={22} className="text-white" />
+              </div>
+              <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg" style={{ background: `linear-gradient(135deg, ${BRAND.gold}, ${BRAND.goldDark})` }}>
+                <Feather size={28} className="text-white" />
+              </div>
+              <div className="w-11 h-11 rounded-2xl flex items-center justify-center" style={{ background: "rgba(124,58,237,0.5)" }}>
+                <BookOpen size={22} className="text-white" />
+              </div>
+            </div>
+            <h1
+              className="text-4xl font-bold text-white mb-3"
+              style={{ fontFamily: "'EB Garamond', Georgia, serif" }}
+            >
+              Poetry Workshop
             </h1>
-            <p className="text-xs text-slate-600 truncate">
-              {projectTitle} • Write poems and use Poetry Studio tools while you draft
+            <p className="text-white/80 max-w-xl mx-auto text-lg">
+              Craft poems that breathe. Build collections that endure.
             </p>
           </div>
+        </div>
 
-          <div className="flex items-center gap-2 flex-wrap justify-end">
-            <button
-              onClick={() => navigate("/story-lab/hub")}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-sm border border-slate-200 hover:bg-slate-50 text-slate-700"
-              type="button"
-            >
-              <BookOpen className="h-4 w-4" />
-              Hub
-            </button>
-
-            <button
-              onClick={loadChapters}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-sm border border-slate-200 hover:bg-slate-50 text-slate-700"
-              type="button"
-            >
-              <RefreshCw className="h-4 w-4" />
-              Refresh
-            </button>
-
-            <button
-              onClick={onCreatePoem}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-semibold text-white bg-[color:var(--brand-navy,#1e3a5f)] hover:opacity-95"
-              type="button"
-            >
-              <Plus className="h-4 w-4" />
-              New Poem
-            </button>
-
-            <button
-              onClick={goAiTools}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-sm border border-slate-200 hover:bg-slate-50 text-slate-700"
-              type="button"
-            >
-              <Sparkles className="h-4 w-4" />
-              AI
-            </button>
-
-            <button
-              onClick={openInWriter}
-              disabled={!activeId}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-sm border border-slate-200 hover:bg-slate-50 text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed"
-              type="button"
-              title={!activeId ? "Select a poem first" : "Open in the full Writer editor"}
-            >
-              <Feather className="h-4 w-4" />
-              Writer
-            </button>
+        {/* Craft & Revision */}
+        <div className="mb-10">
+          <SectionHeader title="Craft & Revision" count={CRAFT_MODULES.length} />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+            {CRAFT_MODULES.map((mod) => <ModuleCard key={mod.id} mod={mod} />)}
           </div>
         </div>
-      </div>
 
-      {/* Workspace */}
-      <div className="px-6 py-6">
-        <div className="grid grid-cols-12 gap-6">
-          {/* LEFT SIDEBAR: Library + Studio */}
-          <aside className="col-span-12 lg:col-span-3">
-            <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
-              {/* Poem Library */}
-              <div className="px-4 py-3 border-b border-slate-200">
-                <div className="flex items-center justify-between">
-                  <div className="text-sm font-semibold text-slate-900">
-                    Poem Library
-                  </div>
-                  <div className="text-xs text-slate-500">{poems.length}</div>
-                </div>
-                <div className="text-[11px] text-slate-500 mt-1">
-                  Your poems are saved inside Chapters (type: poem)
-                </div>
+        {/* Structure & Experimentation */}
+        <div className="mb-10">
+          <SectionHeader title="Structure & Experimentation" count={STRUCTURE_MODULES.length} />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            {STRUCTURE_MODULES.map((mod) => <ModuleCard key={mod.id} mod={mod} />)}
+          </div>
+        </div>
+
+        {/* AI & Publishing */}
+        <div className="mb-10">
+          <SectionHeader title="AI Tools & Publishing" count={AI_MODULES.length} />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            {AI_MODULES.map((mod) => <ModuleCard key={mod.id} mod={mod} />)}
+          </div>
+        </div>
+
+        {/* Suggested Journey */}
+        <div className="p-6 rounded-2xl border border-slate-200 bg-white/80 mb-8">
+          <h3 className="font-semibold text-slate-700 mb-4 flex items-center gap-2">
+            <Feather size={18} style={{ color: BRAND.gold }} />
+            Suggested Journey
+          </h3>
+          <div className="flex items-center justify-between flex-wrap gap-4 text-sm">
+            {[
+              { n: 1, label: "Craft Lab", color: "#7c3aed" },
+              { n: 2, label: "Voice & Identity", color: "#0891b2" },
+              { n: 3, label: "Revision Lab", color: BRAND.roseDark },
+              { n: 4, label: "Remix Lab", color: "#059669" },
+              { n: 5, label: "Sequence Builder", color: BRAND.gold },
+              { n: 6, label: "Export & Publish", color: BRAND.navy },
+            ].map((step, i) => (
+              <div key={step.n} className="flex items-center gap-2">
+                {i > 0 && <span className="text-slate-300">→</span>}
+                <span className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold" style={{ background: step.color }}>
+                  {step.n}
+                </span>
+                <span className="text-slate-600">{step.label}</span>
               </div>
+            ))}
+          </div>
+        </div>
 
-              <div className="p-3 space-y-2 max-h-[44vh] overflow-auto">
-                {poems.length === 0 ? (
-                  <div className="text-sm text-slate-600 p-2">
-                    No poems yet. Click <b>New Poem</b>.
-                  </div>
-                ) : (
-                  poems.map((p) => {
-                    const isActiveRow = String(p.id) === String(activeId);
-                    return (
-                      <div
-                        key={p.id}
-                        className={[
-                          "rounded-xl border p-3 transition cursor-pointer",
-                          isActiveRow
-                            ? "border-slate-300 bg-slate-50"
-                            : "border-slate-200 hover:bg-slate-50",
-                        ].join(" ")}
-                        onClick={() => setActivePoemId(p.id)}
-                        role="button"
-                        tabIndex={0}
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0">
-                            <div className="text-sm font-semibold text-slate-900 truncate">
-                              {p.title || "Untitled Poem"}
-                            </div>
-                            <div className="text-[11px] text-slate-500 mt-1">
-                              {countWords(p.content || "")} words
-                            </div>
-                          </div>
-
-                          <button
-                            type="button"
-                            className="shrink-0 inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded-lg border border-slate-200 hover:bg-white text-slate-600"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              deletePoem(p.id);
-                            }}
-                            title="Delete poem"
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-
-              {/* Poetry Studio */}
-              <div className="border-t border-slate-200">
-                <div className="px-4 py-3 border-b border-slate-200">
-                  <div className="text-sm font-semibold text-slate-900">
-                    Poetry Studio
-                  </div>
-                  <div className="text-xs text-slate-500 mt-0.5">
-                    Use these craft labs while you draft.
-                  </div>
-                </div>
-
-                <div className="p-3">
-                  <PoetryModule />
-                </div>
-
-                <div className="px-4 pb-4">
-                  <Link
-                    to="/story-lab/hub"
-                    className="text-sm font-semibold text-[color:var(--brand-navy,#1e3a5f)] hover:underline"
-                  >
-                    Back to StoryLab Hub →
-                  </Link>
-                </div>
-              </div>
-            </div>
-          </aside>
-
-          {/* CENTER: Editor */}
-          <main className="col-span-12 lg:col-span-9">
-            <div className="rounded-2xl border border-slate-200 bg-white overflow-hidden">
-              {!activePoem ? (
-                <div className="p-8 text-sm text-slate-600">
-                  Select a poem from the library, or click <b>New Poem</b> to start.
-                </div>
-              ) : (
-                <div className="p-6">
-                  {/* Editor header */}
-                  <div className="flex items-center justify-between gap-3 mb-4">
-                    <div className="min-w-0 flex-1">
-                      <input
-                        value={activePoem.title || ""}
-                        onChange={(e) => updateActivePoem({ title: e.target.value })}
-                        className="w-full text-xl font-semibold text-slate-900 outline-none border border-slate-200 rounded-2xl px-4 py-3"
-                        placeholder="Poem title"
-                      />
-                      <div className="mt-2 text-xs text-slate-500 flex items-center gap-4">
-                        <span>
-                          Words:{" "}
-                          <span className="font-semibold text-slate-700">
-                            {stats.words}
-                          </span>
-                        </span>
-                        <span>
-                          Lines:{" "}
-                          <span className="font-semibold text-slate-700">
-                            {stats.lines}
-                          </span>
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Compact AI actions (route to AI tools page for now) */}
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={goAiTools}
-                        className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-sm border border-slate-200 hover:bg-slate-50 text-slate-700"
-                        title="Open AI tools"
-                      >
-                        <Sparkles className="h-4 w-4" />
-                        AI Tools
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Editor body */}
-                  <textarea
-                    value={activePoem.content || ""}
-                    onChange={(e) => updateActivePoem({ content: e.target.value })}
-                    className="w-full min-h-[62vh] rounded-2xl border border-slate-200 p-4 text-sm text-slate-900 outline-none focus:ring-2 focus:ring-slate-200"
-                    placeholder="Write your poem here…"
-                  />
-
-                  <div className="mt-3 text-xs text-slate-500">
-                    Tip: keep line breaks exactly as you want them to appear.
-                  </div>
-                </div>
-              )}
-            </div>
-          </main>
+        {/* Back link */}
+        <div className="text-center">
+          <Link
+            to="/story-lab"
+            className="inline-flex items-center gap-2 text-sm font-medium hover:gap-3 transition-all"
+            style={{ color: BRAND.navy }}
+          >
+            ← Back to StoryLab Modules
+          </Link>
         </div>
       </div>
-
-      {/* subtle footer spacing */}
-      <div className="h-10" />
     </div>
   );
 }
+
