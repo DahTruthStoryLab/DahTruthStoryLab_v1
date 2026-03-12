@@ -61,12 +61,19 @@ export default function StoryLabLayout() {
   const [storyTitle, setStoryTitle] = useState("");
 
   useEffect(() => {
-    const load = () => {
-      const story = safeJsonParse(localStorage.getItem(CURRENT_STORY_KEY), {});
-      const nextTrack = normalizeGenre(story?.primaryGenre || story?.genre);
-      setTrack(nextTrack);
-      setStoryTitle(story?.title || "");
-    };
+  const load = () => {
+  const story = safeJsonParse(localStorage.getItem(CURRENT_STORY_KEY), {});
+  const storyGenre = normalizeGenre(story?.primaryGenre || story?.genre);
+
+  // Override with URL path if we're in a specific genre section
+  let nextTrack = storyGenre;
+  if (pathname.startsWith("/story-lab/poetry")) nextTrack = "Poetry";
+  else if (pathname.startsWith("/story-lab/nonfiction")) nextTrack = "Nonfiction";
+  else if (pathname.startsWith("/story-lab/fiction")) nextTrack = "Fiction";
+
+  setTrack(nextTrack);
+  setStoryTitle(story?.title || "");
+};
 
     load();
 
@@ -82,7 +89,7 @@ export default function StoryLabLayout() {
       window.removeEventListener("project:change", onProjectChange);
       window.removeEventListener("storage", onStorage);
     };
-  }, []);
+ }, [pathname]);
 
   const isStoryLabLanding = pathname === "/story-lab";
   const isHub =
