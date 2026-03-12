@@ -23,6 +23,14 @@ import {
   X,
   ChevronDown,
   ChevronRight,
+} from "lucide-react"; 
+
+import {
+  // ...existing imports...
+  PenTool,
+  Wand2,
+  Shuffle,
+  Mic2,
 } from "lucide-react";
 
 /* ---------------------------
@@ -85,9 +93,11 @@ const NONFICTION_TOOLS = [
 ];
 
 const POETRY_TOOLS = [
-  { icon: Feather, label: "Craft Lab", path: "/story-lab/poetry", comingSoon: true },
-  { icon: PenLine, label: "Revision Lab", path: "/story-lab/poetry", comingSoon: true },
-  { icon: BookOpen, label: "Sequence Builder", path: "/story-lab/poetry", comingSoon: true },
+  { icon: PenTool, label: "Craft Lab", path: "/story-lab/poetry/craft" },
+  { icon: Wand2, label: "Revision Lab", path: "/story-lab/poetry/revision" },
+  { icon: Layers, label: "Sequence Builder", path: "/story-lab/poetry/sequence" },
+  { icon: Shuffle, label: "Remix Lab", path: "/story-lab/poetry/remix" },
+  { icon: Mic2, label: "Voice & Identity", path: "/story-lab/poetry/voice" },
 ];
 
 const SHARED_TOOLS = [
