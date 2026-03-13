@@ -1,5 +1,5 @@
 // src/routes/storylab/PoetryRoutes.jsx
-import React, { lazy } from "react";
+import React, { lazy, Suspense } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 
 const PoetryLab = lazy(() => import("../../pages/storylab/PoetryLab"));
@@ -10,24 +10,26 @@ const VoiceIdentity = lazy(() => import("../../pages/storylab/poetry/VoiceIdenti
 const SequenceBuilder = lazy(() => import("../../pages/storylab/poetry/SequenceBuilder"));
 const RemixLab = lazy(() => import("../../pages/storylab/poetry/RemixLab"));
 
+const Fallback = () => (
+  <div className="min-h-[60vh] grid place-items-center">
+    <div className="animate-pulse text-lg text-slate-400">Loading…</div>
+  </div>
+);
+
 export default function PoetryRoutes() {
   return (
-    <Routes>
-      {/* /story-lab/poetry — landing hub */}
-      <Route index element={<PoetryLab />} />
-
-      {/* Sub-tools with sidebar layout */}
-      <Route element={<PoetryLayout />}>
-        <Route path="craft" element={<CraftLab />} />
-        <Route path="revision" element={<RevisionLab />} />
-        <Route path="voice" element={<VoiceIdentity />} />
-        <Route path="sequence" element={<SequenceBuilder />} />
-        <Route path="remix" element={<RemixLab />} />
-      </Route>
-
-      {/* Fallback */}
-      <Route path="*" element={<Navigate to="." replace />} />
-    </Routes>
+    <Suspense fallback={<Fallback />}>
+      <Routes>
+        <Route index element={<PoetryLab />} />
+        <Route element={<PoetryLayout />}>
+          <Route path="craft" element={<CraftLab />} />
+          <Route path="revision" element={<RevisionLab />} />
+          <Route path="voice" element={<VoiceIdentity />} />
+          <Route path="sequence" element={<SequenceBuilder />} />
+          <Route path="remix" element={<RemixLab />} />
+        </Route>
+        <Route path="*" element={<Navigate to="." replace />} />
+      </Routes>
+    </Suspense>
   );
 }
-
