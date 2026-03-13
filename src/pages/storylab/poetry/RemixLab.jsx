@@ -2,14 +2,21 @@
 import React, { useState } from "react";
 import { Shuffle, Sparkles } from "lucide-react";
 
-const BRAND = { navy: "#1e3a5f", gold: "#d4af37", green: "#059669" };
+const BRAND = {
+  purple: "#4c1d95",
+  purpleLight: "#7c3aed",
+  gold: "#d4af37",
+  goldDark: "#b8960c",
+  green: "#6ee7b7",
+  greenDark: "#059669",
+};
 
 const REMIX_MODES = [
-  { id: "erase", label: "Erasure", prompt: "Create an erasure poem from this source text. Select words and phrases already present in the text — do not add new words. What remains should feel like a complete, resonant poem discovered inside the original. Return the erasure poem and the source text with the selected words highlighted in brackets." },
-  { id: "mirror", label: "Mirror", prompt: "Write a mirror poem that responds to this poem. The mirror poem should use the same structure and number of lines but reverse or complicate every claim, image, or emotion. Return the mirror poem alongside the original." },
-  { id: "compress", label: "Compress to a Lyric", prompt: "Compress this poem into a single tight lyric of no more than 6 lines. Keep only the essential image and emotion. Every word must carry the weight of what was cut. Return the compressed lyric and explain what you kept and why." },
-  { id: "expand", label: "Expand", prompt: "Expand this poem into a longer piece — at least double its current length. Do not pad or repeat. Add new images, deepen the turn, develop what the original poem gestures toward but doesn't fully enter. Return the expanded poem." },
-  { id: "constraint", label: "Constraint Rewrite", prompt: "Rewrite this poem under a formal constraint of your choosing — lipogram (avoid a letter), syllabic verse, abecedarian, or anaphora. Name the constraint you chose and return the constrained rewrite." },
+  { id: "erase", label: "Erasure", color: "#a78bfa", desc: "Find a poem inside the original text.", prompt: "Create an erasure poem from this source text. Select words and phrases already present — do not add new words. What remains should feel like a complete, resonant poem discovered inside the original. Return the erasure poem and show which words you selected in brackets." },
+  { id: "mirror", label: "Mirror", color: "#f9a8d4", desc: "Reverse or complicate every claim.", prompt: "Write a mirror poem that responds to this poem. Use the same structure and number of lines but reverse or complicate every claim, image, or emotion. Return the mirror poem alongside the original." },
+  { id: "compress", label: "Compress to a Lyric", color: BRAND.gold, desc: "Six lines. Essential image only.", prompt: "Compress this poem into a single tight lyric of no more than 6 lines. Keep only the essential image and emotion. Every word must carry the weight of what was cut. Return the compressed lyric and explain what you kept and why." },
+  { id: "expand", label: "Expand", color: "#67e8f9", desc: "Double the length without padding.", prompt: "Expand this poem into a longer piece — at least double its current length. Do not pad or repeat. Add new images, deepen the turn, develop what the original poem gestures toward but doesn't fully enter. Return the expanded poem." },
+  { id: "constraint", label: "Constraint Rewrite", color: BRAND.green, desc: "Lipogram, anaphora, abecedarian.", prompt: "Rewrite this poem under a formal constraint of your choosing — lipogram (avoid a letter), syllabic verse, abecedarian, or anaphora. Name the constraint you chose and return the constrained rewrite." },
 ];
 
 export default function RemixLab() {
@@ -18,11 +25,12 @@ export default function RemixLab() {
   const [result, setResult] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const selected = REMIX_MODES.find(m => m.id === mode);
+
   async function remix() {
     if (!poem.trim()) return;
     setLoading(true);
     setResult("");
-    const selectedMode = REMIX_MODES.find(m => m.id === mode);
     try {
       const res = await fetch("https://api.anthropic.com/v1/messages", {
         method: "POST",
@@ -30,7 +38,7 @@ export default function RemixLab() {
         body: JSON.stringify({
           model: "claude-sonnet-4-20250514",
           max_tokens: 1000,
-          messages: [{ role: "user", content: `${selectedMode.prompt}\n\nPoem/Text:\n${poem}` }]
+          messages: [{ role: "user", content: `${selected.prompt}\n\nPoem/Text:\n${poem}` }]
         })
       });
       const data = await res.json();
@@ -42,61 +50,109 @@ export default function RemixLab() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto py-6 px-2">
-      <div className="flex items-center gap-3 mb-6">
-        <div className="w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: "linear-gradient(135deg, #047857, #059669)" }}>
-          <Shuffle size={20} className="text-white" />
+    <div className="max-w-2xl">
+
+      {/* Page header */}
+      <div className="flex items-center gap-4 mb-8">
+        <div
+          className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg"
+          style={{ background: `linear-gradient(135deg, ${BRAND.greenDark}, #34d399)` }}
+        >
+          <Shuffle size={22} className="text-white" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold text-slate-900" style={{ fontFamily: "'EB Garamond', Georgia, serif" }}>Remix Lab</h1>
-          <p className="text-sm text-slate-500">Rewrite with constraints: erase, mirror, compress, expand.</p>
+          <h1
+            className="font-bold text-slate-900"
+            style={{ fontFamily: "'EB Garamond', Georgia, serif", fontSize: "26px" }}
+          >
+            Remix Lab
+          </h1>
+          <p className="text-slate-500 text-sm mt-0.5">Erase · Mirror · Compress · Expand · Constrain</p>
         </div>
       </div>
 
-      <div className="rounded-2xl border border-slate-200 bg-white p-6 mb-6">
-        <h2 className="font-bold text-slate-800 mb-4">Choose a Remix Mode</h2>
-        <div className="grid grid-cols-2 gap-3 mb-6">
-          {REMIX_MODES.map(m => (
-            <button
-              key={m.id}
-              onClick={() => setMode(m.id)}
-              className="rounded-xl border px-4 py-3 text-sm font-semibold text-left transition"
+      {/* Mode selector */}
+      <div className="grid grid-cols-2 gap-3 mb-6">
+        {REMIX_MODES.map(m => (
+          <button
+            key={m.id}
+            onClick={() => setMode(m.id)}
+            className="rounded-2xl px-4 py-4 text-left transition-all"
+            style={{
+              background: mode === m.id ? `${m.color}15` : "#faf8ff",
+              border: `1px solid ${mode === m.id ? m.color + "50" : "#e8e0ff"}`,
+              boxShadow: mode === m.id ? `0 4px 16px ${m.color}20` : "none",
+            }}
+          >
+            <div className="w-2 h-2 rounded-full mb-2" style={{ background: m.color }} />
+            <span
+              className="font-semibold block"
               style={{
-                borderColor: mode === m.id ? BRAND.green : "#e2e8f0",
-                background: mode === m.id ? "#d1fae5" : "white",
-                color: mode === m.id ? BRAND.green : "#475569",
+                fontFamily: "'EB Garamond', Georgia, serif",
+                fontSize: "15px",
+                color: mode === m.id ? "#1e1040" : "#475569",
               }}
             >
               {m.label}
-            </button>
-          ))}
-        </div>
+            </span>
+            <span className="text-xs mt-0.5 block" style={{ color: "#94a3b8" }}>
+              {m.desc}
+            </span>
+          </button>
+        ))}
+      </div>
+
+      {/* Poem input */}
+      <div
+        className="rounded-3xl p-6"
+        style={{
+          background: `linear-gradient(135deg, ${BRAND.purple}06, ${BRAND.purpleLight}04)`,
+          border: `1px solid ${BRAND.purpleLight}18`,
+        }}
+      >
         <textarea
           value={poem}
           onChange={e => setPoem(e.target.value)}
           placeholder="Paste your poem or source text here..."
           rows={8}
-          className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm text-slate-800 resize-none focus:outline-none focus:ring-2 focus:ring-green-300"
-          style={{ fontFamily: "'EB Garamond', Georgia, serif", fontSize: "15px" }}
+          className="w-full rounded-2xl px-5 py-4 text-slate-800 resize-none focus:outline-none"
+          style={{
+            fontFamily: "'EB Garamond', Georgia, serif",
+            fontSize: "16px",
+            lineHeight: "1.7",
+            border: `1px solid ${BRAND.purpleLight}20`,
+            background: "white",
+          }}
         />
         <button
           onClick={remix}
           disabled={loading || !poem.trim()}
-          className="mt-3 px-5 py-2 rounded-xl text-white text-sm font-semibold transition disabled:opacity-50"
-          style={{ background: "linear-gradient(135deg, #047857, #059669)" }}
+          className="mt-4 px-6 py-2.5 rounded-xl text-white text-sm font-semibold transition-all hover:opacity-90 disabled:opacity-40"
+          style={{ background: `linear-gradient(135deg, ${BRAND.greenDark}, #34d399)` }}
         >
-          {loading ? "Remixing..." : "Remix Poem"}
+          {loading ? "Remixing..." : `Apply — ${selected?.label}`}
         </button>
       </div>
 
+      {/* Result */}
       {result && (
-        <div className="rounded-2xl border border-slate-200 bg-white p-6">
-          <h3 className="font-bold text-slate-800 mb-3 flex items-center gap-2">
-            <Sparkles size={16} style={{ color: BRAND.gold }} />
-            Remixed Result
-          </h3>
-          <div className="rounded-xl bg-slate-50 border border-slate-200 px-5 py-4 text-sm text-slate-700 leading-relaxed whitespace-pre-wrap"
-            style={{ fontFamily: "'EB Garamond', Georgia, serif", fontSize: "15px" }}>
+        <div
+          className="mt-6 rounded-3xl p-6"
+          style={{ background: "white", border: `1px solid ${BRAND.purpleLight}18` }}
+        >
+          <div className="flex items-center gap-2 mb-4">
+            <Sparkles size={15} style={{ color: BRAND.gold }} />
+            <h3
+              className="font-bold text-slate-800"
+              style={{ fontFamily: "'EB Garamond', Georgia, serif", fontSize: "17px" }}
+            >
+              Remixed Result
+            </h3>
+          </div>
+          <div
+            className="text-slate-700 leading-relaxed whitespace-pre-wrap"
+            style={{ fontFamily: "'EB Garamond', Georgia, serif", fontSize: "16px", lineHeight: "1.8" }}
+          >
             {result}
           </div>
         </div>
@@ -104,3 +160,4 @@ export default function RemixLab() {
     </div>
   );
 }
+
