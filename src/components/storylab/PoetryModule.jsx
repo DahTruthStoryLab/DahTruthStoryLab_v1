@@ -1,125 +1,59 @@
-// src/components/storylab/PoetryLayout.jsx
+// src/components/storylab/PoetryModule.jsx
 import React from "react";
-import { Outlet, useLocation, Link } from "react-router-dom";
-import PoetryModule from "./PoetryModule";
-import { Feather, ArrowLeft } from "lucide-react";
+import { Link, useLocation } from "react-router-dom";
+import { Wand2, Layers, PenTool, Shuffle, Mic2 } from "lucide-react";
 
-const BRAND = {
-  purple: "#4c1d95",
-  purpleLight: "#7c3aed",
-  gold: "#d4af37",
-  goldDark: "#b8960c",
-  ink: "#0F172A",
-};
+const items = [
+  { to: "/story-lab/poetry/craft", title: "Craft Lab", desc: "Line breaks, sound, metaphor, tension.", tag: "Craft", Icon: PenTool, color: "#a78bfa" },
+  { to: "/story-lab/poetry/revision", title: "Revision Lab", desc: "Tighten diction, sharpen images.", tag: "Revise", Icon: Wand2, color: "#f9a8d4" },
+  { to: "/story-lab/poetry/voice", title: "Voice & Identity", desc: "Tone, stance, persona, signature.", tag: "Voice", Icon: Mic2, color: "#67e8f9" },
+  { to: "/story-lab/poetry/sequence", title: "Sequence Builder", desc: "Arrange poems into an arc.", tag: "Structure", Icon: Layers, color: "#d4af37" },
+  { to: "/story-lab/poetry/remix", title: "Remix Lab", desc: "Erase, mirror, compress, expand.", tag: "Experiment", Icon: Shuffle, color: "#6ee7b7" },
+];
 
-const TOOL_TITLES = {
-  "/story-lab/poetry/craft": "Craft Lab",
-  "/story-lab/poetry/revision": "Revision Lab",
-  "/story-lab/poetry/voice": "Voice & Identity",
-  "/story-lab/poetry/sequence": "Sequence Builder",
-  "/story-lab/poetry/remix": "Remix Lab",
-};
-
-export default function PoetryLayout() {
+export default function PoetryModule() {
   const { pathname } = useLocation();
-  const currentTitle = TOOL_TITLES[pathname] || "Poetry Workshop";
 
   return (
-    <div className="flex min-h-screen" style={{ background: "#f5f3ff" }}>
-
-      {/* ── Sidebar ── */}
-      <aside
-        className="w-72 shrink-0 flex flex-col overflow-y-auto"
-        style={{
-          background: `linear-gradient(175deg, ${BRAND.purple} 0%, #2e1065 55%, ${BRAND.ink} 100%)`,
-          minHeight: "100vh",
-          borderRight: "1px solid rgba(124,58,237,0.25)",
-          boxShadow: "4px 0 24px rgba(76,29,149,0.18)",
-        }}
-      >
-        {/* Header */}
-        <div className="px-5 py-6" style={{ borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
-          <div className="flex items-center gap-3">
-            <div
-              className="w-10 h-10 rounded-xl flex items-center justify-center shadow-lg"
-              style={{ background: `linear-gradient(135deg, ${BRAND.gold}, ${BRAND.goldDark})` }}
-            >
-              <Feather size={19} className="text-white" />
-            </div>
-            <div>
-              <h2
-                className="text-white font-bold text-base leading-tight"
-                style={{ fontFamily: "'EB Garamond', Georgia, serif", letterSpacing: "0.06em" }}
-              >
-                Poetry Workshop
-              </h2>
-              <p style={{ color: "rgba(255,255,255,0.38)", fontSize: "11px", marginTop: "2px" }}>
-                Select a tool below
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Nav items */}
-        <div className="flex-1 px-3 py-5">
-          <PoetryModule />
-        </div>
-
-        {/* Footer back link */}
-        <div className="px-5 py-4" style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+    <nav className="flex flex-col gap-1.5">
+      {items.map((it) => {
+        const active = pathname === it.to;
+        const Icon = it.Icon;
+        return (
           <Link
-            to="/story-lab/poetry"
-            className="flex items-center gap-2 transition-colors"
-            style={{ color: "rgba(255,255,255,0.4)", fontSize: "12px" }}
-            onMouseEnter={e => e.currentTarget.style.color = "rgba(255,255,255,0.85)"}
-            onMouseLeave={e => e.currentTarget.style.color = "rgba(255,255,255,0.4)"}
-          >
-            <ArrowLeft size={13} />
-            Back to Poetry Hub
-          </Link>
-        </div>
-      </aside>
-
-      {/* ── Main ── */}
-      <main className="flex-1 flex flex-col overflow-y-auto">
-        {/* Breadcrumb bar */}
-        <div
-          className="sticky top-0 z-10 px-8 py-4 flex items-center gap-3"
-          style={{
-            background: "rgba(245,243,255,0.96)",
-            backdropFilter: "blur(14px)",
-            borderBottom: "1px solid rgba(124,58,237,0.12)",
-          }}
-        >
-          <div
-            className="w-1 h-7 rounded-full"
-            style={{ background: `linear-gradient(180deg, ${BRAND.purpleLight}, ${BRAND.gold})` }}
-          />
-          <span
-            className="text-xs font-medium"
-            style={{ color: "rgba(76,29,149,0.5)", fontFamily: "'EB Garamond', Georgia, serif" }}
-          >
-            Poetry Workshop
-          </span>
-          <span style={{ color: "rgba(76,29,149,0.25)", fontSize: "12px" }}>›</span>
-          <h1
-            className="font-bold"
+            key={it.to}
+            to={it.to}
+            className="flex items-start gap-3 rounded-2xl px-3 py-3.5 transition-all duration-200 hover:bg-white/10"
             style={{
-              fontFamily: "'EB Garamond', Georgia, serif",
-              color: BRAND.purple,
-              fontSize: "18px",
-              letterSpacing: "0.03em",
+              background: active ? "rgba(255,255,255,0.12)" : "rgba(255,255,255,0.04)",
+              border: active ? "1px solid rgba(255,255,255,0.2)" : "1px solid transparent",
             }}
           >
-            {currentTitle}
-          </h1>
-        </div>
-
-        <div className="flex-1 px-8 py-8">
-          <Outlet />
-        </div>
-      </main>
-    </div>
+            <div
+              className="mt-0.5 shrink-0 w-8 h-8 rounded-xl flex items-center justify-center"
+              style={{
+                background: active ? `${it.color}25` : "rgba(255,255,255,0.07)",
+                border: `1px solid ${active ? it.color + "40" : "rgba(255,255,255,0.1)"}`,
+              }}
+            >
+              <Icon size={15} style={{ color: active ? it.color : "rgba(255,255,255,0.5)" }} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between gap-1">
+                <span className="text-sm font-semibold truncate" style={{ fontFamily: "'EB Garamond', Georgia, serif", color: active ? "#fff" : "rgba(255,255,255,0.75)" }}>
+                  {it.title}
+                </span>
+                <span className="shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded-full" style={{ background: active ? `${it.color}25` : "rgba(255,255,255,0.08)", color: active ? it.color : "rgba(255,255,255,0.4)" }}>
+                  {it.tag}
+                </span>
+              </div>
+              <p className="text-xs mt-0.5 truncate" style={{ color: "rgba(255,255,255,0.38)" }}>
+                {it.desc}
+              </p>
+            </div>
+          </Link>
+        );
+      })}
+    </nav>
   );
 }
-
