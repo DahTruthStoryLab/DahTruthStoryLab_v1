@@ -1,7 +1,7 @@
 // src/components/storylab/NonfictionLayout.jsx
 import React from "react";
 import { Outlet, useLocation, Link } from "react-router-dom";
-import NonfictionModule from "./NonfictionModule";
+import NonfictionModule from "./NonFictionModule";
 import { FileText, ArrowLeft } from "lucide-react";
 
 const TOOL_TITLES = {
