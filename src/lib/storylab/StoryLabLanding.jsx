@@ -423,12 +423,15 @@ export default function StoryLabLanding() {
   const story = useCurrentStory();
 
   return (
-    <div className="min-h-screen bg-base bg-radial-fade text-ink relative overflow-hidden">
+    <div className="min-h-screen relative overflow-hidden"
+      style={{ background: "radial-gradient(circle at top left, #fefdfb 0%, #f1f5f9 40%, #ede9fe 100%)" }}>
 
-      {/* Decorative blobs — matching LandingPage */}
+      {/* Decorative blobs */}
       <div className="absolute inset-0 opacity-20 pointer-events-none" aria-hidden="true">
-        <div className="absolute top-20 left-10 w-72 h-72 bg-accent rounded-full mix-blend-multiply blur-xl animate-pulse" />
-        <div className="absolute top-40 right-10 w-72 h-72 bg-primary rounded-full mix-blend-multiply blur-xl animate-pulse" />
+        <div className="absolute top-20 left-10 w-72 h-72 rounded-full mix-blend-multiply blur-xl animate-pulse"
+          style={{ background: "#b8a9c9" }} />
+        <div className="absolute top-40 right-10 w-72 h-72 rounded-full mix-blend-multiply blur-xl animate-pulse"
+          style={{ background: "#1e3a5f" }} />
         <div className="absolute -bottom-8 left-20 w-72 h-72 rounded-full mix-blend-multiply blur-xl animate-pulse"
           style={{ background: `${BRAND.gold}99` }} />
       </div>
@@ -439,38 +442,48 @@ export default function StoryLabLanding() {
       <main className="relative z-10 md:ml-56">
         <div className="max-w-4xl mx-auto px-4 md:px-6 py-8">
 
-          {/* Hero — matches LandingPage style */}
-          <div className="glass-panel rounded-3xl p-10 mb-10 text-center relative overflow-hidden border border-white/60 shadow-2xl">
+          {/* ✅ FIX 2: Replaced glass-panel with hardcoded navy-to-rose gradient */}
+          <div className="rounded-3xl p-10 mb-10 text-center relative overflow-hidden"
+            style={{
+              background: "linear-gradient(135deg, #1e3a5f 0%, #2d4a6f 30%, #b8a9c9 70%, #e8b4b8 100%)",
+              boxShadow: "0 25px 50px rgba(0,0,0,0.15)"
+            }}>
             <div className="absolute top-0 left-0 w-64 h-64 rounded-full opacity-10"
               style={{ background: BRAND.gold, filter: "blur(80px)" }} />
             <div className="absolute bottom-0 right-0 w-80 h-80 rounded-full opacity-10"
-              style={{ background: BRAND.mauve, filter: "blur(100px)" }} />
+              style={{ background: BRAND.rose, filter: "blur(100px)" }} />
             <div className="relative z-10">
               <div className="flex items-center justify-center gap-3 mb-6">
-                <div className="w-11 h-11 rounded-2xl flex items-center justify-center bg-primary/15">
-                  <BookOpen size={22} className="text-primary" />
+                {/* ✅ FIX 3: Replaced bg-primary/15 and text-primary with hardcoded values */}
+                <div className="w-11 h-11 rounded-2xl flex items-center justify-center"
+                  style={{ background: "rgba(30,58,95,0.5)" }}>
+                  <BookOpen size={22} className="text-white" />
                 </div>
                 <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg"
                   style={{ background: `linear-gradient(135deg, ${BRAND.gold}, ${BRAND.goldDark})` }}>
                   <Sparkles size={28} className="text-white" />
                 </div>
-                <div className="w-11 h-11 rounded-2xl flex items-center justify-center bg-accent/15">
-                  <Feather size={22} className="text-accent" />
+                {/* ✅ FIX 4: Replaced bg-accent/15 and text-accent with hardcoded values */}
+                <div className="w-11 h-11 rounded-2xl flex items-center justify-center"
+                  style={{ background: "rgba(124,58,237,0.5)" }}>
+                  <Feather size={22} className="text-white" />
                 </div>
               </div>
-              <h1 className="text-3xl md:text-4xl font-bold mb-3 font-serif"
+              {/* ✅ FIX 5: Changed text color to white */}
+              <h1 className="text-3xl md:text-4xl font-bold mb-3 text-white"
                 style={{ fontFamily: "'EB Garamond', Georgia, serif" }}>
                 StoryLab Modules
               </h1>
-              <p className="text-ink/70 max-w-xl mx-auto text-base md:text-lg mb-6 font-serif">
+              {/* ✅ FIX 6: Changed text-ink/70 to text-white/80 */}
+              <p className="text-white/80 max-w-xl mx-auto text-base md:text-lg mb-6 font-serif">
                 Choose your craft. Every genre has its own set of tools, exercises, and pathways built for the way you write.
               </p>
               {story.title && (
-                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full glass-soft border border-white/60">
-                  <span className="text-ink/60 text-sm">Working on:</span>
-                  <span className="text-ink text-sm font-semibold">{story.title}</span>
+                <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/15 border border-white/20">
+                  <span className="text-white/70 text-sm">Working on:</span>
+                  <span className="text-white text-sm font-semibold">{story.title}</span>
                   {story.wordCount > 0 && (
-                    <span className="text-sm" style={{ color: BRAND.goldDark }}>
+                    <span className="text-amber-300 text-sm">
                       • {story.wordCount.toLocaleString()} words
                     </span>
                   )}
@@ -483,7 +496,7 @@ export default function StoryLabLanding() {
                   <PenLine size={16} /> Start Writing
                 </button>
                 <button onClick={() => navigate("/dashboard")}
-                  className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full font-serif font-medium text-sm glass-soft border border-white/60 transition-all hover:bg-white/80">
+                  className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full font-serif font-medium text-sm border border-white/40 text-white bg-white/10 transition-all hover:bg-white/20">
                   <Home size={16} /> Dashboard
                 </button>
               </div>
@@ -507,7 +520,7 @@ export default function StoryLabLanding() {
                 { label: "Workshop Hub", desc: "Cohort sessions, group breakouts, and collaboration tools.", icon: Layers, color: BRAND.navy, path: "/story-lab/hub" },
               ].map((tool) => (
                 <button key={tool.label} onClick={() => navigate(tool.path)}
-                  className="group glass-soft rounded-2xl p-5 text-left transition-all hover:shadow-lg hover:scale-[1.01] border border-white/60">
+                  className="group bg-white rounded-2xl p-5 text-left transition-all hover:shadow-lg hover:scale-[1.01] border border-slate-200">
                   <div className="flex items-center gap-4">
                     <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: `${tool.color}15` }}>
                       <tool.icon size={24} style={{ color: tool.color }} />
