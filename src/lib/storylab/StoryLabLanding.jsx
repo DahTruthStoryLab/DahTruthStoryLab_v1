@@ -241,11 +241,13 @@ function StoryLabSidebar({ mobileOpen, setMobileOpen }) {
     <>
       <aside
         className="hidden md:flex fixed left-0 top-0 z-40 h-screen w-56 flex-col"
-        style={{
-          background: "linear-gradient(160deg, rgba(249,245,255,0.96), rgba(234,224,252,0.98))",
-          borderRight: "1px solid rgba(209,213,219,0.9)",
-          backdropFilter: "blur(20px)",
-        }}
+       style={{
+        background: "linear-gradient(160deg, rgba(76,29,149,0.08), rgba(124,58,237,0.12))",
+        borderRight: "1px solid rgba(124,58,237,0.2)",
+        backdropFilter: "blur(20px)",
+        WebkitBackdropFilter: "blur(20px)",
+        boxShadow: "4px 0 24px rgba(76,29,149,0.08)",
+      }}
       >
         {sidebarContent}
       </aside>
