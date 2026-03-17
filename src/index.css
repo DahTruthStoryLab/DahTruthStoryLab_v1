@@ -11,74 +11,153 @@
 /* ============================
    Quill font mapping
    ============================ */
-.ql-font-arial { font-family: "Arial", sans-serif; }
-.ql-font-calibri { font-family: "Calibri", sans-serif; }
-.ql-font-cambria { font-family: "Cambria", serif; }
-.ql-font-timesnewroman { font-family: "Times New Roman", serif; }
-.ql-font-georgia { font-family: "Georgia", serif; }
-.ql-font-garamond { font-family: "Garamond", serif; }
-.ql-font-verdana { font-family: "Verdana", sans-serif; }
-.ql-font-couriernew { font-family: "Courier New", monospace; }
-.ql-font-sans { font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; }
-.ql-font-serif { font-family: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif; }
-.ql-font-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace; }
+.ql-font-arial {
+  font-family: "Arial", sans-serif;
+}
+.ql-font-calibri {
+  font-family: "Calibri", sans-serif;
+}
+.ql-font-cambria {
+  font-family: "Cambria", serif;
+}
+.ql-font-timesnewroman {
+  font-family: "Times New Roman", serif;
+}
+.ql-font-georgia {
+  font-family: "Georgia", serif;
+}
+.ql-font-garamond {
+  font-family: "Garamond", serif;
+}
+.ql-font-verdana {
+  font-family: "Verdana", sans-serif;
+}
+.ql-font-couriernew {
+  font-family: "Courier New", monospace;
+}
+.ql-font-sans {
+  font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial,
+    sans-serif;
+}
+.ql-font-serif {
+  font-family: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
+}
+.ql-font-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    "Liberation Mono", monospace;
+}
 
-/* Quill picker label text */
+/* Quill picker label text (optional, nice UX) */
 .ql-snow .ql-picker.ql-font .ql-picker-label[data-value="sans"]::before,
-.ql-snow .ql-picker.ql-font .ql-picker-item[data-value="sans"]::before { content: "Sans Serif"; }
+.ql-snow .ql-picker.ql-font .ql-picker-item[data-value="sans"]::before {
+  content: "Sans Serif";
+}
 .ql-snow .ql-picker.ql-font .ql-picker-label[data-value="serif"]::before,
-.ql-snow .ql-picker.ql-font .ql-picker-item[data-value="serif"]::before { content: "Serif"; }
+.ql-snow .ql-picker.ql-font .ql-picker-item[data-value="serif"]::before {
+  content: "Serif";
+}
 .ql-snow .ql-picker.ql-font .ql-picker-label[data-value="mono"]::before,
-.ql-snow .ql-picker.ql-font .ql-picker-item[data-value="mono"]::before { content: "Mono"; }
+.ql-snow .ql-picker.ql-font .ql-picker-item[data-value="mono"]::before {
+  content: "Mono";
+}
 .ql-snow .ql-picker.ql-font .ql-picker-label[data-value="georgia"]::before,
-.ql-snow .ql-picker.ql-font .ql-picker-item[data-value="georgia"]::before { content: "Georgia"; }
+.ql-snow .ql-picker.ql-font .ql-picker-item[data-value="georgia"]::before {
+  content: "Georgia";
+}
 .ql-snow .ql-picker.ql-font .ql-picker-label[data-value="garamond"]::before,
-.ql-snow .ql-picker.ql-font .ql-picker-item[data-value="garamond"]::before { content: "Garamond"; }
+.ql-snow .ql-picker.ql-font .ql-picker-item[data-value="garamond"]::before {
+  content: "Garamond";
+}
 .ql-snow .ql-picker.ql-font .ql-picker-label[data-value="times"]::before,
-.ql-snow .ql-picker.ql-font .ql-picker-item[data-value="times"]::before { content: "Times"; }
+.ql-snow .ql-picker.ql-font .ql-picker-item[data-value="times"]::before {
+  content: "Times";
+}
 
 /* ============================
    Quill toolbar normalization
    ============================ */
 .ql-toolbar,
-.ql-toolbar * { font-size: 14px !important; }
-.ql-toolbar .ql-picker-label::before { line-height: 1.2 !important; }
-.ql-toolbar button { transition: background-color 0.15s ease; }
-.ql-toolbar button:hover { background-color: rgba(0, 0, 0, 0.05); }
+.ql-toolbar * {
+  font-size: 14px !important;
+}
+
+.ql-toolbar .ql-picker-label::before {
+  line-height: 1.2 !important;
+}
+
+/* Ensure Quill toolbar buttons match app styling */
+.ql-toolbar button {
+  transition: background-color 0.15s ease;
+}
+
+.ql-toolbar button:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
 
 /* ===========================================================
-   FIX: Quill stacking LOCAL to editor only
+   ✅ FIX: Quill stacking should be LOCAL to the editor only
+   (prevents Quill UI from overlaying your sidebar/grid)
    =========================================================== */
 .word-style-editor .ql-toolbar {
   overflow: visible !important;
   position: relative;
   z-index: 2;
 }
+
 .word-style-editor .ql-container {
   position: relative;
   z-index: 1;
 }
-.word-style-editor .ql-toolbar.ql-snow .ql-picker.ql-expanded .ql-picker-options { z-index: 6; }
-.word-style-editor .ql-tooltip { z-index: 7; }
 
-/* === Line-height picker === */
+/* Dropdown options panel above toolbar but still local */
+.word-style-editor .ql-toolbar.ql-snow .ql-picker.ql-expanded .ql-picker-options {
+  z-index: 6;
+}
+
+/* Quill tooltip (link tooltip etc.) local only */
+.word-style-editor .ql-tooltip {
+  z-index: 7;
+}
+
+/* === Line-height picker visibility & styling (if you keep it) === */
 .ql-toolbar .ql-picker.ql-line-height .ql-picker-label::before,
 .ql-toolbar .ql-picker.ql-line-height .ql-picker-item::before {
   color: #0f172a;
   font-size: 12px;
 }
+
 .ql-toolbar .ql-picker.ql-line-height .ql-picker-options {
   background: #ffffff;
   border: 1px solid #e5e7eb;
   box-shadow: 0 8px 16px rgba(15, 23, 42, 0.12);
   z-index: 8;
 }
-.ql-toolbar .ql-picker.ql-line-height { min-width: 2.5rem; }
-.ql-editor p { margin: 0 0 0.75em 0; }
-.storylab-editor .ql-editor { line-height: 1.5; }
-.storylab-lh-1 .ql-editor { line-height: 1; }
-.storylab-lh-1_5 .ql-editor { line-height: 1.5; }
-.storylab-lh-2 .ql-editor { line-height: 2; }
+
+.ql-toolbar .ql-picker.ql-line-height {
+  min-width: 2.5rem;
+}
+
+/* Keep a little space between paragraphs inside the editor */
+.ql-editor p {
+  margin: 0 0 0.75em 0;
+}
+
+/* 🔹 Editor line spacing helpers */
+.storylab-editor .ql-editor {
+  line-height: 1.5;
+}
+
+.storylab-lh-1 .ql-editor {
+  line-height: 1;
+}
+
+.storylab-lh-1_5 .ql-editor {
+  line-height: 1.5;
+}
+
+.storylab-lh-2 .ql-editor {
+  line-height: 2;
+}
 
 /* ================================
    Brand + Global Base (LIGHT THEME)
@@ -166,43 +245,8 @@
   }
 }
 
-/* ================================
-   Utility Classes
-   ================================ */
-@layer utilities {
-  .bg-base {
-    background-color: var(--color-base);
-  }
-
-  .bg-radial-fade {
-    background: radial-gradient(circle at top left, #fefdfb 0%, #f1f5f9 40%, #ede9fe 100%);
-  }
-
-  .glass-panel {
-    background: rgba(255, 255, 255, 0.85);
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border: 1px solid rgba(255, 255, 255, 0.6);
-  }
-
-  .glass-soft {
-    background: rgba(255, 255, 255, 0.65);
-    backdrop-filter: blur(12px);
-    -webkit-backdrop-filter: blur(12px);
-    border: 1px solid rgba(255, 255, 255, 0.5);
-  }
-
-  .text-ink { color: var(--color-ink); }
-  .text-muted { color: var(--color-muted); }
-  .text-gold { color: var(--color-gold); }
-  .text-primary { color: var(--color-primary); }
-  .text-accent { color: var(--color-accent); }
-  .bg-primary { background-color: var(--color-primary); }
-  .bg-accent { background-color: var(--color-accent); }
-}
-
 /* ===================================
-   Dark theme (toggle .theme-dark)
+   Optional: Dark theme (toggle .theme-dark)
    =================================== */
 .theme-dark {
   --background: 222 61% 7%;
@@ -232,6 +276,13 @@
    Reusable Helper Classes
    ======================= */
 @layer components {
+  .glass-panel {
+    @apply bg-white/60 backdrop-blur-xl border border-white/40 rounded-2xl shadow-lg;
+  }
+  .glass-soft {
+    @apply bg-white/40 backdrop-blur-md border border-white/30 rounded-xl shadow;
+  }
+
   .btn-primary {
     @apply font-medium px-4 py-2 rounded-lg;
     background: var(--color-accent);
@@ -242,32 +293,56 @@
     background: var(--color-gold);
     color: white;
   }
+
+  .text-muted {
+    color: var(--color-muted);
+  }
+}
+
+/* Optional radial background accent for hero/dashboard */
+.bg-radial-fade {
+  background-image: radial-gradient(
+    circle at 20% 10%,
+    rgba(202, 177, 214, 0.25),
+    rgba(234, 242, 255, 0) 60%
+  );
+}
+
+/* Optional DnD visuals (CSS-only) */
+.dnd-draggable {
+  touch-action: none;
+}
+.dnd-dragging {
+  opacity: 0.5;
+}
+.dnd-drop-hover {
+  border-color: #4f46e5 !important;
+  background-color: rgba(79, 70, 229, 0.1) !important;
 }
 
 /* ---------- Brand tokens (safe defaults) ---------- */
 :root {
+  /* Core surfaces */
   --brand-bg: #faf7fb;
   --brand-white: #ffffff;
   --brand-surface: #ffffff;
+
+  /* Borders */
   --brand-border: #ead9e5;
   --brand-border-strong: #e3cfe0;
+
+  /* Text */
   --brand-text: #2b2330;
   --brand-subtext: #6b5a68;
+
+  /* Primary brand */
   --brand-primary: #ec4899;
   --brand-accent: #f472b6;
   --brand-highlight: rgba(236, 72, 153, 0.1);
+
+  /* Header gradient */
   --brand-rose: #ec4899;
   --brand-pink: #f9a8d4;
-}
-
-/* Publishing header + brand tune */
-:root {
-  --brand-rose: #e48aa8;
-  --brand-peach: #f6c0b3;
-  --brand-primary: #d46d92;
-  --brand-accent: #f1a3bf;
-  --brand-highlight: rgba(212, 109, 146, 0.12);
-  --brand-peach: var(--brand-pink);
 }
 
 /* Optional: subtle page smoothing & resets */
@@ -279,7 +354,9 @@ body,
   color: var(--brand-text);
 }
 
-button { font: inherit; }
+button {
+  font: inherit;
+}
 
 select,
 input,
@@ -288,15 +365,33 @@ textarea {
   color: var(--brand-text);
 }
 
-iframe { background: transparent; }
+iframe {
+  background: transparent;
+}
 
+/* Optional: nicer focus ring for accessibility */
 :focus-visible {
   outline: 2px solid var(--brand-accent);
   outline-offset: 2px;
 }
 
+/* --- Publishing header + brand tune --- */
+:root {
+  --brand-rose: #e48aa8;
+  --brand-peach: #f6c0b3;
+  --brand-primary: #d46d92;
+  --brand-accent: #f1a3bf;
+  --brand-highlight: rgba(212, 109, 146, 0.12);
+}
+
+/* Keep alias if you were using brand-pink */
+:root {
+  --brand-peach: var(--brand-pink);
+}
+
 /* =========================================================
    HARD RESET for Quill layout
+   This prevents the editor "page" from overlapping the sidebar
    ========================================================= */
 .word-style-editor .ql-container,
 .word-style-editor .ql-editor,
@@ -318,16 +413,9 @@ iframe { background: transparent; }
   max-width: 100% !important;
 }
 
+/* Prevent any Quill inner element from forcing horizontal overflow */
 .word-style-editor .ql-editor {
   margin: 0 !important;
   overflow-wrap: anywhere;
   word-break: break-word;
-}
-
-/* Optional DnD visuals */
-.dnd-draggable { touch-action: none; }
-.dnd-dragging { opacity: 0.5; }
-.dnd-drop-hover {
-  border-color: #4f46e5 !important;
-  background-color: rgba(79, 70, 229, 0.1) !important;
 }
