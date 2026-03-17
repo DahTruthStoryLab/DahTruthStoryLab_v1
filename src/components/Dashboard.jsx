@@ -96,17 +96,17 @@ function readAuthorProfile() {
 // --------- Collapsible nav section ---------
 function NavSection({ icon: Icon, label, path, subItems, navigate, pathname, isActive }) {
   const [open, setOpen] = useState(pathname.startsWith(path) || false);
- 
+
   return (
     <>
       <button
         type="button"
         onClick={() => subItems ? setOpen(!open) : navigate(path)}
-        className={`group relative w-full h-10 rounded-xl flex items-center gap-2.5 px-3 transition-all duration-150
+        className={`group relative w-full h-11 rounded-xl flex items-center gap-2.5 px-3 transition-all duration-150
           ${isActive && !subItems ? "bg-white/90 shadow-sm" : "hover:bg-white/70"}`}
       >
-        <Icon size={17} className={isActive ? "text-violet-500" : "text-slate-500"} />
-        <span className="font-medium text-sm flex-1"
+        <Icon size={18} className={isActive ? "text-violet-500" : "text-slate-500"} />
+        <span className="font-medium text-base flex-1"
           style={{ fontFamily: "'EB Garamond', Georgia, serif", color: isActive ? "#111827" : "#374151" }}>
           {label}
         </span>
@@ -124,11 +124,11 @@ function NavSection({ icon: Icon, label, path, subItems, navigate, pathname, isA
               <button
                 key={sub.path}
                 onClick={() => navigate(sub.path)}
-                className={`w-full h-9 rounded-xl flex items-center gap-2.5 px-4 transition-all duration-150
+                className={`w-full h-10 rounded-xl flex items-center gap-2.5 px-4 transition-all duration-150
                   ${subActive ? "bg-white/90 shadow-sm" : "hover:bg-white/70"}`}
               >
-                <sub.icon size={14} className={subActive ? "text-violet-500" : "text-slate-400"} />
-                <span className="font-medium text-sm"
+                <sub.icon size={16} className={subActive ? "text-violet-500" : "text-slate-400"} />
+                <span className="font-medium text-base"
                   style={{ fontFamily: "'EB Garamond', Georgia, serif", color: subActive ? "#111827" : "#6B7280" }}>
                   {sub.label}
                 </span>
