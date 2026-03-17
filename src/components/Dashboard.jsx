@@ -125,10 +125,10 @@ const menuItems = [
   { icon: PencilLine, label: "Writer",            path: "/writer" },
 
   // StoryLab (parent)
-  { icon: Layers,     label: "StoryLab",          path: "/story-lab/hub" },
+   { icon: Layers,   label: "StoryLab",           path: "/story-lab" },
 
   // Genre sub-items nested under StoryLab
-  { icon: BookOpen,   label: "Fiction",           path: "/story-lab/hub",        section: "StoryLab" },
+  { icon: BookOpen,   label: "Fiction",           path: "/story-lab/fiction",    section: "StoryLab" },
   { icon: FileText,   label: "Nonfiction",        path: "/story-lab/nonfiction", section: "StoryLab" },
   { icon: BookOpen,   label: "Poetry",            path: "/story-lab/poetry",     section: "StoryLab" },
 
