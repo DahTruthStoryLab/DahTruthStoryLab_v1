@@ -187,7 +187,7 @@ function StoryLabSidebar({ mobileOpen, setMobileOpen }) {
               >
                 StoryLab
               </h1>
-              <p className="text-[11px] text-slate-500">All Modules</p>
+             <p className="text-[11px] text-slate-500">StoryLab Modules</p>
             </div>
           </div>
           <button
@@ -233,7 +233,7 @@ function StoryLabSidebar({ mobileOpen, setMobileOpen }) {
           icon={BookOpen}
           iconColor={BRAND.navy}
           tools={FICTION_TOOLS}
-          defaultOpen={false}
+          defaultOpen={true}
         />
 
         {/* Nonfiction Section */}
@@ -242,7 +242,7 @@ function StoryLabSidebar({ mobileOpen, setMobileOpen }) {
           icon={FileText}
           iconColor={BRAND.goldDark}
           tools={NONFICTION_TOOLS}
-          defaultOpen={false}
+          defaultOpen={true}
         />
 
         {/* Poetry Section */}
@@ -251,7 +251,7 @@ function StoryLabSidebar({ mobileOpen, setMobileOpen }) {
           icon={Feather}
           iconColor={BRAND.purpleLight}
           tools={POETRY_TOOLS}
-          defaultOpen={false}
+          defaultOpen={true}
         />
 
         <div className="my-2 border-t border-slate-200/80" />
