@@ -106,7 +106,7 @@ function NavSection({ icon: Icon, label, path, subItems, navigate, pathname, isA
           ${isActive && !subItems ? "bg-white/90 shadow-sm" : "hover:bg-white/70"}`}
       >
         <Icon size={17} className={isActive ? "text-violet-500" : "text-slate-500"} />
-        <span className="font-medium text-xs flex-1"
+        <span className="font-medium text-sm flex-1"
           style={{ fontFamily: "'EB Garamond', Georgia, serif", color: isActive ? "#111827" : "#374151" }}>
           {label}
         </span>
@@ -128,7 +128,7 @@ function NavSection({ icon: Icon, label, path, subItems, navigate, pathname, isA
                   ${subActive ? "bg-white/90 shadow-sm" : "hover:bg-white/70"}`}
               >
                 <sub.icon size={14} className={subActive ? "text-violet-500" : "text-slate-400"} />
-                <span className="font-medium text-xs"
+                <span className="font-medium text-sm"
                   style={{ fontFamily: "'EB Garamond', Georgia, serif", color: subActive ? "#111827" : "#6B7280" }}>
                   {sub.label}
                 </span>
