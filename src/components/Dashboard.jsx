@@ -100,23 +100,20 @@ function NavSection({ icon: Icon, label, path, subItems, navigate, pathname, isA
     <>
       <button
         type="button"
-        onClick={() => {
-          if (subItems) {
-            setOpen(!open);
-            navigate(path);
-          } else {
-            navigate(path);
-          }
-        }}
+        onClick={() => subItems ? setOpen(!open) : navigate(path)}
+        
         className={`group relative w-full h-12 rounded-xl flex items-center justify-start gap-3 px-3 transition-all duration-150
           ${isActive && !subItems ? "bg-white/90 shadow-sm" : "hover:bg-white/70"}`}
       >
         {/* ✅ Standardized icon size to 20 */}
         <Icon size={20} className={isActive ? "text-violet-500" : "text-slate-500"} />
-        <span className="font-medium text-base flex-1 text-left"
-          style={{ fontFamily: "'EB Garamond', Georgia, serif", color: isActive ? "#111827" : "#374151" }}>
-          {label}
-        </span>
+       <span
+  className="font-medium text-base flex-1 text-left"
+  style={{ fontFamily: "'EB Garamond', Georgia, serif", color: isActive ? "#111827" : "#374151" }}
+  onClick={(e) => { e.stopPropagation(); navigate(path); }}
+>
+  {label}
+</span>
         {subItems && (
           open
             ? <ChevronDown size={14} className="text-slate-400" />
