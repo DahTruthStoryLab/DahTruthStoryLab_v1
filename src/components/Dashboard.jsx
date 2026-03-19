@@ -1,3 +1,4 @@
+src/components/Dashboard.js — DahTruth StoryLab
 
 // src/components/Dashboard.js
 import React, { useState, useEffect } from "react";
@@ -73,7 +74,7 @@ const Progress = ({ value }) => (
  
 // --------- Profile helper ---------
 function readAuthorProfile() {
-  let name = "New Author";
+  let name = "Author";
   let avatarUrl = "";
   try {
     const keys = ["dahtruth_project_meta", "dt_profile", "userProfile", "profile", "currentUser"];
@@ -96,24 +97,32 @@ function readAuthorProfile() {
 // --------- Collapsible nav section ---------
 function NavSection({ icon: Icon, label, path, subItems, navigate, pathname, isActive }) {
   const [open, setOpen] = useState(pathname.startsWith(path) || false);
-
+ 
   return (
     <>
       <button
         type="button"
-        onClick={() => subItems ? setOpen(!open) : navigate(path)}
-        className={`group relative w-full h-11 rounded-xl flex items-center gap-2.5 px-3 transition-all duration-150
+        onClick={() => {
+          if (subItems) {
+            setOpen(!open);
+            navigate(path);
+          } else {
+            navigate(path);
+          }
+        }}
+        className={`group relative w-full h-12 rounded-xl flex items-center justify-start gap-3 px-3 transition-all duration-150
           ${isActive && !subItems ? "bg-white/90 shadow-sm" : "hover:bg-white/70"}`}
       >
-        <Icon size={18} className={isActive ? "text-violet-500" : "text-slate-500"} />
-        <span className="font-medium text-base flex-1"
+        {/* ✅ Standardized icon size to 20 */}
+        <Icon size={20} className={isActive ? "text-violet-500" : "text-slate-500"} />
+        <span className="font-medium text-base flex-1 text-left"
           style={{ fontFamily: "'EB Garamond', Georgia, serif", color: isActive ? "#111827" : "#374151" }}>
           {label}
         </span>
         {subItems && (
           open
-            ? <ChevronDown size={13} className="text-slate-400" />
-            : <ChevronRight size={13} className="text-slate-400" />
+            ? <ChevronDown size={14} className="text-slate-400" />
+            : <ChevronRight size={14} className="text-slate-400" />
         )}
       </button>
       {subItems && open && (
@@ -124,10 +133,11 @@ function NavSection({ icon: Icon, label, path, subItems, navigate, pathname, isA
               <button
                 key={sub.path}
                 onClick={() => navigate(sub.path)}
-                className={`w-full h-10 rounded-xl flex items-center gap-2.5 px-4 transition-all duration-150
+                className={`w-full h-11 rounded-xl flex items-center justify-start gap-3 px-4 transition-all duration-150
                   ${subActive ? "bg-white/90 shadow-sm" : "hover:bg-white/70"}`}
               >
-                <sub.icon size={16} className={subActive ? "text-violet-500" : "text-slate-400"} />
+                {/* ✅ Standardized sub-item icon size to 20 */}
+                <sub.icon size={20} className={subActive ? "text-violet-500" : "text-slate-400"} />
                 <span className="font-medium text-base"
                   style={{ fontFamily: "'EB Garamond', Georgia, serif", color: subActive ? "#111827" : "#6B7280" }}>
                   {sub.label}
@@ -273,7 +283,7 @@ const Sidebar = ({ isOpen, onClose, authorName, authorAvatar, navigate, userNove
                       {words.toLocaleString()} words
                       {status && (
                         <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] uppercase tracking-wide"
-                          style={{ background: "rgba(249,250,251,0.95)", border: "1px solid rgba(209,213,219,0.9)", color: "rgba(55,65,81,1)" }}>
+                          style={{ background: "rgba(249,250,251,0.95)", border: "1px solid rgba(209,213,219,0.9)", color: "rgba(55,65,71,1)" }}>
                           {status}
                         </span>
                       )}
@@ -331,16 +341,17 @@ export default function Dashboard() {
   const { user } = useUser();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [greeting, setGreeting] = useState("");
-  const [authorName, setAuthorName] = useState("New Author");
+  const [authorName, setAuthorName] = useState("Author");
   const [authorAvatar, setAuthorAvatar] = useState("");
   const [userNovels, setUserNovels] = useState([]);
  
   useEffect(() => {
     if (user) {
+      // ✅ Removed email fallback — shows "Author" instead of email
       const name = user.displayName ||
         user.author ||
         (user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : null) ||
-        user.firstName || user.username || user.email?.split("@")[0] || "New Author";
+        user.firstName || user.username || "Author";
       setAuthorName(name);
       setAuthorAvatar(user.avatarUrl || "");
     } else {
@@ -351,7 +362,7 @@ export default function Dashboard() {
   }, [user]);
  
   useEffect(() => {
-    const name = authorName && authorName !== "New Author" ? authorName : "";
+    const name = authorName && authorName !== "Author" ? authorName : "";
     const hour = new Date().getHours();
     const firstName = name.split(" ")[0];
     let g;
@@ -432,7 +443,7 @@ export default function Dashboard() {
               <CardBody className="flex items-center justify-between gap-6">
                 <div>
                   <p className="text-sm text-violet-100/80 mb-1 tracking-[0.16em] uppercase">
-                    {authorName && authorName !== "New Author" ? "Author workspace" : "Welcome"}
+                    {authorName && authorName !== "Author" ? "Author workspace" : "Welcome"}
                   </p>
                   <h1 className="text-3xl md:text-4xl font-semibold text-white"
                     style={{ fontFamily: "'EB Garamond', Georgia, serif" }}>
