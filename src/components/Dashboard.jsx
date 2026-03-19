@@ -1,6 +1,4 @@
 src/components/Dashboard.js — DahTruth StoryLab
-
-// src/components/Dashboard.js
 import React, { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useUser } from "../lib/userStore";
