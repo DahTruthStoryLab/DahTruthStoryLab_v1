@@ -341,32 +341,41 @@ export default function Dashboard() {
   const [userNovels, setUserNovels] = useState([]);
  
   useEffect(() => {
-    if (user) {
-      // ✅ Removed email fallback — shows "Author" instead of email
-      const name = user.displayName ||
-        user.author ||
-        (user.firstName && user.lastName ? `${user.firstName} ${user.lastName}` : null) ||
-        user.firstName || user.username || "Author";
-      setAuthorName(name);
-      setAuthorAvatar(user.avatarUrl || "");
-    } else {
-      const profile = readAuthorProfile();
-      setAuthorName(profile.name);
-      setAuthorAvatar(profile.avatarUrl);
-    }
-  }, [user]);
- 
-  useEffect(() => {
-    const name = authorName && authorName !== "Author" ? authorName : "";
-    const hour = new Date().getHours();
-    const firstName = name.split(" ")[0];
-    let g;
-    if (!name) g = "Welcome to DahTruth Story Lab";
-    else if (hour < 12) g = `Good Morning, ${firstName}`;
-    else if (hour < 17) g = `Good Afternoon, ${firstName}`;
-    else g = `Good Evening, ${firstName}`;
-    setGreeting(g);
-  }, [authorName]);
+  if (user) {
+    // Try user-specific profile key first
+    const profileKey = `dt_user_profile_${user.id || user.sub}`;
+    const profileRaw = storage.getItem(profileKey);
+    const profile = profileRaw ? JSON.parse(profileRaw) : null;
+    const name =
+      (profile?.firstName && profile?.lastName
+        ? `${profile.firstName} ${profile.lastName}`
+        : null) ||
+      profile?.firstName ||
+      profile?.displayName ||
+      user.displayName ||
+      user.author ||
+      user.firstName ||
+      "Author";
+    setAuthorName(name);
+    setAuthorAvatar(profile?.avatarUrl || user.avatarUrl || "");
+  } else {
+    const profile = readAuthorProfile();
+    setAuthorName(profile.name);
+    setAuthorAvatar(profile.avatarUrl);
+  }
+}, [user]);
+
+useEffect(() => {
+  const name = authorName && authorName !== "Author" ? authorName : "";
+  const hour = new Date().getHours();
+  const firstName = name.split(" ")[0];
+  let g;
+  if (!name) g = "Welcome to DahTruth Story Lab";
+  else if (hour < 12) g = `Good Morning, ${firstName}`;
+  else if (hour < 17) g = `Good Afternoon, ${firstName}`;
+  else g = `Good Evening, ${firstName}`;
+  setGreeting(g);
+}, [authorName]);;
  
   useEffect(() => {
     const loadProjects = () => {
