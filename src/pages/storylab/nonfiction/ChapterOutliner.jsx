@@ -1,6 +1,10 @@
 // src/pages/storylab/nonfiction/ChapterOutliner.jsx
+// FIXED: Removed direct fetch to api.anthropic.com
+// Now routes through Lambda via runAssistant() from api.ts
+
 import React, { useState } from "react";
 import { LayoutList, Plus, Trash2, Sparkles, GripVertical } from "lucide-react";
+import { runAssistant } from "../../../lib/api";
 
 const BRAND = { brown: "#78350f", amber: "#b45309", gold: "#d4af37", goldDark: "#b8960c" };
 
@@ -30,25 +34,24 @@ export default function ChapterOutliner() {
     if (!filled.length) return;
     setLoading(true);
     setFeedback("");
+
     const formatted = filled.map((c, i) =>
       `Chapter ${i + 1}: ${c.title}\nPurpose: ${c.purpose}\nKey Points: ${c.keyPoints}\nTransition: ${c.transition}`
     ).join("\n\n");
+
+    const instructions =
+      "You are a nonfiction book editor. Review this chapter outline and advise on: " +
+      "(1) whether each chapter has a clear purpose, (2) whether the arc builds effectively, " +
+      "(3) any gaps or redundancies, (4) how transitions between chapters can be strengthened. Be specific.";
+
+    const text = `Book notes: ${bookNote || "None."}\n\nOutline:\n${formatted}`;
+
     try {
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 1000,
-          messages: [{
-            role: "user",
-            content: `You are a nonfiction book editor. Review this chapter outline and advise on: (1) whether each chapter has a clear purpose, (2) whether the arc builds effectively, (3) any gaps or redundancies, (4) how transitions between chapters can be strengthened. Be specific.\n\nBook notes: ${bookNote || "None."}\n\nOutline:\n${formatted}`
-          }]
-        })
-      });
-      const data = await res.json();
-      setFeedback(data.content?.[0]?.text || "No response received.");
-    } catch { setFeedback("Error connecting to AI. Please try again."); }
+      const res = await runAssistant(text, "clarify", instructions, "anthropic");
+      setFeedback(res?.result || res?.text || "No response received.");
+    } catch {
+      setFeedback("Error connecting to AI. Please try again.");
+    }
     setLoading(false);
   }
 
@@ -129,4 +132,3 @@ export default function ChapterOutliner() {
     </div>
   );
 }
-
