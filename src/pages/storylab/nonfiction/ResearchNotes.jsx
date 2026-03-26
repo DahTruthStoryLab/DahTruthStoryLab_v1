@@ -1,6 +1,7 @@
 // src/pages/storylab/nonfiction/ResearchNotes.jsx
 import React, { useState } from "react";
 import { Search, Plus, Trash2, Sparkles } from "lucide-react";
+import { runAssistant } from "../../../lib/api";
 
 const BRAND = { brown: "#78350f", amber: "#b45309", gold: "#d4af37", amberLight: "#fbbf24" };
 
@@ -26,25 +27,22 @@ export default function ResearchNotes() {
     if (!filled.length) return;
     setLoading(true);
     setSynthesis("");
+
     const formatted = filled.map((n, i) =>
       `Source ${i + 1}: ${n.source}\nQuote: ${n.quote}\nParaphrase: ${n.paraphrase}\nCommentary: ${n.commentary}`
     ).join("\n\n");
+
+    const instructions =
+      "You are a research editor. Review these research notes and: " +
+      "(1) identify the strongest evidence, (2) flag any gaps in the argument, " +
+      "(3) suggest how these sources can be woven together into a coherent section. Be specific.";
+
     try {
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 1000,
-          messages: [{
-            role: "user",
-            content: `You are a research editor. Review these research notes and: (1) identify the strongest evidence, (2) flag any gaps in the argument, (3) suggest how these sources can be woven together into a coherent section. Be specific.\n\nNotes:\n${formatted}`
-          }]
-        })
-      });
-      const data = await res.json();
-      setSynthesis(data.content?.[0]?.text || "No response received.");
-    } catch { setSynthesis("Error connecting to AI. Please try again."); }
+      const res = await runAssistant(formatted, "clarify", instructions, "anthropic");
+      setSynthesis(res?.result || res?.text || "No response received.");
+    } catch {
+      setSynthesis("Error connecting to AI. Please try again.");
+    }
     setLoading(false);
   }
 
@@ -116,4 +114,3 @@ export default function ResearchNotes() {
     </div>
   );
 }
-
