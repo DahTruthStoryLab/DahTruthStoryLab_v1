@@ -1,14 +1,15 @@
 // src/pages/storylab/nonfiction/MemoirSceneMap.jsx
 import React, { useState } from "react";
 import { BookOpen, Sparkles } from "lucide-react";
+import { runAssistant } from "../../../lib/api";
 
 const BRAND = { brown: "#78350f", amber: "#b45309", gold: "#d4af37", amberLight: "#fbbf24" };
 
 const SCENE_MODES = [
-  { id: "map", label: "Map a Scene", color: "#fbbf24", prompt: "Help me map a memoir scene. Analyze this scene for: scene goal (what the narrator wants), emotional turn (where the feeling shifts), sensory details (what is seen/heard/felt), and reflection (what the narrator understands now that they didn't then). Be specific and point to exact moments.\n\nScene:" },
-  { id: "sensory", label: "Deepen Sensory Detail", color: "#d97706", prompt: "Revise this memoir scene to deepen the sensory detail. Replace abstractions with specific sensory experiences — what is seen, heard, smelled, touched, tasted. The body should be present in every scene. Return the revised scene with a note on what you added.\n\nScene:" },
-  { id: "reflection", label: "Strengthen Reflection", color: "#b45309", prompt: "Strengthen the reflective layer of this memoir scene. The narrator's present-day consciousness should interpret the past event — not just report it. Add depth, complexity, and earned insight. Return the revised scene.\n\nScene:" },
-  { id: "compress", label: "Compress the Scene", color: "#78350f", prompt: "Compress this memoir scene by 25-30%. Cut backstory, repetition, and over-explanation. Keep only the essential action, sensory detail, and reflection. Return the compressed scene.\n\nScene:" },
+  { id: "map", label: "Map a Scene", color: "#fbbf24", prompt: "Help me map a memoir scene. Analyze this scene for: scene goal (what the narrator wants), emotional turn (where the feeling shifts), sensory details (what is seen/heard/felt), and reflection (what the narrator understands now that they didn't then). Be specific and point to exact moments." },
+  { id: "sensory", label: "Deepen Sensory Detail", color: "#d97706", prompt: "Revise this memoir scene to deepen the sensory detail. Replace abstractions with specific sensory experiences — what is seen, heard, smelled, touched, tasted. The body should be present in every scene. Return the revised scene with a note on what you added." },
+  { id: "reflection", label: "Strengthen Reflection", color: "#b45309", prompt: "Strengthen the reflective layer of this memoir scene. The narrator's present-day consciousness should interpret the past event — not just report it. Add depth, complexity, and earned insight. Return the revised scene." },
+  { id: "compress", label: "Compress the Scene", color: "#78350f", prompt: "Compress this memoir scene by 25-30%. Cut backstory, repetition, and over-explanation. Keep only the essential action, sensory detail, and reflection. Return the compressed scene." },
 ];
 
 export default function MemoirSceneMap() {
@@ -24,18 +25,11 @@ export default function MemoirSceneMap() {
     setLoading(true);
     setResult("");
     try {
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 1000,
-          messages: [{ role: "user", content: `${selected.prompt}\n\n${scene}` }]
-        })
-      });
-      const data = await res.json();
-      setResult(data.content?.[0]?.text || "No response received.");
-    } catch { setResult("Error connecting to AI. Please try again."); }
+      const res = await runAssistant(scene, "clarify", selected.prompt, "anthropic");
+      setResult(res?.result || res?.text || "No response received.");
+    } catch {
+      setResult("Error connecting to AI. Please try again.");
+    }
     setLoading(false);
   }
 
@@ -96,4 +90,3 @@ export default function MemoirSceneMap() {
     </div>
   );
 }
-
