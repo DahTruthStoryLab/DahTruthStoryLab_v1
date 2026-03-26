@@ -1,9 +1,3 @@
-FILE: src/pages/storylab/nonfiction/EssayBuilder.jsx  (FIXED)
-
-WHAT CHANGED: Removed direct fetch to api.anthropic.com.
-Added: import { runAssistant } from '../../../lib/api'
-Replaced the fetch block with: runAssistant(essay, 'clarify', instructions, 'anthropic')
-
 // src/pages/storylab/nonfiction/EssayBuilder.jsx
 // FIXED: No longer calls api.anthropic.com directly.
 // Now routes through your Lambda via runAssistant() from api.ts
