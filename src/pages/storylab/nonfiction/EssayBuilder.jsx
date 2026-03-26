@@ -1,14 +1,24 @@
+FILE: src/pages/storylab/nonfiction/EssayBuilder.jsx  (FIXED)
+
+WHAT CHANGED: Removed direct fetch to api.anthropic.com.
+Added: import { runAssistant } from '../../../lib/api'
+Replaced the fetch block with: runAssistant(essay, 'clarify', instructions, 'anthropic')
+
 // src/pages/storylab/nonfiction/EssayBuilder.jsx
+// FIXED: No longer calls api.anthropic.com directly.
+// Now routes through your Lambda via runAssistant() from api.ts
+
 import React, { useState } from "react";
 import { FileText, Sparkles, ChevronDown, ChevronUp } from "lucide-react";
+import { runAssistant } from "../../../lib/api";
 
 const BRAND = { brown: "#78350f", amber: "#b45309", gold: "#d4af37", goldDark: "#b8960c" };
 
 const ESSAY_PARTS = [
   { title: "Thesis Statement", color: "#d97706", content: "Your thesis is a single, arguable claim that your entire essay defends. It should be specific, debatable, and significant. Avoid thesis statements that merely state a fact or announce your topic. A strong thesis takes a position and signals the stakes of the argument.", prompt: "Write your thesis in one sentence. Then ask: Is this arguable? Is it specific? Does it matter?" },
-  { title: "Claims & Evidence", color: "#d4af37", content: "Each body paragraph makes one claim that supports your thesis. The claim is your argument; the evidence is your proof. Evidence must be specific — a quote, a statistic, an example. After evidence, always explain how it supports your claim. Never let evidence speak for itself.", prompt: "For each paragraph, write: Claim → Evidence → Explanation. Are all three present?" },
-  { title: "Counterargument", color: "#92400e", content: "A strong essay anticipates and addresses opposing views. Acknowledge the counterargument fairly — don't strawman it. Then refute it, concede part of it, or reframe it. Handling objections strengthens your credibility and deepens your argument.", prompt: "What is the strongest objection to your argument? Write it honestly, then respond to it." },
-  { title: "Transitions", color: "#b45309", content: "Transitions are the connective tissue of your essay. They show logical relationships — causation, contrast, sequence, consequence. Avoid mechanical transitions (firstly, secondly, in conclusion). Instead, use transitional ideas that grow naturally from your previous point.", prompt: "Read your essay aloud. Where does it feel abrupt or disconnected? Rewrite those moments." },
+  { title: "Claims & Evidence", color: "#d4af37", content: "Each body paragraph makes one claim that supports your thesis. The claim is your argument; the evidence is your proof. Evidence must be specific — a quote, a statistic, an example. After evidence, always explain how it supports your claim. Never let evidence speak for itself.", prompt: "For each paragraph, write: Claim -> Evidence -> Explanation. Are all three present?" },
+  { title: "Counterargument", color: "#92400e", content: "A strong essay anticipates and addresses opposing views. Acknowledge the counterargument fairly. Then refute it, concede part of it, or reframe it. Handling objections strengthens your credibility and deepens your argument.", prompt: "What is the strongest objection to your argument? Write it honestly, then respond to it." },
+  { title: "Transitions", color: "#b45309", content: "Transitions are the connective tissue of your essay. They show logical relationships — causation, contrast, sequence, consequence. Avoid mechanical transitions. Instead, use transitional ideas that grow naturally from your previous point.", prompt: "Read your essay aloud. Where does it feel abrupt or disconnected? Rewrite those moments." },
   { title: "Conclusion", color: "#78350f", content: "Your conclusion should do more than summarize. It should land with weight — synthesizing your argument, raising the stakes, or opening outward to a larger implication. The final sentence of your essay is the last thing your reader carries away. Make it count.", prompt: "Write a conclusion that begins with synthesis, not summary. What does your argument mean beyond itself?" },
 ];
 
@@ -23,21 +33,16 @@ export default function EssayBuilder() {
     setLoading(true);
     setFeedback("");
     try {
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-20250514",
-          max_tokens: 1000,
-          messages: [{
-            role: "user",
-            content: `You are a rigorous essay editor. Analyze this essay or essay draft for: thesis strength, claim-evidence-explanation structure, counterargument handling, transitions, and conclusion. Be specific. Point to exact sentences. Do not be generic.\n\nEssay:\n${essay}`
-          }]
-        })
-      });
-      const data = await res.json();
-      setFeedback(data.content?.[0]?.text || "No response received.");
-    } catch { setFeedback("Error connecting to AI. Please try again."); }
+      const instructions =
+        "You are a rigorous essay editor. Analyze this essay or essay draft for: " +
+        "thesis strength, claim-evidence-explanation structure, counterargument handling, " +
+        "transitions, and conclusion. Be specific. Point to exact sentences. Do not be generic.";
+
+      const res = await runAssistant(essay, "clarify", instructions, "anthropic");
+      setFeedback(res?.result || res?.text || "No response received.");
+    } catch (err) {
+      setFeedback("Error connecting to AI. Please try again.");
+    }
     setLoading(false);
   }
 
@@ -103,4 +108,3 @@ export default function EssayBuilder() {
     </div>
   );
 }
-
