@@ -101,6 +101,10 @@ const Export = lazy(() => import("./pages/Export.tsx"));
 const PublishingPrep = lazy(() => import("./pages/PublishingPrep.tsx"));
 const Cover = lazy(() => import("./pages/Cover.tsx"));
 
+// Author
+const AuthorPage = lazy(() => import("./pages/AuthorPage.tsx"));
+const BookPage = lazy(() => import("./pages/BookPage.tsx"));
+
 // Other
 const Profile = lazy(() => import("./components/Profile"));
 const PlansPage = lazy(() => import("./components/PlansPage"));
@@ -423,6 +427,24 @@ export default function App() {
                     element={
                       <ProtectedRoute>
                         <Calendar />
+                      </ProtectedRoute>
+                    }
+                  />
+
+                  {/* Author */}
+                  <Route
+                    path="/author"
+                    element={
+                      <ProtectedRoute>
+                        <AuthorPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/author/book/:bookId"
+                    element={
+                      <ProtectedRoute>
+                        <BookPage />
                       </ProtectedRoute>
                     }
                   />
