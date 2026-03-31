@@ -1,24 +1,17 @@
 // src/components/storylab/StoryLabLayout.jsx
+// Nav links removed from header — AppSidebar handles all navigation now.
+// Header retains track badge + project title for in-context awareness.
+
 import React, { useEffect, useState } from "react";
 import { Outlet, Link, useLocation } from "react-router-dom";
-import {
-  BookOpen,
-  PenLine,
-  LayoutGrid,
-  Home,
-  Compass,
-} from "lucide-react";
+import { LayoutGrid } from "lucide-react";
 
-/* ============================================
-   BRAND COLORS (keep aligned with WorkshopHub)
-   ============================================ */
 const BRAND = {
   navy: "#1e3a5f",
   navyLight: "#2d4a6f",
   gold: "#d4af37",
   goldDark: "#b8960c",
   rose: "#e8b4b8",
-  ink: "#0F172A",
 };
 
 const CURRENT_STORY_KEY = "currentStory";
@@ -33,9 +26,7 @@ function safeJsonParse(value, fallback = null) {
 
 function normalizeGenre(genreRaw) {
   const g = String(genreRaw || "").toLowerCase();
-
   if (g.includes("poem") || g.includes("poetry")) return "Poetry";
-
   if (
     (g.includes("non") && g.includes("fiction")) ||
     g.includes("memoir") ||
@@ -51,7 +42,6 @@ function normalizeGenre(genreRaw) {
   ) {
     return "Nonfiction";
   }
-
   return "Fiction";
 }
 
@@ -61,148 +51,86 @@ export default function StoryLabLayout() {
   const [storyTitle, setStoryTitle] = useState("");
 
   useEffect(() => {
-  const load = () => {
-  const story = safeJsonParse(localStorage.getItem(CURRENT_STORY_KEY), {});
-  const storyGenre = normalizeGenre(story?.primaryGenre || story?.genre);
+    const load = () => {
+      const story = safeJsonParse(localStorage.getItem(CURRENT_STORY_KEY), {});
+      const storyGenre = normalizeGenre(story?.primaryGenre || story?.genre);
 
-  // Override with URL path if we're in a specific genre section
-  let nextTrack = storyGenre;
-  if (pathname.startsWith("/story-lab/poetry")) nextTrack = "Poetry";
-  else if (pathname.startsWith("/story-lab/nonfiction")) nextTrack = "Nonfiction";
-  else if (pathname.startsWith("/story-lab/fiction")) nextTrack = "Fiction";
+      let nextTrack = storyGenre;
+      if (pathname.startsWith("/story-lab/poetry")) nextTrack = "Poetry";
+      else if (pathname.startsWith("/story-lab/nonfiction")) nextTrack = "Nonfiction";
+      else if (pathname.startsWith("/story-lab/fiction")) nextTrack = "Fiction";
 
-  setTrack(nextTrack);
-  setStoryTitle(story?.title || "");
-};
+      setTrack(nextTrack);
+      setStoryTitle(story?.title || "");
+    };
 
     load();
 
     const onProjectChange = () => load();
     window.addEventListener("project:change", onProjectChange);
-
-    const onStorage = (e) => {
-      if (e.key === CURRENT_STORY_KEY) load();
-    };
+    const onStorage = (e) => { if (e.key === CURRENT_STORY_KEY) load(); };
     window.addEventListener("storage", onStorage);
 
     return () => {
       window.removeEventListener("project:change", onProjectChange);
       window.removeEventListener("storage", onStorage);
     };
- }, [pathname]);
-
-  const isStoryLabLanding = pathname === "/story-lab";
-  const isHub =
-    pathname === "/story-lab/hub" ||
-    pathname === "/story-lab/workshop" ||
-    pathname.startsWith("/story-lab/workshop/");
-
-  const isStoryLabSection = pathname.startsWith("/story-lab");
+  }, [pathname]);
 
   return (
     <div className="min-h-screen bg-[color:var(--brand-bg,#f8fafc)]">
-      {/* Sticky header */}
-      <div className="sticky top-0 z-50 bg-white/95 backdrop-blur border-b border-slate-200">
-        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
-          {/* Left: Brand + context */}
-          <div className="flex items-center gap-3 min-w-0">
-            <Link
-              to="/story-lab"
-              className="w-10 h-10 rounded-2xl flex items-center justify-center text-white shadow-sm hover:opacity-95 transition"
-              style={{
-                background: `linear-gradient(135deg, ${BRAND.navy} 0%, ${BRAND.navyLight} 55%, ${BRAND.rose} 100%)`,
-              }}
-              title="StoryLab"
-              aria-label="StoryLab"
-            >
-              <LayoutGrid size={18} />
-            </Link>
+      {/* Slim context header — track + project only, no nav links */}
+      <div className="sticky top-0 z-30 bg-white/95 backdrop-blur border-b border-slate-200">
+        <div className="px-6 py-3 flex items-center gap-3">
+          {/* StoryLab icon */}
+          <Link
+            to="/story-lab"
+            className="w-8 h-8 rounded-xl flex items-center justify-center text-white shadow-sm hover:opacity-90 transition flex-shrink-0"
+            style={{
+              background: `linear-gradient(135deg, ${BRAND.navy} 0%, ${BRAND.navyLight} 55%, ${BRAND.rose} 100%)`,
+            }}
+            title="Story Lab Studio"
+          >
+            <LayoutGrid size={15} />
+          </Link>
 
-            <div className="min-w-0">
-              <div className="flex items-center gap-2 min-w-0">
-                <span className="font-semibold text-slate-800">StoryLab</span>
-                <span className="text-slate-300">•</span>
-                <span
-                  className="text-xs font-semibold px-2 py-0.5 rounded-full"
-                  style={{
-                    background: "rgba(212,175,55,0.14)",
-                    border: `1px solid rgba(212,175,55,0.25)`,
-                    color: BRAND.goldDark,
-                  }}
-                >
-                  {track}
-                </span>
+          {/* Studio label */}
+          <span
+            className="text-sm font-semibold text-slate-700"
+            style={{ fontFamily: "'EB Garamond', Georgia, serif" }}
+          >
+            Story Lab Studio
+          </span>
 
-                {isStoryLabSection && (
-                  <span className="hidden sm:inline text-xs text-slate-400 truncate">
-                    {isStoryLabLanding ? "Landing" : isHub ? "Hub" : ""}
-                  </span>
-                )}
-              </div>
+          <span className="text-slate-300 text-sm">·</span>
 
-              <div className="text-xs text-slate-500 truncate">
-                {storyTitle ? storyTitle : "No project selected"}
-              </div>
-            </div>
-          </div>
+          {/* Track badge */}
+          <span
+            className="text-xs font-semibold px-2.5 py-0.5 rounded-full"
+            style={{
+              background: "rgba(212,175,55,0.14)",
+              border: `1px solid rgba(212,175,55,0.25)`,
+              color: BRAND.goldDark,
+            }}
+          >
+            {track}
+          </span>
 
-          {/* Right: quick nav */}
-          <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
-            {/* ✅ StoryLab should ALWAYS go to the StoryLab landing page */}
-            <Link
-              to="/story-lab"
-              className="hidden sm:inline-flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-colors"
-              style={{
-                background: "rgba(30,58,95,0.08)",
-                border: "1px solid rgba(30,58,95,0.16)",
-                color: BRAND.navy,
-              }}
-              title="StoryLab Landing"
-            >
-              <Home size={16} />
-              StoryLab
-            </Link>
+          {/* Current project */}
+          {storyTitle && (
+            <>
+              <span className="text-slate-300 text-sm hidden sm:inline">·</span>
+              <span className="text-xs text-slate-400 truncate hidden sm:inline">
+                {storyTitle}
+              </span>
+            </>
+          )}
 
-            {/* ✅ Hub stays Hub (workshop hub) */}
-            <Link
-              to="/story-lab/hub"
-              className="hidden sm:inline-flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-colors hover:bg-slate-100 text-slate-700"
-              title="Workshop Hub"
-            >
-              <Compass size={16} />
-              Hub
-            </Link>
-
-            {/* Writer */}
-            <Link
-              to="/compose"
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium"
-              style={{
-                background: "rgba(30,58,95,0.10)",
-                border: "1px solid rgba(30,58,95,0.18)",
-                color: BRAND.navy,
-              }}
-              title="Writer"
-            >
-              <PenLine size={16} />
-              Writer
-            </Link>
-
-            {/* Dashboard (global) */}
-            <Link
-              to="/dashboard"
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium"
-              style={{
-                background: "rgba(212,175,55,0.12)",
-                border: "1px solid rgba(212,175,55,0.20)",
-                color: BRAND.goldDark,
-              }}
-              title="Dashboard"
-            >
-              <BookOpen size={16} />
-              Dashboard
-            </Link>
-          </div>
+          {!storyTitle && (
+            <span className="text-xs text-slate-400 hidden sm:inline">
+              No project selected
+            </span>
+          )}
         </div>
       </div>
 
@@ -213,3 +141,4 @@ export default function StoryLabLayout() {
     </div>
   );
 }
+
