@@ -1,19 +1,6 @@
 // src/components/AppSidebar.jsx
 // Global navigation sidebar — three studio structure
-//
-// WRITER'S STUDIO:   Projects, Table of Contents, Compose
-//
-// STORY LAB STUDIO:
-//   Fiction:         Hopes Fears & Legacy, Priority Cards, Character Roadmap,
-//                    Plot Builder, Narrative Arc, Clothesline
-//   Nonfiction:      Essay Builder, Memoir Scene Map, Research Notes,
-//                    Argument & Theses, Chapter Outliner
-//   Poetry:          Craft Lab, Revision Lab, Voice & Identity,
-//                    Sequence Builder, Remix Lab, AI Poetry Prompts
-//   Workshop Hub:    Dialogue Lab, Writing Prompts, Workshop Community,
-//                    Calendar, Export, Publish
-//
-// AUTHOR STUDIO:     Author Page, Profile
+// All paths verified against FictionRoutes, NonfictionRoutes, PoetryRoutes
 
 import React, { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
@@ -28,8 +15,8 @@ import {
 import { storage } from "../lib/storage";
 
 // ─────────────────────────────────────────────
-//  STUDIO LABEL — all caps with divider
-//  Optional navPath makes the label itself clickable
+//  STUDIO LABEL
+//  Optional navPath makes the label clickable
 // ─────────────────────────────────────────────
 function StudioLabel({ label, navPath }) {
   const navigate = useNavigate();
@@ -42,19 +29,15 @@ function StudioLabel({ label, navPath }) {
           onClick={() => navigate(navPath)}
           className="w-full flex items-center justify-between group text-left"
         >
-          <p
-            className="text-[10px] font-semibold uppercase tracking-[0.18em] group-hover:text-violet-500 transition-colors"
-            style={{ color: "#6B7280", fontFamily: "'EB Garamond', Georgia, serif" }}
-          >
+          <p className="text-[10px] font-semibold uppercase tracking-[0.18em] group-hover:text-violet-500 transition-colors"
+            style={{ color: "#6B7280", fontFamily: "'EB Garamond', Georgia, serif" }}>
             {label}
           </p>
           <ChevronRight size={10} className="text-slate-300 group-hover:text-violet-400 transition-colors" />
         </button>
       ) : (
-        <p
-          className="text-[10px] font-semibold uppercase tracking-[0.18em]"
-          style={{ color: "#6B7280", fontFamily: "'EB Garamond', Georgia, serif" }}
-        >
+        <p className="text-[10px] font-semibold uppercase tracking-[0.18em]"
+          style={{ color: "#6B7280", fontFamily: "'EB Garamond', Georgia, serif" }}>
           {label}
         </p>
       )}
@@ -95,42 +78,56 @@ function NavItem({ icon: Icon, label, path, active, indent = false }) {
 // ─────────────────────────────────────────────
 //  COLLAPSIBLE GROUP
 // ─────────────────────────────────────────────
-function NavGroup({ icon: Icon, label, basePath, items, pathname }) {
+function NavGroup({ icon: Icon, label, basePath, topPath, items, pathname }) {
+  const navigate = useNavigate();
   const groupActive = pathname.startsWith(basePath);
   const [open, setOpen] = useState(groupActive);
 
+  const handleLabelClick = (e) => {
+    e.stopPropagation();
+    navigate(topPath || basePath);
+  };
+
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl transition-all duration-150
-          ${groupActive && !open ? "bg-white/90 shadow-sm" : "hover:bg-white/70"}`}
-      >
-        <Icon
-          size={16}
-          style={{ flexShrink: 0, color: groupActive ? "#7C3AED" : "#64748b" }}
-        />
-        <span
-          className="text-sm font-medium flex-1 text-left truncate"
-          style={{
-            fontFamily: "'EB Garamond', Georgia, serif",
-            color: groupActive ? "#111827" : "#374151",
-          }}
+      <div className={`w-full flex items-center rounded-xl transition-all duration-150
+        ${groupActive && !open ? "bg-white/90 shadow-sm" : "hover:bg-white/70"}`}>
+        {/* Label — navigates to top-level page */}
+        <button
+          type="button"
+          onClick={handleLabelClick}
+          className="flex items-center gap-3 px-3 py-2 flex-1 text-left min-w-0"
         >
-          {label}
-        </span>
-        {open
-          ? <ChevronDown size={12} style={{ color: "#94a3b8", flexShrink: 0 }} />
-          : <ChevronRight size={12} style={{ color: "#94a3b8", flexShrink: 0 }} />
-        }
-      </button>
+          <Icon
+            size={16}
+            style={{ flexShrink: 0, color: groupActive ? "#7C3AED" : "#64748b" }}
+          />
+          <span
+            className="text-sm font-medium truncate"
+            style={{
+              fontFamily: "'EB Garamond', Georgia, serif",
+              color: groupActive ? "#111827" : "#374151",
+            }}
+          >
+            {label}
+          </span>
+        </button>
+        {/* Chevron — toggles expand/collapse */}
+        <button
+          type="button"
+          onClick={() => setOpen((o) => !o)}
+          className="px-2 py-2 flex-shrink-0"
+        >
+          {open
+            ? <ChevronDown size={12} style={{ color: "#94a3b8" }} />
+            : <ChevronRight size={12} style={{ color: "#94a3b8" }} />}
+        </button>
+      </div>
 
       {open && (
         <div className="mt-0.5 space-y-0.5 pl-4 border-l border-slate-200/80 ml-5">
           {items.map((item) => {
-            const active =
-              pathname === item.path || pathname.startsWith(item.path + "/");
+            const active = pathname === item.path || pathname.startsWith(item.path + "/");
             return (
               <NavItem
                 key={item.path + item.label}
@@ -174,6 +171,8 @@ export default function AppSidebar({ isOpen, onClose, userNovels = [] }) {
   } catch { }
 
   // ── FICTION items ─────────────────────────
+  // All paths verified against FictionRoutes.jsx
+  // Fiction sub-tools live under /story-lab/workshop/* and /story-lab/*
   const fictionItems = [
     { icon: Heart,         label: "Hopes, Fears & Legacy", path: "/story-lab/workshop/hfl" },
     { icon: ClipboardList, label: "Priority Cards",         path: "/story-lab/workshop/priorities" },
@@ -184,42 +183,43 @@ export default function AppSidebar({ isOpen, onClose, userNovels = [] }) {
   ];
 
   // ── NONFICTION items ──────────────────────
+  // Paths verified against NonfictionRoutes.jsx
+  // Routes: /essay /memoir /research /argument /chapter
   const nonfictionItems = [
-    { icon: PencilLine,    label: "Essay Builder",          path: "/story-lab/nonfiction/essay-builder" },
-    { icon: BookOpen,      label: "Memoir Scene Map",       path: "/story-lab/nonfiction/memoir-scene-map" },
-    { icon: FileText,      label: "Research Notes",         path: "/story-lab/nonfiction/research-notes" },
-    { icon: GraduationCap, label: "Argument & Theses",      path: "/story-lab/nonfiction/argument-theses" },
-    { icon: AlignJustify,  label: "Chapter Outliner",       path: "/story-lab/nonfiction/chapter-outliner" },
+    { icon: PencilLine,    label: "Essay Builder",    path: "/story-lab/nonfiction/essay" },
+    { icon: BookOpen,      label: "Memoir Scene Map", path: "/story-lab/nonfiction/memoir" },
+    { icon: FileText,      label: "Research Notes",   path: "/story-lab/nonfiction/research" },
+    { icon: GraduationCap, label: "Argument & Thesis",path: "/story-lab/nonfiction/argument" },
+    { icon: AlignJustify,  label: "Chapter Outliner", path: "/story-lab/nonfiction/chapter" },
   ];
 
   // ── POETRY items ──────────────────────────
+  // Paths verified against PoetryRoutes.jsx
+  // Routes: /craft /revision /voice /sequence /remix
+  // AI Poetry Prompts redirects to /story-lab/prompts (no dedicated page yet)
   const poetryItems = [
-    { icon: Wand2,         label: "Craft Lab",              path: "/story-lab/poetry/craft-lab" },
-    { icon: RefreshCw,     label: "Revision Lab",           path: "/story-lab/poetry/revision-lab" },
-    { icon: Fingerprint,   label: "Voice & Identity",       path: "/story-lab/poetry/voice-identity" },
-    { icon: BookCopy,      label: "Sequence Builder",       path: "/story-lab/poetry/sequence-builder" },
-    { icon: Shuffle,       label: "Remix Lab",              path: "/story-lab/poetry/remix-lab" },
-    { icon: Sparkles,      label: "AI Poetry Prompts",      path: "/story-lab/poetry/ai-prompts" },
+    { icon: Wand2,       label: "Craft Lab",        path: "/story-lab/poetry/craft" },
+    { icon: RefreshCw,   label: "Revision Lab",     path: "/story-lab/poetry/revision" },
+    { icon: Fingerprint, label: "Voice & Identity", path: "/story-lab/poetry/voice" },
+    { icon: BookCopy,    label: "Sequence Builder", path: "/story-lab/poetry/sequence" },
+    { icon: Shuffle,     label: "Remix Lab",        path: "/story-lab/poetry/remix" },
+    { icon: Sparkles,    label: "AI Poetry Prompts",path: "/story-lab/prompts" },
   ];
 
   // ── WORKSHOP HUB items ────────────────────
+  // Export + Publish moved to Author Studio
   const hubItems = [
-    { icon: MessageSquare, label: "Dialogue Lab",           path: "/story-lab/dialogue-lab" },
-    { icon: Lightbulb,     label: "Writing Prompts",        path: "/story-lab/prompts" },
-    { icon: Users,         label: "Workshop Community",     path: "/story-lab/community" },
-    { icon: Calendar,      label: "Calendar",               path: "/calendar" },
-    { icon: Download,      label: "Export",                 path: "/export" },
-    { icon: UploadCloud,   label: "Publish",                path: "/publishing" },
+    { icon: MessageSquare, label: "Dialogue Lab",        path: "/story-lab/dialogue-lab" },
+    { icon: Lightbulb,     label: "Writing Prompts",     path: "/story-lab/prompts" },
+    { icon: Users,         label: "Workshop Community",  path: "/story-lab/community" },
+    { icon: Calendar,      label: "Calendar",            path: "/calendar" },
   ];
 
   return (
     <>
       {/* Mobile overlay */}
       {isOpen && (
-        <div
-          className="fixed inset-0 bg-slate-900/40 z-40 lg:hidden"
-          onClick={onClose}
-        />
+        <div className="fixed inset-0 bg-slate-900/40 z-40 lg:hidden" onClick={onClose} />
       )}
 
       <div
@@ -236,30 +236,19 @@ export default function AppSidebar({ isOpen, onClose, userNovels = [] }) {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="w-11 h-11 rounded-full overflow-hidden bg-white shadow-md border border-amber-300/60 flex-shrink-0">
-                <img
-                  src="/assets/Story%20Lab_Transparent.jpeg"
-                  alt="DahTruth Story Lab"
-                  className="w-full h-full object-cover"
-                />
+                <img src="/assets/Story%20Lab_Transparent.jpeg" alt="DahTruth Story Lab"
+                  className="w-full h-full object-cover" />
               </div>
               <div>
-                <h1
-                  className="text-sm font-semibold tracking-wide text-slate-900"
-                  style={{
-                    fontFamily: "'EB Garamond', Georgia, serif",
-                    letterSpacing: "0.12em",
-                    textTransform: "uppercase",
-                  }}
-                >
+                <h1 className="text-sm font-semibold tracking-wide text-slate-900"
+                  style={{ fontFamily: "'EB Garamond', Georgia, serif", letterSpacing: "0.12em", textTransform: "uppercase" }}>
                   DAHTRUTH
                 </h1>
                 <p className="text-[11px] text-slate-500">Your Creative Studio</p>
               </div>
             </div>
-            <button
-              onClick={onClose}
-              className="lg:hidden text-slate-600 hover:text-slate-900 p-1.5 rounded-lg hover:bg-white/80 transition-colors"
-            >
+            <button onClick={onClose}
+              className="lg:hidden text-slate-600 hover:text-slate-900 p-1.5 rounded-lg hover:bg-white/80 transition-colors">
               <X size={18} />
             </button>
           </div>
@@ -301,34 +290,42 @@ export default function AppSidebar({ isOpen, onClose, userNovels = [] }) {
           {/* ══ STORY LAB STUDIO ══ */}
           <StudioLabel label="Story Lab Studio" navPath="/story-lab" />
 
+          {/* Fiction — label navigates to /story-lab/fiction, chevron expands */}
           <NavGroup
             icon={BookMarked}
             label="Fiction"
             basePath="/story-lab/fiction"
+            topPath="/story-lab/fiction"
             items={fictionItems}
             pathname={pathname}
           />
 
+          {/* Nonfiction — label navigates to /story-lab/nonfiction */}
           <NavGroup
             icon={FileText}
             label="Nonfiction"
             basePath="/story-lab/nonfiction"
+            topPath="/story-lab/nonfiction"
             items={nonfictionItems}
             pathname={pathname}
           />
 
+          {/* Poetry — label navigates to /story-lab/poetry */}
           <NavGroup
             icon={Feather}
             label="Poetry"
             basePath="/story-lab/poetry"
+            topPath="/story-lab/poetry"
             items={poetryItems}
             pathname={pathname}
           />
 
+          {/* Workshop Hub — label navigates to /story-lab/hub */}
           <NavGroup
             icon={Compass}
             label="Workshop Hub"
             basePath="/story-lab/hub"
+            topPath="/story-lab/hub"
             items={hubItems}
             pathname={pathname}
           />
@@ -343,6 +340,21 @@ export default function AppSidebar({ isOpen, onClose, userNovels = [] }) {
             active={pathname.startsWith("/author")}
           />
           <NavItem
+            icon={UploadCloud}
+            label="Publishing"
+            path="/publishing"
+            active={
+              pathname.startsWith("/publishing") ||
+              ["/proof", "/publishing-prep", "/cover"].includes(pathname)
+            }
+          />
+          <NavItem
+            icon={Download}
+            label="Export"
+            path="/export"
+            active={pathname === "/export" || pathname === "/format"}
+          />
+          <NavItem
             icon={Settings}
             label="Profile"
             path="/profile"
@@ -354,16 +366,12 @@ export default function AppSidebar({ isOpen, onClose, userNovels = [] }) {
         {/* ── Projects quick list ── */}
         <div className="p-3 border-t border-slate-200 flex-shrink-0">
           <div className="flex items-center justify-between mb-2">
-            <h3
-              className="text-[10px] font-semibold uppercase tracking-[0.16em]"
-              style={{ color: "#4B5563", fontFamily: "'EB Garamond', Georgia, serif" }}
-            >
+            <h3 className="text-[10px] font-semibold uppercase tracking-[0.16em]"
+              style={{ color: "#4B5563", fontFamily: "'EB Garamond', Georgia, serif" }}>
               Your Projects ({userNovels.length})
             </h3>
-            <button
-              onClick={() => navigate("/project")}
-              className="text-slate-700 hover:text-slate-900 p-1 rounded-lg hover:bg-white/80 transition-colors"
-            >
+            <button onClick={() => navigate("/project")}
+              className="text-slate-700 hover:text-slate-900 p-1 rounded-lg hover:bg-white/80 transition-colors">
               <Plus size={14} />
             </button>
           </div>
@@ -378,43 +386,24 @@ export default function AppSidebar({ isOpen, onClose, userNovels = [] }) {
                 const title  = project.title || "Untitled Story";
                 const words  = project.words || project.wordCount || 0;
                 const status = project.status || "Draft";
-
                 const handleOpen = () => {
                   try {
-                    storage.setItem(
-                      "currentStory",
-                      JSON.stringify({
-                        id: project.id || i,
-                        title,
-                        status,
-                        wordCount: words,
-                        lastModified: project.lastModified || new Date().toISOString(),
-                      })
-                    );
+                    storage.setItem("currentStory", JSON.stringify({
+                      id: project.id || i, title, status, wordCount: words,
+                      lastModified: project.lastModified || new Date().toISOString(),
+                    }));
                     window.dispatchEvent(new Event("project:change"));
-                  } catch (err) {
-                    console.error("Failed to set currentStory:", err);
-                  }
+                  } catch (err) { console.error("Failed to set currentStory:", err); }
                   navigate("/writer");
                 };
-
                 return (
-                  <button
-                    key={project.id || i}
-                    onClick={handleOpen}
-                    className="w-full text-left p-2 rounded-lg bg-white/90 hover:bg-white transition-colors border border-slate-200/70"
-                  >
+                  <button key={project.id || i} onClick={handleOpen}
+                    className="w-full text-left p-2 rounded-lg bg-white/90 hover:bg-white transition-colors border border-slate-200/70">
                     <h4 className="text-xs font-medium text-slate-900 truncate">{title}</h4>
                     <p className="text-[10px] mt-0.5 text-slate-600">
                       {words.toLocaleString()} words
-                      <span
-                        className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] uppercase tracking-wide"
-                        style={{
-                          background: "rgba(249,250,251,0.95)",
-                          border: "1px solid rgba(209,213,219,0.9)",
-                          color: "rgba(55,65,71,1)",
-                        }}
-                      >
+                      <span className="ml-1 inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] uppercase tracking-wide"
+                        style={{ background: "rgba(249,250,251,0.95)", border: "1px solid rgba(209,213,219,0.9)", color: "rgba(55,65,71,1)" }}>
                         {status}
                       </span>
                     </p>
@@ -427,29 +416,22 @@ export default function AppSidebar({ isOpen, onClose, userNovels = [] }) {
 
         {/* ── Author footer ── */}
         <div className="p-3 border-t border-slate-200 flex-shrink-0">
-          <div
-            className="p-3 rounded-xl bg-white/90 hover:bg-white transition-colors cursor-pointer border border-slate-200/80"
-            onClick={() => navigate("/profile")}
-            role="button"
-          >
+          <div className="p-3 rounded-xl bg-white/90 hover:bg-white transition-colors cursor-pointer border border-slate-200/80"
+            onClick={() => navigate("/profile")} role="button">
             <div className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-full shadow-sm overflow-hidden flex-shrink-0 grid place-items-center border border-violet-300/70 bg-gradient-to-br from-amber-100 to-violet-200">
-                {authorAvatar ? (
-                  <img src={authorAvatar} alt={authorName} className="w-full h-full object-cover" />
-                ) : (
-                  <span className="text-xs font-semibold text-slate-800">
-                    {authorName?.charAt(0)?.toUpperCase?.() || "A"}
-                  </span>
-                )}
+                {authorAvatar
+                  ? <img src={authorAvatar} alt={authorName} className="w-full h-full object-cover" />
+                  : <span className="text-xs font-semibold text-slate-800">
+                      {authorName?.charAt(0)?.toUpperCase?.() || "A"}
+                    </span>}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-medium text-slate-900 truncate">{authorName}</p>
                 <p className="text-[10px] text-slate-500">Author</p>
               </div>
-              <button
-                onClick={(e) => { e.stopPropagation(); navigate("/profile"); }}
-                className="p-1 rounded-lg hover:bg-slate-100 transition-colors text-slate-600 flex-shrink-0"
-              >
+              <button onClick={(e) => { e.stopPropagation(); navigate("/profile"); }}
+                className="p-1 rounded-lg hover:bg-slate-100 transition-colors text-slate-600 flex-shrink-0">
                 <Settings size={13} />
               </button>
             </div>
