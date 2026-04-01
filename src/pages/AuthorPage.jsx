@@ -5,7 +5,6 @@
 import { useState, useRef, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuthorProfile } from '../hooks/useAuthorProfile';
-import type { AuthorProfile, Book } from '../types/authorTypes';
 
 // ── Status badge colours ───────────────────────
 const STATUS_STYLES: Record<string, string> = {
