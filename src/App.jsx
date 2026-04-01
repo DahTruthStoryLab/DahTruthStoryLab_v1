@@ -77,8 +77,8 @@ const PublishingPrep = lazy(() => import("./pages/PublishingPrep.tsx"));
 const Cover          = lazy(() => import("./pages/Cover.tsx"));
 
 // Author Studio
-const AuthorPage = lazy(() => import("./pages/AuthorPage.tsx"));
-const BookPage   = lazy(() => import("./pages/BookPage.tsx"));
+const AuthorPage = lazy(() => import("./pages/AuthorPage.jsx"));
+const BookPage   = lazy(() => import("./pages/BookPage.jsx"));
 
 // Other
 const Profile        = lazy(() => import("./components/Profile"));
