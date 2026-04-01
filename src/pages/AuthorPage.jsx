@@ -77,7 +77,7 @@ function SectionHeader({ title, sub }) {
 }
 
 function AuthorAvatarPlaceholder({ size }) {
-  const iconSize = Math.round(size * 0.28);
+  const iconSize = Math.round(size * 0.26);
   return (
     <div className="rounded-full flex flex-col items-center justify-center gap-1"
       style={{
@@ -87,7 +87,7 @@ function AuthorAvatarPlaceholder({ size }) {
         boxShadow: "0 4px 20px rgba(30,58,95,0.1)",
       }}>
       <Feather size={iconSize} style={{ color: "#b8960c", transform: "rotate(-20deg)" }} />
-      <BookOpen size={iconSize - 2} style={{ color: "#1e3a5f", opacity: 0.5 }} />
+      <BookOpen size={iconSize} style={{ color: "#1e3a5f", opacity: 0.65 }} />
     </div>
   );
 }
