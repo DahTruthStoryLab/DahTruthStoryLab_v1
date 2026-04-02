@@ -280,12 +280,12 @@ export default function AppSidebar({ isOpen, onClose, userNovels = [] }) {
             path="/toc"
             active={pathname === "/toc"}
           />
-          <NavItem
-            icon={PencilLine}
-            label="Compose"
-            path="/writer"
-            active={["/writer", "/write", "/writing", "/compose"].includes(pathname)}
-          />
+         <NavItem
+          icon={PencilLine}
+          label="Compose"
+          path="/writer?mode=compose"
+          active={["/writer", "/write", "/writing", "/compose"].includes(pathname)}
+        />
 
           {/* ══ STORY LAB STUDIO ══ */}
           <StudioLabel label="Story Lab Studio" navPath="/story-lab" />
