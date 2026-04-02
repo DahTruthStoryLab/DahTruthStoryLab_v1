@@ -1443,7 +1443,10 @@ export default function ComposePage() {
   const [chatInput, setChatInput] = useState("");
   const [chatBusy, setChatBusy] = useState(false);
 
-  const [view, setView] = useState("grid");
+ const searchParams = new URLSearchParams(window.location.search);
+ const [view, setView] = useState(
+  searchParams.get("mode") === "compose" ? "editor" : "grid"
+);
   const [showSearch, setShowSearch] = useState(false);
   const [editorViewMode, setEditorViewMode] = useState("editor");
 
