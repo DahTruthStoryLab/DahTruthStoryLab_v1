@@ -85,7 +85,11 @@ const Profile        = lazy(() => import("./components/Profile"));
 const PlansPage      = lazy(() => import("./components/PlansPage"));
 const BillingSuccess = lazy(() => import("./pages/BillingSuccess.jsx"));
 const AiTools        = lazy(() => import("./pages/AiTools"));
-const AboutPage      = lazy(() => import("./components/AboutPage.jsx"));
+const AboutPage      = lazy(() => import("./components/AboutPage.jsx")); 
+
+const CharacterForge     = lazy(() => import("./components/storylab/fiction/CharacterForge"));
+const WorldBuilder       = lazy(() => import("./components/storylab/fiction/WorldBuilder"));
+const StoryArchitecture  = lazy(() => import("./components/storylab/fiction/StoryArchitecture"));
 
 // =========================
 // Error Boundary
@@ -191,28 +195,31 @@ export default function App() {
                       <Route key={p} path={p} element={<ComposePage />} />
                     ))}
 
-                    {/* ── Story Lab Studio ── */}
-                    <Route path="/storylab" element={<Navigate to="/story-lab" replace />} />
-                    <Route path="/story-lab/*" element={<StoryLabLayout />}>
-                      <Route index element={<StoryLabLanding />} />
-                      <Route path="hub" element={<WorkshopHub />} />
-                      <Route path="workshop" element={<WorkshopHub />} />
-                      <Route path="narrative-arc" element={<NarrativeArc />} />
-                      <Route path="community" element={<WorkshopCohort />} />
-                      <Route path="plot-builder" element={<PlotBuilder />} />
-                      <Route path="dialogue-lab" element={<DialogueLab />} />
-                      <Route path="workshop/priorities" element={<PriorityCards />} />
-                      <Route path="workshop/roadmap" element={<CharacterRoadmap />} />
-                      <Route path="workshop/clothesline" element={<Clothesline />} />
-                      <Route path="workshop/hfl" element={<HopesFearsLegacy />} />
-                      <Route path="prompts" element={<StoryPromptsWorkshop />} />
-                      <Route path="fiction/*" element={<FictionRoutes />} />
-                      <Route path="nonfiction/*" element={<NonfictionRoutes />} />
-                      <Route path="poetry/*" element={<PoetryRoutes />} />
-                    </Route>
+                   {/* ── Story Lab Studio ── */}
+              <Route path="/storylab" element={<Navigate to="/story-lab" replace />} />
+              <Route path="/story-lab/*" element={<StoryLabLayout />}>
+              <Route index element={<StoryLabLanding />} />
+              <Route path="hub" element={<WorkshopHub />} />
+              <Route path="workshop" element={<WorkshopHub />} />
+              <Route path="narrative-arc" element={<NarrativeArc />} />
+              <Route path="community" element={<WorkshopCohort />} />
+              <Route path="plot-builder" element={<PlotBuilder />} />
+              <Route path="dialogue-lab" element={<DialogueLab />} />
+              <Route path="workshop/priorities" element={<PriorityCards />} />
+              <Route path="workshop/roadmap" element={<CharacterRoadmap />} />
+              <Route path="workshop/clothesline" element={<Clothesline />} />
+              <Route path="workshop/hfl" element={<HopesFearsLegacy />} />
+              <Route path="workshop/character-forge" element={<CharacterForge />} />
+              <Route path="workshop/world-builder" element={<WorldBuilder />} />
+              <Route path="workshop/story-architecture" element={<StoryArchitecture />} />
+              <Route path="prompts" element={<StoryPromptsWorkshop />} />
+              <Route path="fiction/*" element={<FictionRoutes />} />
+              <Route path="nonfiction/*" element={<NonfictionRoutes />} />
+              <Route path="poetry/*" element={<PoetryRoutes />} />
+          </Route>
 
-                    {/* Calendar lives under Story Lab Studio */}
-                    <Route path="/calendar" element={<Calendar />} />
+{/* Calendar lives under Story Lab Studio */}
+<Route path="/calendar" element={<Calendar />} />
 
                     {/* ── Author Studio ── */}
                     <Route path="/author" element={<AuthorPage />} />
