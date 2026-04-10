@@ -1,5 +1,6 @@
 // src/components/storylab/FictionModule.jsx
 // Fiction Workshop Hub — landing page for all fiction writing tools
+// UPDATED: Character Forge added as the first module in Character Development
 
 import React from "react";
 import { Link } from "react-router-dom";
@@ -15,6 +16,7 @@ import {
   ArrowRight,
   MapPin,
   Feather,
+  User,
 } from "lucide-react";
 
 const BRAND = {
@@ -29,7 +31,20 @@ const BRAND = {
   cream: "#fefdfb",
 };
 
+// ── CHARACTER MODULES ─────────────────────────────────────────────────────────
+// Character Forge is now FIRST — writers build characters here before anything else.
 const CHARACTER_MODULES = [
+  {
+    id: "character-forge",
+    title: "Character Forge",
+    description:
+      "Build your characters from the ground up — name, voice, wound, desire. Every other module reads from here.",
+    icon: User,
+    path: "/story-lab/workshop/character-forge",
+    color: BRAND.goldDark,
+    gradient: `linear-gradient(135deg, ${BRAND.navy} 0%, ${BRAND.navyLight} 50%, ${BRAND.goldDark} 100%)`,
+    isNew: true,
+  },
   {
     id: "hfl",
     title: "Hopes • Fears • Legacy",
@@ -62,6 +77,7 @@ const CHARACTER_MODULES = [
   },
 ];
 
+// ── STRUCTURE MODULES ─────────────────────────────────────────────────────────
 const STRUCTURE_MODULES = [
   {
     id: "plot-builder",
@@ -94,6 +110,7 @@ const STRUCTURE_MODULES = [
   },
 ];
 
+// ── WRITING MODULES ───────────────────────────────────────────────────────────
 const WRITING_MODULES = [
   {
     id: "dialogue-lab",
@@ -127,6 +144,7 @@ const WRITING_MODULES = [
   },
 ];
 
+// ── Module Card ───────────────────────────────────────────────────────────────
 function ModuleCard({ mod }) {
   const Icon = mod.icon;
   return (
@@ -167,6 +185,7 @@ function ModuleCard({ mod }) {
   );
 }
 
+// ── Section Header ─────────────────────────────────────────────────────────────
 function SectionHeader({ title, count, color = BRAND.navy }) {
   return (
     <h2 className="text-xl font-bold mb-5 flex items-center gap-3" style={{ color }}>
@@ -176,30 +195,55 @@ function SectionHeader({ title, count, color = BRAND.navy }) {
   );
 }
 
+// ── Main Export ────────────────────────────────────────────────────────────────
 export default function FictionModule() {
   return (
-    <div className="min-h-screen" style={{ background: `linear-gradient(180deg, ${BRAND.cream} 0%, #f1f5f9 100%)` }}>
+    <div
+      className="min-h-screen"
+      style={{ background: `linear-gradient(180deg, ${BRAND.cream} 0%, #f1f5f9 100%)` }}
+    >
       <div className="max-w-5xl mx-auto px-4 py-8">
+
         {/* Hero Banner */}
         <div
           className="rounded-3xl p-10 mb-10 text-center relative overflow-hidden"
-          style={{ background: `linear-gradient(135deg, ${BRAND.ink} 0%, ${BRAND.navy} 30%, ${BRAND.navyLight} 60%, ${BRAND.mauve} 100%)` }}
+          style={{
+            background: `linear-gradient(135deg, ${BRAND.ink} 0%, ${BRAND.navy} 30%, ${BRAND.navyLight} 60%, ${BRAND.mauve} 100%)`,
+          }}
         >
-          <div className="absolute top-0 left-0 w-64 h-64 rounded-full opacity-10" style={{ background: BRAND.gold, filter: "blur(80px)" }} />
-          <div className="absolute bottom-0 right-0 w-80 h-80 rounded-full opacity-10" style={{ background: BRAND.rose, filter: "blur(100px)" }} />
+          <div
+            className="absolute top-0 left-0 w-64 h-64 rounded-full opacity-10"
+            style={{ background: BRAND.gold, filter: "blur(80px)" }}
+          />
+          <div
+            className="absolute bottom-0 right-0 w-80 h-80 rounded-full opacity-10"
+            style={{ background: BRAND.rose, filter: "blur(100px)" }}
+          />
           <div className="relative z-10">
             <div className="flex items-center justify-center gap-3 mb-6">
-              <div className="w-11 h-11 rounded-2xl flex items-center justify-center" style={{ background: `${BRAND.rose}50` }}>
+              <div
+                className="w-11 h-11 rounded-2xl flex items-center justify-center"
+                style={{ background: `${BRAND.rose}50` }}
+              >
                 <Heart size={22} className="text-white" />
               </div>
-              <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg" style={{ background: `linear-gradient(135deg, ${BRAND.gold}, ${BRAND.goldDark})` }}>
+              <div
+                className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg"
+                style={{ background: `linear-gradient(135deg, ${BRAND.gold}, ${BRAND.goldDark})` }}
+              >
                 <Layers size={28} className="text-white" />
               </div>
-              <div className="w-11 h-11 rounded-2xl flex items-center justify-center" style={{ background: `${BRAND.navy}70` }}>
+              <div
+                className="w-11 h-11 rounded-2xl flex items-center justify-center"
+                style={{ background: `${BRAND.navy}70` }}
+              >
                 <LayoutGrid size={22} className="text-white" />
               </div>
             </div>
-            <h1 className="text-4xl font-bold text-white mb-3" style={{ fontFamily: "'EB Garamond', Georgia, serif" }}>
+            <h1
+              className="text-4xl font-bold text-white mb-3"
+              style={{ fontFamily: "'EB Garamond', Georgia, serif" }}
+            >
               Fiction Workshop
             </h1>
             <p className="text-white/80 max-w-xl mx-auto text-lg">
@@ -208,44 +252,74 @@ export default function FictionModule() {
           </div>
         </div>
 
+        {/* Character Development */}
         <div className="mb-10">
-          <SectionHeader title="Character Development" count={CHARACTER_MODULES.length} />
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {CHARACTER_MODULES.map((mod) => <ModuleCard key={mod.id} mod={mod} />)}
+          <SectionHeader
+            title="Character Development"
+            count={CHARACTER_MODULES.length}
+          />
+          {/* Character Forge gets a featured banner treatment since it is now the foundation */}
+          <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 flex items-start gap-2">
+            <span className="text-amber-500 font-bold mt-0.5">→</span>
+            <span>
+              <strong>Start here.</strong> Build your characters in Character Forge first.
+              All other modules — Hopes and Fears, Priority Cards, Character Roadmap — will
+              pull from the characters you create here.
+            </span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-5">
+            {CHARACTER_MODULES.map((mod) => (
+              <ModuleCard key={mod.id} mod={mod} />
+            ))}
           </div>
         </div>
 
+        {/* Structure & Plot */}
         <div className="mb-10">
-          <SectionHeader title="Structure & Plot" count={STRUCTURE_MODULES.length} />
+          <SectionHeader title="Structure and Plot" count={STRUCTURE_MODULES.length} />
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {STRUCTURE_MODULES.map((mod) => <ModuleCard key={mod.id} mod={mod} />)}
+            {STRUCTURE_MODULES.map((mod) => (
+              <ModuleCard key={mod.id} mod={mod} />
+            ))}
           </div>
         </div>
 
+        {/* Writing & Community */}
         <div className="mb-10">
-          <SectionHeader title="Writing & Community" count={WRITING_MODULES.length} />
+          <SectionHeader
+            title="Writing and Community"
+            count={WRITING_MODULES.length}
+          />
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {WRITING_MODULES.map((mod) => <ModuleCard key={mod.id} mod={mod} />)}
+            {WRITING_MODULES.map((mod) => (
+              <ModuleCard key={mod.id} mod={mod} />
+            ))}
           </div>
         </div>
 
+        {/* Suggested Journey */}
         <div className="p-6 rounded-2xl border border-slate-200 bg-white/80 mb-8">
-          <h3 className="font-semibold text-slate-700 mb-4 flex items-center gap-2">
+          <h3
+            className="font-semibold text-slate-700 mb-4 flex items-center gap-2"
+          >
             <Feather size={18} style={{ color: BRAND.gold }} />
             Suggested Journey
           </h3>
           <div className="flex items-center justify-between flex-wrap gap-4 text-sm">
             {[
-              { n: 1, label: "Hopes • Fears • Legacy", color: BRAND.rose },
-              { n: 2, label: "Priority Cards", color: BRAND.gold },
-              { n: 3, label: "Plot Builder", color: "#dc2626" },
-              { n: 4, label: "Narrative Arc", color: BRAND.navy },
-              { n: 5, label: "Dialogue Lab", color: "#0891b2" },
-              { n: 6, label: "Clothesline", color: "#6366f1" },
+              { n: 1, label: "Character Forge", color: BRAND.navy },
+              { n: 2, label: "Hopes and Fears", color: BRAND.rose },
+              { n: 3, label: "Priority Cards", color: BRAND.gold },
+              { n: 4, label: "Plot Builder", color: "#dc2626" },
+              { n: 5, label: "Narrative Arc", color: BRAND.navy },
+              { n: 6, label: "Dialogue Lab", color: "#0891b2" },
             ].map((step, i) => (
               <div key={step.n} className="flex items-center gap-2">
                 {i > 0 && <span className="text-slate-300">→</span>}
-                <span className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold" style={{ background: step.color }}>
+                <span
+                  className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold"
+                  style={{ background: step.color }}
+                >
                   {step.n}
                 </span>
                 <span className="text-slate-600">{step.label}</span>
@@ -254,8 +328,13 @@ export default function FictionModule() {
           </div>
         </div>
 
+        {/* Back link */}
         <div className="text-center">
-          <Link to="/story-lab" className="inline-flex items-center gap-2 text-sm font-medium hover:gap-3 transition-all" style={{ color: BRAND.navy }}>
+          <Link
+            to="/story-lab"
+            className="inline-flex items-center gap-2 text-sm font-medium hover:gap-3 transition-all"
+            style={{ color: BRAND.navy }}
+          >
             ← Back to StoryLab Modules
           </Link>
         </div>
