@@ -1,6 +1,6 @@
 // src/components/storylab/FictionModule.jsx
 // Fiction Workshop Hub — landing page for all fiction writing tools
-// UPDATED: Character Forge added as the first module in Character Development
+// UPDATED: Character Forge, World Builder, and Story Architecture added as foundation layer
 
 import React from "react";
 import { Link } from "react-router-dom";
@@ -17,6 +17,8 @@ import {
   MapPin,
   Feather,
   User,
+  Globe,
+  Layout,
 } from "lucide-react";
 
 const BRAND = {
@@ -31,20 +33,45 @@ const BRAND = {
   cream: "#fefdfb",
 };
 
-// ── CHARACTER MODULES ─────────────────────────────────────────────────────────
-// Character Forge is now FIRST — writers build characters here before anything else.
-const CHARACTER_MODULES = [
+// ── FOUNDATION MODULES — Build these first ────────────────────────────────────
+const FOUNDATION_MODULES = [
   {
     id: "character-forge",
     title: "Character Forge",
     description:
-      "Build your characters from the ground up — name, voice, wound, desire. Every other module reads from here.",
+      "Build your characters from the ground up — name, voice, wound, desire, internal contradiction. Every other module reads from here.",
     icon: User,
     path: "/story-lab/workshop/character-forge",
     color: BRAND.goldDark,
     gradient: `linear-gradient(135deg, ${BRAND.navy} 0%, ${BRAND.navyLight} 50%, ${BRAND.goldDark} 100%)`,
     isNew: true,
   },
+  {
+    id: "world-builder",
+    title: "World Builder",
+    description:
+      "Set the atmosphere, sensory details, social climate, and moral logic of your story's world. Make the setting a living thing.",
+    icon: Globe,
+    path: "/story-lab/workshop/world-builder",
+    color: "#2a5298",
+    gradient: `linear-gradient(135deg, ${BRAND.navyLight} 0%, #2a5298 50%, ${BRAND.mauve} 100%)`,
+    isNew: true,
+  },
+  {
+    id: "story-architecture",
+    title: "Story Architecture",
+    description:
+      "Define structure, POV, pacing, and chapter transitions. Includes a Transition Engine to build the Dostoevsky pull from chapter to chapter.",
+    icon: Layout,
+    path: "/story-lab/workshop/story-architecture",
+    color: "#6b4c8a",
+    gradient: "linear-gradient(135deg, #1a1a2e 0%, #1e3a5f 40%, #6b4c8a 100%)",
+    isNew: true,
+  },
+];
+
+// ── CHARACTER DEPTH MODULES ───────────────────────────────────────────────────
+const CHARACTER_MODULES = [
   {
     id: "hfl",
     title: "Hopes • Fears • Legacy",
@@ -87,7 +114,6 @@ const STRUCTURE_MODULES = [
     path: "/story-lab/plot-builder",
     color: "#dc2626",
     gradient: "linear-gradient(135deg, #b91c1c 0%, #dc2626 50%, #f97316 100%)",
-    isNew: true,
   },
   {
     id: "narrative-arc",
@@ -185,7 +211,6 @@ function ModuleCard({ mod }) {
   );
 }
 
-// ── Section Header ─────────────────────────────────────────────────────────────
 function SectionHeader({ title, count, color = BRAND.navy }) {
   return (
     <h2 className="text-xl font-bold mb-5 flex items-center gap-3" style={{ color }}>
@@ -195,7 +220,6 @@ function SectionHeader({ title, count, color = BRAND.navy }) {
   );
 }
 
-// ── Main Export ────────────────────────────────────────────────────────────────
 export default function FictionModule() {
   return (
     <div
@@ -247,27 +271,38 @@ export default function FictionModule() {
               Fiction Workshop
             </h1>
             <p className="text-white/80 max-w-xl mx-auto text-lg">
-              Build unforgettable characters and a powerful narrative arc.
+              Build unforgettable characters, a living world, and a powerful narrative arc.
             </p>
           </div>
         </div>
 
-        {/* Character Development */}
+        {/* Foundation Layer */}
         <div className="mb-10">
-          <SectionHeader
-            title="Character Development"
-            count={CHARACTER_MODULES.length}
-          />
-          {/* Character Forge gets a featured banner treatment since it is now the foundation */}
-          <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 flex items-start gap-2">
+          <SectionHeader title="Foundation — Start Here" count={FOUNDATION_MODULES.length} />
+          <div
+            className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 flex items-start gap-2"
+          >
             <span className="text-amber-500 font-bold mt-0.5">→</span>
             <span>
-              <strong>Start here.</strong> Build your characters in Character Forge first.
-              All other modules — Hopes and Fears, Priority Cards, Character Roadmap — will
-              pull from the characters you create here.
+              <strong>Build these three first.</strong> Character Forge, World Builder, and
+              Story Architecture are the foundation of your story. All other modules read from
+              what you create here. Once these are in place, everything else connects.
             </span>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-5">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            {FOUNDATION_MODULES.map((mod) => (
+              <ModuleCard key={mod.id} mod={mod} />
+            ))}
+          </div>
+        </div>
+
+        {/* Character Depth */}
+        <div className="mb-10">
+          <SectionHeader title="Character Depth" count={CHARACTER_MODULES.length} />
+          <p className="text-sm text-slate-500 mb-5 -mt-3">
+            Go deeper into the characters you built in Character Forge.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {CHARACTER_MODULES.map((mod) => (
               <ModuleCard key={mod.id} mod={mod} />
             ))}
@@ -286,10 +321,7 @@ export default function FictionModule() {
 
         {/* Writing & Community */}
         <div className="mb-10">
-          <SectionHeader
-            title="Writing and Community"
-            count={WRITING_MODULES.length}
-          />
+          <SectionHeader title="Writing and Community" count={WRITING_MODULES.length} />
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {WRITING_MODULES.map((mod) => (
               <ModuleCard key={mod.id} mod={mod} />
@@ -299,19 +331,17 @@ export default function FictionModule() {
 
         {/* Suggested Journey */}
         <div className="p-6 rounded-2xl border border-slate-200 bg-white/80 mb-8">
-          <h3
-            className="font-semibold text-slate-700 mb-4 flex items-center gap-2"
-          >
+          <h3 className="font-semibold text-slate-700 mb-4 flex items-center gap-2">
             <Feather size={18} style={{ color: BRAND.gold }} />
             Suggested Journey
           </h3>
           <div className="flex items-center justify-between flex-wrap gap-4 text-sm">
             {[
               { n: 1, label: "Character Forge", color: BRAND.navy },
-              { n: 2, label: "Hopes and Fears", color: BRAND.rose },
-              { n: 3, label: "Priority Cards", color: BRAND.gold },
-              { n: 4, label: "Plot Builder", color: "#dc2626" },
-              { n: 5, label: "Narrative Arc", color: BRAND.navy },
+              { n: 2, label: "World Builder", color: "#2a5298" },
+              { n: 3, label: "Story Architecture", color: "#6b4c8a" },
+              { n: 4, label: "Hopes and Fears", color: BRAND.rose },
+              { n: 5, label: "Priority Cards", color: BRAND.gold },
               { n: 6, label: "Dialogue Lab", color: "#0891b2" },
             ].map((step, i) => (
               <div key={step.n} className="flex items-center gap-2">
@@ -328,7 +358,6 @@ export default function FictionModule() {
           </div>
         </div>
 
-        {/* Back link */}
         <div className="text-center">
           <Link
             to="/story-lab"
