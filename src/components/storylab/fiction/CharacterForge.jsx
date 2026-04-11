@@ -3,13 +3,14 @@
 // Writers build characters here first; the writing studio then references them.
 
 import React, { useEffect, useMemo, useState } from "react";
-import { Plus, Trash2, User, Save, ChevronLeft } from "lucide-react";
+import { Plus, Trash2, User, Save } from "lucide-react";
 import {
   createEmptyCharacter,
   getCharacters,
   upsertCharacter,
   deleteCharacter,
 } from "../../../utils/storyCharacters";
+import { ExpandableTextArea } from "./WritingPad";
 
 const CURRENT_PROJECT_KEY = "dahtruth-current-project-id";
 
@@ -40,22 +41,7 @@ function Field({ label, value, onChange, placeholder = "" }) {
   );
 }
 
-function TextArea({ label, value, onChange, placeholder = "", rows = 3 }) {
-  return (
-    <label className="block">
-      <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
-        {label}
-      </div>
-      <textarea
-        value={value || ""}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        rows={rows}
-        className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-300 bg-white resize-none"
-      />
-    </label>
-  );
-}
+// TextArea is now ExpandableTextArea imported from WritingPad.jsx
 
 // ─── Character Card ────────────────────────────────────────────────────────────
 
@@ -383,13 +369,13 @@ export default function CharacterForge() {
                     Presence
                   </div>
                   <div className="grid grid-cols-2 gap-4">
-                    <TextArea
+                    <ExpandableTextArea
                       label="Physical Presence"
                       value={form.physicalPresence}
                       onChange={(v) => handleChange("physicalPresence", v)}
                       placeholder="How they enter a room. What people notice first."
                     />
-                    <TextArea
+                    <ExpandableTextArea
                       label="Voice"
                       value={form.voice}
                       onChange={(v) => handleChange("voice", v)}
@@ -407,25 +393,25 @@ export default function CharacterForge() {
                     Interior Life
                   </div>
                   <div className="grid grid-cols-2 gap-4">
-                    <TextArea
+                    <ExpandableTextArea
                       label="Background"
                       value={form.background}
                       onChange={(v) => handleChange("background", v)}
                       placeholder="Where they come from. What shaped them."
                     />
-                    <TextArea
+                    <ExpandableTextArea
                       label="Core Wound"
                       value={form.coreWound}
                       onChange={(v) => handleChange("coreWound", v)}
                       placeholder="The pain at the center of who they are."
                     />
-                    <TextArea
+                    <ExpandableTextArea
                       label="Desire"
                       value={form.desire}
                       onChange={(v) => handleChange("desire", v)}
                       placeholder="What they want at the start of the story."
                     />
-                    <TextArea
+                    <ExpandableTextArea
                       label="Lie They Believe"
                       value={form.lieTheyBelieve}
                       onChange={(v) => handleChange("lieTheyBelieve", v)}
@@ -443,13 +429,13 @@ export default function CharacterForge() {
                     Complexity
                   </div>
                   <div className="grid grid-cols-2 gap-4">
-                    <TextArea
+                    <ExpandableTextArea
                       label="Internal Contradiction"
                       value={form.internalContradiction}
                       onChange={(v) => handleChange("internalContradiction", v)}
                       placeholder="The tension inside them that makes them real."
                     />
-                    <TextArea
+                    <ExpandableTextArea
                       label="Notes"
                       value={form.notes}
                       onChange={(v) => handleChange("notes", v)}
