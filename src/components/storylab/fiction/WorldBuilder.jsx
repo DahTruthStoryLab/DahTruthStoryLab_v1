@@ -4,6 +4,7 @@
 
 import React, { useEffect, useState } from "react";
 import { Plus, Trash2, Globe, Save } from "lucide-react";
+import { ExpandableTextArea } from "./WritingPad";
 
 const CURRENT_PROJECT_KEY = "dahtruth-current-project-id";
 const WORLDS_KEY = (projectId) => `dahtruth_worlds_${projectId}`;
@@ -93,22 +94,7 @@ function Field({ label, value, onChange, placeholder = "" }) {
   );
 }
 
-function TextArea({ label, value, onChange, placeholder = "", rows = 3 }) {
-  return (
-    <label className="block">
-      <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
-        {label}
-      </div>
-      <textarea
-        value={value || ""}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        rows={rows}
-        className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-300 bg-white resize-none"
-      />
-    </label>
-  );
-}
+// TextArea is now ExpandableTextArea imported from WritingPad.jsx
 
 // ─── World Card ────────────────────────────────────────────────────────────────
 
@@ -420,25 +406,25 @@ export default function WorldBuilder() {
                     Readers experience place through the senses. Be specific.
                   </p>
                   <div className="grid grid-cols-2 gap-4">
-                    <TextArea
+                    <ExpandableTextArea
                       label="What it looks like"
                       value={form.sightDetails}
                       onChange={(v) => handleChange("sightDetails", v)}
                       placeholder="Row houses, broken streetlights, church steeples..."
                     />
-                    <TextArea
+                    <ExpandableTextArea
                       label="What it sounds like"
                       value={form.soundDetails}
                       onChange={(v) => handleChange("soundDetails", v)}
                       placeholder="Gospel through open windows, traffic, voices..."
                     />
-                    <TextArea
+                    <ExpandableTextArea
                       label="What it smells like"
                       value={form.smellDetails}
                       onChange={(v) => handleChange("smellDetails", v)}
                       placeholder="Frying fish, cut grass, summer heat on asphalt..."
                     />
-                    <TextArea
+                    <ExpandableTextArea
                       label="What it feels like"
                       value={form.feelDetails}
                       onChange={(v) => handleChange("feelDetails", v)}
@@ -451,25 +437,25 @@ export default function WorldBuilder() {
                 <div>
                   <SectionLabel label="Social and Moral Climate" />
                   <div className="grid grid-cols-2 gap-4">
-                    <TextArea
+                    <ExpandableTextArea
                       label="Social Environment"
                       value={form.socialClimate}
                       onChange={(v) => handleChange("socialClimate", v)}
                       placeholder="Working class, deeply religious, politically charged..."
                     />
-                    <TextArea
+                    <ExpandableTextArea
                       label="Cultural Tone"
                       value={form.culturalTone}
                       onChange={(v) => handleChange("culturalTone", v)}
                       placeholder="Hopeful but tired, tense, quietly grieving, rising..."
                     />
-                    <TextArea
+                    <ExpandableTextArea
                       label="What this world rewards"
                       value={form.whatWorldRewards}
                       onChange={(v) => handleChange("whatWorldRewards", v)}
                       placeholder="Silence, loyalty, endurance, performance of faith..."
                     />
-                    <TextArea
+                    <ExpandableTextArea
                       label="What this world punishes"
                       value={form.whatWorldPunishes}
                       onChange={(v) => handleChange("whatWorldPunishes", v)}
@@ -482,14 +468,14 @@ export default function WorldBuilder() {
                 <div>
                   <SectionLabel label="Character and World" />
                   <div className="grid grid-cols-2 gap-4">
-                    <TextArea
+                    <ExpandableTextArea
                       label="How does this world treat your main character?"
                       value={form.howWorldTreatsCharacter}
                       onChange={(v) => handleChange("howWorldTreatsCharacter", v)}
                       placeholder="It ignores her, traps him, welcomes and then betrays..."
                       rows={4}
                     />
-                    <TextArea
+                    <ExpandableTextArea
                       label="Notes"
                       value={form.notes}
                       onChange={(v) => handleChange("notes", v)}
