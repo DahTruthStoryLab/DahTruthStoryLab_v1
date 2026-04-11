@@ -4,6 +4,7 @@
 
 import React, { useEffect, useState } from "react";
 import { Plus, Trash2, Layout, Save, ChevronDown, ChevronUp } from "lucide-react";
+import { ExpandableTextArea } from "./WritingPad";
 
 const CURRENT_PROJECT_KEY = "dahtruth-current-project-id";
 const ARCHITECTURE_KEY = (projectId) => `dahtruth_architecture_${projectId}`;
@@ -103,22 +104,7 @@ function Field({ label, value, onChange, placeholder = "" }) {
   );
 }
 
-function TextArea({ label, value, onChange, placeholder = "", rows = 3 }) {
-  return (
-    <label className="block">
-      <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
-        {label}
-      </div>
-      <textarea
-        value={value || ""}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        rows={rows}
-        className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-300 bg-white resize-none"
-      />
-    </label>
-  );
-}
+// TextArea is now ExpandableTextArea imported from WritingPad.jsx
 
 function SelectField({ label, value, onChange, options }) {
   return (
@@ -216,25 +202,25 @@ function ChapterPlanCard({ plan, index, onChange, onDelete }) {
           />
 
           <div className="grid grid-cols-2 gap-4">
-            <TextArea
+            <ExpandableTextArea
               label="Purpose of this chapter"
               value={plan.purpose}
               onChange={(v) => onChange("purpose", v)}
               placeholder="What must this chapter accomplish in the story?"
             />
-            <TextArea
+            <ExpandableTextArea
               label="What changes by the end?"
               value={plan.whatChanges}
               onChange={(v) => onChange("whatChanges", v)}
               placeholder="Something must shift — in the world or in the character."
             />
-            <TextArea
+            <ExpandableTextArea
               label="Who is affected?"
               value={plan.whoIsAffected}
               onChange={(v) => onChange("whoIsAffected", v)}
               placeholder="Which characters carry the weight of this chapter?"
             />
-            <TextArea
+            <ExpandableTextArea
               label="What is revealed?"
               value={plan.whatIsRevealed}
               onChange={(v) => onChange("whatIsRevealed", v)}
@@ -267,7 +253,7 @@ function ChapterPlanCard({ plan, index, onChange, onDelete }) {
               options={CHAPTER_ENDING_TYPES}
             />
 
-            <TextArea
+            <ExpandableTextArea
               label="What pulls the reader into the next chapter?"
               value={plan.bridgeToNext}
               onChange={(v) => onChange("bridgeToNext", v)}
@@ -283,7 +269,7 @@ function ChapterPlanCard({ plan, index, onChange, onDelete }) {
             />
           </div>
 
-          <TextArea
+          <ExpandableTextArea
             label="Notes"
             value={plan.notes}
             onChange={(v) => onChange("notes", v)}
@@ -479,28 +465,28 @@ export default function StoryArchitecture() {
           <div className="rounded-2xl border border-slate-200 bg-white shadow-sm p-6">
             <SectionLabel label="Thematic Architecture" />
             <div className="grid grid-cols-2 gap-4">
-              <TextArea
+              <ExpandableTextArea
                 label="Central Theme"
                 value={arch.centralTheme}
                 onChange={(v) => handleChange("centralTheme", v)}
                 placeholder="The one truth this story is telling."
                 rows={3}
               />
-              <TextArea
+              <ExpandableTextArea
                 label="Opening Image"
                 value={arch.openingImage}
                 onChange={(v) => handleChange("openingImage", v)}
                 placeholder="The first image or moment that sets the world's tone."
                 rows={3}
               />
-              <TextArea
+              <ExpandableTextArea
                 label="Closing Image"
                 value={arch.closingImage}
                 onChange={(v) => handleChange("closingImage", v)}
                 placeholder="The final image — how has the world changed?"
                 rows={3}
               />
-              <TextArea
+              <ExpandableTextArea
                 label="Architecture Notes"
                 value={arch.notes}
                 onChange={(v) => handleChange("notes", v)}
