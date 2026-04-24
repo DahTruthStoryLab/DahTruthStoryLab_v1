@@ -8,13 +8,8 @@ import { useState, useEffect, useRef, useCallback } from "react";
 const PREFIX        = "storylab_draft_";
 const CLOUD_TIMEOUT = 8000;
 
-function getApiBase() {
-  return String(
-    (typeof window !== "undefined" && window.__API_BASE__) ||
-    (typeof import.meta !== "undefined" && import.meta.env?.VITE_API_BASE) ||
-    "/api"
-  ).replace(/\/+$/, "");
-}
+import { API_BASE } from "../lib/api";
+function getApiBase() { return API_BASE; }
 
 // ── Get userId ────────────────────────────────────────
 function getUserId() {
