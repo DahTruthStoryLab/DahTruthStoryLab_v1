@@ -29,13 +29,8 @@ export const DEFAULT_AUTHOR_PROFILE = {
 };
 
 // ── Helpers ───────────────────────────────────────────
-function getApiBase() {
-  return String(
-    (typeof window !== "undefined" && window.__API_BASE__) ||
-    (typeof import.meta !== "undefined" && import.meta.env?.VITE_API_BASE) ||
-    "/api"
-  ).replace(/\/+$/, "");
-}
+import { API_BASE } from "../lib/api";
+function getApiBase() { return API_BASE; }
 
 function getUserId() {
   try {
