@@ -3,12 +3,15 @@
 // Saves to S3 via Lambda — localStorage used as fast cache and offline fallback
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { API_BASE } from "../lib/api";
-
 const PREFIX        = "storylab_draft_";
 const CLOUD_TIMEOUT = 8000;
 
-function getApiBase() { return API_BASE; }
+function getApiBase() {
+  return (
+    (typeof window !== "undefined" && window.__API_BASE__) ||
+    "https://nh462913aa.execute-api.us-east-1.amazonaws.com/prod"
+  );
+}
 
 // ── Storage keys (localStorage cache) ─────────────────
 const KEYS = {
