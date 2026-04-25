@@ -3,14 +3,17 @@
 // Auto-saves on every keystroke (debounced 1.5s for cloud, 500ms for local)
 // Restores from cloud on mount, falls back to localStorage if offline
 
-import { useState, useEffect, useRef, useCallback } from "react";
-import { API_BASE } from "../lib/api";
+import { useState, useEffect, useRef, useCallback } from "react"; 
 
 const PREFIX        = "storylab_draft_";
 const CLOUD_TIMEOUT = 8000;
 
-function getApiBase() { return API_BASE; }
-
+function getApiBase() {
+  return (
+    (typeof window !== "undefined" && window.__API_BASE__) ||
+    "https://nh462913aa.execute-api.us-east-1.amazonaws.com/prod"
+  );
+}
 // ── Get userId ────────────────────────────────────────
 function getUserId() {
   try {
