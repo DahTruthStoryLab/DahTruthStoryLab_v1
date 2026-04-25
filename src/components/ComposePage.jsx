@@ -21,6 +21,7 @@ import { runAssistant } from "../lib/api";
 import {
   Sparkles,
   Search,
+  GraduationCap 
   FileText,
   ChevronDown,
   FolderOpen,
@@ -2139,6 +2140,27 @@ useEffect(() => {
     setShowCharacterSuggestion(true);
   };
 
+const handleSendToEssayBuilder = () => {
+  const content = html || "";
+  if (!content.trim()) {
+    alert("Please open a chapter first.");
+    return;
+  }
+  const tmp = document.createElement("div");
+  tmp.innerHTML = content;
+  const plainText = (tmp.textContent || tmp.innerText || "").trim();
+  try {
+    localStorage.setItem("essay-builder-incoming", JSON.stringify({
+      text: plainText,
+      chapterId: selectedId,
+      chapterTitle: title || selectedChapter?.title || "Untitled Chapter",
+      projectTitle: bookTitle,
+      sentAt: new Date().toISOString(),
+    }));
+  } catch (err) { console.error(err); }
+  navigate("/story-lab/nonfiction/essay");
+};
+  
   // ✅ Jump to StoryLab — syncs project ID and navigates
   const jumpToStoryLab = () => {
     try {
@@ -2503,7 +2525,7 @@ useEffect(() => {
             />
           </DropdownMenu>
 
-          <button
+         <button
             type="button"
             onClick={() => setShowSearch((s) => !s)}
             className={`
@@ -2520,6 +2542,16 @@ useEffect(() => {
             Search
           </button>
 
+          <button
+            type="button"
+            onClick={handleSendToEssayBuilder}
+            disabled={!hasChapter}
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+          >
+            <GraduationCap size={16} />
+            Essay Builder
+          </button>
+       
           <div className="flex-1" />
 
           {queueLength > 0 && (
