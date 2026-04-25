@@ -21,7 +21,7 @@ import { runAssistant } from "../lib/api";
 import {
   Sparkles,
   Search,
-  GraduationCap 
+  GraduationCap,
   FileText,
   ChevronDown,
   FolderOpen,
