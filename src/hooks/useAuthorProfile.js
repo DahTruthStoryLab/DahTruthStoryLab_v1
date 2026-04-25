@@ -2,9 +2,13 @@
 // Author profile + book data hook
 // Saves to S3 via Lambda — localStorage used as fast cache and offline fallback
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { API_BASE } from "../lib/api";
 
+const PREFIX        = "storylab_draft_";
 const CLOUD_TIMEOUT = 8000;
+
+function getApiBase() { return API_BASE; }
 
 // ── Storage keys (localStorage cache) ─────────────────
 const KEYS = {
@@ -29,8 +33,6 @@ export const DEFAULT_AUTHOR_PROFILE = {
 };
 
 // ── Helpers ───────────────────────────────────────────
-import { API_BASE } from "../lib/api";
-function getApiBase() { return API_BASE; }
 
 function getUserId() {
   try {
