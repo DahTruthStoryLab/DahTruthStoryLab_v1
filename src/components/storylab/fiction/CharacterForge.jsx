@@ -1,26 +1,27 @@
 // src/components/storylab/fiction/CharacterForge.jsx
-// Character creation module — the source of truth for all characters in a project.
-// Writers build characters here first; the writing studio then references them.
+// Character creation module — source of truth for all characters in a project.
+// UPDATED: Loads from S3 on mount for cross-device sync
 
 import React, { useEffect, useMemo, useState } from "react";
-import { Plus, Trash2, User, Save } from "lucide-react";
+import { Plus, Trash2, User, Save, RefreshCw } from "lucide-react";
 import {
   createEmptyCharacter,
   getCharacters,
   upsertCharacter,
   deleteCharacter,
+  loadCharactersFromCloud,
 } from "../../../utils/storyCharacters";
 import { ExpandableTextArea } from "./WritingPad";
 
 const CURRENT_PROJECT_KEY = "dahtruth-current-project-id";
 
 const BRAND = {
-  navy: "#1e3a5f",
+  navy:      "#1e3a5f",
   navyLight: "#2d4a6f",
-  gold: "#d4af37",
-  goldDark: "#b8960c",
-  mauve: "#b8a9c9",
-  rose: "#e8b4b8",
+  gold:      "#d4af37",
+  goldDark:  "#b8960c",
+  mauve:     "#b8a9c9",
+  rose:      "#e8b4b8",
 };
 
 // ─── Field Components ──────────────────────────────────────────────────────────
@@ -41,8 +42,6 @@ function Field({ label, value, onChange, placeholder = "" }) {
   );
 }
 
-// TextArea is now ExpandableTextArea imported from WritingPad.jsx
-
 // ─── Character Card ────────────────────────────────────────────────────────────
 
 function CharacterCard({ character, isSelected, onClick }) {
@@ -58,11 +57,9 @@ function CharacterCard({ character, isSelected, onClick }) {
       onClick={onClick}
       className="w-full text-left rounded-xl border transition-all duration-200 p-3 flex items-center gap-3"
       style={{
-        background: isSelected
-          ? `linear-gradient(135deg, ${BRAND.navy}08, ${BRAND.gold}08)`
-          : "white",
-        borderColor: isSelected ? BRAND.gold : "#e2e8f0",
-        boxShadow: isSelected ? `0 0 0 1px ${BRAND.gold}40` : "none",
+        background:   isSelected ? `linear-gradient(135deg, ${BRAND.navy}08, ${BRAND.gold}08)` : "white",
+        borderColor:  isSelected ? BRAND.gold : "#e2e8f0",
+        boxShadow:    isSelected ? `0 0 0 1px ${BRAND.gold}40` : "none",
       }}
     >
       <div
@@ -90,31 +87,54 @@ function CharacterCard({ character, isSelected, onClick }) {
 // ─── Main Component ────────────────────────────────────────────────────────────
 
 export default function CharacterForge() {
-  const [projectId, setProjectId] = useState("");
-  const [characters, setCharacters] = useState([]);
-  const [selectedId, setSelectedId] = useState("");
-  const [form, setForm] = useState(createEmptyCharacter());
-  const [saveStatus, setSaveStatus] = useState("idle"); // idle | saving | saved
+  const [projectId, setProjectId]     = useState("");
+  const [characters, setCharacters]   = useState([]);
+  const [selectedId, setSelectedId]   = useState("");
+  const [form, setForm]               = useState(createEmptyCharacter());
+  const [saveStatus, setSaveStatus]   = useState("idle");
+  const [cloudLoading, setCloudLoading] = useState(true);
 
-  // Load project and characters on mount
+  // ── Load project + characters on mount ────────────────
   useEffect(() => {
     const pid = localStorage.getItem(CURRENT_PROJECT_KEY) || "";
     setProjectId(pid);
-    if (pid) {
-      const existing = getCharacters(pid);
-      setCharacters(existing);
-      if (existing.length) {
-        setSelectedId(existing[0].id);
-        setForm(existing[0]);
-      } else {
-        const empty = createEmptyCharacter();
-        setSelectedId(empty.id);
-        setForm(empty);
-      }
+
+    if (!pid) {
+      setCloudLoading(false);
+      return;
     }
+
+    // Load local first (instant)
+    const local = getCharacters(pid);
+    if (local.length) {
+      setCharacters(local);
+      setSelectedId(local[0].id);
+      setForm(local[0]);
+    } else {
+      const empty = createEmptyCharacter();
+      setSelectedId(empty.id);
+      setForm(empty);
+    }
+
+    // Then load from cloud (may override local with newer data)
+    loadCharactersFromCloud(pid).then((cloudData) => {
+      if (cloudData && cloudData.length) {
+        setCharacters(cloudData);
+        setSelectedId((prev) => {
+          const stillExists = cloudData.find((c) => c.id === prev);
+          if (stillExists) {
+            setForm(stillExists);
+            return prev;
+          }
+          setForm(cloudData[0]);
+          return cloudData[0].id;
+        });
+      }
+      setCloudLoading(false);
+    });
   }, []);
 
-  // Listen for character changes from other modules
+  // ── Listen for character changes from other modules ───
   useEffect(() => {
     function handleChange(e) {
       const pid = localStorage.getItem(CURRENT_PROJECT_KEY) || "";
@@ -131,15 +151,11 @@ export default function CharacterForge() {
     return () => window.removeEventListener("characters:change", handleChange);
   }, [selectedId]);
 
-  const selectedCharacter = useMemo(
-    () => characters.find((c) => c.id === selectedId) || null,
-    [characters, selectedId]
-  );
-
   function handleCreateNew() {
     const empty = createEmptyCharacter();
     setSelectedId(empty.id);
     setForm(empty);
+    setSaveStatus("idle");
   }
 
   function handleSelect(character) {
@@ -154,7 +170,10 @@ export default function CharacterForge() {
   }
 
   function handleSave() {
-    if (!projectId) return;
+    if (!projectId) {
+      alert("No project is open. Please open a project in Compose first.");
+      return;
+    }
     setSaveStatus("saving");
     const saved = upsertCharacter(projectId, form);
     const updated = getCharacters(projectId);
@@ -169,11 +188,9 @@ export default function CharacterForge() {
     if (!projectId || !selectedId) return;
     const label = form.name || "this character";
     if (!window.confirm(`Delete "${label}"? This cannot be undone.`)) return;
-
     deleteCharacter(projectId, selectedId);
     const updated = getCharacters(projectId);
     setCharacters(updated);
-
     if (updated.length) {
       setSelectedId(updated[0].id);
       setForm(updated[0]);
@@ -188,35 +205,23 @@ export default function CharacterForge() {
   const isExisting = characters.some((c) => c.id === selectedId);
 
   return (
-    <div
-      className="min-h-screen"
-      style={{ background: "linear-gradient(180deg, #fefdfb 0%, #f1f5f9 100%)" }}
-    >
+    <div className="min-h-screen"
+      style={{ background: "linear-gradient(180deg, #fefdfb 0%, #f1f5f9 100%)" }}>
       <div className="max-w-5xl mx-auto px-4 py-8">
 
         {/* Hero Banner */}
-        <div
-          className="rounded-3xl p-8 mb-8 relative overflow-hidden"
-          style={{
-            background: `linear-gradient(135deg, ${BRAND.navy} 0%, ${BRAND.navyLight} 40%, ${BRAND.mauve} 100%)`,
-          }}
-        >
-          <div
-            className="absolute top-0 left-0 w-64 h-64 rounded-full opacity-10"
-            style={{ background: BRAND.gold, filter: "blur(80px)" }}
-          />
+        <div className="rounded-3xl p-8 mb-8 relative overflow-hidden"
+          style={{ background: `linear-gradient(135deg, ${BRAND.navy} 0%, ${BRAND.navyLight} 40%, ${BRAND.mauve} 100%)` }}>
+          <div className="absolute top-0 left-0 w-64 h-64 rounded-full opacity-10"
+            style={{ background: BRAND.gold, filter: "blur(80px)" }} />
           <div className="relative z-10 flex items-center gap-4">
-            <div
-              className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg"
-              style={{ background: `linear-gradient(135deg, ${BRAND.gold}, ${BRAND.goldDark})` }}
-            >
+            <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg"
+              style={{ background: `linear-gradient(135deg, ${BRAND.gold}, ${BRAND.goldDark})` }}>
               <User size={28} className="text-white" />
             </div>
             <div>
-              <h1
-                className="text-3xl font-bold text-white"
-                style={{ fontFamily: "'EB Garamond', Georgia, serif" }}
-              >
+              <h1 className="text-3xl font-bold text-white"
+                style={{ fontFamily: "'EB Garamond', Georgia, serif" }}>
                 Character Forge
               </h1>
               <p className="text-white/75 mt-1">
@@ -224,7 +229,27 @@ export default function CharacterForge() {
               </p>
             </div>
           </div>
+
+          {/* Cloud sync indicator */}
+          {cloudLoading && (
+            <div className="absolute top-4 right-4 flex items-center gap-2 px-3 py-1.5 rounded-full text-xs text-white/70"
+              style={{ background: "rgba(255,255,255,0.1)" }}>
+              <RefreshCw size={12} className="animate-spin" />
+              Syncing from cloud...
+            </div>
+          )}
         </div>
+
+        {/* No project warning */}
+        {!projectId && (
+          <div className="mb-6 px-4 py-3 rounded-xl text-sm flex items-center gap-3"
+            style={{ background: "rgba(212,175,55,0.1)", border: "1px solid rgba(212,175,55,0.3)", color: BRAND.navy }}>
+            <User size={16} style={{ color: BRAND.goldDark }} />
+            <span>
+              No project is open. Open a project in <strong>Compose</strong> first so characters are linked to the correct manuscript.
+            </span>
+          </div>
+        )}
 
         {/* Main Grid */}
         <div className="grid grid-cols-12 gap-6">
@@ -232,19 +257,14 @@ export default function CharacterForge() {
           {/* Left: Character List */}
           <aside className="col-span-4">
             <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-              <div
-                className="px-4 py-3 flex items-center justify-between border-b border-slate-100"
-                style={{ background: `${BRAND.navy}04` }}
-              >
+              <div className="px-4 py-3 flex items-center justify-between border-b border-slate-100"
+                style={{ background: `${BRAND.navy}04` }}>
                 <h2 className="font-semibold text-sm" style={{ color: BRAND.navy }}>
                   Characters ({characters.length})
                 </h2>
-                <button
-                  onClick={handleCreateNew}
+                <button onClick={handleCreateNew}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-all hover:scale-105"
-                  style={{ background: `linear-gradient(135deg, ${BRAND.gold}, ${BRAND.goldDark})` }}
-                  title="Create a new character"
-                >
+                  style={{ background: `linear-gradient(135deg, ${BRAND.gold}, ${BRAND.goldDark})` }}>
                   <Plus size={14} />
                   New
                 </button>
@@ -272,25 +292,24 @@ export default function CharacterForge() {
             </div>
 
             {/* Tip */}
-            <div
-              className="mt-4 rounded-xl p-4 text-xs text-slate-600 border border-slate-200 bg-white/70"
-            >
+            <div className="mt-4 rounded-xl p-4 text-xs text-slate-600 border border-slate-200 bg-white/70">
               <div className="font-semibold mb-1" style={{ color: BRAND.navy }}>
                 How Character Forge works
               </div>
               Build each character fully here. Once saved, your characters become available
               in the Writing Studio, Hopes and Fears, Priority Cards, and the Character Roadmap.
               You never need to enter a name twice.
+              <div className="mt-2 pt-2 border-t border-slate-100 text-slate-400">
+                Characters sync across all your devices automatically.
+              </div>
             </div>
           </aside>
 
           {/* Right: Form */}
           <section className="col-span-8">
             <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-              <div
-                className="px-6 py-4 border-b border-slate-100 flex items-center justify-between"
-                style={{ background: `${BRAND.navy}04` }}
-              >
+              <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between"
+                style={{ background: `${BRAND.navy}04` }}>
                 <div>
                   <h3 className="font-semibold" style={{ color: BRAND.navy }}>
                     {isExisting ? "Edit Character" : "New Character"}
@@ -304,145 +323,66 @@ export default function CharacterForge() {
 
                 <div className="flex items-center gap-2">
                   {isExisting && (
-                    <button
-                      onClick={handleDelete}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-red-200 text-red-600 hover:bg-red-50 transition-colors"
-                      title="Delete this character"
-                    >
+                    <button onClick={handleDelete}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-red-200 text-red-600 hover:bg-red-50 transition-colors">
                       <Trash2 size={13} />
                       Delete
                     </button>
                   )}
-                  <button
-                    onClick={handleSave}
-                    disabled={saveStatus === "saving"}
+                  <button onClick={handleSave} disabled={saveStatus === "saving"}
                     className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-semibold text-white transition-all hover:scale-105 disabled:opacity-50"
-                    style={{ background: `linear-gradient(135deg, ${BRAND.gold}, ${BRAND.goldDark})` }}
-                  >
+                    style={{ background: `linear-gradient(135deg, ${BRAND.gold}, ${BRAND.goldDark})` }}>
                     <Save size={13} />
-                    {saveStatus === "saving"
-                      ? "Saving..."
-                      : saveStatus === "saved"
-                      ? "Saved ✓"
-                      : "Save Character"}
+                    {saveStatus === "saving" ? "Saving..." : saveStatus === "saved" ? "Saved ✓" : "Save Character"}
                   </button>
                 </div>
               </div>
 
               <div className="p-6 space-y-5">
-                {/* Row 1: Identity */}
+
+                {/* Identity */}
                 <div>
-                  <div
-                    className="text-xs font-bold uppercase tracking-widest mb-3 pb-1 border-b border-slate-100"
-                    style={{ color: BRAND.gold }}
-                  >
-                    Identity
-                  </div>
+                  <div className="text-xs font-bold uppercase tracking-widest mb-3 pb-1 border-b border-slate-100"
+                    style={{ color: BRAND.gold }}>Identity</div>
                   <div className="grid grid-cols-3 gap-4">
-                    <Field
-                      label="Name"
-                      value={form.name}
-                      onChange={(v) => handleChange("name", v)}
-                      placeholder="Daisy Knox"
-                    />
-                    <Field
-                      label="Role in Story"
-                      value={form.role}
-                      onChange={(v) => handleChange("role", v)}
-                      placeholder="Protagonist"
-                    />
-                    <Field
-                      label="Age"
-                      value={form.age}
-                      onChange={(v) => handleChange("age", v)}
-                      placeholder="34"
-                    />
+                    <Field label="Name" value={form.name} onChange={(v) => handleChange("name", v)} placeholder="Daisy Knox" />
+                    <Field label="Role in Story" value={form.role} onChange={(v) => handleChange("role", v)} placeholder="Protagonist" />
+                    <Field label="Age" value={form.age} onChange={(v) => handleChange("age", v)} placeholder="34" />
                   </div>
                 </div>
 
-                {/* Row 2: Presence */}
+                {/* Presence */}
                 <div>
-                  <div
-                    className="text-xs font-bold uppercase tracking-widest mb-3 pb-1 border-b border-slate-100"
-                    style={{ color: BRAND.gold }}
-                  >
-                    Presence
-                  </div>
+                  <div className="text-xs font-bold uppercase tracking-widest mb-3 pb-1 border-b border-slate-100"
+                    style={{ color: BRAND.gold }}>Presence</div>
                   <div className="grid grid-cols-2 gap-4">
-                    <ExpandableTextArea
-                      label="Physical Presence"
-                      value={form.physicalPresence}
-                      onChange={(v) => handleChange("physicalPresence", v)}
-                      placeholder="How they enter a room. What people notice first."
-                    />
-                    <ExpandableTextArea
-                      label="Voice"
-                      value={form.voice}
-                      onChange={(v) => handleChange("voice", v)}
-                      placeholder="How they speak — tone, pace, word choices."
-                    />
+                    <ExpandableTextArea label="Physical Presence" value={form.physicalPresence} onChange={(v) => handleChange("physicalPresence", v)} placeholder="How they enter a room. What people notice first." />
+                    <ExpandableTextArea label="Voice" value={form.voice} onChange={(v) => handleChange("voice", v)} placeholder="How they speak — tone, pace, word choices." />
                   </div>
                 </div>
 
-                {/* Row 3: Interior */}
+                {/* Interior Life */}
                 <div>
-                  <div
-                    className="text-xs font-bold uppercase tracking-widest mb-3 pb-1 border-b border-slate-100"
-                    style={{ color: BRAND.gold }}
-                  >
-                    Interior Life
-                  </div>
+                  <div className="text-xs font-bold uppercase tracking-widest mb-3 pb-1 border-b border-slate-100"
+                    style={{ color: BRAND.gold }}>Interior Life</div>
                   <div className="grid grid-cols-2 gap-4">
-                    <ExpandableTextArea
-                      label="Background"
-                      value={form.background}
-                      onChange={(v) => handleChange("background", v)}
-                      placeholder="Where they come from. What shaped them."
-                    />
-                    <ExpandableTextArea
-                      label="Core Wound"
-                      value={form.coreWound}
-                      onChange={(v) => handleChange("coreWound", v)}
-                      placeholder="The pain at the center of who they are."
-                    />
-                    <ExpandableTextArea
-                      label="Desire"
-                      value={form.desire}
-                      onChange={(v) => handleChange("desire", v)}
-                      placeholder="What they want at the start of the story."
-                    />
-                    <ExpandableTextArea
-                      label="Lie They Believe"
-                      value={form.lieTheyBelieve}
-                      onChange={(v) => handleChange("lieTheyBelieve", v)}
-                      placeholder="The false belief driving their choices."
-                    />
+                    <ExpandableTextArea label="Background" value={form.background} onChange={(v) => handleChange("background", v)} placeholder="Where they come from. What shaped them." />
+                    <ExpandableTextArea label="Core Wound" value={form.coreWound} onChange={(v) => handleChange("coreWound", v)} placeholder="The pain at the center of who they are." />
+                    <ExpandableTextArea label="Desire" value={form.desire} onChange={(v) => handleChange("desire", v)} placeholder="What they want at the start of the story." />
+                    <ExpandableTextArea label="Lie They Believe" value={form.lieTheyBelieve} onChange={(v) => handleChange("lieTheyBelieve", v)} placeholder="The false belief driving their choices." />
                   </div>
                 </div>
 
-                {/* Row 4: Contradiction + Notes */}
+                {/* Complexity */}
                 <div>
-                  <div
-                    className="text-xs font-bold uppercase tracking-widest mb-3 pb-1 border-b border-slate-100"
-                    style={{ color: BRAND.gold }}
-                  >
-                    Complexity
-                  </div>
+                  <div className="text-xs font-bold uppercase tracking-widest mb-3 pb-1 border-b border-slate-100"
+                    style={{ color: BRAND.gold }}>Complexity</div>
                   <div className="grid grid-cols-2 gap-4">
-                    <ExpandableTextArea
-                      label="Internal Contradiction"
-                      value={form.internalContradiction}
-                      onChange={(v) => handleChange("internalContradiction", v)}
-                      placeholder="The tension inside them that makes them real."
-                    />
-                    <ExpandableTextArea
-                      label="Notes"
-                      value={form.notes}
-                      onChange={(v) => handleChange("notes", v)}
-                      placeholder="Anything else — quirks, symbols, relationships."
-                    />
+                    <ExpandableTextArea label="Internal Contradiction" value={form.internalContradiction} onChange={(v) => handleChange("internalContradiction", v)} placeholder="The tension inside them that makes them real." />
+                    <ExpandableTextArea label="Notes" value={form.notes} onChange={(v) => handleChange("notes", v)} placeholder="Anything else — quirks, symbols, relationships." />
                   </div>
                 </div>
+
               </div>
             </div>
           </section>
