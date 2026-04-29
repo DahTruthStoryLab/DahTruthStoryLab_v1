@@ -2,52 +2,58 @@
 import React, { useState } from "react";
 import { Search, Plus, Trash2, Sparkles } from "lucide-react";
 import { runAssistant } from "../../../lib/api";
+import { usePersistedText } from "../../../hooks/usePersistedText";
+import SendToManuscript from "../../../components/storylab/SendToManuscript";
 
 const BRAND = { brown: "#78350f", amber: "#b45309", gold: "#d4af37", amberLight: "#fbbf24" };
 
+const EMPTY_NOTE = () => ({ id: Date.now(), source: "", quote: "", paraphrase: "", commentary: "" });
+
+function usePersistedNotes() {
+  const [raw, setRaw, clearRaw] = usePersistedText("research-notes-data", "[]");
+  const notes = (() => { try { return JSON.parse(raw) || []; } catch { return []; } })();
+  const setNotes = (n) => setRaw(JSON.stringify(n));
+  return [notes.length ? notes : [EMPTY_NOTE()], setNotes, clearRaw];
+}
+
 export default function ResearchNotes() {
-  const [notes, setNotes] = useState([{ id: 1, source: "", quote: "", paraphrase: "", commentary: "" }]);
-  const [synthesis, setSynthesis] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [notes, setNotes, clearNotes]         = usePersistedNotes();
+  const [synthesis, setSynthesis, clearSynth] = usePersistedText("research-notes-synthesis", "");
+  const [loading, setLoading]                 = useState(false);
+  const [showSend, setShowSend]               = useState(false);
 
-  function addNote() {
-    setNotes(prev => [...prev, { id: Date.now(), source: "", quote: "", paraphrase: "", commentary: "" }]);
-  }
-
-  function removeNote(id) {
-    setNotes(prev => prev.filter(n => n.id !== id));
-  }
-
-  function updateNote(id, field, value) {
-    setNotes(prev => prev.map(n => n.id === id ? { ...n, [field]: value } : n));
-  }
+  function addNote() { setNotes([...notes, EMPTY_NOTE()]); }
+  function removeNote(id) { setNotes(notes.filter(n => n.id !== id)); }
+  function updateNote(id, field, value) { setNotes(notes.map(n => n.id === id ? { ...n, [field]: value } : n)); }
 
   async function synthesize() {
     const filled = notes.filter(n => n.source.trim() || n.quote.trim());
     if (!filled.length) return;
     setLoading(true);
     setSynthesis("");
-
     const formatted = filled.map((n, i) =>
       `Source ${i + 1}: ${n.source}\nQuote: ${n.quote}\nParaphrase: ${n.paraphrase}\nCommentary: ${n.commentary}`
     ).join("\n\n");
-
     const instructions =
       "You are a research editor. Review these research notes and: " +
       "(1) identify the strongest evidence, (2) flag any gaps in the argument, " +
       "(3) suggest how these sources can be woven together into a coherent section. Be specific.";
-
     try {
       const res = await runAssistant(formatted, "clarify", instructions, "anthropic");
       setSynthesis(res?.result || res?.text || "No response received.");
-    } catch {
-      setSynthesis("Error connecting to AI. Please try again.");
-    }
+    } catch { setSynthesis("Error connecting to AI. Please try again."); }
     setLoading(false);
   }
 
+  const notesText = notes.filter(n => n.source.trim() || n.quote.trim())
+    .map((n, i) => `Source ${i + 1}: ${n.source}\nQuote: ${n.quote}\nParaphrase: ${n.paraphrase}\nCommentary: ${n.commentary}`)
+    .join("\n\n");
+
   return (
     <div className="max-w-2xl">
+      <SendToManuscript isOpen={showSend} onClose={() => setShowSend(false)}
+        writerText={notesText} aiFeedback={synthesis} sourceLabel="Research Notes" />
+
       <div className="flex items-center gap-4 mb-8">
         <div className="w-12 h-12 rounded-2xl flex items-center justify-center shadow-lg"
           style={{ background: `linear-gradient(135deg, #92400e, #d97706)` }}>
@@ -69,10 +75,10 @@ export default function ResearchNotes() {
               </button>
             </div>
             {[
-              { field: "source", label: "Source / Author", placeholder: "Book title, article, author..." },
-              { field: "quote", label: "Direct Quote", placeholder: "Exact words from the source..." },
-              { field: "paraphrase", label: "Paraphrase", placeholder: "In your own words..." },
-              { field: "commentary", label: "Your Commentary", placeholder: "What this means for your argument..." },
+              { field: "source",     label: "Source / Author",  placeholder: "Book title, article, author..." },
+              { field: "quote",      label: "Direct Quote",     placeholder: "Exact words from the source..." },
+              { field: "paraphrase", label: "Paraphrase",       placeholder: "In your own words..." },
+              { field: "commentary", label: "Your Commentary",  placeholder: "What this means for your argument..." },
             ].map(({ field, label, placeholder }) => (
               <div key={field} className="mb-3">
                 <label className="text-xs font-semibold text-slate-500 block mb-1">{label}</label>
@@ -86,7 +92,7 @@ export default function ResearchNotes() {
         ))}
       </div>
 
-      <div className="flex items-center gap-3 mb-8">
+      <div className="flex items-center flex-wrap gap-3 mb-8">
         <button onClick={addNote}
           className="flex items-center gap-2 text-sm font-semibold px-4 py-2.5 rounded-xl transition-all hover:opacity-80"
           style={{ background: `${BRAND.amber}15`, color: BRAND.amber, border: `1px solid ${BRAND.amber}25` }}>
@@ -97,6 +103,18 @@ export default function ResearchNotes() {
           style={{ background: `linear-gradient(135deg, ${BRAND.brown}, ${BRAND.amber})` }}>
           <Sparkles size={14} /> {loading ? "Analyzing..." : "Synthesize Sources"}
         </button>
+        <button onClick={() => setShowSend(true)} disabled={!notesText.trim() && !synthesis.trim()}
+          className="flex items-center gap-2 text-xs font-semibold px-4 py-2.5 rounded-xl transition-all hover:opacity-80 disabled:opacity-40"
+          style={{ background: "linear-gradient(135deg, #1e3a5f, #2d4a6f)", color: "#fff" }}>
+          Send to Manuscript
+        </button>
+        {(notesText || synthesis) && (
+          <button onClick={() => { clearNotes(); clearSynth(); }}
+            className="text-xs px-4 py-2.5 rounded-xl font-medium transition-all hover:opacity-80"
+            style={{ background: "rgba(120,53,15,0.07)", color: BRAND.brown, border: "1px solid rgba(120,53,15,0.15)" }}>
+            Start Over
+          </button>
+        )}
       </div>
 
       {synthesis && (
