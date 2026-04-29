@@ -289,13 +289,25 @@ export default function StoryArchitecture() {
   const [saveStatus, setSaveStatus] = useState("idle");
 
   useEffect(() => {
-    const pid = localStorage.getItem(CURRENT_PROJECT_KEY) || "";
-    setProjectId(pid);
-    if (pid) {
-      const existing = getArchitecture(pid);
-      if (existing) setArch(existing);
-    }
-  }, []);
+  const params = new URLSearchParams(window.location.search);
+  const pid = params.get("projectId") || localStorage.getItem(CURRENT_PROJECT_KEY) || "";
+  // Store it so other modules can find it
+  if (pid) localStorage.setItem(CURRENT_PROJECT_KEY, pid);
+  
+  setProjectId(pid);
+
+  if (!pid) { setCloudLoading(false); return; }
+
+  // Load local first (instant)
+  const local = getArchitecture(pid);
+  if (local) setArch(local);
+
+  // Then sync from cloud
+  loadArchitectureFromCloud(pid).then((cloudData) => {
+    if (cloudData) setArch(cloudData);
+    setCloudLoading(false);
+  });
+}, []);
 
   function handleChange(field, value) {
     setArch((prev) => ({ ...prev, [field]: value }));
