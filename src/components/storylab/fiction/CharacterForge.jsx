@@ -95,9 +95,10 @@ export default function CharacterForge() {
   const [cloudLoading, setCloudLoading] = useState(true);
 
   // ── Load project + characters on mount ────────────────
-  useEffect(() => {
-    const pid = localStorage.getItem(CURRENT_PROJECT_KEY) || "";
-    setProjectId(pid);
+  const params = new URLSearchParams(window.location.search);
+  const pid = params.get("projectId") || localStorage.getItem(CURRENT_PROJECT_KEY) || "";
+  // Also store it so other modules can find it
+  if (pid) localStorage.setItem(CURRENT_PROJECT_KEY, pid);
 
     if (!pid) {
       setCloudLoading(false);
