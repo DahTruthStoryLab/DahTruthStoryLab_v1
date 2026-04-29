@@ -2554,6 +2554,48 @@ const handleSendToEssayBuilder = () => {
        
           <div className="flex-1" />
 
+<button
+            type="button"
+            onClick={handleSendToEssayBuilder}
+            disabled={!hasChapter}
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+          >
+            <GraduationCap size={16} />
+            Essay Builder
+          </button>
+
+          <button
+            type="button"
+            onClick={() => navigate(`/story-lab/workshop/character-forge?projectId=${currentProjectId}`)}
+            disabled={!hasAnyChapters}
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+          >
+            <Users size={16} />
+            Fiction Studio
+          </button>
+
+          <button
+            type="button"
+            onClick={() => navigate(`/story-lab/nonfiction/essay?projectId=${currentProjectId}`)}
+            disabled={!hasAnyChapters}
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+          >
+            <FileText size={16} />
+            Nonfiction Studio
+          </button>
+
+          <button
+            type="button"
+            onClick={() => navigate(`/story-lab/poetry/craft?projectId=${currentProjectId}`)}
+            disabled={!hasAnyChapters}
+            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+          >
+            <Feather size={16} />
+            Poetry Studio
+          </button>
+
+          <div className="flex-1" />
+                 
           {queueLength > 0 && (
             <div className="flex items-center gap-1 px-2 py-1 bg-blue-50 rounded border border-blue-200 flex-shrink-0">
               <span className="text-xs text-blue-700">
@@ -2580,9 +2622,9 @@ const handleSendToEssayBuilder = () => {
             Send to Publishing
           </button>
         </div>
-      </div>
+      </div> 
 
-      {/* GRID VIEW */}
+         {/* GRID VIEW */}
       {view === "grid" && (
         <div className="flex-1">
           {showSearch && (
