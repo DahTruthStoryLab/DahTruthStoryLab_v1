@@ -2543,19 +2543,7 @@ const handleSendToEssayBuilder = () => {
             Search
           </button>
 
-          <button
-            type="button"
-            onClick={handleSendToEssayBuilder}
-            disabled={!hasChapter}
-            className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
-          >
-            <GraduationCap size={16} />
-            Essay Builder
-          </button>
-       
-          <div className="flex-1" />
-
-<button
+         <button
             type="button"
             onClick={handleSendToEssayBuilder}
             disabled={!hasChapter}
