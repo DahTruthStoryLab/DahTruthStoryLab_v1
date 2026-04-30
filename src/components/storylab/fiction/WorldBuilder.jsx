@@ -78,7 +78,12 @@ function WorldCard({ world, isSelected, onClick }) {
 // ─── Main Component ────────────────────────────────────────────────────────────
 
 export default function WorldBuilder() {
-  const [projectId, setProjectId]       = useState("");
+  const [projectId, setProjectId] = useState(() => {
+  const params = new URLSearchParams(window.location.search);
+  const pid = params.get("projectId") || localStorage.getItem("dahtruth-current-project-id") || "";
+  if (pid) localStorage.setItem("dahtruth-current-project-id", pid);
+  return pid;
+});
   const [worlds, setWorlds]             = useState([]);
   const [selectedId, setSelectedId]     = useState("");
   const [form, setForm]                 = useState(createEmptyWorld());
