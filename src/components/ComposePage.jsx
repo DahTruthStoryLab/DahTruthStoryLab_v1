@@ -2555,7 +2555,10 @@ const handleSendToEssayBuilder = () => {
 
           <button
             type="button"
-            onClick={() => navigate(`/story-lab/workshop/character-forge?projectId=${currentProjectId}`)}
+            onClick={() => {
+            saveCurrentStorySnapshot({ id: currentProjectId, title: bookTitle, primaryGenre });
+            navigate(`/story-lab/workshop/character-forge?projectId=${currentProjectId}`);
+          }}
             disabled={!hasAnyChapters}
             className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
           >
@@ -2565,7 +2568,10 @@ const handleSendToEssayBuilder = () => {
 
           <button
             type="button"
-            onClick={() => navigate(`/story-lab/nonfiction/essay?projectId=${currentProjectId}`)}
+            onClick={() => {
+            saveCurrentStorySnapshot({ id: currentProjectId, title: bookTitle, primaryGenre });
+            navigate(`/story-lab/nonfiction/essay?projectId=${currentProjectId}`);
+          }}
             disabled={!hasAnyChapters}
             className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
           >
@@ -2575,7 +2581,10 @@ const handleSendToEssayBuilder = () => {
 
           <button
             type="button"
-            onClick={() => navigate(`/story-lab/poetry/craft?projectId=${currentProjectId}`)}
+            onClick={() => {
+            saveCurrentStorySnapshot({ id: currentProjectId, title: bookTitle, primaryGenre });
+            navigate(`/story-lab/poetry/craft?projectId=${currentProjectId}`);
+          }}
             disabled={!hasAnyChapters}
             className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
           >
