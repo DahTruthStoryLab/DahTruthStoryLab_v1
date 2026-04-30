@@ -1,8 +1,5 @@
 // src/components/storylab/fiction/CharacterForge.jsx
-// Character creation module — source of truth for all characters in a project.
-// UPDATED: Loads from S3 on mount for cross-device sync
-
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Plus, Trash2, User, Save, RefreshCw } from "lucide-react";
 import {
   createEmptyCharacter,
@@ -24,88 +21,55 @@ const BRAND = {
   rose:      "#e8b4b8",
 };
 
-// ─── Field Components ──────────────────────────────────────────────────────────
-
 function Field({ label, value, onChange, placeholder = "" }) {
   return (
     <label className="block">
-      <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
-        {label}
-      </div>
-      <input
-        value={value || ""}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-300 bg-white"
-      />
+      <div className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</div>
+      <input value={value || ""} onChange={(e) => onChange(e.target.value)} placeholder={placeholder}
+        className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-300 bg-white" />
     </label>
   );
 }
 
-// ─── Character Card ────────────────────────────────────────────────────────────
-
 function CharacterCard({ character, isSelected, onClick }) {
-  const initials = (character.name || "?")
-    .split(" ")
-    .map((w) => w[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
-
+  const initials = (character.name || "?").split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase();
   return (
-    <button
-      onClick={onClick}
+    <button onClick={onClick}
       className="w-full text-left rounded-xl border transition-all duration-200 p-3 flex items-center gap-3"
       style={{
-        background:   isSelected ? `linear-gradient(135deg, ${BRAND.navy}08, ${BRAND.gold}08)` : "white",
-        borderColor:  isSelected ? BRAND.gold : "#e2e8f0",
-        boxShadow:    isSelected ? `0 0 0 1px ${BRAND.gold}40` : "none",
-      }}
-    >
-      <div
-        className="w-9 h-9 rounded-lg flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
-        style={{
-          background: isSelected
-            ? `linear-gradient(135deg, ${BRAND.gold}, ${BRAND.goldDark})`
-            : `linear-gradient(135deg, ${BRAND.navy}, ${BRAND.navyLight})`,
-        }}
-      >
+        background:  isSelected ? `linear-gradient(135deg, ${BRAND.navy}08, ${BRAND.gold}08)` : "white",
+        borderColor: isSelected ? BRAND.gold : "#e2e8f0",
+        boxShadow:   isSelected ? `0 0 0 1px ${BRAND.gold}40` : "none",
+      }}>
+      <div className="w-9 h-9 rounded-lg flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
+        style={{ background: isSelected ? `linear-gradient(135deg, ${BRAND.gold}, ${BRAND.goldDark})` : `linear-gradient(135deg, ${BRAND.navy}, ${BRAND.navyLight})` }}>
         {initials}
       </div>
       <div className="min-w-0">
-        <div className="font-semibold text-sm truncate" style={{ color: BRAND.navy }}>
-          {character.name || "Untitled Character"}
-        </div>
-        <div className="text-xs text-slate-400 truncate">
-          {character.role || "No role set"}
-        </div>
+        <div className="font-semibold text-sm truncate" style={{ color: BRAND.navy }}>{character.name || "Untitled Character"}</div>
+        <div className="text-xs text-slate-400 truncate">{character.role || "No role set"}</div>
       </div>
     </button>
   );
 }
 
-// ─── Main Component ────────────────────────────────────────────────────────────
-
 export default function CharacterForge() {
-  const [projectId, setProjectId]     = useState("");
-  const [characters, setCharacters]   = useState([]);
-  const [selectedId, setSelectedId]   = useState("");
-  const [form, setForm]               = useState(createEmptyCharacter());
-  const [saveStatus, setSaveStatus]   = useState("idle");
+  const [projectId, setProjectId] = useState(() => {
+    const params = new URLSearchParams(window.location.search);
+    const pid = params.get("projectId") || localStorage.getItem(CURRENT_PROJECT_KEY) || "";
+    if (pid) localStorage.setItem(CURRENT_PROJECT_KEY, pid);
+    return pid;
+  });
+  const [characters, setCharacters]     = useState([]);
+  const [selectedId, setSelectedId]     = useState("");
+  const [form, setForm]                 = useState(createEmptyCharacter());
+  const [saveStatus, setSaveStatus]     = useState("idle");
   const [cloudLoading, setCloudLoading] = useState(true);
 
-  // ── Load project + characters on mount ────────────────
   useEffect(() => {
-    const pid = localStorage.getItem(CURRENT_PROJECT_KEY) || "";
-    setProjectId(pid);
+    if (!projectId) { setCloudLoading(false); return; }
 
-    if (!pid) {
-      setCloudLoading(false);
-      return;
-    }
-
-    // Load local first (instant)
-    const local = getCharacters(pid);
+    const local = getCharacters(projectId);
     if (local.length) {
       setCharacters(local);
       setSelectedId(local[0].id);
@@ -116,25 +80,20 @@ export default function CharacterForge() {
       setForm(empty);
     }
 
-    // Then load from cloud (may override local with newer data)
-    loadCharactersFromCloud(pid).then((cloudData) => {
+    loadCharactersFromCloud(projectId).then((cloudData) => {
       if (cloudData && cloudData.length) {
         setCharacters(cloudData);
         setSelectedId((prev) => {
           const stillExists = cloudData.find((c) => c.id === prev);
-          if (stillExists) {
-            setForm(stillExists);
-            return prev;
-          }
+          if (stillExists) { setForm(stillExists); return prev; }
           setForm(cloudData[0]);
           return cloudData[0].id;
         });
       }
       setCloudLoading(false);
     });
-  }, []);
+  }, [projectId]);
 
-  // ── Listen for character changes from other modules ───
   useEffect(() => {
     function handleChange(e) {
       const pid = localStorage.getItem(CURRENT_PROJECT_KEY) || "";
@@ -205,11 +164,9 @@ export default function CharacterForge() {
   const isExisting = characters.some((c) => c.id === selectedId);
 
   return (
-    <div className="min-h-screen"
-      style={{ background: "linear-gradient(180deg, #fefdfb 0%, #f1f5f9 100%)" }}>
+    <div className="min-h-screen" style={{ background: "linear-gradient(180deg, #fefdfb 0%, #f1f5f9 100%)" }}>
       <div className="max-w-5xl mx-auto px-4 py-8">
 
-        {/* Hero Banner */}
         <div className="rounded-3xl p-8 mb-8 relative overflow-hidden"
           style={{ background: `linear-gradient(135deg, ${BRAND.navy} 0%, ${BRAND.navyLight} 40%, ${BRAND.mauve} 100%)` }}>
           <div className="absolute top-0 left-0 w-64 h-64 rounded-full opacity-10"
@@ -220,17 +177,12 @@ export default function CharacterForge() {
               <User size={28} className="text-white" />
             </div>
             <div>
-              <h1 className="text-3xl font-bold text-white"
-                style={{ fontFamily: "'EB Garamond', Georgia, serif" }}>
+              <h1 className="text-3xl font-bold text-white" style={{ fontFamily: "'EB Garamond', Georgia, serif" }}>
                 Character Forge
               </h1>
-              <p className="text-white/75 mt-1">
-                Build your characters here. Every other module reads from this.
-              </p>
+              <p className="text-white/75 mt-1">Build your characters here. Every other module reads from this.</p>
             </div>
           </div>
-
-          {/* Cloud sync indicator */}
           {cloudLoading && (
             <div className="absolute top-4 right-4 flex items-center gap-2 px-3 py-1.5 rounded-full text-xs text-white/70"
               style={{ background: "rgba(255,255,255,0.1)" }}>
@@ -240,21 +192,15 @@ export default function CharacterForge() {
           )}
         </div>
 
-        {/* No project warning */}
         {!projectId && (
           <div className="mb-6 px-4 py-3 rounded-xl text-sm flex items-center gap-3"
             style={{ background: "rgba(212,175,55,0.1)", border: "1px solid rgba(212,175,55,0.3)", color: BRAND.navy }}>
             <User size={16} style={{ color: BRAND.goldDark }} />
-            <span>
-              No project is open. Open a project in <strong>Compose</strong> first so characters are linked to the correct manuscript.
-            </span>
+            No project is open. Open a project in <strong className="mx-1">Compose</strong> first so characters are linked to the correct manuscript.
           </div>
         )}
 
-        {/* Main Grid */}
         <div className="grid grid-cols-12 gap-6">
-
-          {/* Left: Character List */}
           <aside className="col-span-4">
             <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
               <div className="px-4 py-3 flex items-center justify-between border-b border-slate-100"
@@ -265,47 +211,32 @@ export default function CharacterForge() {
                 <button onClick={handleCreateNew}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition-all hover:scale-105"
                   style={{ background: `linear-gradient(135deg, ${BRAND.gold}, ${BRAND.goldDark})` }}>
-                  <Plus size={14} />
-                  New
+                  <Plus size={14} /> New
                 </button>
               </div>
-
               <div className="p-3 space-y-2 max-h-[500px] overflow-y-auto">
                 {characters.length === 0 ? (
                   <div className="text-center py-8 text-sm text-slate-400">
                     <User size={32} className="mx-auto mb-2 opacity-30" />
-                    No characters yet.
-                    <br />
-                    Click New to create your first.
+                    No characters yet.<br />Click New to create your first.
                   </div>
                 ) : (
                   characters.map((c) => (
-                    <CharacterCard
-                      key={c.id}
-                      character={c}
-                      isSelected={selectedId === c.id}
-                      onClick={() => handleSelect(c)}
-                    />
+                    <CharacterCard key={c.id} character={c} isSelected={selectedId === c.id} onClick={() => handleSelect(c)} />
                   ))
                 )}
               </div>
             </div>
-
-            {/* Tip */}
             <div className="mt-4 rounded-xl p-4 text-xs text-slate-600 border border-slate-200 bg-white/70">
-              <div className="font-semibold mb-1" style={{ color: BRAND.navy }}>
-                How Character Forge works
-              </div>
-              Build each character fully here. Once saved, your characters become available
-              in the Writing Studio, Hopes and Fears, Priority Cards, and the Character Roadmap.
-              You never need to enter a name twice.
+              <div className="font-semibold mb-1" style={{ color: BRAND.navy }}>How Character Forge works</div>
+              Build each character fully here. Once saved, your characters become available in the Writing Studio,
+              Hopes and Fears, Priority Cards, and the Character Roadmap. You never need to enter a name twice.
               <div className="mt-2 pt-2 border-t border-slate-100 text-slate-400">
                 Characters sync across all your devices automatically.
               </div>
             </div>
           </aside>
 
-          {/* Right: Form */}
           <section className="col-span-8">
             <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
               <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between"
@@ -315,18 +246,14 @@ export default function CharacterForge() {
                     {isExisting ? "Edit Character" : "New Character"}
                   </h3>
                   <p className="text-xs text-slate-400 mt-0.5">
-                    {isExisting
-                      ? "Changes are not saved until you click Save Character."
-                      : "Fill in what you know. You can always return to add more."}
+                    {isExisting ? "Changes are not saved until you click Save Character." : "Fill in what you know. You can always return to add more."}
                   </p>
                 </div>
-
                 <div className="flex items-center gap-2">
                   {isExisting && (
                     <button onClick={handleDelete}
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-red-200 text-red-600 hover:bg-red-50 transition-colors">
-                      <Trash2 size={13} />
-                      Delete
+                      <Trash2 size={13} /> Delete
                     </button>
                   )}
                   <button onClick={handleSave} disabled={saveStatus === "saving"}
@@ -339,32 +266,23 @@ export default function CharacterForge() {
               </div>
 
               <div className="p-6 space-y-5">
-
-                {/* Identity */}
                 <div>
-                  <div className="text-xs font-bold uppercase tracking-widest mb-3 pb-1 border-b border-slate-100"
-                    style={{ color: BRAND.gold }}>Identity</div>
+                  <div className="text-xs font-bold uppercase tracking-widest mb-3 pb-1 border-b border-slate-100" style={{ color: BRAND.gold }}>Identity</div>
                   <div className="grid grid-cols-3 gap-4">
                     <Field label="Name" value={form.name} onChange={(v) => handleChange("name", v)} placeholder="Daisy Knox" />
                     <Field label="Role in Story" value={form.role} onChange={(v) => handleChange("role", v)} placeholder="Protagonist" />
                     <Field label="Age" value={form.age} onChange={(v) => handleChange("age", v)} placeholder="34" />
                   </div>
                 </div>
-
-                {/* Presence */}
                 <div>
-                  <div className="text-xs font-bold uppercase tracking-widest mb-3 pb-1 border-b border-slate-100"
-                    style={{ color: BRAND.gold }}>Presence</div>
+                  <div className="text-xs font-bold uppercase tracking-widest mb-3 pb-1 border-b border-slate-100" style={{ color: BRAND.gold }}>Presence</div>
                   <div className="grid grid-cols-2 gap-4">
                     <ExpandableTextArea label="Physical Presence" value={form.physicalPresence} onChange={(v) => handleChange("physicalPresence", v)} placeholder="How they enter a room. What people notice first." />
                     <ExpandableTextArea label="Voice" value={form.voice} onChange={(v) => handleChange("voice", v)} placeholder="How they speak — tone, pace, word choices." />
                   </div>
                 </div>
-
-                {/* Interior Life */}
                 <div>
-                  <div className="text-xs font-bold uppercase tracking-widest mb-3 pb-1 border-b border-slate-100"
-                    style={{ color: BRAND.gold }}>Interior Life</div>
+                  <div className="text-xs font-bold uppercase tracking-widest mb-3 pb-1 border-b border-slate-100" style={{ color: BRAND.gold }}>Interior Life</div>
                   <div className="grid grid-cols-2 gap-4">
                     <ExpandableTextArea label="Background" value={form.background} onChange={(v) => handleChange("background", v)} placeholder="Where they come from. What shaped them." />
                     <ExpandableTextArea label="Core Wound" value={form.coreWound} onChange={(v) => handleChange("coreWound", v)} placeholder="The pain at the center of who they are." />
@@ -372,17 +290,13 @@ export default function CharacterForge() {
                     <ExpandableTextArea label="Lie They Believe" value={form.lieTheyBelieve} onChange={(v) => handleChange("lieTheyBelieve", v)} placeholder="The false belief driving their choices." />
                   </div>
                 </div>
-
-                {/* Complexity */}
                 <div>
-                  <div className="text-xs font-bold uppercase tracking-widest mb-3 pb-1 border-b border-slate-100"
-                    style={{ color: BRAND.gold }}>Complexity</div>
+                  <div className="text-xs font-bold uppercase tracking-widest mb-3 pb-1 border-b border-slate-100" style={{ color: BRAND.gold }}>Complexity</div>
                   <div className="grid grid-cols-2 gap-4">
                     <ExpandableTextArea label="Internal Contradiction" value={form.internalContradiction} onChange={(v) => handleChange("internalContradiction", v)} placeholder="The tension inside them that makes them real." />
                     <ExpandableTextArea label="Notes" value={form.notes} onChange={(v) => handleChange("notes", v)} placeholder="Anything else — quirks, symbols, relationships." />
                   </div>
                 </div>
-
               </div>
             </div>
           </section>
