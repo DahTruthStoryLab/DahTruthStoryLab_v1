@@ -103,10 +103,11 @@ const AI_MODULES = [
   },
 ];
 
-function ModuleCard({ mod }) {
+function ModuleCard({ mod, projectId }) {
   const Icon = mod.icon;
   return (
-   function ModuleCard({ mod, projectId }) {
+    <Link
+      to={projectId ? `${mod.path}?projectId=${projectId}` : mod.path}
       className="group relative rounded-2xl overflow-hidden transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl"
       style={{ background: "white", border: `1px solid ${mod.color}20` }}
     >
@@ -141,7 +142,6 @@ function ModuleCard({ mod }) {
     </Link>
   );
 }
-
 function SectionHeader({ title, count, color = BRAND.navy }) {
   return (
     <h2 className="text-xl font-bold mb-5 flex items-center gap-3" style={{ color }}>
