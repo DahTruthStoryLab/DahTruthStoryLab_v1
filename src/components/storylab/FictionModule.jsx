@@ -1,192 +1,51 @@
 // src/components/storylab/FictionModule.jsx
-// Fiction Workshop Hub — landing page for all fiction writing tools
-// UPDATED: Character Forge, World Builder, and Story Architecture added as foundation layer
-
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
-  Heart,
-  Target,
-  Layers,
-  LayoutGrid,
-  TrendingUp,
-  MessageSquare,
-  Sparkles,
-  Users,
-  ArrowRight,
-  MapPin,
-  Feather,
-  User,
-  Globe,
-  Layout,
+  Heart, Target, Layers, LayoutGrid, TrendingUp, MessageSquare,
+  Sparkles, Users, ArrowRight, MapPin, Feather, User, Globe, Layout,
 } from "lucide-react";
 
 const BRAND = {
-  navy: "#1e3a5f",
-  navyLight: "#2d4a6f",
-  gold: "#d4af37",
-  goldDark: "#b8960c",
-  mauve: "#b8a9c9",
-  rose: "#e8b4b8",
-  roseDark: "#c97b7b",
-  ink: "#0F172A",
-  cream: "#fefdfb",
-}; 
+  navy: "#1e3a5f", navyLight: "#2d4a6f", gold: "#d4af37", goldDark: "#b8960c",
+  mauve: "#b8a9c9", rose: "#e8b4b8", roseDark: "#c97b7b", ink: "#0F172A", cream: "#fefdfb",
+};
 
-const { search } = useLocation();
-const projectId = new URLSearchParams(search).get("projectId") ||
-  localStorage.getItem("dahtruth-current-project-id") || "";
-
-// ── FOUNDATION MODULES — Build these first ────────────────────────────────────
 const FOUNDATION_MODULES = [
-  {
-    id: "character-forge",
-    title: "Character Forge",
-    description:
-      "Build your characters from the ground up — name, voice, wound, desire, internal contradiction. Every other module reads from here.",
-    icon: User,
-    path: "/story-lab/workshop/character-forge",
-    color: BRAND.goldDark,
-    gradient: `linear-gradient(135deg, ${BRAND.navy} 0%, ${BRAND.navyLight} 50%, ${BRAND.goldDark} 100%)`,
-    isNew: true,
-  },
-  {
-    id: "world-builder",
-    title: "World Builder",
-    description:
-      "Set the atmosphere, sensory details, social climate, and moral logic of your story's world. Make the setting a living thing.",
-    icon: Globe,
-    path: "/story-lab/workshop/world-builder",
-    color: "#2a5298",
-    gradient: `linear-gradient(135deg, ${BRAND.navyLight} 0%, #2a5298 50%, ${BRAND.mauve} 100%)`,
-    isNew: true,
-  },
-  {
-    id: "story-architecture",
-    title: "Story Architecture",
-    description:
-      "Define structure, POV, pacing, and chapter transitions. Includes a Transition Engine to build the Dostoevsky pull from chapter to chapter.",
-    icon: Layout,
-    path: "/story-lab/workshop/story-architecture",
-    color: "#6b4c8a",
-    gradient: "linear-gradient(135deg, #1a1a2e 0%, #1e3a5f 40%, #6b4c8a 100%)",
-    isNew: true,
-  },
+  { id: "character-forge", title: "Character Forge", description: "Build your characters from the ground up — name, voice, wound, desire, internal contradiction. Every other module reads from here.", icon: User, path: "/story-lab/workshop/character-forge", color: BRAND.goldDark, gradient: `linear-gradient(135deg, ${BRAND.navy} 0%, ${BRAND.navyLight} 50%, ${BRAND.goldDark} 100%)`, isNew: true },
+  { id: "world-builder", title: "World Builder", description: "Set the atmosphere, sensory details, social climate, and moral logic of your story's world. Make the setting a living thing.", icon: Globe, path: "/story-lab/workshop/world-builder", color: "#2a5298", gradient: `linear-gradient(135deg, ${BRAND.navyLight} 0%, #2a5298 50%, ${BRAND.mauve} 100%)`, isNew: true },
+  { id: "story-architecture", title: "Story Architecture", description: "Define structure, POV, pacing, and chapter transitions. Includes a Transition Engine to build the Dostoevsky pull from chapter to chapter.", icon: Layout, path: "/story-lab/workshop/story-architecture", color: "#6b4c8a", gradient: "linear-gradient(135deg, #1a1a2e 0%, #1e3a5f 40%, #6b4c8a 100%)", isNew: true },
 ];
 
-// ── CHARACTER DEPTH MODULES ───────────────────────────────────────────────────
 const CHARACTER_MODULES = [
-  {
-    id: "hfl",
-    title: "Hopes • Fears • Legacy",
-    description:
-      "Define what drives your characters — their dreams, obstacles, and what they leave behind.",
-    icon: Heart,
-    path: "/story-lab/workshop/hfl",
-    color: BRAND.rose,
-    gradient: `linear-gradient(135deg, ${BRAND.roseDark} 0%, ${BRAND.rose} 100%)`,
-  },
-  {
-    id: "priorities",
-    title: "Priority Cards",
-    description:
-      "Track wants, fears, needs, and secrets with AI-powered suggestions.",
-    icon: Target,
-    path: "/story-lab/workshop/priorities",
-    color: BRAND.gold,
-    gradient: `linear-gradient(135deg, ${BRAND.goldDark} 0%, ${BRAND.gold} 100%)`,
-  },
-  {
-    id: "roadmap",
-    title: "Character Roadmap",
-    description:
-      "Plan milestones and track the character journey through your story.",
-    icon: MapPin,
-    path: "/story-lab/workshop/roadmap",
-    color: "#7c3aed",
-    gradient: "linear-gradient(135deg, #6d28d9 0%, #7c3aed 100%)",
-  },
+  { id: "hfl", title: "Hopes • Fears • Legacy", description: "Define what drives your characters — their dreams, obstacles, and what they leave behind.", icon: Heart, path: "/story-lab/workshop/hfl", color: BRAND.rose, gradient: `linear-gradient(135deg, ${BRAND.roseDark} 0%, ${BRAND.rose} 100%)` },
+  { id: "priorities", title: "Priority Cards", description: "Track wants, fears, needs, and secrets with AI-powered suggestions.", icon: Target, path: "/story-lab/workshop/priorities", color: BRAND.gold, gradient: `linear-gradient(135deg, ${BRAND.goldDark} 0%, ${BRAND.gold} 100%)` },
+  { id: "roadmap", title: "Character Roadmap", description: "Plan milestones and track the character journey through your story.", icon: MapPin, path: "/story-lab/workshop/roadmap", color: "#7c3aed", gradient: "linear-gradient(135deg, #6d28d9 0%, #7c3aed 100%)" },
 ];
 
-// ── STRUCTURE MODULES ─────────────────────────────────────────────────────────
 const STRUCTURE_MODULES = [
-  {
-    id: "plot-builder",
-    title: "Plot Builder",
-    description: "Build story architecture — stakes, obstacles, turning points.",
-    icon: Layers,
-    path: "/story-lab/plot-builder",
-    color: "#dc2626",
-    gradient: "linear-gradient(135deg, #b91c1c 0%, #dc2626 50%, #f97316 100%)",
-  },
-  {
-    id: "narrative-arc",
-    title: "Narrative Arc",
-    description:
-      "Map structure using classic frameworks (Save the Cat, Hero's Journey, etc.).",
-    icon: TrendingUp,
-    path: "/story-lab/narrative-arc",
-    color: BRAND.navy,
-    gradient: `linear-gradient(135deg, ${BRAND.ink} 0%, ${BRAND.navy} 100%)`,
-  },
-  {
-    id: "clothesline",
-    title: "Clothesline",
-    description: "Visualize your story — scenes, chapters, and character threads.",
-    icon: LayoutGrid,
-    path: "/story-lab/workshop/clothesline",
-    color: "#6366f1",
-    gradient: "linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)",
-  },
+  { id: "plot-builder", title: "Plot Builder", description: "Build story architecture — stakes, obstacles, turning points.", icon: Layers, path: "/story-lab/plot-builder", color: "#dc2626", gradient: "linear-gradient(135deg, #b91c1c 0%, #dc2626 50%, #f97316 100%)" },
+  { id: "narrative-arc", title: "Narrative Arc", description: "Map structure using classic frameworks (Save the Cat, Hero's Journey, etc.).", icon: TrendingUp, path: "/story-lab/narrative-arc", color: BRAND.navy, gradient: `linear-gradient(135deg, ${BRAND.ink} 0%, ${BRAND.navy} 100%)` },
+  { id: "clothesline", title: "Clothesline", description: "Visualize your story — scenes, chapters, and character threads.", icon: LayoutGrid, path: "/story-lab/workshop/clothesline", color: "#6366f1", gradient: "linear-gradient(135deg, #4f46e5 0%, #6366f1 100%)" },
 ];
 
-// ── WRITING MODULES ───────────────────────────────────────────────────────────
 const WRITING_MODULES = [
-  {
-    id: "dialogue-lab",
-    title: "Dialogue Lab",
-    description:
-      "Write, analyze, and enhance dialogue with AI-powered feedback.",
-    icon: MessageSquare,
-    path: "/story-lab/dialogue-lab",
-    color: "#0891b2",
-    gradient: "linear-gradient(135deg, #0e7490 0%, #0891b2 50%, #06b6d4 100%)",
-    isNew: true,
-  },
-  {
-    id: "prompts",
-    title: "Writing Prompts",
-    description: "AI-powered prompts to spark creativity and overcome blocks.",
-    icon: Sparkles,
-    path: "/story-lab/prompts",
-    color: BRAND.mauve,
-    gradient: `linear-gradient(135deg, ${BRAND.mauve} 0%, #a78bfa 100%)`,
-  },
-  {
-    id: "community",
-    title: "Workshop Community",
-    description:
-      "Connect with other writers — share work, give feedback, grow together.",
-    icon: Users,
-    path: "/story-lab/community",
-    color: "#059669",
-    gradient: "linear-gradient(135deg, #047857 0%, #059669 100%)",
-  },
+  { id: "dialogue-lab", title: "Dialogue Lab", description: "Write, analyze, and enhance dialogue with AI-powered feedback.", icon: MessageSquare, path: "/story-lab/dialogue-lab", color: "#0891b2", gradient: "linear-gradient(135deg, #0e7490 0%, #0891b2 50%, #06b6d4 100%)", isNew: true },
+  { id: "prompts", title: "Writing Prompts", description: "AI-powered prompts to spark creativity and overcome blocks.", icon: Sparkles, path: "/story-lab/prompts", color: BRAND.mauve, gradient: `linear-gradient(135deg, ${BRAND.mauve} 0%, #a78bfa 100%)` },
+  { id: "community", title: "Workshop Community", description: "Connect with other writers — share work, give feedback, grow together.", icon: Users, path: "/story-lab/community", color: "#059669", gradient: "linear-gradient(135deg, #047857 0%, #059669 100%)" },
 ];
 
-// ── Module Card ───────────────────────────────────────────────────────────────
 function ModuleCard({ mod, projectId }) {
   const Icon = mod.icon;
   return (
-    <Link to={projectId ? `${mod.path}?projectId=${projectId}` : mod.path}
+    <Link
+      to={projectId ? `${mod.path}?projectId=${projectId}` : mod.path}
       className="group relative rounded-2xl overflow-hidden transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl"
       style={{ background: "white", border: `1px solid ${mod.color}20` }}
     >
       {mod.isNew && (
-        <div
-          className="absolute top-3 right-3 text-xs font-bold px-2 py-1 rounded-full text-white z-10"
-          style={{ background: BRAND.gold }}
-        >
+        <div className="absolute top-3 right-3 text-xs font-bold px-2 py-1 rounded-full text-white z-10"
+          style={{ background: BRAND.gold }}>
           NEW
         </div>
       )}
@@ -199,15 +58,10 @@ function ModuleCard({ mod, projectId }) {
         </div>
       </div>
       <div className="px-6 py-5">
-        <p className="text-sm text-slate-600 mb-4 leading-relaxed">
-          {mod.description}
-        </p>
-        <span
-          className="text-sm font-semibold flex items-center gap-1 transition-all group-hover:gap-2"
-          style={{ color: mod.color }}
-        >
-          Open Module
-          <ArrowRight size={16} />
+        <p className="text-sm text-slate-600 mb-4 leading-relaxed">{mod.description}</p>
+        <span className="text-sm font-semibold flex items-center gap-1 transition-all group-hover:gap-2"
+          style={{ color: mod.color }}>
+          Open Module <ArrowRight size={16} />
         </span>
       </div>
     </Link>
@@ -224,115 +78,86 @@ function SectionHeader({ title, count, color = BRAND.navy }) {
 }
 
 export default function FictionModule() {
+  const { search } = useLocation();
+  const projectId = new URLSearchParams(search).get("projectId") ||
+    localStorage.getItem("dahtruth-current-project-id") || "";
+
   return (
-    <div
-      className="min-h-screen"
-      style={{ background: `linear-gradient(180deg, ${BRAND.cream} 0%, #f1f5f9 100%)` }}
-    >
+    <div className="min-h-screen" style={{ background: `linear-gradient(180deg, ${BRAND.cream} 0%, #f1f5f9 100%)` }}>
       <div className="max-w-5xl mx-auto px-4 py-8">
 
-        {/* Hero Banner */}
-        <div
-          className="rounded-3xl p-10 mb-10 text-center relative overflow-hidden"
-          style={{
-            background: `linear-gradient(135deg, ${BRAND.ink} 0%, ${BRAND.navy} 30%, ${BRAND.navyLight} 60%, ${BRAND.mauve} 100%)`,
-          }}
-        >
-          <div
-            className="absolute top-0 left-0 w-64 h-64 rounded-full opacity-10"
-            style={{ background: BRAND.gold, filter: "blur(80px)" }}
-          />
-          <div
-            className="absolute bottom-0 right-0 w-80 h-80 rounded-full opacity-10"
-            style={{ background: BRAND.rose, filter: "blur(100px)" }}
-          />
+        <div className="rounded-3xl p-10 mb-10 text-center relative overflow-hidden"
+          style={{ background: `linear-gradient(135deg, ${BRAND.ink} 0%, ${BRAND.navy} 30%, ${BRAND.navyLight} 60%, ${BRAND.mauve} 100%)` }}>
+          <div className="absolute top-0 left-0 w-64 h-64 rounded-full opacity-10" style={{ background: BRAND.gold, filter: "blur(80px)" }} />
+          <div className="absolute bottom-0 right-0 w-80 h-80 rounded-full opacity-10" style={{ background: BRAND.rose, filter: "blur(100px)" }} />
           <div className="relative z-10">
             <div className="flex items-center justify-center gap-3 mb-6">
-              <div
-                className="w-11 h-11 rounded-2xl flex items-center justify-center"
-                style={{ background: `${BRAND.rose}50` }}
-              >
+              <div className="w-11 h-11 rounded-2xl flex items-center justify-center" style={{ background: `${BRAND.rose}50` }}>
                 <Heart size={22} className="text-white" />
               </div>
-              <div
-                className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg"
-                style={{ background: `linear-gradient(135deg, ${BRAND.gold}, ${BRAND.goldDark})` }}
-              >
+              <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-lg" style={{ background: `linear-gradient(135deg, ${BRAND.gold}, ${BRAND.goldDark})` }}>
                 <Layers size={28} className="text-white" />
               </div>
-              <div
-                className="w-11 h-11 rounded-2xl flex items-center justify-center"
-                style={{ background: `${BRAND.navy}70` }}
-              >
+              <div className="w-11 h-11 rounded-2xl flex items-center justify-center" style={{ background: `${BRAND.navy}70` }}>
                 <LayoutGrid size={22} className="text-white" />
               </div>
             </div>
-            <h1
-              className="text-4xl font-bold text-white mb-3"
-              style={{ fontFamily: "'EB Garamond', Georgia, serif" }}
-            >
+            <h1 className="text-4xl font-bold text-white mb-3" style={{ fontFamily: "'EB Garamond', Georgia, serif" }}>
               Fiction Workshop
             </h1>
             <p className="text-white/80 max-w-xl mx-auto text-lg">
               Build unforgettable characters, a living world, and a powerful narrative arc.
             </p>
+            {projectId && (
+              <div className="mt-4 inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-sm text-white/80"
+                style={{ background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.25)" }}>
+                {JSON.parse(localStorage.getItem("currentStory") || "{}").title || "Your Project"}
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Foundation Layer */}
         <div className="mb-10">
           <SectionHeader title="Foundation — Start Here" count={FOUNDATION_MODULES.length} />
-          <div
-            className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 flex items-start gap-2"
-          >
+          <div className="mb-5 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 flex items-start gap-2">
             <span className="text-amber-500 font-bold mt-0.5">→</span>
-            <span>
-              <strong>Build these three first.</strong> Character Forge, World Builder, and
-              Story Architecture are the foundation of your story. All other modules read from
-              what you create here. Once these are in place, everything else connects.
-            </span>
+            <span><strong>Build these three first.</strong> Character Forge, World Builder, and Story Architecture are the foundation of your story. All other modules read from what you create here.</span>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             {FOUNDATION_MODULES.map((mod) => (
-             <ModuleCard key={mod.id} mod={mod} projectId={projectId} />
+              <ModuleCard key={mod.id} mod={mod} projectId={projectId} />
             ))}
           </div>
         </div>
 
-        {/* Character Depth */}
         <div className="mb-10">
           <SectionHeader title="Character Depth" count={CHARACTER_MODULES.length} />
-          <p className="text-sm text-slate-500 mb-5 -mt-3">
-            Go deeper into the characters you built in Character Forge.
-          </p>
+          <p className="text-sm text-slate-500 mb-5 -mt-3">Go deeper into the characters you built in Character Forge.</p>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {CHARACTER_MODULES.map((mod) => (
-             <ModuleCard key={mod.id} mod={mod} projectId={projectId} />
+              <ModuleCard key={mod.id} mod={mod} projectId={projectId} />
             ))}
           </div>
         </div>
 
-        {/* Structure & Plot */}
         <div className="mb-10">
           <SectionHeader title="Structure and Plot" count={STRUCTURE_MODULES.length} />
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {STRUCTURE_MODULES.map((mod) => (
-             <ModuleCard key={mod.id} mod={mod} projectId={projectId} />
+              <ModuleCard key={mod.id} mod={mod} projectId={projectId} />
             ))}
           </div>
         </div>
 
-        {/* Writing & Community */}
         <div className="mb-10">
           <SectionHeader title="Writing and Community" count={WRITING_MODULES.length} />
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {WRITING_MODULES.map((mod) => (
-             <ModuleCard key={mod.id} mod={mod} projectId={projectId} />
+              <ModuleCard key={mod.id} mod={mod} projectId={projectId} />
             ))}
           </div>
         </div>
 
-        {/* Suggested Journey */}
         <div className="p-6 rounded-2xl border border-slate-200 bg-white/80 mb-8">
           <h3 className="font-semibold text-slate-700 mb-4 flex items-center gap-2">
             <Feather size={18} style={{ color: BRAND.gold }} />
@@ -349,10 +174,7 @@ export default function FictionModule() {
             ].map((step, i) => (
               <div key={step.n} className="flex items-center gap-2">
                 {i > 0 && <span className="text-slate-300">→</span>}
-                <span
-                  className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold"
-                  style={{ background: step.color }}
-                >
+                <span className="w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold" style={{ background: step.color }}>
                   {step.n}
                 </span>
                 <span className="text-slate-600">{step.label}</span>
@@ -362,11 +184,7 @@ export default function FictionModule() {
         </div>
 
         <div className="text-center">
-          <Link
-            to="/story-lab"
-            className="inline-flex items-center gap-2 text-sm font-medium hover:gap-3 transition-all"
-            style={{ color: BRAND.navy }}
-          >
+          <Link to="/story-lab" className="inline-flex items-center gap-2 text-sm font-medium hover:gap-3 transition-all" style={{ color: BRAND.navy }}>
             ← Back to StoryLab Modules
           </Link>
         </div>
