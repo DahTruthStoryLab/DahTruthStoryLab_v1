@@ -1,6 +1,6 @@
 // src/pages/storylab/PoetryLab.jsx
 import React from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import {
   Wand2,
   Layers,
@@ -25,6 +25,10 @@ const BRAND = {
   ink: "#0F172A",
   cream: "#fefdfb",
 };
+
+const { search } = useLocation();
+const projectId = new URLSearchParams(search).get("projectId") ||
+  localStorage.getItem("dahtruth-current-project-id") || "";
 
 const CRAFT_MODULES = [
   {
@@ -102,8 +106,7 @@ const AI_MODULES = [
 function ModuleCard({ mod }) {
   const Icon = mod.icon;
   return (
-    <Link
-      to={mod.path}
+   function ModuleCard({ mod, projectId }) {
       className="group relative rounded-2xl overflow-hidden transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl"
       style={{ background: "white", border: `1px solid ${mod.color}20` }}
     >
@@ -184,11 +187,13 @@ export default function PoetryLab() {
           </div>
         </div>
 
-        {/* Craft & Revision */}
+       {/* Craft & Revision */}
         <div className="mb-10">
           <SectionHeader title="Craft & Revision" count={CRAFT_MODULES.length} />
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-            {CRAFT_MODULES.map((mod) => <ModuleCard key={mod.id} mod={mod} />)}
+            {CRAFT_MODULES.map((mod) => (
+              <ModuleCard key={mod.id} mod={mod} projectId={projectId} />
+            ))}
           </div>
         </div>
 
@@ -196,7 +201,9 @@ export default function PoetryLab() {
         <div className="mb-10">
           <SectionHeader title="Structure & Experimentation" count={STRUCTURE_MODULES.length} />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {STRUCTURE_MODULES.map((mod) => <ModuleCard key={mod.id} mod={mod} />)}
+            {STRUCTURE_MODULES.map((mod) => (
+              <ModuleCard key={mod.id} mod={mod} projectId={projectId} />
+            ))}
           </div>
         </div>
 
@@ -204,7 +211,9 @@ export default function PoetryLab() {
         <div className="mb-10">
           <SectionHeader title="AI Tools & Publishing" count={AI_MODULES.length} />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            {AI_MODULES.map((mod) => <ModuleCard key={mod.id} mod={mod} />)}
+            {AI_MODULES.map((mod) => (
+              <ModuleCard key={mod.id} mod={mod} projectId={projectId} />
+            ))}
           </div>
         </div>
 
