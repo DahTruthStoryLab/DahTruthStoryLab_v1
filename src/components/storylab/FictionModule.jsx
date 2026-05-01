@@ -3,7 +3,7 @@
 // UPDATED: Character Forge, World Builder, and Story Architecture added as foundation layer
 
 import React from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import {
   Heart,
   Target,
@@ -31,7 +31,11 @@ const BRAND = {
   roseDark: "#c97b7b",
   ink: "#0F172A",
   cream: "#fefdfb",
-};
+}; 
+
+const { search } = useLocation();
+const projectId = new URLSearchParams(search).get("projectId") ||
+  localStorage.getItem("dahtruth-current-project-id") || "";
 
 // ── FOUNDATION MODULES — Build these first ────────────────────────────────────
 const FOUNDATION_MODULES = [
@@ -171,11 +175,10 @@ const WRITING_MODULES = [
 ];
 
 // ── Module Card ───────────────────────────────────────────────────────────────
-function ModuleCard({ mod }) {
+function ModuleCard({ mod, projectId }) {
   const Icon = mod.icon;
   return (
-    <Link
-      to={mod.path}
+    <Link to={projectId ? `${mod.path}?projectId=${projectId}` : mod.path}
       className="group relative rounded-2xl overflow-hidden transition-all duration-300 hover:scale-[1.02] hover:shadow-2xl"
       style={{ background: "white", border: `1px solid ${mod.color}20` }}
     >
@@ -291,7 +294,7 @@ export default function FictionModule() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
             {FOUNDATION_MODULES.map((mod) => (
-              <ModuleCard key={mod.id} mod={mod} />
+             <ModuleCard key={mod.id} mod={mod} projectId={projectId} />
             ))}
           </div>
         </div>
@@ -304,7 +307,7 @@ export default function FictionModule() {
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {CHARACTER_MODULES.map((mod) => (
-              <ModuleCard key={mod.id} mod={mod} />
+             <ModuleCard key={mod.id} mod={mod} projectId={projectId} />
             ))}
           </div>
         </div>
@@ -314,7 +317,7 @@ export default function FictionModule() {
           <SectionHeader title="Structure and Plot" count={STRUCTURE_MODULES.length} />
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {STRUCTURE_MODULES.map((mod) => (
-              <ModuleCard key={mod.id} mod={mod} />
+             <ModuleCard key={mod.id} mod={mod} projectId={projectId} />
             ))}
           </div>
         </div>
@@ -324,7 +327,7 @@ export default function FictionModule() {
           <SectionHeader title="Writing and Community" count={WRITING_MODULES.length} />
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {WRITING_MODULES.map((mod) => (
-              <ModuleCard key={mod.id} mod={mod} />
+             <ModuleCard key={mod.id} mod={mod} projectId={projectId} />
             ))}
           </div>
         </div>
