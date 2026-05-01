@@ -2,105 +2,28 @@
 import React from "react";
 import { Link, useLocation } from "react-router-dom";
 import {
-  Wand2,
-  Layers,
-  PenTool,
-  Shuffle,
-  Mic2,
-  Feather,
-  Sparkles,
-  BookOpen,
-  ArrowRight,
-  Download,
+  Wand2, Layers, PenTool, Shuffle, Mic2, Feather, Sparkles, BookOpen, ArrowRight, Download,
 } from "lucide-react";
 
 const BRAND = {
-  navy: "#1e3a5f",
-  navyLight: "#2d4a6f",
-  gold: "#d4af37",
-  goldDark: "#b8960c",
-  mauve: "#b8a9c9",
-  rose: "#e8b4b8",
-  roseDark: "#c97b7b",
-  ink: "#0F172A",
-  cream: "#fefdfb",
+  navy: "#1e3a5f", navyLight: "#2d4a6f", gold: "#d4af37", goldDark: "#b8960c",
+  mauve: "#b8a9c9", rose: "#e8b4b8", roseDark: "#c97b7b", ink: "#0F172A", cream: "#fefdfb",
 };
 
-const { search } = useLocation();
-const projectId = new URLSearchParams(search).get("projectId") ||
-  localStorage.getItem("dahtruth-current-project-id") || "";
-
 const CRAFT_MODULES = [
-  {
-    id: "craft",
-    title: "Craft Lab",
-    description: "Line breaks, sound, metaphor, syntax, tension, clarity — the building blocks of the poem.",
-    icon: PenTool,
-    path: "/story-lab/poetry/craft",
-    color: "#7c3aed",
-    gradient: "linear-gradient(135deg, #6d28d9 0%, #7c3aed 100%)",
-  },
-  {
-    id: "revision",
-    title: "Revision Lab",
-    description: "Tighten diction, sharpen images, strengthen the turn. Make every word earn its place.",
-    icon: Wand2,
-    path: "/story-lab/poetry/revision",
-    color: BRAND.roseDark,
-    gradient: `linear-gradient(135deg, ${BRAND.roseDark} 0%, ${BRAND.rose} 100%)`,
-  },
-  {
-    id: "voice",
-    title: "Voice & Identity",
-    description: "Tone, stance, persona, signature language. Develop a voice that is unmistakably yours.",
-    icon: Mic2,
-    path: "/story-lab/poetry/voice",
-    color: "#0891b2",
-    gradient: "linear-gradient(135deg, #0e7490 0%, #0891b2 50%, #06b6d4 100%)",
-  },
+  { id: "craft", title: "Craft Lab", description: "Line breaks, sound, metaphor, syntax, tension, clarity — the building blocks of the poem.", icon: PenTool, path: "/story-lab/poetry/craft", color: "#7c3aed", gradient: "linear-gradient(135deg, #6d28d9 0%, #7c3aed 100%)" },
+  { id: "revision", title: "Revision Lab", description: "Tighten diction, sharpen images, strengthen the turn. Make every word earn its place.", icon: Wand2, path: "/story-lab/poetry/revision", color: BRAND.roseDark, gradient: `linear-gradient(135deg, ${BRAND.roseDark} 0%, ${BRAND.rose} 100%)` },
+  { id: "voice", title: "Voice & Identity", description: "Tone, stance, persona, signature language. Develop a voice that is unmistakably yours.", icon: Mic2, path: "/story-lab/poetry/voice", color: "#0891b2", gradient: "linear-gradient(135deg, #0e7490 0%, #0891b2 50%, #06b6d4 100%)" },
 ];
 
 const STRUCTURE_MODULES = [
-  {
-    id: "sequence",
-    title: "Sequence Builder",
-    description: "Arrange poems into an arc: openings, hinges, closers. Shape the collection as a whole.",
-    icon: Layers,
-    path: "/story-lab/poetry/sequence",
-    color: BRAND.gold,
-    gradient: `linear-gradient(135deg, ${BRAND.goldDark} 0%, ${BRAND.gold} 100%)`,
-  },
-  {
-    id: "remix",
-    title: "Remix Lab",
-    description: "Rewrite with constraints: erase, mirror, compress, expand. Break the poem open.",
-    icon: Shuffle,
-    path: "/story-lab/poetry/remix",
-    color: "#059669",
-    gradient: "linear-gradient(135deg, #047857 0%, #059669 100%)",
-    isNew: true,
-  },
+  { id: "sequence", title: "Sequence Builder", description: "Arrange poems into an arc: openings, hinges, closers. Shape the collection as a whole.", icon: Layers, path: "/story-lab/poetry/sequence", color: BRAND.gold, gradient: `linear-gradient(135deg, ${BRAND.goldDark} 0%, ${BRAND.gold} 100%)` },
+  { id: "remix", title: "Remix Lab", description: "Rewrite with constraints: erase, mirror, compress, expand. Break the poem open.", icon: Shuffle, path: "/story-lab/poetry/remix", color: "#059669", gradient: "linear-gradient(135deg, #047857 0%, #059669 100%)", isNew: true },
 ];
 
 const AI_MODULES = [
-  {
-    id: "prompts",
-    title: "AI Poetry Prompts",
-    description: "AI-powered prompts to spark creativity, break blocks, and push into new territory.",
-    icon: Sparkles,
-    path: "/story-lab/prompts",
-    color: BRAND.mauve,
-    gradient: `linear-gradient(135deg, ${BRAND.mauve} 0%, #a78bfa 100%)`,
-  },
-  {
-    id: "publish",
-    title: "Export & Publish",
-    description: "Format your collection for print or digital — KDP-ready, beautifully typeset.",
-    icon: Download,
-    path: "/publishing",
-    color: BRAND.navy,
-    gradient: `linear-gradient(135deg, ${BRAND.ink} 0%, ${BRAND.navy} 100%)`,
-  },
+  { id: "prompts", title: "AI Poetry Prompts", description: "AI-powered prompts to spark creativity, break blocks, and push into new territory.", icon: Sparkles, path: "/story-lab/prompts", color: BRAND.mauve, gradient: `linear-gradient(135deg, ${BRAND.mauve} 0%, #a78bfa 100%)` },
+  { id: "publish", title: "Export & Publish", description: "Format your collection for print or digital — KDP-ready, beautifully typeset.", icon: Download, path: "/publishing", color: BRAND.navy, gradient: `linear-gradient(135deg, ${BRAND.ink} 0%, ${BRAND.navy} 100%)` },
 ];
 
 function ModuleCard({ mod, projectId }) {
@@ -112,10 +35,8 @@ function ModuleCard({ mod, projectId }) {
       style={{ background: "white", border: `1px solid ${mod.color}20` }}
     >
       {mod.isNew && (
-        <div
-          className="absolute top-3 right-3 text-xs font-bold px-2 py-1 rounded-full text-white z-10"
-          style={{ background: BRAND.gold }}
-        >
+        <div className="absolute top-3 right-3 text-xs font-bold px-2 py-1 rounded-full text-white z-10"
+          style={{ background: BRAND.gold }}>
           NEW
         </div>
       )}
@@ -128,20 +49,16 @@ function ModuleCard({ mod, projectId }) {
         </div>
       </div>
       <div className="px-6 py-5">
-        <p className="text-sm text-slate-600 mb-4 leading-relaxed">
-          {mod.description}
-        </p>
-        <span
-          className="text-sm font-semibold flex items-center gap-1 transition-all group-hover:gap-2"
-          style={{ color: mod.color }}
-        >
-          Open Module
-          <ArrowRight size={16} />
+        <p className="text-sm text-slate-600 mb-4 leading-relaxed">{mod.description}</p>
+        <span className="text-sm font-semibold flex items-center gap-1 transition-all group-hover:gap-2"
+          style={{ color: mod.color }}>
+          Open Module <ArrowRight size={16} />
         </span>
       </div>
     </Link>
   );
 }
+
 function SectionHeader({ title, count, color = BRAND.navy }) {
   return (
     <h2 className="text-xl font-bold mb-5 flex items-center gap-3" style={{ color }}>
@@ -152,15 +69,16 @@ function SectionHeader({ title, count, color = BRAND.navy }) {
 }
 
 export default function PoetryLab() {
+  const { search } = useLocation();
+  const projectId = new URLSearchParams(search).get("projectId") ||
+    localStorage.getItem("dahtruth-current-project-id") || "";
+
   return (
     <div className="min-h-screen" style={{ background: `linear-gradient(180deg, ${BRAND.cream} 0%, #f1f5f9 100%)` }}>
       <div className="max-w-5xl mx-auto px-4 py-8">
 
-        {/* Hero Banner */}
-        <div
-          className="rounded-3xl p-10 mb-10 text-center relative overflow-hidden"
-          style={{ background: `linear-gradient(135deg, ${BRAND.ink} 0%, #3b1f5e 40%, #7c3aed 80%, ${BRAND.mauve} 100%)` }}
-        >
+        <div className="rounded-3xl p-10 mb-10 text-center relative overflow-hidden"
+          style={{ background: `linear-gradient(135deg, ${BRAND.ink} 0%, #3b1f5e 40%, #7c3aed 80%, ${BRAND.mauve} 100%)` }}>
           <div className="absolute top-0 left-0 w-64 h-64 rounded-full opacity-10" style={{ background: BRAND.gold, filter: "blur(80px)" }} />
           <div className="absolute bottom-0 right-0 w-80 h-80 rounded-full opacity-10" style={{ background: BRAND.rose, filter: "blur(100px)" }} />
           <div className="relative z-10">
@@ -175,19 +93,21 @@ export default function PoetryLab() {
                 <BookOpen size={22} className="text-white" />
               </div>
             </div>
-            <h1
-              className="text-4xl font-bold text-white mb-3"
-              style={{ fontFamily: "'EB Garamond', Georgia, serif" }}
-            >
+            <h1 className="text-4xl font-bold text-white mb-3" style={{ fontFamily: "'EB Garamond', Georgia, serif" }}>
               Poetry Workshop
             </h1>
             <p className="text-white/80 max-w-xl mx-auto text-lg">
               Craft poems that breathe. Build collections that endure.
             </p>
+            {projectId && (
+              <div className="mt-4 inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-sm text-white/80"
+                style={{ background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.25)" }}>
+                {JSON.parse(localStorage.getItem("currentStory") || "{}").title || "Your Project"}
+              </div>
+            )}
           </div>
         </div>
 
-       {/* Craft & Revision */}
         <div className="mb-10">
           <SectionHeader title="Craft & Revision" count={CRAFT_MODULES.length} />
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -197,7 +117,6 @@ export default function PoetryLab() {
           </div>
         </div>
 
-        {/* Structure & Experimentation */}
         <div className="mb-10">
           <SectionHeader title="Structure & Experimentation" count={STRUCTURE_MODULES.length} />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -207,7 +126,6 @@ export default function PoetryLab() {
           </div>
         </div>
 
-        {/* AI & Publishing */}
         <div className="mb-10">
           <SectionHeader title="AI Tools & Publishing" count={AI_MODULES.length} />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
@@ -217,7 +135,6 @@ export default function PoetryLab() {
           </div>
         </div>
 
-        {/* Suggested Journey */}
         <div className="p-6 rounded-2xl border border-slate-200 bg-white/80 mb-8">
           <h3 className="font-semibold text-slate-700 mb-4 flex items-center gap-2">
             <Feather size={18} style={{ color: BRAND.gold }} />
@@ -243,13 +160,8 @@ export default function PoetryLab() {
           </div>
         </div>
 
-        {/* Back link */}
         <div className="text-center">
-          <Link
-            to="/story-lab"
-            className="inline-flex items-center gap-2 text-sm font-medium hover:gap-3 transition-all"
-            style={{ color: BRAND.navy }}
-          >
+          <Link to="/story-lab" className="inline-flex items-center gap-2 text-sm font-medium hover:gap-3 transition-all" style={{ color: BRAND.navy }}>
             ← Back to StoryLab Modules
           </Link>
         </div>
@@ -257,4 +169,3 @@ export default function PoetryLab() {
     </div>
   );
 }
-
