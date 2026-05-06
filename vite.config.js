@@ -5,11 +5,12 @@ import { VitePWA } from "vite-plugin-pwa";
 export default defineConfig({
   plugins: [
     react(),
-    VitePWA({
-      registerType: "autoUpdate",
-      workbox: {
-        navigateFallback: null
-      },
+   VitePWA({
+  registerType: "autoUpdate",
+  workbox: {
+    navigateFallback: null,
+    maximumFileSizeToCacheInBytes: 6 * 1024 * 1024
+  },
       manifest: {
         name: "DahTruth StoryLab",
         short_name: "StoryLab",
