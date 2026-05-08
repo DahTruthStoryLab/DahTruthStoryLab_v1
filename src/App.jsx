@@ -140,7 +140,10 @@ function ScrollToTop() {
   return null;
 }
 
-const BYPASS_AUTH = true;
+// Bypass auth in local development only. In production builds (Vite sets
+// import.meta.env.DEV to false during `pnpm build`), this is always false,
+// so the dashboard and other protected routes are properly guarded.
+const BYPASS_AUTH = import.meta.env.DEV;
 
 function ProtectedRoute({ children }) {
   if (BYPASS_AUTH) return children;
