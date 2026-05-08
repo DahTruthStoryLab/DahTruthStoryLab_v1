@@ -393,6 +393,9 @@ function CompanionItem({ icon, title, body }) {
 }
  
 function TourCard({ name, caption, screenshot }) {
+  const [imageLoaded, setImageLoaded] = React.useState(false);
+  const [imageError, setImageError] = React.useState(false);
+ 
   return (
     <div className="group glass-soft rounded-2xl border border-white/60 overflow-hidden shadow-xl hover:scale-[1.02] hover:border-accent/40 transition-all duration-300">
       <div className="aspect-[16/10] bg-gradient-to-br from-accent/15 via-white/40 to-primary/10 border-b border-white/60 relative overflow-hidden">
@@ -400,11 +403,14 @@ function TourCard({ name, caption, screenshot }) {
           src={screenshot}
           alt={`Preview of the ${name} studio`}
           className="w-full h-full object-cover"
-          onError={(e) => { e.target.style.display = 'none'; }}
+          onLoad={() => setImageLoaded(true)}
+          onError={() => setImageError(true)}
         />
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <span className="font-serif text-2xl text-ink/30 italic">{name}</span>
-        </div>
+        {(!imageLoaded || imageError) && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+            <span className="font-serif text-2xl text-ink/30 italic">{name}</span>
+          </div>
+        )}
       </div>
       <div className="p-6 text-center">
         <h4 className="font-serif font-bold text-xl mb-2">{name}</h4>
