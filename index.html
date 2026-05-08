@@ -95,6 +95,28 @@
         :root { color-scheme: light; }
       }
     </style>
+<script>
+      // One-time cleanup: unregister any leftover service workers from
+      // the previous PWA setup. Safe to leave in place permanently.
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function(registrations) {
+          if (registrations.length > 0) {
+            Promise.all(registrations.map(function(r) { return r.unregister(); }))
+              .then(function() {
+                if (window.caches) {
+                  caches.keys().then(function(names) {
+                    return Promise.all(names.map(function(n) { return caches.delete(n); }));
+                  }).then(function() {
+                    window.location.reload();
+                  });
+                } else {
+                  window.location.reload();
+                }
+              });
+          }
+        });
+      }
+    </script>
   </head>
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>
