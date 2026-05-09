@@ -465,6 +465,247 @@ export function filesGet(params: { userId: string; key: string; expiresIn?: numb
 export function filesDelete(params: { userId: string; manuscriptId?: string; fileKey?: string; }) {
   return fetchWithTimeout(`${API_BASE}${ROUTES.files}`, { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify(params) }, 25000)
     .then(async (res) => { const text = await res.text().catch(() => null); const norm = normalizeResponse(res, text); if (!norm.ok) throw new Error(norm.error || `HTTP ${res.status}`); return norm.json; });
+} 
+
+/* =============================================================================
+   Conversation Persistence Helpers
+   
+   ============================================================================= */
+
+/* ----------------------- Conversation Types ----------------------- */
+
+export type ConversationMessage = {
+  role: "user" | "assistant";
+  content: string;
+  timestamp?: string;
+  id?: string | number;
+};
+
+export type Conversation = {
+  id: string;
+  title: string;
+  messages: ConversationMessage[];
+  model?: "anthropic" | "openai";
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type ConversationSummary = {
+  id: string;
+  title: string;
+  model?: string;
+  messageCount: number;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+/* ----------------------- List Conversations ----------------------- */
+
+/**
+ * List all saved conversations for a project. Returns metadata only
+ * (not the full message history), so this is fast even with many
+ * conversations.
+ */
+export async function listConversations(
+  projectId: string,
+  userId: string = "default"
+): Promise<ConversationSummary[]> {
+  if (!projectId) {
+    throw new Error("listConversations: projectId is required");
+  }
+
+  const url = `${API_BASE}/files/conversations?projectId=${encodeURIComponent(projectId)}`;
+
+  const res = await fetchWithTimeout(
+    url,
+    {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        "x-user-id": userId,
+      },
+    },
+    20000
+  );
+
+  const text = await res.text().catch(() => null);
+  const norm = normalizeResponse(res, text);
+
+  if (!norm.ok) {
+    throw new Error(norm.error || `HTTP ${res.status}`);
+  }
+
+  const conversations =
+    (norm.json && (norm.json as any).conversations) || [];
+  return Array.isArray(conversations) ? conversations : [];
+}
+
+/* ----------------------- Load Conversation ----------------------- */
+
+/**
+ * Load the full message history for a single conversation.
+ */
+export async function loadConversation(
+  projectId: string,
+  conversationId: string,
+  userId: string = "default"
+): Promise<Conversation | null> {
+  if (!projectId || !conversationId) {
+    throw new Error(
+      "loadConversation: projectId and conversationId are required"
+    );
+  }
+
+  const url =
+    `${API_BASE}/files/conversation?projectId=${encodeURIComponent(projectId)}` +
+    `&conversationId=${encodeURIComponent(conversationId)}`;
+
+  const res = await fetchWithTimeout(
+    url,
+    {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        "x-user-id": userId,
+      },
+    },
+    20000
+  );
+
+  const text = await res.text().catch(() => null);
+  const norm = normalizeResponse(res, text);
+
+  if (!norm.ok) {
+    throw new Error(norm.error || `HTTP ${res.status}`);
+  }
+
+  const conversation = norm.json && (norm.json as any).conversation;
+  return conversation || null;
+}
+
+/* ----------------------- Save Conversation ----------------------- */
+
+/**
+ * Save a conversation. The Lambda will assign timestamps automatically.
+ * Pass a conversation object with at minimum: id, title, messages array.
+ */
+export async function saveConversation(
+  projectId: string,
+  conversation: Conversation,
+  userId: string = "default"
+): Promise<Conversation> {
+  if (!projectId) {
+    throw new Error("saveConversation: projectId is required");
+  }
+  if (!conversation || !conversation.id) {
+    throw new Error("saveConversation: conversation.id is required");
+  }
+
+  const url = `${API_BASE}/files/conversation`;
+
+  const res = await fetchWithTimeout(
+    url,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-user-id": userId,
+      },
+      body: JSON.stringify({ projectId, conversation }),
+    },
+    25000
+  );
+
+  const text = await res.text().catch(() => null);
+  const norm = normalizeResponse(res, text);
+
+  if (!norm.ok) {
+    throw new Error(norm.error || `HTTP ${res.status}`);
+  }
+
+  const saved = norm.json && (norm.json as any).conversation;
+  return saved || conversation;
+}
+
+/* ----------------------- Delete Conversation ----------------------- */
+
+/**
+ * Delete a saved conversation. Returns true on success.
+ */
+export async function deleteConversation(
+  projectId: string,
+  conversationId: string,
+  userId: string = "default"
+): Promise<boolean> {
+  if (!projectId || !conversationId) {
+    throw new Error(
+      "deleteConversation: projectId and conversationId are required"
+    );
+  }
+
+  const url =
+    `${API_BASE}/files/conversation?projectId=${encodeURIComponent(projectId)}` +
+    `&conversationId=${encodeURIComponent(conversationId)}`;
+
+  const res = await fetchWithTimeout(
+    url,
+    {
+      method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+        "x-user-id": userId,
+      },
+    },
+    20000
+  );
+
+  const text = await res.text().catch(() => null);
+  const norm = normalizeResponse(res, text);
+
+  if (!norm.ok) {
+    throw new Error(norm.error || `HTTP ${res.status}`);
+  }
+
+  return true;
+}
+
+/* ----------------------- Helpers for ID + Title Generation ----------------------- */
+
+/**
+ * Generate a unique conversation ID. Use this when starting a new conversation.
+ */
+export function generateConversationId(): string {
+  const timestamp = Date.now().toString(36);
+  const random = Math.random().toString(36).slice(2, 8);
+  return `conv_${timestamp}_${random}`;
+}
+
+/**
+ * Generate a conversation title from the first user message.
+ * Takes the first 5 meaningful words and trims to a reasonable length.
+ */
+export function generateConversationTitle(firstMessage: string): string {
+  if (!firstMessage) return "New Conversation";
+
+  const words = firstMessage
+    .trim()
+    .split(/\s+/)
+    .filter((w) => w.length > 0)
+    .slice(0, 5);
+
+  if (words.length === 0) return "New Conversation";
+
+  let title = words.join(" ");
+
+  // Cap at ~50 characters for sidebar display
+  if (title.length > 50) {
+    title = title.slice(0, 47) + "...";
+  }
+
+  // Capitalize first letter for nicer display
+  title = title.charAt(0).toUpperCase() + title.slice(1);
+
+  return title;
 }
 
 /* --------------------------------- Ping ----------------------------------- */
