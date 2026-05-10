@@ -10,6 +10,7 @@ import SearchPanel from "./Writing/SearchPanel";
 import PaginatedView from "./Writing/PaginatedView";
 import SidebarRouter from "./Writing/SidebarRouter";
 import EditorToolbar from "./Editor/EditorToolbar";
+import AIAssistantPanel from "./AIAssistantPanel";
 
 import { useChapterManager } from "../hooks/useChapterManager";
 import { useProjectStore } from "../hooks/useProjectStore";
@@ -1827,6 +1828,41 @@ useEffect(() => {
     }
   };
 
+// Insert AI text at the cursor position in the Quill editor
+  const handleSendToComposeFromAI = useCallback(
+    (text) => {
+      if (!text) return;
+
+      const editorEl = document.querySelector(".ql-editor");
+      if (!editorEl) return;
+
+      // Try to use Quill's API for clean insertion at cursor
+      const quillContainer = editorEl.closest(".quill") || editorEl.parentElement;
+      const quill =
+        quillContainer?.__quill ||
+        (typeof window !== "undefined" && window.Quill?.find?.(quillContainer));
+
+      if (quill && quill.getSelection) {
+        const range = quill.getSelection(true);
+        const insertPos = range ? range.index : quill.getLength();
+        quill.insertText(insertPos, text + "\n\n", "user");
+        quill.setSelection(insertPos + text.length + 2, 0);
+      } else {
+        // Fallback: append to current html
+        const newHtml = (html || "") + `<p>${text.replace(/\n/g, "<br/>")}</p>`;
+        setHtml(newHtml);
+        if (selectedId) {
+          updateChapter(selectedId, {
+            title: title || selectedChapter?.title || "",
+            content: newHtml,
+            preview: generatePreview(newHtml, 20),
+          });
+        }
+      }
+    },
+    [html, selectedId, title, selectedChapter, updateChapter]
+  );
+    
   const handleAssistantSend = async () => {
     const text = chatInput.trim();
     if (!text) return;
@@ -2649,15 +2685,29 @@ useEffect(() => {
               />
             </div>
 
-            <div
-              className="grid gap-6 flex-1 min-h-0 overflow-hidden items-stretch"
-              style={{
-                gridTemplateColumns: showAssistant
-                  ? "300px minmax(0, 1fr) 320px"
-                  : "300px minmax(0, 1fr)",
-                alignItems: "stretch",
-              }}
+         <div
+              className="flex-1 min-h-0 overflow-hidden flex flex-col"
+              style={{ alignItems: "stretch" }}
             >
+              <div className="flex-1 ...">       ← new outer wrapper
+  <div className="grid ...">         ← the inner grid (just sidebar + editor)
+    <aside>...sidebar...</aside>
+    <main>...editor...</main>
+  </div>                              ← close the inner grid
+  
+  {showAssistant && (
+    <AIAssistantPanel
+      isOpen={showAssistant}
+      onClose={() => setShowAssistant(false)}
+      projectId={currentProjectId}
+      chapterTitle={title}
+      chapterText={chapterPlainText}
+      provider={provider}
+      onSendToCompose={handleSendToComposeFromAI}
+    />
+  )}
+</div>                                ← close the outer wrapper
+                
               {/* LEFT SIDEBAR */}
               <aside className="min-h-0 flex flex-col gap-4 overflow-y-auto pr-1">
                 {/* ✅ ONLY ONE SidebarRouter (duplicate removed) */}
@@ -2825,35 +2875,17 @@ useEffect(() => {
               </main>
 
               {/* Right-hand AI Assistant */}
-              {showAssistant && (
-                <section
-                  className="flex flex-col bg-white border border-slate-200 rounded-xl shadow-sm h-full overflow-hidden relative z-20"
-                  style={{ minHeight: "400px", maxHeight: "calc(100vh - 180px)" }}
-                >
-                  <div className="px-3 py-2 border-b border-slate-200 flex items-center justify-between flex-shrink-0">
-                    <div>
-                      <div className="text-xs font-semibold text-slate-800">AI Assistant</div>
-                      <div className="text-[11px] text-slate-500">Ask questions, get suggestions</div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setShowAssistant(false)}
-                      className="text-[11px] px-2 py-1 rounded border border-slate-200 hover:bg-slate-50"
-                    >
-                      Close
-                    </button>
-                  </div>
-
-                  <div className="flex-1 overflow-y-auto px-3 py-2 space-y-2 text-sm">
-                    {chatMessages.length === 0 && (
-                      <p className="text-[12px] text-slate-500 mt-2">
-                        Example questions:
-                        <br />• "Help me tighten this opening."
-                        <br />• "Is this dialogue natural?"
-                        <br />• "Suggest a stronger ending."
-                      </p>
-                    )}
-
+             {showAssistant && (
+  <AIAssistantPanel
+    isOpen={showAssistant}
+    onClose={() => setShowAssistant(false)}
+    projectId={currentProjectId}
+    chapterTitle={title}
+    chapterText={chapterPlainText}
+    provider={provider}
+    onSendToCompose={handleSendToComposeFromAI}
+  />
+)}
                     {chatMessages.map((msg) => (
                       <div
                         key={msg.id}
