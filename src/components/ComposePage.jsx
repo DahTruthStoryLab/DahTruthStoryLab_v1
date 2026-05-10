@@ -23,7 +23,7 @@ import {
   Sparkles,
   Search,
   FileText,
-  Feather, 
+  Feather,
   ChevronDown,
   FolderOpen,
   Download,
@@ -91,18 +91,15 @@ function stripSpacerParagraphs(html = "") {
 }
 
 // Helper: normalize to "double spaced" paragraphs on import / AI
-// NOW: 3 blank lines between paragraphs
 const applyDoubleSpacing = (text = "") => {
   if (!text) return "";
 
-  // If it already looks like HTML, convert paragraph breaks
   if (/<\/p>/i.test(text)) {
     return text
       .replace(/<\/p>\s*<p>/gi, "</p>\n\n\n\n<p>")
       .replace(/(<p>)/gi, "$1");
   }
 
-  // Plain text → use 3 blank lines between paragraphs
   return text
     .replace(/\r\n/g, "\n")
     .replace(/\n{2,}/g, "\n\n\n\n")
@@ -134,11 +131,7 @@ function saveCurrentStorySnapshot({ id, title, primaryGenre }) {
     };
 
     storage.setItem(CURRENT_STORY_KEY, JSON.stringify(snapshot));
-
-    // keep selected project id in sync for any page that reads it
     storage.setItem("dahtruth-current-project-id", snapshot.id);
-
-    // notify StoryLab/other pages
     window.dispatchEvent(new Event("project:change"));
   } catch (err) {
     console.error("Failed to save currentStory:", err);
@@ -171,245 +164,43 @@ function selectedChapterKeyForProject(projectId) {
 // Clean/normalize html for publishing stability
 function normalizeHtmlForPublishing(html = "") {
   let out = String(html || "");
-
-  // Remove spacer paragraphs
   out = stripSpacerParagraphs(out);
-
-  // Normalize multiple <br> runs inside paragraphs
   out = out.replace(/(<br\s*\/?>\s*){4,}/gi, "<br/><br/><br/>");
-
-  // Remove trailing empty paragraphs again after normalization
   out = stripSpacerParagraphs(out);
-
   return out;
 }
 
 /* =============================================================================
-   Regex Character Scan (shared by modal + refresh button)
+   Regex Character Scan
 ============================================================================= */
 
-// Common words to exclude (not character names)
 const EXCLUDED_WORDS = new Set([
-  "the",
-  "a",
-  "an",
-  "and",
-  "but",
-  "or",
-  "for",
-  "nor",
-  "on",
-  "at",
-  "to",
-  "from",
-  "by",
-  "in",
-  "of",
-  "with",
-  "as",
-  "is",
-  "was",
-  "were",
-  "been",
-  "be",
-  "have",
-  "has",
-  "had",
-  "do",
-  "does",
-  "did",
-  "will",
-  "would",
-  "could",
-  "should",
-  "may",
-  "might",
-  "must",
-  "shall",
-  "can",
-  "need",
-  "dare",
-  "ought",
-  "used",
-  "i",
-  "you",
-  "he",
-  "she",
-  "it",
-  "we",
-  "they",
-  "me",
-  "him",
-  "her",
-  "us",
-  "them",
-  "my",
-  "your",
-  "his",
-  "its",
-  "our",
-  "their",
-  "mine",
-  "yours",
-  "hers",
-  "ours",
-  "theirs",
-  "this",
-  "that",
-  "these",
-  "those",
-  "who",
-  "whom",
-  "which",
-  "what",
-  "whose",
-  "where",
-  "when",
-  "why",
-  "how",
-  "all",
-  "each",
-  "every",
-  "both",
-  "few",
-  "more",
-  "most",
-  "other",
-  "some",
-  "such",
-  "no",
-  "not",
-  "only",
-  "own",
-  "same",
-  "so",
-  "than",
-  "too",
-  "very",
-  "just",
-  "also",
-  "now",
-  "here",
-  "there",
-  "then",
-  // Days & months
-  "monday",
-  "tuesday",
-  "wednesday",
-  "thursday",
-  "friday",
-  "saturday",
-  "sunday",
-  "january",
-  "february",
-  "march",
-  "april",
-  "may",
-  "june",
-  "july",
-  "august",
-  "september",
-  "october",
-  "november",
-  "december",
-  // Common titles
-  "mr",
-  "mrs",
-  "ms",
-  "miss",
-  "dr",
-  "prof",
-  "sir",
-  "lord",
-  "lady",
-  // Common places/things often capitalized
-  "church",
-  "hospital",
-  "school",
-  "university",
-  "street",
-  "avenue",
-  "road",
-  "building",
-  "house",
-  "room",
-  "office",
-  "god",
-  "lord",
-  "bible",
-  "chapter",
-  // Story-related words
-  "part",
-  "book",
-  "story",
-  "page",
-  "said",
-  "asked",
-  "replied",
-  "answered",
-  "whispered",
-  "shouted",
-  "cried",
-  "called",
-  "thought",
-  "knew",
-  "felt",
-  "saw",
-  "heard",
-  "looked",
-  "turned",
-  "walked",
-  "ran",
-  "came",
-  "went",
-  "got",
-  "made",
-  "took",
-  "gave",
-  "found",
-  "told",
-  "let",
-  "put",
-  "seemed",
-  "left",
-  "kept",
-  "began",
-  "started",
-  "tried",
-  "wanted",
-  "needed",
-  "liked",
+  "the","a","an","and","but","or","for","nor","on","at","to","from","by","in","of","with","as",
+  "is","was","were","been","be","have","has","had","do","does","did","will","would","could",
+  "should","may","might","must","shall","can","need","dare","ought","used",
+  "i","you","he","she","it","we","they","me","him","her","us","them",
+  "my","your","his","its","our","their","mine","yours","hers","ours","theirs",
+  "this","that","these","those","who","whom","which","what","whose","where","when","why","how",
+  "all","each","every","both","few","more","most","other","some","such",
+  "no","not","only","own","same","so","than","too","very","just","also","now","here","there","then",
+  "monday","tuesday","wednesday","thursday","friday","saturday","sunday",
+  "january","february","march","april","may","june","july","august","september","october","november","december",
+  "mr","mrs","ms","miss","dr","prof","sir","lord","lady",
+  "church","hospital","school","university","street","avenue","road","building","house","room","office",
+  "god","lord","bible","chapter","part","book","story","page",
+  "said","asked","replied","answered","whispered","shouted","cried","called","thought","knew","felt",
+  "saw","heard","looked","turned","walked","ran","came","went","got","made","took","gave","found","told",
+  "let","put","seemed","left","kept","began","started","tried","wanted","needed","liked",
 ]);
 
-// Common place indicators
 const PLACE_INDICATORS = [
-  "street",
-  "avenue",
-  "road",
-  "drive",
-  "lane",
-  "way",
-  "boulevard",
-  "court",
-  "place",
-  "park",
-  "city",
-  "town",
-  "county",
-  "state",
-  "building",
-  "tower",
-  "center",
-  "mall",
-  "hospital",
-  "church",
-  "school",
+  "street","avenue","road","drive","lane","way","boulevard","court","place","park",
+  "city","town","county","state","building","tower","center","mall","hospital","church","school",
 ];
 
 function regexScanForCharacters(chapterList = []) {
-  const nameStats = new Map(); // name -> { count, inDialogue, chapters, contexts }
+  const nameStats = new Map();
 
-  // Get already tagged characters
   const existingTags = new Set();
   const tagPattern = /@char:\s*([A-Za-z][A-Za-z\s.'-]*)/gi;
   chapterList.forEach((ch) => {
@@ -424,7 +215,6 @@ function regexScanForCharacters(chapterList = []) {
     const content = stripHtml(chapter?.content || "");
     const chapterTitle = chapter?.title || `Chapter ${chIdx + 1}`;
 
-    // Pattern 1: Names in dialogue tags
     const dialoguePatterns = [
       /(?:said|asked|replied|answered|whispered|shouted|called|cried|muttered|murmured|exclaimed|demanded|insisted|suggested|continued|added|agreed|admitted|announced|argued|began|begged|bellowed|blurted|boasted|bragged|breathed|chimed|choked|claimed|coaxed|commanded|commented|complained|conceded|concluded|confessed|confirmed|corrected|countered|croaked|declared|denied|drawled|echoed|encouraged|ended|explained|finished|gasped|giggled|groaned|growled|grumbled|grunted|guessed|gulped|hinted|hissed|huffed|hummed|informed|inquired|instructed|interrupted|interjected|joked|laughed|lectured|lied|mentioned|moaned|mocked|mumbled|mused|nagged|nodded|noted|objected|observed|offered|ordered|panted|persisted|piped|pleaded|pointed|pondered|pouted|praised|prayed|pressed|proclaimed|promised|proposed|protested|provoked|purred|questioned|quipped|quoted|ranted|reasoned|reassured|recalled|recited|refused|reminded|repeated|reported|requested|responded|retorted|revealed|roared|sang|scoffed|scolded|screamed|sighed|smiled|snapped|snarled|sneered|sobbed|spoke|spluttered|squeaked|squealed|stammered|started|stated|stormed|stressed|stuttered|suggested|summarized|taunted|teased|thanked|threatened|thundered|urged|uttered|vowed|wailed|warned|wept|whimpered|whined|wondered|yawned|yelled|yelped)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/gi,
       /([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s+(?:said|asked|replied|answered|whispered|shouted|called|cried|muttered|murmured|exclaimed|demanded|insisted|suggested|continued|added|agreed|admitted|announced|argued|began|begged|bellowed|blurted|boasted|bragged|breathed|chimed|choked|claimed|coaxed|commanded|commented|complained|conceded|concluded|confessed|confirmed|corrected|countered|croaked|declared|denied|drawled|echoed|encouraged|ended|explained|finished|gasped|giggled|groaned|growled|grumbled|grunted|guessed|gulped|hinted|hissed|huffed|hummed|informed|inquired|instructed|interrupted|interjected|joked|laughed|lectured|lied|mentioned|moaned|mocked|mumbled|mused|nagged|nodded|noted|objected|observed|offered|ordered|panted|persisted|piped|pleaded|pointed|pondered|pouted|praised|prayed|pressed|proclaimed|promised|proposed|protested|provoked|purred|questioned|quipped|quoted|ranted|reasoned|reassured|recalled|recited|refused|reminded|repeated|reported|requested|responded|retorted|revealed|roared|sang|scoffed|scolded|screamed|sighed|smiled|snapped|snarled|sneered|sobbed|spoke|spluttered|squeaked|squealed|stammered|started|stated|stormed|stressed|stuttered|suggested|summarized|taunted|teased|thanked|threatened|thundered|urged|uttered|vowed|wailed|warned|wept|whimpered|whined|wondered|yawned|yelled|yelped)/gi,
@@ -438,12 +228,7 @@ function regexScanForCharacters(chapterList = []) {
           const key = name.toLowerCase();
           if (!EXCLUDED_WORDS.has(key) && !existingTags.has(key)) {
             if (!nameStats.has(name)) {
-              nameStats.set(name, {
-                count: 0,
-                inDialogue: 0,
-                chapters: new Set(),
-                contexts: [],
-              });
+              nameStats.set(name, { count: 0, inDialogue: 0, chapters: new Set(), contexts: [] });
             }
             const stats = nameStats.get(name);
             stats.count++;
@@ -455,9 +240,7 @@ function regexScanForCharacters(chapterList = []) {
       }
     });
 
-    // Pattern 2: Names with titles
-    const titlePattern =
-      /(?:Mr\.|Mrs\.|Ms\.|Miss|Dr\.|Pastor|Father|Mother|Sister|Brother|Uncle|Aunt|Grandma|Grandpa|Coach|Officer|Detective|Agent|Captain|Professor|Prof\.)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/gi;
+    const titlePattern = /(?:Mr\.|Mrs\.|Ms\.|Miss|Dr\.|Pastor|Father|Mother|Sister|Brother|Uncle|Aunt|Grandma|Grandpa|Coach|Officer|Detective|Agent|Captain|Professor|Prof\.)\s+([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)/gi;
     let match;
     while ((match = titlePattern.exec(content)) !== null) {
       const fullMatch = match[0].trim();
@@ -465,12 +248,7 @@ function regexScanForCharacters(chapterList = []) {
       const key = name.toLowerCase();
       if (!existingTags.has(key)) {
         if (!nameStats.has(name)) {
-          nameStats.set(name, {
-            count: 0,
-            inDialogue: 0,
-            chapters: new Set(),
-            contexts: [],
-          });
+          nameStats.set(name, { count: 0, inDialogue: 0, chapters: new Set(), contexts: [] });
         }
         const stats = nameStats.get(name);
         stats.count++;
@@ -479,7 +257,6 @@ function regexScanForCharacters(chapterList = []) {
       }
     }
 
-    // Pattern 3: Proper nouns
     const properNounPattern = /[a-z,;:]\s+([A-Z][a-z]{2,}(?:\s+[A-Z][a-z]+)?)/g;
     while ((match = properNounPattern.exec(content)) !== null) {
       const name = match[1]?.trim();
@@ -494,12 +271,7 @@ function regexScanForCharacters(chapterList = []) {
         if (isPlace) continue;
 
         if (!nameStats.has(name)) {
-          nameStats.set(name, {
-            count: 0,
-            inDialogue: 0,
-            chapters: new Set(),
-            contexts: [],
-          });
+          nameStats.set(name, { count: 0, inDialogue: 0, chapters: new Set(), contexts: [] });
         }
         const stats = nameStats.get(name);
         stats.count++;
@@ -507,9 +279,7 @@ function regexScanForCharacters(chapterList = []) {
       }
     }
 
-    // Pattern 4: Action patterns
-    const actionPattern =
-      /([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s+(?:walked|ran|looked|turned|smiled|frowned|nodded|shook|stood|sat|leaned|reached|grabbed|pulled|pushed|opened|closed|picked|put|took|gave|held|felt|watched|stared|glanced|gazed|noticed|saw|heard|listened|moved|stepped|entered|left|arrived|returned|approached|followed|led|stopped|started|continued|began|tried|wanted|needed|decided|thought|knew|remembered|forgot|realized|understood|believed|hoped|wished|feared|loved|hated|liked)/gi;
+    const actionPattern = /([A-Z][a-z]+(?:\s+[A-Z][a-z]+)?)\s+(?:walked|ran|looked|turned|smiled|frowned|nodded|shook|stood|sat|leaned|reached|grabbed|pulled|pushed|opened|closed|picked|put|took|gave|held|felt|watched|stared|glanced|gazed|noticed|saw|heard|listened|moved|stepped|entered|left|arrived|returned|approached|followed|led|stopped|started|continued|began|tried|wanted|needed|decided|thought|knew|remembered|forgot|realized|understood|believed|hoped|wished|feared|loved|hated|liked)/gi;
 
     while ((match = actionPattern.exec(content)) !== null) {
       const name = match[1]?.trim();
@@ -517,12 +287,7 @@ function regexScanForCharacters(chapterList = []) {
         const key = name.toLowerCase();
         if (!EXCLUDED_WORDS.has(key) && !existingTags.has(key)) {
           if (!nameStats.has(name)) {
-            nameStats.set(name, {
-              count: 0,
-              inDialogue: 0,
-              chapters: new Set(),
-              contexts: [],
-            });
+            nameStats.set(name, { count: 0, inDialogue: 0, chapters: new Set(), contexts: [] });
           }
           const stats = nameStats.get(name);
           stats.count++;
@@ -533,7 +298,6 @@ function regexScanForCharacters(chapterList = []) {
     }
   });
 
-  // Convert to array and calculate confidence
   const results = [];
   nameStats.forEach((stats, name) => {
     if (stats.count < 2 && !name.includes(" ") && stats.inDialogue === 0) return;
@@ -568,15 +332,9 @@ function regexScanForCharacters(chapterList = []) {
 }
 
 /* =============================================================================
-   CHARACTER SUGGESTION MODAL (Hybrid: Regex + Optional AI)
+   CHARACTER SUGGESTION MODAL
 ============================================================================= */
-function CharacterSuggestionModal({
-  isOpen,
-  onClose,
-  chapters,
-  onAddCharacterTags,
-  provider,
-}) {
+function CharacterSuggestionModal({ isOpen, onClose, chapters, onAddCharacterTags, provider }) {
   const [suggestions, setSuggestions] = useState([]);
   const [selectedChars, setSelectedChars] = useState(new Set());
   const [hasScanned, setHasScanned] = useState(false);
@@ -982,14 +740,7 @@ Return ONLY the JSON array, no other text.`;
 /* =============================================================================
    PROJECT DROPDOWN COMPONENT
 ============================================================================= */
-function ProjectDropdown({
-  currentProject,
-  projects,
-  onSwitch,
-  onCreate,
-  onImportNew,
-  onRename,
-}) {
+function ProjectDropdown({ currentProject, projects, onSwitch, onCreate, onImportNew, onRename }) {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
 
@@ -1130,13 +881,7 @@ function ProjectDropdown({
 /* =============================================================================
    IMPORT OPTIONS MODAL
 ============================================================================= */
-function ImportOptionsModal({
-  isOpen,
-  onClose,
-  onImportCurrent,
-  onImportNew,
-  fileName,
-}) {
+function ImportOptionsModal({ isOpen, onClose, onImportCurrent, onImportNew, fileName }) {
   if (!isOpen) return null;
 
   return createPortal(
@@ -1316,15 +1061,7 @@ function DropdownMenu({ label, icon: Icon, children, disabled = false }) {
   );
 }
 
-function DropdownItem({
-  icon: Icon,
-  label,
-  onClick,
-  disabled = false,
-  active = false,
-  shortcut,
-  closeMenu,
-}) {
+function DropdownItem({ icon: Icon, label, onClick, disabled = false, active = false, shortcut, closeMenu }) {
   const handleClick = (e) => {
     if (disabled) return;
     if (onClick) onClick(e);
@@ -1400,17 +1137,14 @@ export default function ComposePage() {
   const [bookTitle, setBookTitle] = useState(book?.title || "Untitled Story");
   const [author, setAuthor] = useState("Jacqueline Session Ausby");
 
-  // Genre from project (always safe)
   const primaryGenre =
     currentProject?.primaryGenre || currentProject?.genre || "General / Undeclared";
 
-  // ✅ Selected chapter key (project-scoped)
   const selectedChapterStorageKey = useMemo(
     () => selectedChapterKeyForProject(currentProjectId),
     [currentProjectId]
   );
 
-  // Update bookTitle when project changes
   useEffect(() => {
     if (currentProject?.title) setBookTitle(currentProject.title);
     else if (book?.title) setBookTitle(book.title);
@@ -1440,26 +1174,23 @@ export default function ComposePage() {
   const [provider, setProvider] = useState("anthropic");
   const [instructions, setInstructions] = useState("");
 
+  // AI Assistant — chat state now lives inside AIAssistantPanel
   const [showAssistant, setShowAssistant] = useState(false);
-  const [chatMessages, setChatMessages] = useState([]);
-  const [chatInput, setChatInput] = useState("");
-  const [chatBusy, setChatBusy] = useState(false);
 
- const searchParams = new URLSearchParams(window.location.search);
-const [view, setView] = useState(
-  searchParams.get("mode") === "compose" ? "editor" : "grid"
-);
+  const searchParams = new URLSearchParams(window.location.search);
+  const [view, setView] = useState(
+    searchParams.get("mode") === "compose" ? "editor" : "grid"
+  );
 
-useEffect(() => {
-  const params = new URLSearchParams(window.location.search);
-  if (params.get("mode") === "compose") {
-    setView("editor");
-  } else {
-    setView("grid");
-  }
-}, [window.location.search]);
-  
-  
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("mode") === "compose") {
+      setView("editor");
+    } else {
+      setView("grid");
+    }
+  }, [window.location.search]);
+
   const [showSearch, setShowSearch] = useState(false);
   const [editorViewMode, setEditorViewMode] = useState("editor");
 
@@ -1478,14 +1209,11 @@ useEffect(() => {
   const [headings, setHeadings] = useState([]);
   const [activeAiTab, setActiveAiTab] = useState("proofread");
 
-  // Import modal state
   const [showImportModal, setShowImportModal] = useState(false);
   const [pendingImportFile, setPendingImportFile] = useState(null);
 
-  // Character suggestion modal state
   const [showCharacterSuggestion, setShowCharacterSuggestion] = useState(false);
 
-  // detected characters state
   const [detectedCharacters, setDetectedCharacters] = useState([]);
 
   const hasChapter = !!selectedId && !!selectedChapter;
@@ -1521,7 +1249,6 @@ useEffect(() => {
     } catch {}
   }, [activeAiTab]);
 
-  // ✅ Auto-select a chapter when entering editor view
   useEffect(() => {
     if (view !== "editor") return;
     if (selectedId) return;
@@ -1539,7 +1266,6 @@ useEffect(() => {
     setSelectedId(chapters[0].id);
   }, [view, selectedId, chapters, selectedChapterStorageKey, setSelectedId]);
 
-  // Check for pending character scan after reload
   useEffect(() => {
     const pending = storage.getItem("dt_pending_character_scan");
     if (pending === "true" && chapters.length > 0) {
@@ -1748,17 +1474,13 @@ useEffect(() => {
     const selectedHtml = container.innerHTML.trim();
 
     if (!selectedHtml) {
-      alert(
-        "I couldn't read any content from your selection. Please select the exact sentence or paragraph you want revised and try again."
-      );
+      alert("I couldn't read any content from your selection. Please select the exact sentence or paragraph you want revised and try again.");
       return;
     }
 
     const selectedPlain = selectedHtml.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
     if (!selectedPlain) {
-      alert(
-        "The selected content seems to be empty or only formatting. Please select normal text and try again."
-      );
+      alert("The selected content seems to be empty or only formatting. Please select normal text and try again.");
       return;
     }
 
@@ -1811,15 +1533,6 @@ useEffect(() => {
         content: updatedHtml,
         preview: generatePreview(updatedHtml, 20),
       });
-
-      setChatMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content: "AI revision applied to your selection:\n\n" + processedText,
-          id: Date.now(),
-        },
-      ]);
     } catch (error) {
       console.error("AI request error:", error);
       alert("There was an error calling the AI service. Please try again in a moment.");
@@ -1828,7 +1541,7 @@ useEffect(() => {
     }
   };
 
-// Insert AI text at the cursor position in the Quill editor
+  // Insert AI text at the cursor position in the Quill editor
   const handleSendToComposeFromAI = useCallback(
     (text) => {
       if (!text) return;
@@ -1836,7 +1549,6 @@ useEffect(() => {
       const editorEl = document.querySelector(".ql-editor");
       if (!editorEl) return;
 
-      // Try to use Quill's API for clean insertion at cursor
       const quillContainer = editorEl.closest(".quill") || editorEl.parentElement;
       const quill =
         quillContainer?.__quill ||
@@ -1848,7 +1560,6 @@ useEffect(() => {
         quill.insertText(insertPos, text + "\n\n", "user");
         quill.setSelection(insertPos + text.length + 2, 0);
       } else {
-        // Fallback: append to current html
         const newHtml = (html || "") + `<p>${text.replace(/\n/g, "<br/>")}</p>`;
         setHtml(newHtml);
         if (selectedId) {
@@ -1862,62 +1573,6 @@ useEffect(() => {
     },
     [html, selectedId, title, selectedChapter, updateChapter]
   );
-    
-  const handleAssistantSend = async () => {
-    const text = chatInput.trim();
-    if (!text) return;
-
-    const userMessage = { role: "user", content: text, id: Date.now() };
-    setChatMessages((prev) => [...prev, userMessage]);
-    setChatInput("");
-    setChatBusy(true);
-
-    try {
-      const snippet = chapterPlainText.slice(0, 1500) || "";
-      const instructionsText = [
-        `You are the DahTruth StoryLab writing assistant.`,
-        `The user is working on a chapter titled "${title || "Untitled Chapter"}".`,
-        `When you suggest edits, please quote or clearly separate your suggested text so it can be copy-pasted into the manuscript.`,
-        snippet
-          ? `Here is an excerpt of the chapter for context:\n\n${snippet}`
-          : `There is no chapter text yet; answer based on the question only.`,
-      ].join("\n\n");
-
-      const res = await rateLimiter.addToQueue(() =>
-        runAssistant(text, "clarify", instructionsText, provider)
-      );
-
-      const replyText = (res && (res.result || res.text || res.output || res.data)) || "";
-      const assistantMessage = {
-        role: "assistant",
-        content:
-          replyText ||
-          "I couldn't generate a response. Please try asking your question in a different way.",
-        id: Date.now() + 1,
-      };
-
-      setChatMessages((prev) => [...prev, assistantMessage]);
-    } catch (err) {
-      console.error("Assistant chat error:", err);
-      setChatMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          content: "Sorry, there was an error reaching the assistant. Please try again in a moment.",
-          id: Date.now() + 2,
-        },
-      ]);
-    } finally {
-      setChatBusy(false);
-    }
-  };
-
-  const handleAssistantKeyDown = (e) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleAssistantSend();
-    }
-  };
 
   const parseFile = async (file) => {
     const name = file.name.toLowerCase();
@@ -2129,7 +1784,6 @@ useEffect(() => {
     URL.revokeObjectURL(url);
   };
 
-  // ✅ Updated delete: stay in editor, clear selection + stored key
   const handleDeleteCurrent = () => {
     if (!hasChapter) {
       alert("Please select a chapter first.");
@@ -2176,7 +1830,6 @@ useEffect(() => {
     setShowCharacterSuggestion(true);
   };
 
-  // ✅ Jump to StoryLab — syncs project ID and navigates
   const jumpToStoryLab = () => {
     try {
       storage.setItem("dahtruth-current-project-id", currentProjectId);
@@ -2189,7 +1842,6 @@ useEffect(() => {
 
   const goBack = () => navigate("/dashboard");
 
-  // ✅ Writer navigation: always persist selection per-project
   const goToWriter = (chapterId) => {
     const idToUse =
       chapterId ||
@@ -2329,7 +1981,7 @@ useEffect(() => {
 
   return (
     <div className="h-screen overflow-hidden bg-[rgb(244,247,250)] text-slate-900 flex flex-col">
-     {/* Hidden file inputs */}
+      {/* Hidden file inputs */}
       <input
         ref={fileInputRef}
         type="file"
@@ -2540,7 +2192,7 @@ useEffect(() => {
             />
           </DropdownMenu>
 
-         <button
+          <button
             type="button"
             onClick={() => setShowSearch((s) => !s)}
             className={`
@@ -2557,12 +2209,12 @@ useEffect(() => {
             Search
           </button>
 
-           <button
+          <button
             type="button"
             onClick={() => {
-            saveCurrentStorySnapshot({ id: currentProjectId, title: bookTitle, primaryGenre });
-            navigate(`/story-lab/fiction?projectId=${currentProjectId}`);
-          }}
+              saveCurrentStorySnapshot({ id: currentProjectId, title: bookTitle, primaryGenre });
+              navigate(`/story-lab/fiction?projectId=${currentProjectId}`);
+            }}
             disabled={!hasAnyChapters}
             className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
           >
@@ -2573,9 +2225,9 @@ useEffect(() => {
           <button
             type="button"
             onClick={() => {
-            saveCurrentStorySnapshot({ id: currentProjectId, title: bookTitle, primaryGenre });
-            navigate(`/story-lab/nonfiction?projectId=${currentProjectId}`);
-          }}
+              saveCurrentStorySnapshot({ id: currentProjectId, title: bookTitle, primaryGenre });
+              navigate(`/story-lab/nonfiction?projectId=${currentProjectId}`);
+            }}
             disabled={!hasAnyChapters}
             className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
           >
@@ -2585,10 +2237,10 @@ useEffect(() => {
 
           <button
             type="button"
-           onClick={() => {
-            saveCurrentStorySnapshot({ id: currentProjectId, title: bookTitle, primaryGenre });
-            navigate(`/story-lab/poetry?projectId=${currentProjectId}`);
-          }}
+            onClick={() => {
+              saveCurrentStorySnapshot({ id: currentProjectId, title: bookTitle, primaryGenre });
+              navigate(`/story-lab/poetry?projectId=${currentProjectId}`);
+            }}
             disabled={!hasAnyChapters}
             className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
           >
@@ -2597,7 +2249,7 @@ useEffect(() => {
           </button>
 
           <div className="flex-1" />
-                 
+
           {queueLength > 0 && (
             <div className="flex items-center gap-1 px-2 py-1 bg-blue-50 rounded border border-blue-200 flex-shrink-0">
               <span className="text-xs text-blue-700">
@@ -2624,9 +2276,9 @@ useEffect(() => {
             Send to Publishing
           </button>
         </div>
-      </div> 
+      </div>
 
-         {/* GRID VIEW */}
+      {/* GRID VIEW */}
       {view === "grid" && (
         <div className="flex-1">
           {showSearch && (
@@ -2676,7 +2328,7 @@ useEffect(() => {
                 onImport={handleImportIntoCurrent}
                 onExport={handleExport}
                 onDelete={handleDeleteCurrent}
-                aiBusy={aiBusy || isImporting || chatBusy}
+                aiBusy={aiBusy || isImporting}
                 saveStatus={saveStatus}
                 activeAiTab={activeAiTab}
                 setActiveAiTab={setActiveAiTab}
@@ -2685,264 +2337,202 @@ useEffect(() => {
               />
             </div>
 
-         <div
+            {/* Outer wrapper: column flex (sidebar+editor on top, AI panel on bottom) */}
+            <div
               className="flex-1 min-h-0 overflow-hidden flex flex-col"
               style={{ alignItems: "stretch" }}
             >
-              <div className="flex-1 ...">       ← new outer wrapper
-  <div className="grid ...">         ← the inner grid (just sidebar + editor)
-    <aside>...sidebar...</aside>
-    <main>...editor...</main>
-  </div>                              ← close the inner grid
-  
-  {showAssistant && (
-    <AIAssistantPanel
-      isOpen={showAssistant}
-      onClose={() => setShowAssistant(false)}
-      projectId={currentProjectId}
-      chapterTitle={title}
-      chapterText={chapterPlainText}
-      provider={provider}
-      onSendToCompose={handleSendToComposeFromAI}
-    />
-  )}
-</div>                                ← close the outer wrapper
-                
-              {/* LEFT SIDEBAR */}
-              <aside className="min-h-0 flex flex-col gap-4 overflow-y-auto pr-1">
-                {/* ✅ ONLY ONE SidebarRouter (duplicate removed) */}
-                <SidebarRouter
-                  genre={primaryGenre}
-                  chapters={chapters}
-                  selectedChapterId={selectedId}
-                  projectId={currentProjectId}
-                  projectTitle={bookTitle}
-                  wordCount={totalWordCount}
-                  targetWords={50000}
-                  hasAnyChapters={hasAnyChapters}
-                  onSelectChapter={(id) => {
-                    if (!id) return;
-                    setSelectedId(id);
-                    setView("editor");
-                    setEditorViewMode("editor");
-                    try {
-                      storage.setItem(selectedChapterStorageKey, id);
-                    } catch {}
-                  }}
-                  onRefresh={() => window.dispatchEvent(new Event("project:change"))}
-                />
+              {/* Top row: sidebar + editor */}
+              <div
+                className="grid gap-6 overflow-hidden items-stretch"
+                style={{
+                  gridTemplateColumns: "300px minmax(0, 1fr)",
+                  flex: showAssistant ? "1 1 50%" : "1 1 100%",
+                  minHeight: 0,
+                  transition: "flex 0.3s ease",
+                }}
+              >
+                {/* LEFT SIDEBAR */}
+                <aside className="min-h-0 flex flex-col gap-4 overflow-y-auto pr-1">
+                  <SidebarRouter
+                    genre={primaryGenre}
+                    chapters={chapters}
+                    selectedChapterId={selectedId}
+                    projectId={currentProjectId}
+                    projectTitle={bookTitle}
+                    wordCount={totalWordCount}
+                    targetWords={50000}
+                    hasAnyChapters={hasAnyChapters}
+                    onSelectChapter={(id) => {
+                      if (!id) return;
+                      setSelectedId(id);
+                      setView("editor");
+                      setEditorViewMode("editor");
+                      try {
+                        storage.setItem(selectedChapterStorageKey, id);
+                      } catch {}
+                    }}
+                    onRefresh={() => window.dispatchEvent(new Event("project:change"))}
+                  />
 
-                {headings.length > 0 && (
-                  <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
-                    <div className="text-xs font-semibold text-slate-700 mb-2">
-                      Table of Contents
-                    </div>
-                    <ul className="space-y-1 max-h-64 overflow-auto text-xs">
-                      {headings.map((h, idx) => (
-                        <li key={`${h.level}-${idx}-${h.text}`} className="text-slate-700">
-                          <span
-                            className={
-                              h.level === "h1"
-                                ? "font-semibold"
-                                : h.level === "h2"
-                                ? "ml-2"
-                                : "ml-4 text-slate-500"
-                            }
-                          >
-                            {h.text}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {/* Characters Card */}
-                <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm min-h-[140px]">
-                  <div className="text-xs font-semibold text-slate-700 mb-2 flex items-center justify-between gap-2">
-                    <span>Characters</span>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[11px] text-slate-500">{characterCount} tagged</span>
-                      <button
-                        type="button"
-                        onClick={refreshDetectedCharacters}
-                        disabled={!hasAnyChapters}
-                        className="text-[11px] px-2 py-1 rounded border bg-white border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-50"
-                        title="Refresh detected character list"
-                      >
-                        Refresh Detected
-                      </button>
-                    </div>
-                  </div>
-
-                  {characterCount === 0 ? (
-                    <div>
-                      <p className="text-[11px] text-slate-500 leading-snug mb-2">
-                        No characters tagged yet.
-                        <br />
-                        Introduce a character as{" "}
-                        <span className="font-mono text-[11px] bg-slate-100 px-1 py-0.5 rounded">
-                          @char: John Smith
-                        </span>
-                      </p>
-                      <button
-                        onClick={handleScanForCharacters}
-                        disabled={!hasAnyChapters}
-                        className="text-[11px] px-2 py-1 rounded border bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100 disabled:opacity-50"
-                      >
-                        ✨ Scan for Characters
-                      </button>
-
-                      {detectedCharacters?.length > 0 && (
-                        <div className="mt-3 pt-3 border-t border-slate-100">
-                          <div className="text-[11px] font-semibold text-slate-600 mb-2">
-                            Detected (candidates)
-                          </div>
-                          <ul className="space-y-1 max-h-40 overflow-auto text-xs">
-                            {detectedCharacters.slice(0, 25).map((c) => (
-                              <li key={c.name} className="text-slate-700 truncate">
-                                {c.name}
-                              </li>
-                            ))}
-                          </ul>
-                          {detectedCharacters.length > 25 && (
-                            <div className="text-[11px] text-slate-400 mt-2">
-                              Showing 25 of {detectedCharacters.length}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <>
-                      <ul className="space-y-1 max-h-40 overflow-auto text-xs">
-                        {characters.map((name) => (
-                          <li key={name} className="text-slate-700 truncate">
-                            {name}
+                  {headings.length > 0 && (
+                    <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+                      <div className="text-xs font-semibold text-slate-700 mb-2">
+                        Table of Contents
+                      </div>
+                      <ul className="space-y-1 max-h-64 overflow-auto text-xs">
+                        {headings.map((h, idx) => (
+                          <li key={`${h.level}-${idx}-${h.text}`} className="text-slate-700">
+                            <span
+                              className={
+                                h.level === "h1"
+                                  ? "font-semibold"
+                                  : h.level === "h2"
+                                  ? "ml-2"
+                                  : "ml-4 text-slate-500"
+                              }
+                            >
+                              {h.text}
+                            </span>
                           </li>
                         ))}
                       </ul>
+                    </div>
+                  )}
 
-                      {detectedCharacters?.length > 0 && (
-                        <div className="mt-3 pt-3 border-t border-slate-100">
-                          <div className="text-[11px] font-semibold text-slate-600 mb-2">
-                            Detected (candidates)
-                          </div>
-                          <ul className="space-y-1 max-h-40 overflow-auto text-xs">
-                            {detectedCharacters.slice(0, 25).map((c) => (
-                              <li key={c.name} className="text-slate-700 truncate">
-                                {c.name}
-                              </li>
-                            ))}
-                          </ul>
-                          {detectedCharacters.length > 25 && (
-                            <div className="text-[11px] text-slate-400 mt-2">
-                              Showing 25 of {detectedCharacters.length}
+                  {/* Characters Card */}
+                  <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm min-h-[140px]">
+                    <div className="text-xs font-semibold text-slate-700 mb-2 flex items-center justify-between gap-2">
+                      <span>Characters</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] text-slate-500">{characterCount} tagged</span>
+                        <button
+                          type="button"
+                          onClick={refreshDetectedCharacters}
+                          disabled={!hasAnyChapters}
+                          className="text-[11px] px-2 py-1 rounded border bg-white border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                          title="Refresh detected character list"
+                        >
+                          Refresh Detected
+                        </button>
+                      </div>
+                    </div>
+
+                    {characterCount === 0 ? (
+                      <div>
+                        <p className="text-[11px] text-slate-500 leading-snug mb-2">
+                          No characters tagged yet.
+                          <br />
+                          Introduce a character as{" "}
+                          <span className="font-mono text-[11px] bg-slate-100 px-1 py-0.5 rounded">
+                            @char: John Smith
+                          </span>
+                        </p>
+                        <button
+                          onClick={handleScanForCharacters}
+                          disabled={!hasAnyChapters}
+                          className="text-[11px] px-2 py-1 rounded border bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100 disabled:opacity-50"
+                        >
+                          ✨ Scan for Characters
+                        </button>
+
+                        {detectedCharacters?.length > 0 && (
+                          <div className="mt-3 pt-3 border-t border-slate-100">
+                            <div className="text-[11px] font-semibold text-slate-600 mb-2">
+                              Detected (candidates)
                             </div>
-                          )}
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
-              </aside>
-
-              {/* Main Editor/Paginated View */}
-              <main className="min-h-0 min-w-0 overflow-hidden relative z-10">
-                <div className="min-h-0 min-w-0 w-full h-full overflow-x-auto">
-                  {editorViewMode === "pages" ? (
-                    <PaginatedView
-                      html={html}
-                      title={title}
-                      author={author}
-                      chapterNumber={chapters.findIndex((c) => c.id === selectedId) + 1}
-                      onEdit={() => setEditorViewMode("editor")}
-                    />
-                  ) : (
-                    <EditorPane
-                      title={title}
-                      setTitle={setTitle}
-                      html={html}
-                      setHtml={setHtml}
-                      onSave={handleSave}
-                      onAI={handleAI}
-                      aiBusy={aiBusy || chatBusy}
-                      pageWidth={1000}
-                      onHeadingsChange={setHeadings}
-                    />
-                  )}
-                </div>
-              </main>
-
-              {/* Right-hand AI Assistant */}
-             {showAssistant && (
-  <AIAssistantPanel
-    isOpen={showAssistant}
-    onClose={() => setShowAssistant(false)}
-    projectId={currentProjectId}
-    chapterTitle={title}
-    chapterText={chapterPlainText}
-    provider={provider}
-    onSendToCompose={handleSendToComposeFromAI}
-  />
-)}
-                    {chatMessages.map((msg) => (
-                      <div
-                        key={msg.id}
-                        className={
-                          msg.role === "user"
-                            ? "self-end max-w-[80%] rounded-lg bg-indigo-50 px-3 py-2 text-xs"
-                            : "self-start max-w-[80%] rounded-lg bg-slate-50 px-3 py-2 text-xs"
-                        }
-                      >
-                        <div className="whitespace-pre-wrap text-slate-800">{msg.content}</div>
-                        {msg.role === "assistant" && (
-                          <button
-                            type="button"
-                            onClick={() => navigator.clipboard.writeText(msg.content)}
-                            className="mt-1 text-[10px] px-2 py-0.5 rounded border border-slate-200 bg-white hover:bg-slate-100"
-                          >
-                            Copy
-                          </button>
+                            <ul className="space-y-1 max-h-40 overflow-auto text-xs">
+                              {detectedCharacters.slice(0, 25).map((c) => (
+                                <li key={c.name} className="text-slate-700 truncate">
+                                  {c.name}
+                                </li>
+                              ))}
+                            </ul>
+                            {detectedCharacters.length > 25 && (
+                              <div className="text-[11px] text-slate-400 mt-2">
+                                Showing 25 of {detectedCharacters.length}
+                              </div>
+                            )}
+                          </div>
                         )}
                       </div>
-                    ))}
-                  </div>
+                    ) : (
+                      <>
+                        <ul className="space-y-1 max-h-40 overflow-auto text-xs">
+                          {characters.map((name) => (
+                            <li key={name} className="text-slate-700 truncate">
+                              {name}
+                            </li>
+                          ))}
+                        </ul>
 
-                  <form
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      handleAssistantSend();
-                    }}
-                    className="border-t border-slate-200 p-2 space-y-2 flex-shrink-0"
-                  >
-                    <textarea
-                      rows={3}
-                      className="w-full resize-none rounded-md border border-slate-300 px-2 py-1 text-[13px] focus:outline-none focus:ring-2 focus:ring-amber-400"
-                      placeholder="Ask a question..."
-                      value={chatInput}
-                      onChange={(e) => setChatInput(e.target.value)}
-                      onKeyDown={handleAssistantKeyDown}
-                      disabled={chatBusy}
-                    />
-                    <div className="flex items-center justify-between">
-                      <div className="text-[11px] text-slate-500">Enter to send</div>
-                      <button
-                        type="submit"
-                        disabled={!chatInput.trim() || chatBusy}
-                        className="text-[13px] px-3 py-1.5 rounded-md bg-amber-500 text-white hover:bg-amber-600 disabled:opacity-50"
-                      >
-                        {chatBusy ? "Thinking…" : "Send"}
-                      </button>
-                    </div>
-                  </form>
-                </section>
-              )}
+                        {detectedCharacters?.length > 0 && (
+                          <div className="mt-3 pt-3 border-t border-slate-100">
+                            <div className="text-[11px] font-semibold text-slate-600 mb-2">
+                              Detected (candidates)
+                            </div>
+                            <ul className="space-y-1 max-h-40 overflow-auto text-xs">
+                              {detectedCharacters.slice(0, 25).map((c) => (
+                                <li key={c.name} className="text-slate-700 truncate">
+                                  {c.name}
+                                </li>
+                              ))}
+                            </ul>
+                            {detectedCharacters.length > 25 && (
+                              <div className="text-[11px] text-slate-400 mt-2">
+                                Showing 25 of {detectedCharacters.length}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </aside>
+
+                {/* MAIN EDITOR */}
+                <main className="min-h-0 min-w-0 overflow-hidden relative z-10">
+                  <div className="min-h-0 min-w-0 w-full h-full overflow-x-auto">
+                    {editorViewMode === "pages" ? (
+                      <PaginatedView
+                        html={html}
+                        title={title}
+                        author={author}
+                        chapterNumber={chapters.findIndex((c) => c.id === selectedId) + 1}
+                        onEdit={() => setEditorViewMode("editor")}
+                      />
+                    ) : (
+                      <EditorPane
+                        title={title}
+                        setTitle={setTitle}
+                        html={html}
+                        setHtml={setHtml}
+                        onSave={handleSave}
+                        onAI={handleAI}
+                        aiBusy={aiBusy}
+                        pageWidth={1000}
+                        onHeadingsChange={setHeadings}
+                      />
+                    )}
+                  </div>
+                </main>
+              </div>
+
+              {/* BOTTOM PANEL: AI Assistant — slides up from bottom */}
+              <AIAssistantPanel
+                isOpen={showAssistant}
+                onClose={() => setShowAssistant(false)}
+                projectId={currentProjectId}
+                chapterTitle={title}
+                chapterText={chapterPlainText}
+                provider={provider}
+                onSendToCompose={handleSendToComposeFromAI}
+              />
             </div>
           </div>
         </div>
       )}
     </div>
   );
-} 
+}
 
