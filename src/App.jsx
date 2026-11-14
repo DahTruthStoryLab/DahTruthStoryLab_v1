@@ -79,6 +79,7 @@ const Cover          = lazy(() => import("./pages/Cover.tsx"));
 // Author Studio
 const AuthorPage = lazy(() => import("./pages/AuthorPage.jsx"));
 const BookPage   = lazy(() => import("./pages/BookPage.jsx"));
+const ToBeRead   = lazy(() => import("./pages/ToBeRead.jsx"));
 
 // Other
 const Profile        = lazy(() => import("./components/Profile"));
@@ -227,6 +228,8 @@ export default function App() {
                     {/* ── Author Studio ── */}
                     <Route path="/author" element={<AuthorPage />} />
                     <Route path="/author/book/:bookId" element={<BookPage />} />
+                    <Route path="/to-be-read" element={<ToBeRead />} />
+                    <Route path="/tbr" element={<Navigate to="/to-be-read" replace />} />
                     <Route path="/publishing" element={<Publishing />} />
                     <Route path="/proof" element={<Proof />} />
                     <Route path="/format" element={<Format />} />

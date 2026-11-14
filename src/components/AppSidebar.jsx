@@ -340,6 +340,12 @@ export default function AppSidebar({ isOpen, onClose, userNovels = [] }) {
             active={pathname.startsWith("/author")}
           />
           <NavItem
+            icon={BookMarked}
+            label="To Be Read"
+            path="/to-be-read"
+            active={pathname === "/to-be-read"}
+          />
+          <NavItem
             icon={UploadCloud}
             label="Publishing"
             path="/publishing"
